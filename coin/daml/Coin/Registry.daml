@@ -1,0 +1,141 @@
+module Coin.Registry where
+
+import Coin.Holding
+import Coin.Utils
+import Coin.Transfer
+
+import DA.Assert
+import DA.List
+import DA.Optional
+
+import Splice.Api.Token.BurnMintV1
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1
+
+template CoinRegistry
+    with 
+        issuer : Party
+        instrumentId : InstrumentId
+        meta : Metadata
+
+        -- TODO temp
+        obs : [Party]
+    where
+        signatory issuer
+        observer obs
+
+        interface instance BurnMintFactory for CoinRegistry where
+            view = BurnMintFactoryView with
+                admin = issuer
+                meta
+
+            burnMintFactory_burnMintImpl _self arg = do
+                arg.expectedAdmin === issuer
+                -- burn
+                do forA arg.inputHoldingCids (archive)
+                -- mint
+                cids <- do forA arg.outputs 
+                    (\ output -> do
+                        -- retrieve pre-approval from ChoiceContext and use it to call the Mint function
+                        preapprovalCid <- getFromContextU @(ContractId MintPreapproval) output.context mintPreapprovalContextKey
+                        exercise preapprovalCid MintPreapproval_Mint with
+                            issuer
+                            view = Splice.Api.Token.HoldingV1.HoldingView with 
+                                owner = output.owner
+                                instrumentId
+                                amount = output.amount
+                                meta = emptyMetadata
+                                lock = DA.Optional.None
+                    )
+                pure BurnMintFactory_BurnMintResult with
+                    outputCids = map toInterfaceContractId cids
+
+            burnMintFactory_publicFetchImpl self arg = do
+                arg.expectedAdmin === issuer
+                pure BurnMintFactoryView with
+                    admin = issuer
+                    meta
+        
+        interface instance TransferFactory for CoinRegistry where
+            view = TransferFactoryView with
+                admin = issuer
+                meta = meta
+
+            transferFactory_transferImpl _self arg = do
+                arg.expectedAdmin === issuer
+
+                let inputCid = head arg.transfer.inputHoldingCids
+                let coinHoldingCid = coerceContractId @_ @CoinHolding inputCid
+                
+                input <- fetch coinHoldingCid
+                input.view.owner === arg.transfer.sender
+
+                let remainder = input.view.amount - arg.transfer.amount
+                assert (remainder >= 0.0)
+
+                transferInstructionCid <- toInterfaceContractId <$> create CoinTransferInstruction with
+                    holding = CoinHolding with
+                        issuer = issuer
+                        view = Splice.Api.Token.HoldingV1.HoldingView with
+                            owner = arg.transfer.sender
+                            instrumentId = instrumentId
+                            amount = arg.transfer.amount
+                            meta = emptyMetadata
+                            lock = DA.Optional.None
+                    newOwner = arg.transfer.receiver
+                    requestedAt = arg.transfer.requestedAt
+                    executeBefore = arg.transfer.executeBefore
+
+                senderChangeCids <-if remainder > 0.0
+                    then do
+                        cid <- create CoinHolding with
+                            issuer = issuer
+                            view = HoldingView with
+                                owner = arg.transfer.sender
+                                instrumentId = instrumentId
+                                amount = remainder
+                                meta = emptyMetadata
+                                lock = DA.Optional.None
+                        pure [coerceContractId cid]
+                    else do
+                        pure []
+
+                        
+                archive inputCid
+
+                pure TransferInstructionResult with
+                    output = TransferInstructionResult_Pending with
+                        transferInstructionCid = transferInstructionCid
+                    senderChangeCids = senderChangeCids
+                    meta = emptyMetadata
+
+            
+            transferFactory_publicFetchImpl _self arg = do
+                arg.expectedAdmin === issuer
+                pure TransferFactoryView with
+                    admin = issuer
+                    meta = meta
+
+mintPreapprovalContextKey : Text
+mintPreapprovalContextKey = "mint-preapproval"
+
+template MintPreapproval
+    with 
+        receiver : Party
+        sender : Party
+    where
+        signatory receiver
+        observer sender
+
+        nonconsuming choice MintPreapproval_Mint : ContractId CoinHolding
+            with 
+                issuer : Party
+                view : Splice.Api.Token.HoldingV1.HoldingView
+            controller sender
+            do
+                create CoinHolding
+                    with
+                        issuer
+                        view
+

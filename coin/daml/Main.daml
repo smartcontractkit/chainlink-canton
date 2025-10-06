@@ -1,0 +1,106 @@
+module Main where
+
+import Daml.Script
+
+import Splice.Api.Token.HoldingV1
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.BurnMintV1
+
+import DA.Map qualified as Map
+
+import Coin.Registry
+
+setup : Script ()
+setup = do
+    issuer <- allocateParty "issuer"
+    alice <- allocateParty "alice"
+    bob <- allocateParty "bob"
+    charlie <- allocateParty "charlie"
+
+    let instrumentId = InstrumentId {
+        admin = issuer,
+        id = "LINK"
+    }
+
+    -- Create Registry
+    registry <- submit issuer do
+        -- toInterfaceContractId @BurnMintFactory <$>
+        createCmd CoinRegistry with
+            issuer = issuer
+            instrumentId = instrumentId
+            meta = emptyMetadata
+
+            obs = [alice, bob] -- TOOD remove using explicit disclosure
+
+    -- alice creates MintPreapproval
+    alicePreApproval <- submit alice do
+        createCmd MintPreapproval with
+            sender = issuer
+            receiver = alice
+
+    -- mint to alice
+    bmResult <- submit issuer do
+        exerciseCmd (toInterfaceContractId @BurnMintFactory registry) BurnMintFactory_BurnMint with
+            expectedAdmin = issuer
+            sender = issuer
+            instrumentId = instrumentId
+            inputHoldingCids = []
+            outputs = [
+                BurnMintOutput {
+                    owner = alice,
+                    amount = 42.00,
+                    context = ChoiceContext with -- add pre-approval cid to choice context
+                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId alicePreApproval)]
+                }]
+            extraActors = []
+            extraArgs = ExtraArgs with
+                context = emptyChoiceContext
+                meta = emptyMetadata
+
+    now <- getTime
+
+    -- alice transfers part of their holdings to bob
+    transferResult <- submit alice do
+        exerciseCmd (toInterfaceContractId @TransferFactory registry) TransferFactory_Transfer with
+            expectedAdmin = issuer
+            transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
+                sender = alice
+                receiver = bob
+                amount = 10.00
+                instrumentId = instrumentId
+                requestedAt = now
+                executeBefore = now
+                inputHoldingCids = bmResult.outputCids
+                meta = emptyMetadata
+            extraArgs = ExtraArgs with
+                context = emptyChoiceContext
+                meta = emptyMetadata
+
+    -- bob accepts the pending transfer, thereby gaining access to the holdings
+    TransferInstructionResult_Pending pendingTransferAtoB <- pure transferResult.output
+    transferResult <- submit bob do
+        exerciseCmd pendingTransferAtoB TransferInstruction_Accept with
+            extraArgs = ExtraArgs with
+                context = emptyChoiceContext
+                meta = emptyMetadata
+
+    -- bob tries to send more assets than they have available to charlie, should fail
+    TransferInstructionResult_Completed bobHoldings <- pure transferResult.output
+    transferResult <- submitMustFail bob do
+        exerciseCmd (toInterfaceContractId @TransferFactory registry) TransferFactory_Transfer with
+            expectedAdmin = issuer
+            transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
+                sender = bob
+                receiver = charlie
+                amount = 100.00
+                instrumentId = instrumentId
+                requestedAt = now
+                executeBefore = now
+                inputHoldingCids = bobHoldings
+                meta = emptyMetadata
+            extraArgs = ExtraArgs with
+                context = emptyChoiceContext
+                meta = emptyMetadata
+
+    pure()

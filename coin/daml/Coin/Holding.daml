@@ -1,0 +1,22 @@
+module Coin.Holding where
+
+import Splice.Api.Token.HoldingV1
+
+template CoinHolding
+    with
+        view         : Splice.Api.Token.HoldingV1.HoldingView
+        issuer       : Party
+    where
+        signatory issuer, view.owner -- Add owner
+        observer view.owner
+        ensure view.amount > 0.0
+    
+        interface instance Holding for CoinHolding where
+            view = view
+        
+        choice Transfer : ContractId CoinHolding
+            with to : Party
+            controller view.owner, issuer
+            do 
+                create this with
+                    view.owner = to
