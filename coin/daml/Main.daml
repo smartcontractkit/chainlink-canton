@@ -8,6 +8,7 @@ import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.BurnMintV1
 
 import DA.Map qualified as Map
+import DA.Optional
 
 import Coin.Registry
 
@@ -31,7 +32,8 @@ setup = do
             instrumentId = instrumentId
             meta = emptyMetadata
 
-            obs = [alice, bob] -- TOOD remove using explicit disclosure
+    -- query the contract disclosure to allow parties to interact with the registry without being observers
+    disclosedRegistry <- fromSome <$> queryDisclosure issuer registry
 
     -- alice creates MintPreapproval
     alicePreApproval <- submit alice do
@@ -61,7 +63,7 @@ setup = do
     now <- getTime
 
     -- alice transfers part of their holdings to bob
-    transferResult <- submit alice do
+    transferResult <- submitWithDisclosures alice [disclosedRegistry] do
         exerciseCmd (toInterfaceContractId @TransferFactory registry) TransferFactory_Transfer with
             expectedAdmin = issuer
             transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -87,7 +89,7 @@ setup = do
 
     -- bob tries to send more assets than they have available to charlie, should fail
     TransferInstructionResult_Completed bobHoldings <- pure transferResult.output
-    transferResult <- submitMustFail bob do
+    transferResult <- submitWithDisclosuresMustFail bob [disclosedRegistry] do
         exerciseCmd (toInterfaceContractId @TransferFactory registry) TransferFactory_Transfer with
             expectedAdmin = issuer
             transfer = Splice.Api.Token.TransferInstructionV1.Transfer with

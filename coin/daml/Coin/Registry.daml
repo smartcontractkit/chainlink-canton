@@ -18,12 +18,8 @@ template CoinRegistry
         issuer : Party
         instrumentId : InstrumentId
         meta : Metadata
-
-        -- TODO temp
-        obs : [Party]
     where
         signatory issuer
-        observer obs
 
         interface instance BurnMintFactory for CoinRegistry where
             view = BurnMintFactoryView with
