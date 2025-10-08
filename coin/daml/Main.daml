@@ -18,6 +18,7 @@ setup = do
     alice <- allocateParty "alice"
     bob <- allocateParty "bob"
     charlie <- allocateParty "charlie"
+    mindy <- allocateParty "mindy"
 
     let instrumentId = InstrumentId {
         admin = issuer,
@@ -104,5 +105,30 @@ setup = do
             extraArgs = ExtraArgs with
                 context = emptyChoiceContext
                 meta = emptyMetadata
+
+    -- issuer grants mint rights to mindy
+    role <- submit issuer do
+        createCmd MintRole with
+            issuer = issuer
+            minter = mindy
+            registry = registry
+
+    -- mindy creates MintPreapproval
+    mindyPreApproval <- submit mindy do
+        createCmd MintPreapproval with
+            sender = issuer
+            receiver = mindy
+
+    -- mindy uses the granted MintRole to mint to themselves
+    result <- submitWithDisclosures mindy [disclosedRegistry] do
+        exerciseCmd role MintRole_Mint with
+            instrumentId = instrumentId
+            outputs = [
+                BurnMintOutput {
+                    owner = mindy,
+                    amount = 77.77,
+                    context = ChoiceContext with -- add pre-approval cid to choice context
+                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId mindyPreApproval)]
+                }]
 
     pure()

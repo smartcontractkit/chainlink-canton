@@ -33,16 +33,31 @@ template CoinRegistry
                 -- mint
                 cids <- do forA arg.outputs 
                     (\ output -> do
-                        -- retrieve pre-approval from ChoiceContext and use it to call the Mint function
-                        preapprovalCid <- getFromContextU @(ContractId MintPreapproval) output.context mintPreapprovalContextKey
-                        exercise preapprovalCid MintPreapproval_Mint with
-                            issuer
-                            view = Splice.Api.Token.HoldingV1.HoldingView with 
-                                owner = output.owner
-                                instrumentId
-                                amount = output.amount
-                                meta = emptyMetadata
-                                lock = DA.Optional.None
+                        -- check the existence of a MintPreapproval in the context
+                        --   if it exists, use it to mint tokens thereby using the receiver's signatory to be able to create the CoinHolding
+                        --   if it doesn't exist, directly create the CoinHolding without the receiver's signatory - will fail
+                        optionalPreapprovalCid <- lookupFromContextU @(ContractId MintPreapproval) output.context mintPreapprovalContextKey
+                        if isSome optionalPreapprovalCid then
+                            do
+                                exercise (fromSome optionalPreapprovalCid) MintPreapproval_Mint with
+                                    issuer
+                                    view = Splice.Api.Token.HoldingV1.HoldingView with 
+                                        owner = output.owner
+                                        instrumentId
+                                        amount = output.amount
+                                        meta = emptyMetadata
+                                        lock = DA.Optional.None
+                        else
+                            do
+                                create CoinHolding
+                                    with
+                                        issuer
+                                        view = Splice.Api.Token.HoldingV1.HoldingView with 
+                                            owner = output.owner
+                                            instrumentId
+                                            amount = output.amount
+                                            meta = emptyMetadata
+                                            lock = DA.Optional.None
                     )
                 pure BurnMintFactory_BurnMintResult with
                     outputCids = map toInterfaceContractId cids
@@ -134,4 +149,31 @@ template MintPreapproval
                     with
                         issuer
                         view
+
+template MintRole
+    with
+        issuer   : Party
+        minter   : Party
+        registry : ContractId CoinRegistry
+    where
+        signatory issuer
+        observer minter
+
+        nonconsuming choice MintRole_Mint : [ContractId Holding]
+            with
+                instrumentId : InstrumentId
+                outputs      : [BurnMintOutput]
+            controller minter
+            do
+                result <- exercise (coerceContractId @_ @BurnMintFactory registry) BurnMintFactory_BurnMint with
+                    expectedAdmin = issuer
+                    sender = minter
+                    instrumentId = instrumentId
+                    inputHoldingCids = []
+                    outputs = outputs
+                    extraActors = []
+                    extraArgs = ExtraArgs with
+                        context = emptyChoiceContext
+                        meta = emptyMetadata
+                pure result.outputCids
 
