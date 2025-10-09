@@ -1,0 +1,13 @@
+// start all local instances defined in the configuration file
+nodes.local.start()
+
+// Bootstrap the domain
+bootstrap.synchronizer(
+  synchronizerName = "da1",
+  sequencers = Seq(sequencer1),
+  mediators = Seq(mediator1),
+  synchronizerOwners = Seq(sequencer1, mediator1),
+  synchronizerThreshold = PositiveInt.two,
+  staticSynchronizerParameters = StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.latest),
+)
+
