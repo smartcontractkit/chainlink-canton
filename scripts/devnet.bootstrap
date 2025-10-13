@@ -11,3 +11,5 @@ bootstrap.synchronizer(
   staticSynchronizerParameters = StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.latest),
 )
 
+participant1.synchronizers.connect_local(sequencer1, alias = "da1")
+participant2.synchronizers.connect_local(sequencer1, alias = "da1")
