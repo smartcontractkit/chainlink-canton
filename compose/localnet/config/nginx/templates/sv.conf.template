@@ -8,7 +8,7 @@ server {
 }
 
 server {
-    listen      8080;
+    listen      8080 http2;
     server_name sv.grpc-ledger-api.localhost;
     location / {
         grpc_pass grpc://canton:${CANTON_PARTICIPANT_LEDGER_API_PORT_PREFIX}00;

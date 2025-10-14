@@ -2,9 +2,9 @@
 
 ## Start
 To start:
-´´´
+```
 docker compose up -d
-´´´
+```
 
 ## Console
 To open the console:
