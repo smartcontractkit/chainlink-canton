@@ -30,3 +30,11 @@ server {
         proxy_pass http://canton:${CANTON_PARTICIPANT_GRPC_HEALTHCHECK_PORT_PREFIX}02;
     }
 }
+
+server {
+    listen 8080 http2;
+    server_name participant2.admin-api.localhost;
+    location / {
+        grpc_pass grpc://canton:${CANTON_PARTICIPANT_ADMIN_API_PORT_PREFIX}02;
+    }
+}
