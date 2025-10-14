@@ -1,0 +1,122 @@
+---
+
+volumes:
+  postgres:
+
+services:
+  postgres:
+    image: "postgres:14"
+    container_name: postgres
+    volumes:
+      - ./docker/postgres:/docker-entrypoint-initdb.d
+      #- postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_INIT_DATABASES=${POSTGRES_INIT_DATABASES}
+    healthcheck:
+      test: "pg_isready -U ${POSTGRES_USER} -d postgres"
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    user: "postgres"
+    ports:
+      - 5432:5432
+    command:
+      - postgres
+      - -c
+      - max_connections=1000
+      - -c
+      - log_statement=all
+
+  canton:
+    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:0.4.20"
+    container_name: canton
+    volumes:
+      - ./docker/canton/health-check.sh:/app/health-check.sh
+      - ./config/canton/app.conf:/app/app.conf
+    env_file:
+      - ./env/common.env
+    environment:
+      - DB_SERVER=postgres
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD", "bash", "/app/health-check.sh"]
+      interval: 20s
+      start_interval: 5s
+      timeout: 30s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    ports:
+    - 1101:1101
+    - 1201:1201
+    - 1301:1301
+  
+  splice:
+    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-app:0.4.20"
+    container_name: splice
+    env_file:
+      - ./env/common.env
+    volumes:
+      - ./docker/splice/health-check.sh:/app/health-check.sh
+      - ./config/splice/app.conf:/app/app.conf
+    environment:
+      - DB_SERVER=postgres
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE=https://canton.network.global
+      - SPLICE_APP_VALIDATOR_AUTH_AUDIENCE=https://canton.network.global
+    healthcheck:
+      test: ["CMD", "bash", "/app/health-check.sh"]
+      interval: 20s
+      start_interval: 5s
+      timeout: 40s
+      retries: 1000
+      start_period: 30s
+    depends_on:
+      canton:
+        condition: service_healthy
+    restart: always
+
+  nginx:
+    image: "nginx:1.27.0"
+    container_name: nginx
+    env_file:
+      - ./env/common.env
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./config/nginx/templates:/etc/nginx/templates
+      - ./config/nginx/includes:/etc/nginx/includes
+    ports:
+      - 8080:8080
+    depends_on:
+      splice:
+        condition: service_healthy
+    restart: always
+
+  console:
+    build:
+      context: ./docker/console
+      args:
+        BASE_NAME: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:0.4.20
+    env_file:
+      - ./env/common.env
+    environment:
+      - DB_SERVER=postgres
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./docker/console/entrypoint.sh:/app/entrypoint.sh
+      - ./config/console/app.conf:/app/app.conf
+    entrypoint: /app/entrypoint.sh
+    stdin_open: true
+    tty: true
+    profiles:
+      - console

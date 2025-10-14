@@ -1,0 +1,32 @@
+server {
+    listen      8080;
+    server_name participant5.json-ledger-api.localhost;
+    location / {
+        proxy_pass http://canton:${CANTON_PARTICIPANT_JSON_API_PORT_PREFIX}05;
+        include    /etc/nginx/includes/cors-headers.conf;
+    }
+}
+
+server {
+    listen      8080;
+    server_name participant5.grpc-ledger-api.localhost;
+    location / {
+        grpc_pass grpc://canton:${CANTON_PARTICIPANT_LEDGER_API_PORT_PREFIX}05;
+    }
+}
+
+server {
+    listen 8080;
+    server_name participant5.http-health-check.localhost;
+    location / {
+        proxy_pass http://canton:${CANTON_PARTICIPANT_HTTP_HEALTHCHECK_PORT_PREFIX}05;
+    }
+}
+
+server {
+    listen 8080;
+    server_name participant5.grpc-health-check.localhost;
+    location / {
+        proxy_pass http://canton:${CANTON_PARTICIPANT_GRPC_HEALTHCHECK_PORT_PREFIX}05;
+    }
+}
