@@ -113,22 +113,22 @@ setup = do
             minter = mindy
             registry = registry
 
-    -- mindy creates MintPreapproval
-    mindyPreApproval <- submit mindy do
+    -- charlie creates MintPreapproval
+    charliePreApproval <- submit charlie do
         createCmd MintPreapproval with
             sender = issuer
-            receiver = mindy
+            receiver = charlie
 
-    -- mindy uses the granted MintRole to mint to themselves
+    -- mindy uses the granted MintRole to mint to charlie
     result <- submitWithDisclosures mindy [disclosedRegistry] do
         exerciseCmd role MintRole_Mint with
             instrumentId = instrumentId
             outputs = [
                 BurnMintOutput {
-                    owner = mindy,
+                    owner = charlie,
                     amount = 77.77,
                     context = ChoiceContext with -- add pre-approval cid to choice context
-                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId mindyPreApproval)]
+                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId charliePreApproval)]
                 }]
 
     pure()

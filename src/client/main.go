@@ -200,7 +200,6 @@ func main() {
 			},
 			ActAs: []string{partyId},
 		},
-		TransactionFormat: nil,
 	})
 	if err != nil {
 		panic(err)
