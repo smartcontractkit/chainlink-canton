@@ -73,15 +73,18 @@ func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
 	}, nil
 }
 
-func UploadDARtoMultipleParticipants(ctx context.Context, dar []byte, participants ...*Participant) ([]string, error) {
+func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, participants ...*Participant) ([]string, error) {
+	var darData []*participantv30.UploadDarRequest_UploadDarData
+	for _, dar := range dars {
+		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{
+			Bytes: dar,
+		})
+	}
+
 	var packageIDs []string
 	for i, participant := range participants {
 		res, err := participant.PackageServiceClient.UploadDar(ctx, &participantv30.UploadDarRequest{
-			Dars: []*participantv30.UploadDarRequest_UploadDarData{
-				{
-					Bytes: dar,
-				},
-			},
+			Dars:               darData,
 			VetAllPackages:     true,
 			SynchronizeVetting: true,
 		})
@@ -247,12 +250,14 @@ func TestCoin(t *testing.T) {
 	participant5, err := NewParticipant("participant5.admin-api.localhost:8080", "participant5.grpc-ledger-api.localhost:8080")
 	require.NoError(t, err)
 
-	// Upload the DAR to all participants
-	dar, err := os.ReadFile("../../coin/.daml/dist/coin-0.0.1.dar")
+	// Upload the DARs to all participants
+	coinDar, err := os.ReadFile("../../contracts/coin/.daml/dist/coin-0.0.1.dar")
 	require.NoError(t, err)
-	packageIDs, err := UploadDARtoMultipleParticipants(ctx, dar, participant1, participant2, participant3, participant4, participant5)
+	spliceDar, err := os.ReadFile("../../contracts/splice/.daml/dist/splice-1.0.0.dar")
 	require.NoError(t, err)
-	fmt.Printf("Uploaded coin DAR to all participants: %v\n", packageIDs)
+	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{coinDar, spliceDar}, participant1, participant2, participant3, participant4, participant5)
+	require.NoError(t, err)
+	fmt.Printf("Uploaded coin DARs to all participants: %v\n", packageIDs)
 
 	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant1, participant2, participant3, participant4, participant5)
 	require.NoError(t, err)
@@ -372,7 +377,7 @@ func TestCoin(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#coin",
+								PackageId:  "#splice",
 								ModuleName: "Splice.Api.Token.BurnMintV1",
 								EntityName: "BurnMintFactory",
 							},
@@ -464,7 +469,7 @@ func TestCoin(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#coin",
+								PackageId:  "#splice",
 								ModuleName: "Splice.Api.Token.TransferInstructionV1",
 								EntityName: "TransferFactory",
 							},
@@ -554,7 +559,7 @@ func TestCoin(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#coin",
+								PackageId:  "#splice",
 								ModuleName: "Splice.Api.Token.TransferInstructionV1",
 								EntityName: "TransferInstruction",
 							},

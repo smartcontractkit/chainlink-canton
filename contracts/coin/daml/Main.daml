@@ -12,8 +12,7 @@ import DA.Optional
 
 import Coin.Registry
 
-setup : Script ()
-setup = do
+setup = script do
     issuer <- allocateParty "issuer"
     alice <- allocateParty "alice"
     bob <- allocateParty "bob"
@@ -118,9 +117,10 @@ setup = do
         createCmd MintPreapproval with
             sender = issuer
             receiver = charlie
+    disclosedCharliePreapproval <- fromSome <$> queryDisclosure issuer charliePreApproval
 
     -- mindy uses the granted MintRole to mint to charlie
-    result <- submitWithDisclosures mindy [disclosedRegistry] do
+    result <- submitWithDisclosures mindy [disclosedRegistry, disclosedCharliePreapproval] do
         exerciseCmd role MintRole_Mint with
             instrumentId = instrumentId
             outputs = [
