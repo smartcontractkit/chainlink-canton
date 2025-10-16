@@ -1,0 +1,49 @@
+module CCIP.TokenPool where
+
+template TokenPool
+    with
+        owner : Party
+        symbol : Text
+        ccipOwner : Party
+    where
+        signatory owner
+        observer ccipOwner
+    
+        nonconsuming choice TokenPool_ReleaseOrMint : ContractId TokenHolding
+            with
+                amount : Decimal
+            controller owner
+            do
+                create TokenHolding with
+                    owner = owner -- this should be the actual receiver instead
+                    symbol = symbol
+                    amount = amount
+
+
+template TokenHolding
+    with
+        owner : Party
+        symbol : Text
+        amount : Decimal
+    
+    where
+        signatory owner
+
+
+template TokenPoolBridgeBurnMintRole
+    with
+        owner : Party
+        ccipOwner : Party
+        tokenPool : ContractId TokenPool
+    
+    where
+        signatory owner
+        observer ccipOwner
+
+        nonconsuming choice TokenPoolBridgeBurnMintRole_Mint : ContractId TokenHolding
+            with
+                amount : Decimal
+            controller ccipOwner
+            do
+                exercise tokenPool TokenPool_ReleaseOrMint with
+                    amount = amount

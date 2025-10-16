@@ -1,0 +1,8 @@
+sdk-version: 2.10.2
+name: ccip
+version: 1.0.0
+source: daml/Main.daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
