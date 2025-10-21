@@ -16,8 +16,8 @@ import Splice.Api.Token.TransferInstructionV1
 template CoinRegistry
     with 
         issuer : Party
-        instrumentId : InstrumentId
-        meta : Metadata
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        meta : Splice.Api.Token.MetadataV1.Metadata
     where
         signatory issuer
 
@@ -45,7 +45,7 @@ template CoinRegistry
                                         owner = output.owner
                                         instrumentId
                                         amount = output.amount
-                                        meta = emptyMetadata
+                                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                         lock = DA.Optional.None
                         else
                             do
@@ -56,7 +56,7 @@ template CoinRegistry
                                             owner = output.owner
                                             instrumentId
                                             amount = output.amount
-                                            meta = emptyMetadata
+                                            meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                             lock = DA.Optional.None
                     )
                 pure BurnMintFactory_BurnMintResult with
@@ -92,7 +92,7 @@ template CoinRegistry
                             owner = arg.transfer.sender
                             instrumentId = instrumentId
                             amount = arg.transfer.amount
-                            meta = emptyMetadata
+                            meta = Splice.Api.Token.MetadataV1.emptyMetadata
                             lock = DA.Optional.None
                     newOwner = arg.transfer.receiver
                     requestedAt = arg.transfer.requestedAt
@@ -106,7 +106,7 @@ template CoinRegistry
                                 owner = arg.transfer.sender
                                 instrumentId = instrumentId
                                 amount = remainder
-                                meta = emptyMetadata
+                                meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                 lock = DA.Optional.None
                         pure [coerceContractId cid]
                     else do
@@ -119,7 +119,7 @@ template CoinRegistry
                     output = TransferInstructionResult_Pending with
                         transferInstructionCid = transferInstructionCid
                     senderChangeCids = senderChangeCids
-                    meta = emptyMetadata
+                    meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
             
             transferFactory_publicFetchImpl _self arg = do
@@ -161,8 +161,8 @@ template MintRole
 
         nonconsuming choice MintRole_Mint : [ContractId Holding]
             with
-                instrumentId : InstrumentId
-                outputs      : [BurnMintOutput]
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                outputs      : [Splice.Api.Token.BurnMintV1.BurnMintOutput]
             controller minter
             do
                 result <- exercise (coerceContractId @_ @BurnMintFactory registry) BurnMintFactory_BurnMint with
@@ -173,7 +173,7 @@ template MintRole
                     outputs = outputs
                     extraActors = []
                     extraArgs = ExtraArgs with
-                        context = emptyChoiceContext
-                        meta = emptyMetadata
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
                 pure result.outputCids
 

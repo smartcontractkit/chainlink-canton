@@ -1,0 +1,25 @@
+{{- /* gotype: github.com/smartcontractkit/chainlink-canton-internal/codegen/render/tmpl.ModuleData */ -}}
+// Code generated - DO NOT EDIT.
+// This file is a generated binding and any manual changes will be lost.
+
+package {{.ModuleName}}
+
+import (
+  {{- range .Imports}}
+  {{.}}
+  {{- end}}
+)
+
+{{- range .TypeDefinitions}}
+{{.}}
+{{- end}}
+
+{{- range .Templates}}
+
+    type {{.Name}} struct {
+      {{- range .ConstructorArgs}}
+        {{.Name}} {{.Type}}
+      {{- end}}
+    }
+
+{{- end}}

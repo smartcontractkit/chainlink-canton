@@ -1,0 +1,1 @@
+go run . -o ../bindings -prefix github.com/smartcontractkit/chainlink-canton-internal/bindings -dar ../contracts/coin/.daml/dist/coin-0.0.1.dar
