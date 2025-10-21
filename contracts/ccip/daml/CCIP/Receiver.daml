@@ -1,0 +1,28 @@
+module CCIP.Receiver where
+
+interface CCIPReceiver where
+    viewtype CCIPReceiverView
+    
+    ccipReceiver_receiveImpl : ContractId CCIPReceiver -> CCIPReceiver_Receive -> Update CCIPReceiver_ReceiveResult
+
+    nonconsuming choice CCIPReceiver_Receive : CCIPReceiver_ReceiveResult
+        with
+            input : CCIPReceiver_ReceiveInput
+        controller input.ccip
+        do ccipReceiver_receiveImpl this self arg
+
+data CCIPReceiver_ReceiveInput = CCIPReceiver_ReceiveInput
+    with
+        ccip : Party
+        messageId : Text
+    deriving (Show, Eq)
+
+data CCIPReceiver_ReceiveResult = CCIPReceiver_ReceiveResult
+    with
+        success : Bool
+    deriving (Show, Eq)
+
+data CCIPReceiverView = CCIPReceiverView
+    with
+        ccip : Party
+    deriving (Show, Eq)
