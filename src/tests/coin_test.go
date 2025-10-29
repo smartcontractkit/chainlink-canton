@@ -1,4 +1,4 @@
-package coin
+package tests
 
 import (
 	"context"

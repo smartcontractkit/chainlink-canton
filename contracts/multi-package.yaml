@@ -1,3 +1,5 @@
 packages:
   - coin
   - splice
+  - ccip
+  - ccipreceiver

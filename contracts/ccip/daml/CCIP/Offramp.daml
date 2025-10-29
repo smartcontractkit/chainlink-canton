@@ -1,0 +1,23 @@
+module CCIP.Offramp where
+
+import CCIP.TokenPool
+
+template Offramp
+    with
+        owner : Party
+        nops : Party
+
+    where
+        signatory owner
+        observer nops
+
+        nonconsuming choice Offramp_Transmit : ContractId TokenHolding
+            with
+                mintAmount : Decimal
+                tokenPoolBridgeBurnMintRole : ContractId TokenPoolBridgeBurnMintRole
+            controller nops
+            do
+                -- Perform signature verification here
+                
+                exercise tokenPoolBridgeBurnMintRole TokenPoolBridgeBurnMintRole_Mint with
+                    amount = mintAmount

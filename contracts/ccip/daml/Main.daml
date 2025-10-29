@@ -1,0 +1,40 @@
+module Main where
+
+import CCIP.Offramp
+import CCIP.TokenPool
+
+import Daml.Script
+
+import DA.Optional
+
+setup = script do
+    ccipOwner <- allocateParty "ccipOwner"
+    tokenPoolOwner <- allocateParty "tokenPoolOwner"
+    nops <- allocateParty "nops"
+
+    offramp <- submit ccipOwner do
+        createCmd Offramp with
+            owner = ccipOwner
+            nops = nops
+
+    tokenPool <- submit tokenPoolOwner do
+        createCmd TokenPool with
+            owner = tokenPoolOwner
+            ccipOwner = ccipOwner
+            symbol = "LINK"
+    tokenPoolDisclosure <- fromSome <$> queryDisclosure ccipOwner tokenPool
+
+    tokenPoolBridgeBurnMintRole <- submit tokenPoolOwner do
+        createCmd TokenPoolBridgeBurnMintRole with
+            owner = tokenPoolOwner
+            ccipOwner = ccipOwner
+            tokenPool = tokenPool
+    tokenPoolBridgeBurnMintRoleDisclosure <- fromSome <$> queryDisclosure ccipOwner tokenPoolBridgeBurnMintRole
+    
+    -- nops will call Mint on the TokenPool via CCIP -> TokenPoolBridgeBurnMintRole -> TokenPool
+    result <- submitWithDisclosures nops [tokenPoolDisclosure, tokenPoolBridgeBurnMintRoleDisclosure] do
+        exerciseCmd offramp Offramp_Transmit with
+            mintAmount = 12.34
+            tokenPoolBridgeBurnMintRole = tokenPoolBridgeBurnMintRole
+
+    pure()

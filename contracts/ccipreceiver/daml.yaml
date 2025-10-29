@@ -1,0 +1,10 @@
+sdk-version: 3.4.0-snapshot.20251013.1566.e75a9cf
+name: ccipreceiver
+version: 1.0.0
+source: daml/Main.daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+  - ../ccip/.daml/dist/ccip-1.0.0.dar
+  - ../splice/.daml/dist/splice-1.0.0.dar
