@@ -1,0 +1,52 @@
+module Main where
+
+import DA.Map qualified as Map
+import Daml.Script
+
+import MCMS.MCMSReceiver
+
+import DummyReceiver.Receiver
+
+setup = script do
+    deployer <- allocateParty "deployer"
+    mcmsowner <- allocateParty "owner"
+
+    receiver <- submit deployer do
+        createCmd MCMSDummyReceiver with
+            owner = deployer
+            pendingOwner = []
+
+    result <- submit deployer do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver receiver) MCMSReceiver_Entrypoint with
+            function = "ChoiceA"
+            c = deployer
+            input = MCMSReceiver_EntrypointInput with
+                values = Map.fromList [("input", AV_Text $ "Hello, world!")]
+
+    result <- submit deployer do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver receiver) MCMSReceiver_Entrypoint with
+            function = "ChoiceB"
+            c = deployer
+            input = MCMSReceiver_EntrypointInput with
+                values = Map.fromList [("input", AV_Int $ 42)]
+
+    receiver <- submit deployer do
+        exerciseCmd receiver MCMSDummyReceiver_TransferOwnership with
+            to = mcmsowner
+
+    result <- submit mcmsowner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver receiver) MCMSReceiver_Entrypoint with
+            function = "AcceptOwnership"
+            c = mcmsowner
+            input = MCMSReceiver_EntrypointInput with
+                values = Map.fromList []
+
+    -- need to get the contractId here somehow
+    result <- submitMustFail mcmsowner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver receiver) MCMSReceiver_Entrypoint with
+            function = "ChoiceA"
+            c = mcmsowner
+            input = MCMSReceiver_EntrypointInput with
+                values = Map.fromList [("input", AV_Text $ "Hello from your new owner!")]
+
+    pure()

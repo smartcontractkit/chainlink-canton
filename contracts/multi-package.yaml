@@ -3,3 +3,5 @@ packages:
   - splice
   - ccip
   - ccipreceiver
+  - mcms/mcms
+  - mcms/dummyreceiver
