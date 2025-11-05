@@ -1,7 +1,7 @@
 packages:
-  - coin
   - splice
-  - ccip
-  - ccipreceiver
-  - mcms/mcms
-  - mcms/dummyreceiver
+  - coin
+  - ccip/common
+  - ccip/feequoter
+  - ccip/onramp
+  - ccip/test

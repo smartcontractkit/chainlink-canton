@@ -32,7 +32,7 @@ services:
       - log_statement=all
 
   canton:
-    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:0.4.20"
+    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}"
     container_name: canton
     volumes:
       - ./docker/canton/health-check.sh:/app/health-check.sh
@@ -60,7 +60,7 @@ services:
     - 1301:1301
   
   splice:
-    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-app:0.4.20"
+    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-app:${SPLICE_VERSION}"
     container_name: splice
     env_file:
       - ./env/common.env
@@ -105,7 +105,7 @@ services:
     build:
       context: ./docker/console
       args:
-        BASE_NAME: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:0.4.20
+        BASE_NAME: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}
     env_file:
       - ./env/common.env
     environment:

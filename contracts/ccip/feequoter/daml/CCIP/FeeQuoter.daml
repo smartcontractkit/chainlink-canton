@@ -1,0 +1,206 @@
+module CCIP.FeeQuoter where
+
+import DA.Crypto.Text (BytesHex)
+import DA.Foldable qualified as Foldable
+import DA.Map qualified as Map
+import DA.Optional
+import DA.Text qualified as Text
+
+import Splice.Api.Token.HoldingV1
+
+import CCIP.Common qualified as Common
+import qualified CCIP.Client
+
+template FeeQuoter
+    with
+        owner : Party
+
+        -- | Set of fee tokens that can be used to pay for fees. The values of the map are the fee multipliers which
+        -- | can be used to set a premium or discount for a specific fee token.
+        feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId Decimal
+        destChainConfigs : Map.Map (Numeric 0) DestChainConfig
+
+        usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
+        usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
+        -- | List of parties that are authorized to update prices, they'll be observers on the contract.
+        priceUpdaters : [Party]
+    where
+        signatory owner
+        observer priceUpdaters
+
+        -- ================================================================
+        -- │                          Prices                              │
+        -- ================================================================
+
+        -- | Get the `tokenPrice` for a given token.
+        nonconsuming choice GetTokenPrice : TimestampedPrice
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                return (fromSomeNote ("No price found for " <> instrumentId.id) (Map.lookup instrumentId usdPerToken))
+
+        -- | Get the gas price for a given destination chain.
+        nonconsuming choice GetDestinationChainGasPrice : TimestampedPrice
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do 
+                return (fromSomeNote ("No gas price found for " <> show destChainSelector) (Map.lookup destChainSelector usdPerUnitGasByDestChainSelector))
+
+        choice UpdatePrices : ContractId FeeQuoter
+            with
+                priceUpdates : PriceUpdates
+                caller : Party
+            controller caller
+            do
+                -- The caller must be an authorized price updater.
+                assertMsg ("Caller is not an authorized price updater: " <> show caller) (caller `elem` priceUpdaters)  
+
+                now <- getTime
+                let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
+                let newUsdPerUnitGasByDestChainSelector = foldl (\acc gpu -> Map.insert gpu.destChainSelector (TimestampedPrice gpu.usdPerUnitGas now) acc) usdPerUnitGasByDestChainSelector priceUpdates.gasPriceUpdates
+                create this with usdPerToken = newUsdPerToken, usdPerUnitGasByDestChainSelector = newUsdPerUnitGasByDestChainSelector
+
+        -- ================================================================
+        -- │                         Fee Quoting                          │
+        -- ================================================================
+
+        nonconsuming choice GetValidatedFee : Decimal
+            with
+                destChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+                caller : Party
+            controller caller
+            do 
+                destChainConfig <- exercise self GetDestChainConfig with destChainSelector = destChainSelector, caller = caller
+
+                -- Validate message size
+                let messageSize = Text.length message.payload + Text.length message.extraArgs
+                assertMsg ("Message size exceeds maxDataBytes for destChainSelector " <> show destChainSelector <> ": " <> show messageSize <> " > " <> show destChainConfig.maxDataBytes) (messageSize <= destChainConfig.maxDataBytes)
+
+                -- Calculate fee components
+                let networkFee = destChainConfig.networkFeeUSD
+                feeTokenPrice <- exercise self GetTokenPrice with instrumentId = message.feeToken, caller = caller
+                let fee = networkFee / feeTokenPrice.price
+
+                return fee
+                
+
+        -- ================================================================
+        -- │                         Fee Tokens                           │
+        -- ================================================================
+
+        -- | Get the list of supported fee tokens.
+        nonconsuming choice GetFeeTokens : [Splice.Api.Token.HoldingV1.InstrumentId]
+            with
+                caller : Party
+            controller caller
+            do
+                return (Map.keys feeTokens)
+
+        -- | Get the premium multiplier for a given fee token.
+        nonconsuming choice GetPremiumMultiplierWeiPerEth : Decimal
+            with
+                token : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                return (fromSomeNote ("Fee token not configured: " <> token.id) (Map.lookup token feeTokens))
+
+        choice ApplyFeeTokenUpdates : ContractId FeeQuoter
+            with
+                feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId]
+                feeTokensToAdd : [FeeTokenArgs]
+                caller : Party
+            controller caller
+            do
+                let newFeeTokens = foldl (\acc ft -> Map.insert ft.instrumentId ft.premiumMultiplier acc) (foldl (\acc tk -> Map.delete tk acc) feeTokens feeTokensToRemove) feeTokensToAdd
+                create this with feeTokens = newFeeTokens
+
+        -- ================================================================
+        -- │                           Configs                            │
+        -- ================================================================
+
+        nonconsuming choice GetDestChainConfig : DestChainConfig
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do
+                return (fromSomeNote ("No dest chain config found for " <> show destChainSelector) (Map.lookup destChainSelector destChainConfigs))
+
+        choice ApplyDestChainConfigUpdates : ContractId FeeQuoter
+            with
+                destChainConfigArgs : [DestChainConfigArgs]
+            controller owner
+            do
+                -- destChainSelector must be non-zero
+                -- defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
+                -- chainFamilySelector must be known
+                Foldable.mapA_ (\dcca -> do
+                        assertMsg ("destChainSelector must be non-zero: " <> show dcca.destChainSelector) (dcca.destChainSelector /= 0.0)
+                        assertMsg ("defaultTxGasLimit must be set (> 0) for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit > 0)
+                        assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
+                        assertMsg ("unknown chainFamilySelector for destChainSelector: " <> show dcca.destChainSelector) (Common.isKnownChainFamilySelector dcca.destChainConfig.chainFamilySelector)
+                    ) destChainConfigArgs
+                
+                let newDestChainConfigs = foldl (\acc dcca -> Map.insert dcca.destChainSelector dcca.destChainConfig acc) destChainConfigs destChainConfigArgs
+                create this with destChainConfigs = newDestChainConfigs
+        
+        
+
+data DestChainConfigArgs = DestChainConfigArgs
+    with
+        destChainSelector : Numeric 0
+        destChainConfig : DestChainConfig
+    deriving (Eq, Show)
+
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool -- ────────────────────╮ Whether this destination chain is enabled.
+        maxDataBytes : Int --                   │ Maximum data payload size in bytes.
+        maxPerMsgGasLimit : Int --              │ Maximum gas limit.
+        destGasOverhead : Int --                │ Gas charged on top of the gasLimit to cover destionation chain costs.
+        destGasPerPayloadByteBase : Int --      │ Default dest-chain gas charged for each byte of `data` payload.
+        chainFamilySelector : BytesHex --       │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+        defaultTxGasLimit : Int --              │ Default gas limit for a tx.
+        networkFeeUSD : Decimal --              │ Flat network fee to charge for messages.
+        -- | The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
+        defaultTokenFeeUSD : Decimal --         │ Default token fee charged per token transfer.
+        defaultTokenDestGasOverhead : Int --  ──╯ Default gas charged to execute a token transfer on the destination chain.
+    deriving (Eq, Show)
+
+data TimestampedPrice = TimestampedPrice
+    with
+        price : Decimal
+        timestamp : Time
+    deriving (Eq, Show)
+
+
+data PriceUpdates = PriceUpdates
+    with
+        tokenPriceUpdates : [TokenPriceUpdate]
+        gasPriceUpdates : [GasPriceUpdate]
+    deriving (Eq, Show)
+
+data TokenPriceUpdate = TokenPriceUpdate
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
+        usdPerToken : Decimal 
+    deriving (Eq, Show)
+
+data GasPriceUpdate = GasPriceUpdate
+    with
+        destChainSelector : Numeric 0
+        usdPerUnitGas : Decimal
+    deriving (Eq, Show)
+
+
+data FeeTokenArgs = FeeTokenArgs
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        premiumMultiplier : Decimal
+    deriving (Eq, Show)

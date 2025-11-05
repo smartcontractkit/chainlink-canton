@@ -1,0 +1,189 @@
+module CCIP.OnRamp where
+
+import DA.Foldable qualified as Foldable
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.Token.TransferInstructionV1
+
+import CCIP.Client (Canton2AnyMessage)
+import CCIP.FeeQuoter qualified as FeeQuoter
+
+template OnRamp
+    with
+        owner : Party
+
+        staticConfig : StaticConfig
+
+        destChainConfigs : Map.Map (Numeric 0) DestChainConfig
+    where
+        signatory owner
+
+        -- ================================================================
+        -- │                          Messaging                           │
+        -- ================================================================
+
+        nonconsuming choice GetExpectedNextSequenceNumber : Numeric 0
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do
+                case Map.lookup destChainSelector destChainConfigs of
+                    None -> abort "Unknown destChainSelector"
+                    Some config -> return (config.sequenceNumber + 1.0)
+
+        choice CCIPSend : CCIPSendResult
+            with 
+                destChainSelector : Numeric 0
+                message : Canton2AnyMessage
+                feeInput : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+                caller : Party
+                feeQuoter : ContractId FeeQuoter.FeeQuoter
+            controller caller
+            do
+                case Map.lookup destChainSelector destChainConfigs of
+                    None -> abort "Unknown destChainSelector"
+                    Some config -> do
+                        -- User FeeQuoter to calculate fees
+                        fee <- exercise feeQuoter FeeQuoter.GetValidatedFee
+                            with
+                                destChainSelector = destChainSelector
+                                message = message
+                                caller = caller
+
+                        -- Verify feeInput covers fee and the receiver is the owner
+                        feeInputContract <- fetch feeInput
+                        let amount = (view feeInputContract).transfer.amount
+                        let receiver = (view feeInputContract).transfer.receiver
+                        assertMsg ("Fee input amount " <> show amount <> " is less than required fee " <> show fee) (amount >= fee)
+                        assertMsg ("Fee input receiver is not the owner") (receiver == owner)
+
+                        -- accept the incoming TransferInstruction as payment
+                        acceptResult <- exercise feeInput Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
+                            with
+                                extraArgs = ExtraArgs with
+                                    context = emptyChoiceContext
+                                    meta = emptyMetadata
+                        -- check that the acceptance was completed
+                        case acceptResult.output of
+                            TransferInstructionResult_Completed _ -> return ()
+                            TransferInstructionResult_Failed -> abort "Transfer instruction failed"
+                            TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
+
+                        let newSequenceNumber = config.sequenceNumber + 1.0
+                        let updatedDestChainConfig = config with sequenceNumber = newSequenceNumber
+                        let newDestChainConfigs = Map.insert destChainSelector updatedDestChainConfig destChainConfigs
+
+                        onRampCid <- create this with destChainConfigs = newDestChainConfigs
+
+                        ccipMessageSentCid <- create CCIPMessageSent
+                            with
+                                ccip_owner = owner
+                                sender = caller
+                                event = CCIPMessageSentEvent
+                                    with
+                                        destChainSelector = destChainSelector
+                                        sequenceNumber = newSequenceNumber
+                                        messageId = "TODO: generate messageId"
+                                        encodedMessage = "TODO: encode message"
+                                        receipts = []
+                                        verifierBlobs = []
+
+                        return CCIPSendResult
+                            with
+                                onRamp = onRampCid
+                                ccipMessageSent = ccipMessageSentCid
+                
+
+        -- ================================================================
+        -- │                           Config                             │
+        -- ================================================================
+
+        nonconsuming choice GetStaticConfig : StaticConfig
+            with
+                caller : Party
+            controller caller
+            do
+                return staticConfig
+
+        choice ApplyDestChainConfigUpdates : ContractId OnRamp
+            with
+                destChainConfigArgs : [DestChainConfigArgs]
+            controller owner
+            do
+                Foldable.mapA_ (\dcaa -> do
+                    assertMsg ("destChainSelector must be non-zero: " <> show dcaa.destChainSelector)(dcaa.destChainSelector /= 0.0)
+                    assertMsg ("destChainSelector must not equal local chainSelector: " <> show dcaa.destChainSelector)(dcaa.destChainSelector /= staticConfig.chainSelector)
+                    ) destChainConfigArgs
+
+                let newDestChainConfigs = foldl (\acc dcaa -> Map.insert dcaa.destChainSelector dcaa.destChainConfig acc) destChainConfigs destChainConfigArgs
+                create this with destChainConfigs = newDestChainConfigs
+        
+        nonconsuming choice GetDestChainConfig : DestChainConfig
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do
+                case Map.lookup destChainSelector destChainConfigs of
+                    None -> abort "Unknown destChainSelector"
+                    Some config -> return config
+
+data CCIPSendResult = CCIPSendResult
+    with
+        onRamp : ContractId OnRamp
+        ccipMessageSent : ContractId CCIPMessageSent
+    deriving (Eq, Show)
+
+-- Events
+
+template CCIPMessageSent
+    with
+        ccip_owner : Party
+        sender : Party
+
+        event : CCIPMessageSentEvent
+    where
+        signatory ccip_owner
+        observer sender
+
+data CCIPMessageSentEvent = CCIPMessageSentEvent
+    with
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        encodedMessage : BytesHex
+        receipts : [Receipt]
+        verifierBlobs : [BytesHex]
+    deriving (Eq, Show)
+
+data Receipt = Receipt
+    with
+        destGasLimit : Numeric 0
+        destBytesOverhead : Numeric 0
+        feeTokenAmount : Decimal
+        extraArgs : BytesHex
+    deriving (Eq, Show)
+
+-- Configs
+
+data StaticConfig = StaticConfig
+    with
+        chainSelector : Numeric 0
+    deriving (Eq, Show)     
+
+data DestChainConfigArgs = DestChainConfigArgs
+    with
+        destChainSelector : Numeric 0
+        destChainConfig : DestChainConfig
+    deriving (Eq, Show)
+
+data DestChainConfig = DestChainConfig
+    with
+        sequenceNumber : Numeric 0
+        defaultExecutor : Text
+        laneMandatedCCVs : [Text]
+        defaultCCVs : [Text]
+    deriving (Eq, Show)

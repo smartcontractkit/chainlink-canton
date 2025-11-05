@@ -6,6 +6,9 @@ name: coin
 source: daml
 init-script: Main:setup
 version: 0.0.1
+build-options:
+  - "-Wno-crypto-text-is-alpha"
+  - "-Wno-template-interface-depends-on-daml-script"
 dependencies:
   - daml-prim
   - daml-stdlib
