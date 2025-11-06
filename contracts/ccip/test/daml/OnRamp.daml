@@ -3,6 +3,7 @@ module OnRamp where
 import Daml.Script
 
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 import DA.Optional
 
 import qualified CCIP.Client
@@ -44,7 +45,6 @@ setup = script do
     bmResult <- submit issuer do
         exerciseCmd (toInterfaceContractId @BurnMintFactory registry) BurnMintFactory_BurnMint with
             expectedAdmin = issuer
-            sender = issuer
             instrumentId = instrumentIdLINK
             inputHoldingCids = []
             outputs = [
@@ -52,7 +52,7 @@ setup = script do
                     owner = user,
                     amount = 1000.00,
                     context = ChoiceContext with -- add pre-approval cid to choice context
-                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId userPreApproval)]
+                        values = TextMap.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId userPreApproval)]
                 }]
             extraActors = []
             extraArgs = ExtraArgs with

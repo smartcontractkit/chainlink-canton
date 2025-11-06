@@ -1,5 +1,4 @@
 packages:
-  - splice
   - coin
   - ccip/common
   - ccip/feequoter

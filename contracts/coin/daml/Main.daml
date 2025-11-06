@@ -7,7 +7,7 @@ import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1
 import Splice.Api.Token.BurnMintV1
 
-import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 import DA.Optional
 
 import Coin.Registry
@@ -45,7 +45,6 @@ setup = script do
     bmResult <- submit issuer do
         exerciseCmd (toInterfaceContractId @BurnMintFactory registry) BurnMintFactory_BurnMint with
             expectedAdmin = issuer
-            sender = issuer
             instrumentId = instrumentId
             inputHoldingCids = []
             outputs = [
@@ -53,7 +52,7 @@ setup = script do
                     owner = alice,
                     amount = 42.00,
                     context = ChoiceContext with -- add pre-approval cid to choice context
-                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId alicePreApproval)]
+                        values = TextMap.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId alicePreApproval)]
                 }]
             extraActors = []
             extraArgs = ExtraArgs with
@@ -128,7 +127,7 @@ setup = script do
                     owner = charlie,
                     amount = 77.77,
                     context = ChoiceContext with -- add pre-approval cid to choice context
-                        values = Map.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId charliePreApproval)]
+                        values = TextMap.fromList [(mintPreapprovalContextKey, AV_ContractId $ coerceContractId charliePreApproval)]
                 }]
 
     pure()
