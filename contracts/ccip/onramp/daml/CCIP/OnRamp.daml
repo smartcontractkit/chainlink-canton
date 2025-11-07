@@ -38,7 +38,7 @@ template OnRamp
             with 
                 destChainSelector : Numeric 0
                 message : Canton2AnyMessage
-                feeInput : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+                feeInput : FeeInput
                 caller : Party
                 feeQuoter : ContractId FeeQuoter.FeeQuoter
             controller caller
@@ -54,18 +54,16 @@ template OnRamp
                                 caller = caller
 
                         -- Verify feeInput covers fee and the receiver is the owner
-                        feeInputContract <- fetch feeInput
+                        feeInputContract <- fetch feeInput.transfer
                         let amount = (view feeInputContract).transfer.amount
                         let receiver = (view feeInputContract).transfer.receiver
                         assertMsg ("Fee input amount " <> show amount <> " is less than required fee " <> show fee) (amount >= fee)
                         assertMsg ("Fee input receiver is not the owner") (receiver == owner)
 
                         -- accept the incoming TransferInstruction as payment
-                        acceptResult <- exercise feeInput Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
+                        acceptResult <- exercise feeInput.transfer Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
                             with
-                                extraArgs = ExtraArgs with
-                                    context = emptyChoiceContext
-                                    meta = emptyMetadata
+                                extraArgs = feeInput.extraArgs
                         -- check that the acceptance was completed
                         case acceptResult.output of
                             TransferInstructionResult_Completed _ -> return ()
@@ -130,6 +128,14 @@ template OnRamp
                 case Map.lookup destChainSelector destChainConfigs of
                     None -> abort "Unknown destChainSelector"
                     Some config -> return config
+
+data FeeInput = FeeInput
+    with
+        -- The TransferInstruction that will be used to pay the fee for the message
+        transfer : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+        -- The extraArgs retrieved from the asset's registry, to be passed to the accept choice
+        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+    deriving (Eq, Show)
 
 data CCIPSendResult = CCIPSendResult
     with

@@ -227,54 +227,6 @@ func GetActiveContractsForParty(ctx context.Context, participant *Participant, p
 	}
 	return events, nil
 }
-func GetActiveContractsForPartyI(ctx context.Context, participant *Participant, party string) ([]*apiv2.CreatedEvent, error) {
-	var events []*apiv2.CreatedEvent
-	offset, err := GetCurrentOffset(ctx, participant)
-	if err != nil {
-		return nil, err
-	}
-	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: offset,
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				party: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{
-								InterfaceFilter: &apiv2.InterfaceFilter{
-									InterfaceId: &apiv2.Identifier{
-										PackageId:  "718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b",
-										ModuleName: "Splice.Api.Token.HoldingV1",
-										EntityName: "Holding",
-									},
-									IncludeInterfaceView:    false,
-									IncludeCreatedEventBlob: false,
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to get active contracts using wildcard filter: %w", err)
-	}
-	defer activeContractsResponse.CloseSend()
-	for {
-		activeContract, err := activeContractsResponse.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to receive active contracts: %w", err)
-		}
-		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			events = append(events, c.ActiveContract.GetCreatedEvent())
-		}
-	}
-	return events, nil
-}
 
 func QueryDisclosedContract(ctx context.Context, contractId string, participant *Participant) (*apiv2.DisclosedContract, error) {
 	offset, err := GetCurrentOffset(ctx, participant)
@@ -917,13 +869,13 @@ func TestCoin(t *testing.T) {
 var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 	{
 		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}},
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
 	},
 }}}}
 
 var emptyChoiceContext = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 	{
 		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}},
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
 	},
 }}}}
