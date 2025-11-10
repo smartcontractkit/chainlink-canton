@@ -269,7 +269,7 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#feequoter",
+								PackageId:  "#ccip-feequoter",
 								ModuleName: "CCIP.FeeQuoter",
 								EntityName: "FeeQuoter",
 							},
@@ -323,7 +323,7 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#onramp",
+								PackageId:  "#ccip-onramp",
 								ModuleName: "CCIP.OnRamp",
 								EntityName: "OnRamp",
 							},
@@ -402,7 +402,7 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#feequoter",
+								PackageId:  "#ccip-feequoter",
 								ModuleName: "CCIP.FeeQuoter",
 								EntityName: "FeeQuoter",
 							},
@@ -446,7 +446,7 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#feequoter",
+								PackageId:  "#ccip-feequoter",
 								ModuleName: "CCIP.FeeQuoter",
 								EntityName: "FeeQuoter",
 							},
@@ -531,7 +531,7 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#onramp",
+								PackageId:  "#ccip-onramp",
 								ModuleName: "CCIP.OnRamp",
 								EntityName: "OnRamp",
 							},
@@ -722,7 +722,7 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#onramp",
+								PackageId:  "#ccip-onramp",
 								ModuleName: "CCIP.OnRamp",
 								EntityName: "OnRamp",
 							},
@@ -830,7 +830,7 @@ func TestMessageSentListener(t *testing.T) {
 								{
 									IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
 										TemplateId: &apiv2.Identifier{
-											PackageId:  "#onramp",
+											PackageId:  "#ccip-onramp",
 											ModuleName: "CCIP.OnRamp",
 											EntityName: "CCIPMessageSent",
 										},

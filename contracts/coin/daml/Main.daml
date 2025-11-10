@@ -62,7 +62,7 @@ setup = script do
     now <- getTime
 
     -- alice transfers part of their holdings to bob
-    transferResult <- submitWithDisclosures alice [disclosedRegistry] do
+    transferResult <- trySubmit (actAs alice <> disclose disclosedRegistry) do
         exerciseCmd (toInterfaceContractId @TransferFactory registry) TransferFactory_Transfer with
             expectedAdmin = issuer
             transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -77,6 +77,7 @@ setup = script do
             extraArgs = ExtraArgs with
                 context = emptyChoiceContext
                 meta = emptyMetadata
+    Right transferResult <- pure transferResult
 
     -- bob accepts the pending transfer, thereby gaining access to the holdings
     TransferInstructionResult_Pending pendingTransferAtoB <- pure transferResult.output
@@ -88,7 +89,7 @@ setup = script do
 
     -- bob tries to send more assets than they have available to charlie, should fail
     TransferInstructionResult_Completed bobHoldings <- pure transferResult.output
-    transferResult <- submitWithDisclosuresMustFail bob [disclosedRegistry] do
+    transferResult <- submitMustFail (actAs bob <> disclose disclosedRegistry) do
         exerciseCmd (toInterfaceContractId @TransferFactory registry) TransferFactory_Transfer with
             expectedAdmin = issuer
             transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -119,7 +120,7 @@ setup = script do
     disclosedCharliePreapproval <- fromSome <$> queryDisclosure issuer charliePreApproval
 
     -- mindy uses the granted MintRole to mint to charlie
-    result <- submitWithDisclosures mindy [disclosedRegistry, disclosedCharliePreapproval] do
+    result <- trySubmit (actAs mindy <> disclose disclosedRegistry <> disclose disclosedCharliePreapproval) do
         exerciseCmd role MintRole_Mint with
             instrumentId = instrumentId
             outputs = [

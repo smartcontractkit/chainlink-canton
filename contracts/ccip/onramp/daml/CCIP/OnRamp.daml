@@ -20,6 +20,25 @@ template OnRamp
     where
         signatory owner
 
+        -- // ================================================================
+        -- // │                             Fees                             │
+        -- // ================================================================
+
+        nonconsuming choice GetFee : Decimal
+            with
+                destChainSelector : Numeric 0
+                message : Canton2AnyMessage
+                caller : Party
+                feeQuoter : ContractId FeeQuoter.FeeQuoter
+            controller caller
+            do
+                -- Use FeeQuoter to calculate fees
+                exercise feeQuoter FeeQuoter.GetValidatedFee
+                    with
+                        destChainSelector = destChainSelector
+                        message = message
+                        caller = caller
+
         -- ================================================================
         -- │                          Messaging                           │
         -- ================================================================

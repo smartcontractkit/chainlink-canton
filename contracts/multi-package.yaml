@@ -3,4 +3,5 @@ packages:
   - ccip/common
   - ccip/feequoter
   - ccip/onramp
+  - ccip/router
   - ccip/test
