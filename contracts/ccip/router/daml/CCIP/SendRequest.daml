@@ -1,0 +1,39 @@
+module CCIP.SendRequest where
+
+import CCIP.Client (Canton2AnyMessage)
+import CCIP.FeeQuoter qualified as FeeQuoter
+import CCIP.OnRamp qualified as OnRamp
+
+
+-- ===============================================================
+-- │                       Send Requests                         │
+-- ===============================================================
+
+template CCIPSendRequest
+    with
+        ccipOwner : Party
+
+        destChainSelector : Numeric 0
+        message : Canton2AnyMessage
+        feeInput : OnRamp.FeeInput
+        sender : Party
+    where
+        signatory sender
+        observer ccipOwner
+
+        choice ExecuteSend : OnRamp.CCIPSendResult
+            with
+                caller : Party
+                onRamp : ContractId OnRamp.OnRamp
+                feeQuoter : ContractId FeeQuoter.FeeQuoter
+            controller caller
+            do
+                -- use OnRamp to send the CCIP message
+                exercise onRamp OnRamp.CCIPSend with
+                    destChainSelector = destChainSelector
+                    message = message
+                    feeInput = OnRamp.FeeInput with
+                        transfer = feeInput.transfer
+                        extraArgs = feeInput.extraArgs
+                    caller = sender
+                    feeQuoter = feeQuoter
