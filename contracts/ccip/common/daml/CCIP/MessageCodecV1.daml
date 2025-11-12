@@ -1,0 +1,738 @@
+module CCIP.MessageCodecV1 
+  ( MessageV1(..)
+  , TokenTransferV1(..)
+  , encodeMessageV1
+  , encodeTokenTransferV1
+  , encodeUint8
+  , encodeUint16
+  , encodeUint32
+  , encodeUint64
+  , encodeUint256
+  , decodeMessageV1
+  , decodeUint8
+  , decodeUint16
+  , decodeUint32
+  , decodeUint64
+  , decodeUint256
+  ) where
+
+import DA.Crypto.Text
+import qualified DA.Text as Text
+import DA.Optional (fromSome)
+
+
+data MessageV1 = MessageV1
+    with
+        sourceChainSelector : Numeric 0 -- uint64
+        destChainSelector : Numeric 0 -- uint64
+        sequenceNumber : Numeric 0 -- uint64
+        onRampAddress : BytesHex -- bytes
+        offRampAddress : BytesHex -- bytes
+        finality : Int -- uint16
+        gasLimit : Int -- uint32
+        sender : BytesHex -- bytes
+        receiver : BytesHex -- bytes
+        destBlob : BytesHex -- bytes
+        tokenTransfer : [TokenTransferV1] -- contains 0 or 1 token transfers
+        messageData : BytesHex -- bytes
+    deriving (Eq, Show)
+
+data TokenTransferV1 = TokenTransferV1
+    with
+        amount : Numeric 0 -- uint256
+        sourcePoolAddress : BytesHex -- bytes
+        sourceTokenAddress : BytesHex -- bytes
+        destTokenAddress : BytesHex -- bytes
+        tokenReceiver : BytesHex -- bytes
+        extraData : BytesHex -- bytes
+    deriving (Eq, Show)
+
+
+-- ===================================================
+-- |                     Encoding                    |
+-- ===================================================
+
+encodeMessageV1 : MessageV1 -> BytesHex
+encodeMessageV1 message =
+    let 
+        encodedTokenTransfer = 
+            if null message.tokenTransfer 
+            then "" 
+            else foldl (<>) "" (map encodeTokenTransferV1 message.tokenTransfer)
+    in
+        (fromSome (encodeUint8 1)) -- version 1
+        <> fromSome (encodeUint64 message.sourceChainSelector)
+        <> fromSome (encodeUint64 message.destChainSelector)
+        <> fromSome (encodeUint64 message.sequenceNumber)
+        <> fromSome (encodeUint8 (byteCount message.onRampAddress))
+        <> message.onRampAddress
+        <> fromSome (encodeUint8 (byteCount message.offRampAddress))
+        <> message.offRampAddress
+        <> fromSome (encodeUint16 message.finality)
+        <> fromSome (encodeUint32 message.gasLimit)
+        <> fromSome (encodeUint8 (byteCount message.sender))
+        <> message.sender
+        <> fromSome (encodeUint8 (byteCount message.receiver))
+        <> message.receiver
+        <> fromSome (encodeUint16 (byteCount message.destBlob))
+        <> message.destBlob
+        <> fromSome (encodeUint16 (byteCount encodedTokenTransfer))
+        <> encodedTokenTransfer
+        <> fromSome (encodeUint16 (byteCount message.messageData))
+        <> message.messageData
+
+encodeTokenTransferV1 : TokenTransferV1 -> BytesHex
+encodeTokenTransferV1 tokenTransfer =
+    (fromSome (encodeUint8 1)) -- version 1
+    <> fromSome (encodeUint256 tokenTransfer.amount)
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.sourcePoolAddress))
+    <> tokenTransfer.sourcePoolAddress
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.sourceTokenAddress))
+    <> tokenTransfer.sourceTokenAddress
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.destTokenAddress))
+    <> tokenTransfer.destTokenAddress
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.tokenReceiver))
+    <> tokenTransfer.tokenReceiver
+    <> fromSome (encodeUint16 (byteCount tokenTransfer.extraData))
+    <> tokenTransfer.extraData
+
+
+encodeUint8 : Int -> Optional BytesHex
+encodeUint8 n =
+    let
+        -- Maximum value for uint8: 2^8 - 1 = 255
+        maxUint8 = 255
+    in
+        if n < 0 || n > maxUint8
+        then None
+        else
+            DA.Crypto.Text.packHexBytes (DA.Crypto.Text.toHex n) 1
+
+encodeUint16 : Int -> Optional BytesHex
+encodeUint16 n =
+    let
+        -- Maximum value for uint16: 2^16 - 1 = 65535
+        maxUint16 = 65535
+    in
+        if n < 0 || n > maxUint16
+        then None
+        else
+            DA.Crypto.Text.packHexBytes (DA.Crypto.Text.toHex n) 2
+
+encodeUint32 : Int -> Optional BytesHex
+encodeUint32 n =
+    let 
+        -- Maximum value for uint32: 2^32 - 1 = 4294967295
+        maxUint32 = 4294967295
+    in
+        if n < 0 || n > maxUint32
+        then None
+        else
+            DA.Crypto.Text.packHexBytes (DA.Crypto.Text.toHex n) 4
+
+-- Convert a Numeric 0 to a hex-encoded uint64 (8 bytes)
+encodeUint64 : Numeric 0 -> Optional BytesHex
+encodeUint64 n = 
+    let 
+        -- Maximum value for uint64: 2^64 - 1 = 18446744073709551615
+        maxUint64 = 18446744073709551615.0
+    in
+        if n < 0.0 || n > maxUint64
+        then None
+        else
+            let 
+                -- Convert numeric to string to preserve full precision
+                numStr = show n
+                
+                -- Remove decimal point if present (since it's Numeric 0, should be whole number)
+                intStr = if Text.isSuffixOf ".0" numStr 
+                         then Text.take (Text.length numStr - 2) numStr 
+                         else numStr
+                
+                -- Convert decimal string to hex without precision loss
+                hexStr = decimalStringToHex intStr
+                
+                -- Pad to 16 hex characters (8 bytes) with leading zeros
+                paddedHex = padLeft 16 "0" hexStr
+            in
+                Some paddedHex
+
+-- Convert a Numeric 0 to a hex-encoded uint256 (32 bytes)
+encodeUint256 : Numeric 0 -> Optional BytesHex
+encodeUint256 n = 
+    if n < 0.0 then None
+    else
+        let
+            -- Convert numeric to string to preserve full precision
+            numStr = show n
+            
+            -- Remove decimal point if present (since it's Numeric 0, should be whole number)
+            intStr = if Text.isSuffixOf ".0" numStr 
+                        then Text.take (Text.length numStr - 2) numStr 
+                        else numStr
+            
+            -- Convert decimal string to hex without precision loss
+            hexStr = decimalStringToHex intStr
+            
+            -- Pad to 64 hex characters (32 bytes) with leading zeros
+            paddedHex = padLeft 64 "0" hexStr
+        in
+            Some paddedHex
+        
+
+-- Helpers
+
+-- Check if a Numeric 0 is greater than uint256 max
+compareWithMaxUint256 : Numeric 0 -> Bool
+compareWithMaxUint256 n =
+    let
+        -- Maximum value for uint256 as string
+        maxUint256String = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        
+        -- Convert input to string
+        numStr = show n
+        intStr = if Text.isSuffixOf ".0" numStr 
+                 then Text.take (Text.length numStr - 2) numStr 
+                 else numStr
+    in
+        compareDecimalStrings intStr maxUint256String
+
+-- Compare two decimal strings numerically (returns True if first > second)
+compareDecimalStrings : Text -> Text -> Bool
+compareDecimalStrings str1 str2 =
+    let
+        len1 = Text.length str1
+        len2 = Text.length str2
+    in
+        (
+            (len1 > len2) || 
+            ((len1 >= len2) && 
+            (str1 > str2)))  -- Same length, can use lexicographic comparison
+
+
+
+        
+
+-- Helper to parse digits from a text string
+parseDigits : Text -> [Int] -> [Int]
+parseDigits str acc =
+    if Text.length str == 0 then reverse acc
+    else 
+        let
+            firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> 0
+                "1" -> 1
+                "2" -> 2
+                "3" -> 3
+                "4" -> 4
+                "5" -> 5
+                "6" -> 6
+                "7" -> 7
+                "8" -> 8
+                "9" -> 9
+                _ -> error ("Invalid digit: " <> firstChar)
+        in
+            parseDigits rest (digit :: acc)
+
+-- Convert decimal string to hexadecimal string (preserves full precision)
+decimalStringToHex : Text -> Text
+decimalStringToHex "0" = "0"
+decimalStringToHex decStr = 
+    let
+        -- Convert decimal string to list of digits
+        decimalDigits = parseDigits decStr []
+        
+        -- Convert to hex using repeated division by 16
+        hexResult = bigIntToHex decimalDigits
+    in
+        if Text.length hexResult == 0 then "0" else hexResult
+
+-- Divide a list of digits by a base, return (quotient digits, remainder)
+divideDigitsByBase : [Int] -> Int -> ([Int], Int)
+divideDigitsByBase digits base = divideDigitsByBaseHelper digits base 0 []
+
+-- Helper function for digit division
+divideDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> ([Int], Int)
+divideDigitsByBaseHelper [] base carry quotientAcc = (reverse quotientAcc, carry)
+divideDigitsByBaseHelper (d :: ds) base carry quotientAcc = 
+    let
+        dividend = carry * 10 + d
+        newQuotient = dividend / base
+        newRemainder = dividend % base
+    in
+        if newQuotient == 0 && null quotientAcc
+        then divideDigitsByBaseHelper ds base newRemainder quotientAcc  -- Skip leading zeros in quotient
+        else divideDigitsByBaseHelper ds base newRemainder (newQuotient :: quotientAcc)
+
+-- Convert big integer (list of decimal digits) to hex string
+bigIntToHex : [Int] -> Text
+bigIntToHex digits = bigIntToHexHelper digits ""
+
+-- Helper for bigIntToHex
+bigIntToHexHelper : [Int] -> Text -> Text
+bigIntToHexHelper [] acc = acc
+bigIntToHexHelper ds acc = 
+    case divideDigitsByBase ds 16 of
+        ([], 0) -> acc
+        ([], remainder) -> digitToHex remainder <> acc
+        (quotient, remainder) -> bigIntToHexHelper quotient (digitToHex remainder <> acc)
+
+-- Convert single digit (0-15) to hex character
+digitToHex : Int -> Text
+digitToHex n = case n of
+    0 -> "0"
+    1 -> "1" 
+    2 -> "2"
+    3 -> "3"
+    4 -> "4"
+    5 -> "5"
+    6 -> "6"
+    7 -> "7"
+    8 -> "8"
+    9 -> "9"
+    10 -> "a"
+    11 -> "b"
+    12 -> "c"
+    13 -> "d"
+    14 -> "e"
+    15 -> "f"
+    _ -> error ("Invalid hex digit: " <> show n)
+
+-- Helper function to pad a string with a character on the left
+padLeft : Int -> Text -> Text -> Text
+padLeft targetLength padString str =
+    let 
+        currentLength = Text.length str
+        paddingNeeded = targetLength - currentLength
+    in
+        if paddingNeeded <= 0 then str
+        else (padHelper paddingNeeded padString) <> str
+
+-- Helper to create padding string by repeating a character
+padHelper : Int -> Text -> Text
+padHelper n padStr =
+    if n <= 0 then ""
+    else padStr <> padHelper (n - 1) padStr
+
+-- ===================================================
+-- |                     Decoding                    |
+-- ===================================================
+
+decodeUint8 : BytesHex -> Optional Int
+decodeUint8 hex = 
+    if byteCount hex /= 1 then None
+    else DA.Crypto.Text.fromHex hex
+
+decodeUint16 : BytesHex -> Optional Int
+decodeUint16 hex = 
+    if byteCount hex /= 2 then None
+    else DA.Crypto.Text.fromHex hex
+
+decodeUint32 : BytesHex -> Optional Int
+decodeUint32 hex = 
+    if byteCount hex /= 4 then None
+    else DA.Crypto.Text.fromHex hex
+
+decodeUint64 : BytesHex -> Optional (Numeric 0)
+decodeUint64 hex = 
+    if byteCount hex /= 8 then None
+    else 
+        case hexToDecimalString hex of
+            Some decStr -> Some (parseDecimal decStr)
+            None -> None
+
+decodeUint256 : BytesHex -> Optional (Numeric 0)
+decodeUint256 hex = 
+    if byteCount hex /= 32 then None
+    else 
+        case hexToDecimalString hex of
+            Some decStr -> Some (parseDecimal decStr)
+            None -> None
+
+-- Helpers
+
+-- Convert hex string to decimal string
+hexToDecimalString : BytesHex -> Optional Text
+hexToDecimalString hex = 
+    let
+        -- Convert hex to list of digits
+        hexDigits = hexStringToDigits hex []
+    in
+        case hexDigits of
+            Some digits -> Some (hexDigitsToDecimal digits)
+            None -> None
+
+-- Parse hex string into list of digit values
+hexStringToDigits : Text -> [Int] -> Optional [Int]
+hexStringToDigits str acc =
+    if Text.length str == 0 then Some acc
+    else 
+        let
+            firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> Some 0
+                "1" -> Some 1
+                "2" -> Some 2
+                "3" -> Some 3
+                "4" -> Some 4
+                "5" -> Some 5
+                "6" -> Some 6
+                "7" -> Some 7
+                "8" -> Some 8
+                "9" -> Some 9
+                "a" -> Some 10
+                "b" -> Some 11
+                "c" -> Some 12
+                "d" -> Some 13
+                "e" -> Some 14
+                "f" -> Some 15
+                "A" -> Some 10
+                "B" -> Some 11
+                "C" -> Some 12
+                "D" -> Some 13
+                "E" -> Some 14
+                "F" -> Some 15
+                _ -> None
+        in
+            case digit of
+                Some d -> hexStringToDigits rest (acc ++ [d])
+                None -> None
+
+-- Convert hex digits to decimal string
+hexDigitsToDecimal : [Int] -> Text
+hexDigitsToDecimal digits = 
+    let
+        -- Convert Int digit to Numeric 0 directly without using intToNumeric
+        digitToNumeric : Int -> Numeric 0
+        digitToNumeric d = case d of
+            0 -> 0.0
+            1 -> 1.0
+            2 -> 2.0
+            3 -> 3.0
+            4 -> 4.0
+            5 -> 5.0
+            6 -> 6.0
+            7 -> 7.0
+            8 -> 8.0
+            9 -> 9.0
+            10 -> 10.0
+            11 -> 11.0
+            12 -> 12.0
+            13 -> 13.0
+            14 -> 14.0
+            15 -> 15.0
+            _ -> 0.0 -- Should not happen for hex digits
+        
+        result = foldl (\acc d -> acc * 16.0 + digitToNumeric d) (0.0 : Numeric 0) digits
+        resultStr = show result
+        -- Remove ".0" suffix if present
+        cleanStr = if Text.isSuffixOf ".0" resultStr
+                   then Text.take (Text.length resultStr - 2) resultStr
+                   else resultStr
+    in
+        cleanStr
+
+-- Multiply list of digits by a base
+multiplyDigitsByBase : [Int] -> Int -> [Int]
+multiplyDigitsByBase digits base = multiplyDigitsByBaseHelper (reverse digits) base 0 []
+
+-- Helper for multiplyDigitsByBase
+multiplyDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> [Int]
+multiplyDigitsByBaseHelper [] base carry acc = if carry == 0 then reverse acc else reverse (carry :: acc)
+multiplyDigitsByBaseHelper (d :: ds) base carry acc = 
+    let
+        product = d * base + carry
+        newDigit = product % 10
+        newCarry = product / 10
+    in
+        multiplyDigitsByBaseHelper ds base newCarry (newDigit :: acc)
+
+-- Multiply decimal string by 16
+multiplyDecimalBy16 : Text -> Text
+multiplyDecimalBy16 "0" = "0"
+multiplyDecimalBy16 decStr = 
+    let
+        digits = parseDecimalDigits decStr []
+        result = multiplyDigitsByBase digits 16
+    in
+        digitsToDecimalString result
+
+-- Add two lists of digits with carry
+addDigitLists : [Int] -> [Int] -> Int -> [Int]
+addDigitLists [] [] carry = if carry == 0 then [] else [carry]
+addDigitLists (d1 :: ds1) [] carry = 
+    let
+        sum = d1 + carry
+        newDigit = sum % 10
+        newCarry = sum / 10
+    in
+        newDigit :: addDigitLists ds1 [] newCarry
+addDigitLists [] (d2 :: ds2) carry = 
+    let
+        sum = d2 + carry
+        newDigit = sum % 10
+        newCarry = sum / 10
+    in
+        newDigit :: addDigitLists [] ds2 newCarry
+addDigitLists (d1 :: ds1) (d2 :: ds2) carry = 
+    let
+        sum = d1 + d2 + carry
+        newDigit = sum % 10
+        newCarry = sum / 10
+    in
+        newDigit :: addDigitLists ds1 ds2 newCarry
+
+-- Add two decimal strings
+addDecimalStrings : Text -> Text -> Text
+addDecimalStrings str1 str2 = 
+    let
+        digits1 = reverse (parseDecimalDigits str1 [])
+        digits2 = reverse (parseDecimalDigits str2 [])
+        result = addDigitLists digits1 digits2 0
+    in
+        digitsToDecimalString (reverse result)
+
+-- Parse decimal string to list of digits
+parseDecimalDigits : Text -> [Int] -> [Int]
+parseDecimalDigits str acc =
+    if Text.length str == 0 then reverse acc
+    else 
+        let
+            firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> 0
+                "1" -> 1
+                "2" -> 2
+                "3" -> 3
+                "4" -> 4
+                "5" -> 5
+                "6" -> 6
+                "7" -> 7
+                "8" -> 8
+                "9" -> 9
+                _ -> error ("Invalid decimal digit character: " <> firstChar)
+        in
+            parseDecimalDigits rest (digit :: acc)
+
+-- Convert list of digits back to decimal string
+digitsToDecimalString : [Int] -> Text
+digitsToDecimalString [] = "0"
+digitsToDecimalString digits = 
+    let
+        digitToChar d = case d of
+            0 -> "0"
+            1 -> "1"
+            2 -> "2"
+            3 -> "3"
+            4 -> "4"
+            5 -> "5"
+            6 -> "6"
+            7 -> "7"
+            8 -> "8"
+            9 -> "9"
+            _ -> error ("Invalid decimal digit: " <> show d)
+    in
+        foldl (<>) "" (map digitToChar digits)
+
+-- Parse decimal string to Numeric 0
+parseDecimal : Text -> Numeric 0
+parseDecimal str = 
+    if Text.length str == 0 then 0.0
+    else 
+        let
+            len = Text.length str
+            lastChar = Text.take 1 (Text.drop (len - 1) str)
+            rest = Text.take (len - 1) str
+            digit = case lastChar of
+                "0" -> 0.0
+                "1" -> 1.0
+                "2" -> 2.0
+                "3" -> 3.0
+                "4" -> 4.0
+                "5" -> 5.0
+                "6" -> 6.0
+                "7" -> 7.0
+                "8" -> 8.0
+                "9" -> 9.0
+                _ -> error ("Invalid decimal digit in parseDecimal: " <> lastChar)
+        in
+            digit + 10.0 * parseDecimal rest
+
+-- Update the main decodeMessageV1 function
+decodeMessageV1 : BytesHex -> Optional MessageV1
+decodeMessageV1 encoded =
+    let
+        totalLength = byteCount encoded
+        
+        -- Helper to extract bytes at position
+        extractBytes startPos numBytes = 
+            if startPos + numBytes > totalLength then None
+            else Some (Text.take (numBytes * 2) (Text.drop (startPos * 2) encoded))
+    in
+        do
+            -- Extract version (1 byte)
+            versionHex <- extractBytes 0 1
+            version <- decodeUint8 versionHex
+            
+            -- Extract source chain selector (8 bytes)
+            sourceChainHex <- extractBytes 1 8
+            sourceChain <- decodeUint64 sourceChainHex
+            
+            -- Extract dest chain selector (8 bytes)  
+            destChainHex <- extractBytes 9 8
+            destChain <- decodeUint64 destChainHex
+            
+            -- Extract sequence number (8 bytes)
+            seqNumHex <- extractBytes 17 8
+            seqNum <- decodeUint64 seqNumHex
+            
+            -- Extract onRamp address length (1 byte)
+            onRampLenHex <- extractBytes 25 1
+            onRampLen <- decodeUint8 onRampLenHex
+            
+            -- Extract onRamp address
+            onRampHex <- extractBytes 26 onRampLen
+            
+            -- Extract offRamp address length (1 byte)
+            offRampLenHex <- extractBytes (26 + onRampLen) 1
+            offRampLen <- decodeUint8 offRampLenHex
+            
+            -- Extract offRamp address
+            offRampHex <- extractBytes (27 + onRampLen) offRampLen
+            
+            -- Extract finality (2 bytes)
+            finalityHex <- extractBytes (27 + onRampLen + offRampLen) 2
+            finality <- decodeUint16 finalityHex
+            
+            -- Extract gas limit (4 bytes)
+            gasLimitHex <- extractBytes (29 + onRampLen + offRampLen) 4
+            gasLimit <- decodeUint32 gasLimitHex
+            
+            -- Extract sender length (1 byte)
+            senderLenHex <- extractBytes (33 + onRampLen + offRampLen) 1
+            senderLen <- decodeUint8 senderLenHex
+            
+            -- Extract sender
+            senderHex <- extractBytes (34 + onRampLen + offRampLen) senderLen
+            
+            -- Extract receiver length (1 byte)
+            receiverLenHex <- extractBytes (34 + onRampLen + offRampLen + senderLen) 1
+            receiverLen <- decodeUint8 receiverLenHex
+            
+            -- Extract receiver
+            receiverHex <- extractBytes (35 + onRampLen + offRampLen + senderLen) receiverLen
+            
+            -- Extract destBlob length (2 bytes)
+            destBlobLenHex <- extractBytes (35 + onRampLen + offRampLen + senderLen + receiverLen) 2
+            destBlobLen <- decodeUint16 destBlobLenHex
+            
+            -- Extract destBlob
+            destBlobHex <- extractBytes (37 + onRampLen + offRampLen + senderLen + receiverLen) destBlobLen
+            
+            -- Extract token transfer length (2 bytes)
+            tokenLenHex <- extractBytes (37 + onRampLen + offRampLen + senderLen + receiverLen + destBlobLen) 2
+            tokenLen <- decodeUint16 tokenLenHex
+            
+            -- Extract and decode token transfers
+            tokenTransfers <- 
+                if tokenLen == 0 then Some []
+                else do
+                    tokenHex <- extractBytes (39 + onRampLen + offRampLen + senderLen + receiverLen + destBlobLen) tokenLen
+                    decodeTokenTransfers tokenHex
+            
+            -- Extract message data length (2 bytes)
+            msgDataLenHex <- extractBytes (39 + onRampLen + offRampLen + senderLen + receiverLen + destBlobLen + tokenLen) 2
+            msgDataLen <- decodeUint16 msgDataLenHex
+            
+            -- Extract message data
+            msgDataHex <- extractBytes (41 + onRampLen + offRampLen + senderLen + receiverLen + destBlobLen + tokenLen) msgDataLen
+            
+            return MessageV1
+                { sourceChainSelector = sourceChain
+                , destChainSelector = destChain
+                , sequenceNumber = seqNum
+                , onRampAddress = onRampHex
+                , offRampAddress = offRampHex
+                , finality = finality
+                , gasLimit = gasLimit
+                , sender = senderHex
+                , receiver = receiverHex
+                , destBlob = destBlobHex
+                , tokenTransfer = tokenTransfers
+                , messageData = msgDataHex
+                }
+
+-- Decode token transfers from hex data
+decodeTokenTransfers : BytesHex -> Optional [TokenTransferV1]
+decodeTokenTransfers hex = 
+    if byteCount hex == 0 then Some []
+    else decodeTokenTransferV1 hex
+
+-- Decode a single token transfer
+decodeTokenTransferV1 : BytesHex -> Optional [TokenTransferV1]
+decodeTokenTransferV1 encoded = 
+    let
+        totalLength = byteCount encoded
+        
+        -- Helper to extract bytes at position
+        extractBytes startPos numBytes = 
+            if startPos + numBytes > totalLength then None
+            else Some (Text.take (numBytes * 2) (Text.drop (startPos * 2) encoded))
+    in
+        do
+            -- Extract version (1 byte)
+            versionHex <- extractBytes 0 1
+            version <- decodeUint8 versionHex
+            
+            -- Extract amount (32 bytes)
+            amountHex <- extractBytes 1 32
+            amount <- decodeUint256 amountHex
+            
+            -- Extract sourcePool length (1 byte)
+            sourcePoolLenHex <- extractBytes 33 1
+            sourcePoolLen <- decodeUint8 sourcePoolLenHex
+            
+            -- Extract sourcePool
+            sourcePoolHex <- extractBytes 34 sourcePoolLen
+            
+            -- Extract sourceToken length (1 byte)
+            sourceTokenLenHex <- extractBytes (34 + sourcePoolLen) 1
+            sourceTokenLen <- decodeUint8 sourceTokenLenHex
+            
+            -- Extract sourceToken
+            sourceTokenHex <- extractBytes (35 + sourcePoolLen) sourceTokenLen
+            
+            -- Extract destToken length (1 byte)
+            destTokenLenHex <- extractBytes (35 + sourcePoolLen + sourceTokenLen) 1
+            destTokenLen <- decodeUint8 destTokenLenHex
+            
+            -- Extract destToken
+            destTokenHex <- extractBytes (36 + sourcePoolLen + sourceTokenLen) destTokenLen
+            
+            -- Extract tokenReceiver length (1 byte)
+            tokenReceiverLenHex <- extractBytes (36 + sourcePoolLen + sourceTokenLen + destTokenLen) 1
+            tokenReceiverLen <- decodeUint8 tokenReceiverLenHex
+            
+            -- Extract tokenReceiver
+            tokenReceiverHex <- extractBytes (37 + sourcePoolLen + sourceTokenLen + destTokenLen) tokenReceiverLen
+            
+            -- Extract extraData length (2 bytes)
+            extraDataLenHex <- extractBytes (37 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) 2
+            extraDataLen <- decodeUint16 extraDataLenHex
+            
+            -- Extract extraData
+            extraDataHex <- extractBytes (39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) extraDataLen
+            
+            return [TokenTransferV1
+                { amount = amount
+                , sourcePoolAddress = sourcePoolHex
+                , sourceTokenAddress = sourceTokenHex
+                , destTokenAddress = destTokenHex
+                , tokenReceiver = tokenReceiverHex
+                , extraData = extraDataHex
+                }]
+

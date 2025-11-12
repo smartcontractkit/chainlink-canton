@@ -794,7 +794,7 @@ func TestCCIPSend(t *testing.T) {
 			}
 		}
 	}
-	fmt.Printf("Sent CCIP Message, event: %v\n", ccipMessageSentCid)
+	fmt.Printf("Sent CCIP Message using OnRamp, event: %v\n", ccipMessageSentCid)
 }
 
 func TestMessageSentListener(t *testing.T) {
