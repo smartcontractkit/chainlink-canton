@@ -1,0 +1,42 @@
+module CCIP.Interfaces.CrossChainVerifier where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
+
+interface ICrossChainVerifier where
+    viewtype CrossChainVerifierView
+
+    crossChainVerifier_verifyMessageImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_VerifyMessage -> Update ()
+    crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update BytesHex
+
+    nonconsuming choice CrossChainVerifier_VerifyMessage : ()
+        with
+            message : MessageCodecV1.MessageV1
+            messageId : BytesHex
+            ccvData : BytesHex
+
+            caller : Party
+        controller caller
+        do crossChainVerifier_verifyMessageImpl this self arg
+
+    nonconsuming choice CrossChainVerifier_ForwardToVerifier : BytesHex
+        with
+            message : MessageCodecV1.MessageV1
+            messageId : BytesHex
+            feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+            feeTokenAmount : Decimal
+            verifierArgs : BytesHex
+
+            caller : Party
+        controller (view this).ccipOwner
+        do crossChainVerifier_forwardToVerifierImpl this self arg
+
+
+data CrossChainVerifierView = CrossChainVerifierView
+    with
+        ccipOwner : Party
+        storageLocation : Text
+    deriving (Eq, Show)

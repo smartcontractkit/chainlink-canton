@@ -1,0 +1,153 @@
+module CCIP.CommitteeVerifier where
+
+import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1WithEcdsaOnly)
+import DA.Optional (fromSomeNote)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.Interfaces.CrossChainVerifier
+
+import qualified CCIP.Crypto.DerEncoding
+
+versionTagV1_7_0 : BytesHex = "49ff34ed"
+
+signature_length : Int = 64
+signature_component_length : Int = 32
+
+template CommitteeVerifier
+    with
+        owner : Party
+
+        ccipOwner : Party
+        storageLocation : Text
+
+        -- config
+        threshold : Int
+        signers : [BytesHex] 
+    where
+        signatory owner
+        ensure storageLocation /= "" && threshold > 0 && length signers >= threshold
+
+        interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
+            view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+                ccipOwner = ccipOwner
+                storageLocation = storageLocation
+
+            crossChainVerifier_verifyMessageImpl self arg = do
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
+                    with
+                        message = arg.message
+                        messageId = arg.messageId
+                        ccvData = arg.ccvData
+                        caller = arg.caller
+
+            crossChainVerifier_forwardToVerifierImpl self arg = do
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
+                    with
+                        message = arg.message
+                        messageId = arg.messageId
+                        feeToken = arg.feeToken
+                        feeTokenAmount = arg.feeTokenAmount
+                        verifierArgs = arg.verifierArgs
+                        caller = arg.caller
+
+        nonconsuming choice CommitteeVerifier_VerifyMessage : ()
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                messageId : BytesHex
+                ccvData : BytesHex
+
+                caller : Party
+            controller caller
+            do
+                let verifierVersion = fromSomeNote "Failed to extract verifier version" (CCIP.MessageCodecV1.extractBytes ccvData 0 (byteCount versionTagV1_7_0))
+                assertMsg "Invalid CCV Version" (verifierVersion == versionTagV1_7_0)
+
+                let signatureLength = fromSomeNote "Failed to extract signature length" (CCIP.MessageCodecV1.decodeUint16 (fromSomeNote "Failed to extract signature length bytes" (CCIP.MessageCodecV1.extractBytes ccvData (byteCount versionTagV1_7_0) 2)))
+                assertMsg "Invalid CCV data" ((byteCount ccvData) == ((byteCount versionTagV1_7_0) + 2 + signatureLength))
+                let numberOfSignatures = signatureLength / signature_length
+                assertMsg "Insufficient signatures provided" (numberOfSignatures >= threshold)
+                let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes ccvData (byteCount versionTagV1_7_0 + 2) signatureLength)
+                -- split signatureData into r and s components
+                let signatures = parseSignatures signatureData
+
+                -- calculate the signed hash
+                let signedHash = keccak256 (versionTagV1_7_0 <> (CCIP.MessageCodecV1.encodeMessageV1 message))
+
+                -- verify signatures
+                let validSigners = findValidSigners signedHash signatures signers
+                let validSignerCount = countValidSigners validSigners
+
+                -- check that number of valid signers == numer of signatures provided
+                -- if it isn't this either means duplicate signatures or signatures from non-signers have been provided
+                assertMsg "Invalid signatures detected" (validSignerCount == numberOfSignatures)
+                
+                -- Check threshold requirement
+                assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold) 
+                    (validSignerCount >= threshold)
+                
+
+                pure()
+
+        nonconsuming choice CommitteeVerifier_ForwardToVerifier : BytesHex
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                messageId : BytesHex
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                feeTokenAmount : Decimal
+                verifierArgs : BytesHex
+                caller : Party
+            controller caller
+            do
+                -- only callable by owner or ccipOwner
+                assertMsg "Not authorized" (caller == owner || caller == ccipOwner)
+
+                pure "49ff34ed"
+
+
+-- Parse signature data into a list of (r, s) tuples
+parseSignatures : BytesHex -> [(BytesHex, BytesHex)]
+parseSignatures signatureData =
+    let dataLength = byteCount signatureData
+        numSignatures = dataLength / signature_length
+    in
+        map (extractRSComponents signatureData) [0 .. numSignatures - 1]
+
+-- Extract r and s components from a single signature at the given index
+extractRSComponents : BytesHex -> Int -> (BytesHex, BytesHex)
+extractRSComponents signatureData index =
+    let offset = index * signature_length
+        r = fromSomeNote "Failed to extract r component" (CCIP.MessageCodecV1.extractBytes signatureData offset signature_component_length)
+        s = fromSomeNote "Failed to extract s component" (CCIP.MessageCodecV1.extractBytes signatureData (offset + signature_component_length) signature_component_length)
+    in
+        (r, s)
+
+validateSignature : BytesHex -> PublicKeyHex -> BytesHex -> BytesHex -> Bool
+validateSignature messageHash publicKey r s =
+  let
+    derSignature = CCIP.Crypto.DerEncoding.rawToDerSignature r s
+    derPublicKey = CCIP.Crypto.DerEncoding.secp256k1PublicKeyToDer publicKey
+  in
+    secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
+
+-- Find valid signers by checking each signature against all signers
+-- Returns a map of valid signers (using list of tuples as map representation)
+findValidSigners : BytesHex -> [(BytesHex, BytesHex)] -> [BytesHex] -> [(BytesHex, Bool)]
+findValidSigners messageHash signatures signerKeys =
+    map (\signer -> (signer, isValidSigner messageHash signatures signer)) signerKeys
+
+-- Check if a signer is valid by testing if any signature matches this signer
+isValidSigner : BytesHex -> [(BytesHex, BytesHex)] -> BytesHex -> Bool
+isValidSigner messageHash signatures signerKey =
+    any (uncurry (validateSignature messageHash signerKey)) signatures
+
+-- Count the number of valid signers
+countValidSigners : [(BytesHex, Bool)] -> Int
+countValidSigners validSignersMap =
+    length (filter snd validSignersMap)
+
+-- Get list of valid signer keys
+getValidSignerKeys : [(BytesHex, Bool)] -> [BytesHex]
+getValidSignerKeys validSignersMap =
+    map fst (filter snd validSignersMap)

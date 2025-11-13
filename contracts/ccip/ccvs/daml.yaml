@@ -1,5 +1,5 @@
 sdk-version: 3.4.0-snapshot.20251013.1566.e75a9cf
-name: feequoter-test
+name: ccip-committeeverifier
 source: daml
 version: 1.0.0
 build-options:
@@ -12,10 +12,6 @@ data-dependencies:
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml-script
-  - ../../coin/.daml/dist/coin-0.0.1.dar
   - ../common/.daml/dist/ccip-common-1.0.0.dar
-  - ../ccvs/.daml/dist/ccip-committeeverifier-1.0.0.dar
   - ../feequoter/.daml/dist/ccip-feequoter-1.0.0.dar
   - ../onramp/.daml/dist/ccip-onramp-1.0.0.dar
-  - ../router/.daml/dist/ccip-router-1.0.0.dar

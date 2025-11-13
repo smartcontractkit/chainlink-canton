@@ -1,5 +1,6 @@
 packages:
   - coin
+  - ccip/ccvs
   - ccip/common
   - ccip/feequoter
   - ccip/onramp
