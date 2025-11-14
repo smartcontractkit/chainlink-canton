@@ -316,10 +316,13 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Printf("Minted 100 AMT, Token Holding Cid: %s\n", tokenHoldingCid)
 
+	// ========================
+	// |   CCIP Deployment    |
+	// ========================
+
 	// CCIP Party deploys CCIP contracts
 	chainSelector := "1111111111"
 	destChainSelector1 := "2222222222"
-	destChainSelector2 := "3333333333"
 	instrumentIdAmt := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{
 			Label: "admin",
@@ -329,9 +332,6 @@ func TestCCIPSend(t *testing.T) {
 			Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "Amulet"}},
 		},
 	}}}}
-	_ = destChainSelector1
-	_ = destChainSelector2
-	_ = instrumentIdAmt
 
 	// Deploy FeeQuoter
 	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
@@ -691,7 +691,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	for range 3 {
-		CCIPSend(t, ccipApi, userParticipant, partyUser, partyCCIP, destChainSelector1, instrumentIdAmt, transferInstructionClient, registryAdmin)
+		CCIPSend(t, ccipApi, userParticipant, partyUser, destChainSelector1, instrumentIdAmt, metadataClient, transferInstructionClient)
 	}
 
 	// Check token holdings for the CCIP party
@@ -713,12 +713,12 @@ func CCIPSend(
 	ccipApi CCIPApi,
 	participant *Participant,
 	party string,
-	ccipParty string,
 	destChainSelector string,
 	feeToken *apiv2.Value,
 
+	// Token Standard APIs
+	metadataClient *tokenMetadataV1.ClientWithResponses,
 	transferInstructionClient *transferInstructionV1.ClientWithResponses,
-	registryAdmin string,
 ) {
 	// Add authorization to the context
 	jwToken, err := getJWT()
@@ -726,7 +726,8 @@ func CCIPSend(
 	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
-	// Query disclosures for CCIP contract - these would be served by off-chain CCIP infrastructure
+	// Query disclosures for CCIP contract - these would be served off-chain
+	ccipParty := ccipApi.GetCCIPParty()
 	feeQuoterDisclosure, err := ccipApi.GetFeeQuoter(t.Context())
 	require.NoError(t, err)
 	onRampDisclosure, err := ccipApi.GetOnRamp(t.Context())
@@ -747,6 +748,8 @@ func CCIPSend(
 	fmt.Printf("Using token holding cid: %s for CCIPSend, balance: %v\n", tokenHoldingCid, tokenHolding.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()[2].GetValue().GetSum().(*apiv2.Value_Numeric).Numeric)
 
 	// Query TransferFactory from AMT registry
+	registryAdmin, err := GetRegistryAdmin(ctx, metadataClient)
+	require.NoError(t, err)
 	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := GetTransferFactory(ctx, transferInstructionClient, registryAdmin, party, ccipParty)
 	require.NoError(t, err)
 

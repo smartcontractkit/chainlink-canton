@@ -14,6 +14,10 @@ type CCIPApi struct {
 	CCIPParty   string
 }
 
+func (a *CCIPApi) GetCCIPParty() string {
+	return a.CCIPParty
+}
+
 func (a *CCIPApi) getContract(ctx context.Context, templateId *apiv2.Identifier) (*apiv2.DisclosedContract, error) {
 	jwToken, err := getJWT()
 	if err != nil {
