@@ -65,10 +65,7 @@ template Router
                                 feeInput = OnRamp.FeeInput
                                     with
                                         transfer = ti
-                                        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs
-                                            with
-                                                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                                                meta = Splice.Api.Token.MetadataV1.emptyMetadata
+                                        extraArgs = feeInput.extraArgs
                                 caller = caller
                                 feeQuoter = feeQuoter
 

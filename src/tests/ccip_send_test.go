@@ -15,12 +15,12 @@ import (
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/transferInstructionV1"
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
 )
 
 func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
@@ -59,73 +59,24 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	}}}}, nil
 }
 
-func TestCCIPSend(t *testing.T) {
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-
-	ccipParticipant, err := NewParticipant("participant1.admin-api.localhost:8080", "participant1.grpc-ledger-api.localhost:8080")
-	require.NoError(t, err)
-	userParticipant, err := NewParticipant("participant2.admin-api.localhost:8080", "participant2.grpc-ledger-api.localhost:8080")
-	require.NoError(t, err)
-
-	// Dars
-	// Uploading the CCIP dars to all participants
-	feeQuoterDar, err := os.ReadFile("../../contracts/ccip/feequoter/.daml/dist/feequoter-1.0.0.dar")
-	require.NoError(t, err)
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{feeQuoterDar}, ccipParticipant, userParticipant)
-	require.NoError(t, err)
-	fmt.Printf("Uploaded CCIP FeeQuoter to ccipParticipant: %s\n", packageIDs)
-	onRampDar, err := os.ReadFile("../../contracts/ccip/onramp/.daml/dist/onramp-1.0.0.dar")
-	require.NoError(t, err)
-	packageIDs, err = UploadDARstoMultipleParticipants(ctx, [][]byte{onRampDar}, ccipParticipant, userParticipant)
-	require.NoError(t, err)
-	fmt.Printf("Uploaded CCIP OnRamp to ccipParticipant: %s\n", packageIDs)
-
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, ccipParticipant, userParticipant)
-	require.NoError(t, err)
-	fmt.Printf("Allocated parties on participants: %v\n", parties)
-	partyCCIP := parties[0]
-	partyUser := parties[1]
-	_ = partyCCIP
-	_ = partyUser
-
-	// List packages
-	pkgs, err := userParticipant.PackageServiceClient.ListPackages(ctx, &participantv30.ListPackagesRequest{
-		Limit:      0,
-		FilterName: "",
-	})
-	require.NoError(t, err)
-	for i, description := range pkgs.GetPackageDescriptions() {
-		fmt.Printf("Package %d: %s\n", i, description)
+func GetRegistryAdmin(ctx context.Context, metadataClient *tokenMetadataV1.ClientWithResponses) (string, error) {
+	registryInfoResponse, err := metadataClient.GetRegistryInfoWithResponse(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting registry info: %w", err)
 	}
+	if registryInfoResponse.StatusCode() != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d: %v", registryInfoResponse.StatusCode(), registryInfoResponse.Body)
+	}
+	return registryInfoResponse.JSON200.AdminId, nil
+}
 
-	// Acquire AMT
-	registryUrl := "http://scan.localhost:8080"
-	metadataClient, err := tokenMetadataV1.NewClientWithResponses(registryUrl)
-	require.NoError(t, err)
-	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(registryUrl)
-	require.NoError(t, err)
-	authProvider, err := securityprovider.NewSecurityProviderBearerToken(jwToken)
-	require.NoError(t, err)
-	scanProxyClient, err := scanProxy.NewClientWithResponses("http://sv.wallet.localhost:8080/api/validator", scanProxy.WithRequestEditorFn(authProvider.Intercept))
-	require.NoError(t, err)
-
-	// Get Instrument Admin
-	registryInfoResponse, err := metadataClient.GetRegistryInfoWithResponse(t.Context())
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, registryInfoResponse.StatusCode())
-	registryAdmin := registryInfoResponse.JSON200.AdminId
-	fmt.Printf("AMT Admin: %v\n", registryAdmin)
-
-	// Create Transfer Factory
-	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(t.Context(), transferInstructionV1.GetFactoryRequest{
+func GetTransferFactory(ctx context.Context, transferInstructionClient *transferInstructionV1.ClientWithResponses, registryAdmin, sender, receiver string) (string, []*apiv2.DisclosedContract, *apiv2.Value, error) {
+	transferFactoryResponse, err := transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": registryAdmin,
 			"transfer": map[string]any{
-				"sender":   registryAdmin,
-				"receiver": partyUser,
+				"sender":   sender,
+				"receiver": receiver,
 				"amount":   "100.00",
 				"instrumentId": map[string]any{
 					"admin": registryAdmin,
@@ -150,16 +101,23 @@ func TestCCIPSend(t *testing.T) {
 		},
 		ExcludeDebugFields: nil,
 	})
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, transferFactoryResponse.StatusCode())
-	fmt.Println(string(transferFactoryResponse.Body))
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("error getting transferFactory response: %w", err)
+	}
+	if transferFactoryResponse.StatusCode() != http.StatusOK {
+		return "", nil, nil, fmt.Errorf("unexpected status code: %d: %v", transferFactoryResponse.StatusCode(), transferFactoryResponse.Body)
+	}
 
 	var disclosedContracts []*apiv2.DisclosedContract
 	for _, contract := range transferFactoryResponse.JSON200.ChoiceContext.DisclosedContracts {
 		id, err := TemplateIdFromString(contract.TemplateId)
-		require.NoError(t, err)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("failed to parse template id: %w", err)
+		}
 		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
-		require.NoError(t, err)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("failed to decode created event blob: %w", err)
+		}
 		disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
 			TemplateId:       id,
 			ContractId:       contract.ContractId,
@@ -167,42 +125,97 @@ func TestCCIPSend(t *testing.T) {
 			SynchronizerId:   contract.SynchronizerId,
 		})
 	}
-	fmt.Println("Disclosed Contracts: ", disclosedContracts)
+	choiceContext, err := ChoiceContextFromData(transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
+	}
 
+	factoryCid := transferFactoryResponse.JSON200.FactoryId
+
+	return factoryCid, disclosedContracts, choiceContext, nil
+}
+
+func GetAmuletRulesContract(ctx context.Context, scanProxyClient *scanProxy.ClientWithResponses) (string, *apiv2.Identifier, error) {
 	// Get Amulet Rules contract
-	amuletRulesResponse, err := scanProxyClient.GetAmuletRulesWithResponse(t.Context())
-	require.NoError(t, err)
-	fmt.Println(string(amuletRulesResponse.Body))
-	require.Equal(t, http.StatusOK, amuletRulesResponse.StatusCode())
+	amuletRulesResponse, err := scanProxyClient.GetAmuletRulesWithResponse(ctx)
+	if err != nil {
+		return "", nil, fmt.Errorf("error getting amulet rules response: %w", err)
+	}
+	if amuletRulesResponse.StatusCode() != http.StatusOK {
+		return "", nil, fmt.Errorf("unexpected status code: %d: %v", amuletRulesResponse.StatusCode(), amuletRulesResponse.Body)
+	}
 	amuletRulesId, err := TemplateIdFromString(amuletRulesResponse.JSON200.AmuletRules.Contract.TemplateId)
-	require.NoError(t, err)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to parse amulet rules template id: %w", err)
+	}
+	return amuletRulesResponse.JSON200.AmuletRules.Contract.ContractId, amuletRulesId, nil
+}
 
-	// Get open mining round
-	openMiningRoundResponse, err := scanProxyClient.GetOpenAndIssuingMiningRoundsWithResponse(t.Context())
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, openMiningRoundResponse.StatusCode())
-	fmt.Println(string(openMiningRoundResponse.Body))
+func GetFirstOpenMiningRound(ctx context.Context, scanProxyClient *scanProxy.ClientWithResponses) (string, error) {
+	openMiningRoundResponse, err := scanProxyClient.GetOpenAndIssuingMiningRoundsWithResponse(ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting open mining rounds response: %w", err)
+	}
+	if openMiningRoundResponse.StatusCode() != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code: %d: %v", openMiningRoundResponse.StatusCode(), openMiningRoundResponse.Body)
+	}
 	slices.SortFunc(openMiningRoundResponse.JSON200.OpenMiningRounds, func(a, b scanProxy.ContractWithState) int {
-		aOpen, err := time.Parse(time.RFC3339, a.Contract.Payload["opensAt"].(string))
-		require.NoError(t, err)
-		bOpen, err := time.Parse(time.RFC3339, b.Contract.Payload["opensAt"].(string))
-		require.NoError(t, err)
+		aOpen, _ := time.Parse(time.RFC3339, a.Contract.Payload["opensAt"].(string))
+		bOpen, _ := time.Parse(time.RFC3339, b.Contract.Payload["opensAt"].(string))
 		return int(aOpen.UnixMilli() - bOpen.UnixMilli())
 	})
 	var openMiningRoundCid string
 	for _, round := range openMiningRoundResponse.JSON200.OpenMiningRounds {
 		opensAt, err := time.Parse(time.RFC3339, round.Contract.Payload["opensAt"].(string))
-		require.NoError(t, err)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse opensAt %q: %w", round.Contract.Payload["opensAt"], err)
+		}
 		targetClosesAt, err := time.Parse(time.RFC3339, round.Contract.Payload["targetClosesAt"].(string))
-		require.NoError(t, err)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse targetClosesAt %q: %w", round.Contract.Payload["targetClosesAt"], err)
+		}
 		if opensAt.Before(time.Now()) && targetClosesAt.After(time.Now()) {
 			openMiningRoundCid = round.Contract.ContractId
 		}
 	}
-	require.NotZero(t, openMiningRoundCid)
-	fmt.Println("Using open mining round: ", openMiningRoundCid)
+	return openMiningRoundCid, nil
+}
 
-	response, err := userParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+func MintAMT(
+	ctx context.Context,
+	participant *Participant,
+	metadataClient *tokenMetadataV1.ClientWithResponses,
+	transferInstructionClient *transferInstructionV1.ClientWithResponses,
+	scanProxyClient *scanProxy.ClientWithResponses,
+	toParty string,
+	amount string,
+) (string, error) {
+	// Get Instrument Admin
+	registryAdmin, err := GetRegistryAdmin(ctx, metadataClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get registry admin: %w", err)
+	}
+
+	// Get AmuletRules Contract
+	amuletRulesCid, amuletRulesId, err := GetAmuletRulesContract(ctx, scanProxyClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get amulet rules contract: %w", err)
+	}
+
+	// Create Transfer Factory
+	_, disclosedContracts, _, err := GetTransferFactory(ctx, transferInstructionClient, registryAdmin, registryAdmin, toParty)
+	if err != nil {
+		return "", fmt.Errorf("failed to get transfer factory: %w", err)
+	}
+
+	// Get open mining round
+	openMiningRoundCid, err := GetFirstOpenMiningRound(ctx, scanProxyClient)
+	if err != nil {
+		return "", fmt.Errorf("failed to get open mining round: %w", err)
+	}
+
+	// Mint AMT
+	response, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -210,15 +223,15 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: amuletRulesId,
-							ContractId: amuletRulesResponse.JSON200.AmuletRules.Contract.ContractId,
+							ContractId: amuletRulesCid,
 							Choice:     "AmuletRules_DevNet_Tap",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{
 									Label: "receiver",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyUser}},
+									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: toParty}},
 								}, {
 									Label: "amount",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "100"}},
+									Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: amount}},
 								}, {
 									Label: "openRound",
 									Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: openMiningRoundCid}},
@@ -228,20 +241,80 @@ func TestCCIPSend(t *testing.T) {
 					},
 				},
 			},
-			ActAs:              []string{partyUser},
+			ActAs:              []string{toParty},
 			DisclosedContracts: disclosedContracts,
 		},
 		TransactionFormat: nil,
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return "", fmt.Errorf("failed to mint AMT: %w", err)
+	}
+
 	tokenHoldingCid := ""
-	for i, event := range response.GetTransaction().GetEvents() {
-		fmt.Printf("Event %v: %v\n", i, event)
+	for _, event := range response.GetTransaction().GetEvents() {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			tokenHoldingCid = e.Created.ContractId
 		}
 	}
-	fmt.Printf("Minted AMT to: %s\n", tokenHoldingCid)
+	return tokenHoldingCid, nil
+}
+
+func TestCCIPSend(t *testing.T) {
+	jwToken, err := getJWT()
+	require.NoError(t, err)
+	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+
+	ccipParticipant, err := NewParticipant("participant1.admin-api.localhost:8080", "participant1.grpc-ledger-api.localhost:8080")
+	require.NoError(t, err)
+	userParticipant, err := NewParticipant("participant2.admin-api.localhost:8080", "participant2.grpc-ledger-api.localhost:8080")
+	require.NoError(t, err)
+
+	// Dars
+	// Uploading the CCIP dars to all participants
+	feeQuoterDar, err := os.ReadFile("../../contracts/ccip/feequoter/.daml/dist/ccip-feequoter-1.0.0.dar")
+	require.NoError(t, err)
+	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{feeQuoterDar}, ccipParticipant, userParticipant)
+	require.NoError(t, err)
+	fmt.Printf("Uploaded CCIP FeeQuoter to ccipParticipant: %s\n", packageIDs)
+	onRampDar, err := os.ReadFile("../../contracts/ccip/onramp/.daml/dist/ccip-onramp-1.0.0.dar")
+	require.NoError(t, err)
+	packageIDs, err = UploadDARstoMultipleParticipants(ctx, [][]byte{onRampDar}, ccipParticipant, userParticipant)
+	require.NoError(t, err)
+	fmt.Printf("Uploaded CCIP OnRamp to ccipParticipant: %s\n", packageIDs)
+	routerDar, err := os.ReadFile("../../contracts/ccip/router/.daml/dist/ccip-router-1.0.0.dar")
+	require.NoError(t, err)
+	packageIDs, err = UploadDARstoMultipleParticipants(ctx, [][]byte{routerDar}, ccipParticipant, userParticipant)
+	require.NoError(t, err)
+	fmt.Printf("Uploaded CCIP Router to ccipParticipant: %s\n", packageIDs)
+
+	parties, err := EnsurePartyOnMultipleParticipants(ctx, ccipParticipant, userParticipant)
+	require.NoError(t, err)
+	fmt.Printf("Allocated parties on participants: %v\n", parties)
+	partyCCIP := parties[0]
+	partyUser := parties[1]
+	_ = partyCCIP
+	_ = partyUser
+
+	// HTTP Clients
+	registryUrl := "http://scan.localhost:8080"
+	metadataClient, err := tokenMetadataV1.NewClientWithResponses(registryUrl)
+	require.NoError(t, err)
+	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(registryUrl)
+	require.NoError(t, err)
+	authProvider, err := securityprovider.NewSecurityProviderBearerToken(jwToken)
+	require.NoError(t, err)
+	scanProxyClient, err := scanProxy.NewClientWithResponses("http://sv.wallet.localhost:8080/api/validator", scanProxy.WithRequestEditorFn(authProvider.Intercept))
+	require.NoError(t, err)
+
+	// Get DSO Admin Party
+	registryAdmin, err := GetRegistryAdmin(ctx, metadataClient)
+	require.NoError(t, err)
+
+	// Mint Tokens to User Party
+	tokenHoldingCid, err := MintAMT(ctx, userParticipant, metadataClient, transferInstructionClient, scanProxyClient, partyUser, "100.00")
+	require.NoError(t, err)
+	fmt.Printf("Minted 100 AMT, Token Holding Cid: %s\n", tokenHoldingCid)
 
 	// CCIP Party deploys CCIP contracts
 	chainSelector := "1111111111"
@@ -260,7 +333,7 @@ func TestCCIPSend(t *testing.T) {
 	_ = destChainSelector2
 	_ = instrumentIdAmt
 
-	// FeeQuoter
+	// Deploy FeeQuoter
 	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -314,7 +387,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 	fmt.Printf("Deployed FeeQuoter to: %s\n", feeQuoterCid)
 
-	// OnRamp
+	// Deploy OnRamp
 	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -360,7 +433,44 @@ func TestCCIPSend(t *testing.T) {
 	}
 	fmt.Printf("Deployed OnRamp to: %s\n", onRampCid)
 
-	// Apply price updates for destChainSelector1 and AMT
+	// Deploy Router
+	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Create{
+						Create: &apiv2.CreateCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#ccip-router",
+								ModuleName: "CCIP.Router",
+								EntityName: "Router",
+							},
+							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{
+									Label: "owner",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}},
+								},
+							}},
+						},
+					},
+				},
+			},
+			ActAs: []string{partyCCIP},
+		},
+	})
+	require.NoError(t, err)
+	routerCid := ""
+	for _, event := range res.GetTransaction().GetEvents() {
+		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+			routerCid = e.Created.ContractId
+		}
+	}
+	fmt.Printf("Deployed Router to: %s\n", routerCid)
+
+	// Apply configs
+
+	// Apply DestChainConfig to FeeQuoter
 	feeQuoterDestChainConfig1 := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{
 			Label: "isEnabled",
@@ -438,6 +548,8 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}
 	fmt.Printf("Applied DestChainConfigUpdates to FeeQuoter: %v\n", feeQuoterCid)
+
+	// Apply Price Updates to FeeQuoter
 	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -508,6 +620,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 	fmt.Printf("Applied Price Updates to FeeQuoter: %v\n", feeQuoterCid)
 
+	// Apply DestChainConfig to OnRamp
 	onRampDestChainConfig1 := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{
 			Label: "sequenceNumber",
@@ -568,63 +681,77 @@ func TestCCIPSend(t *testing.T) {
 	}
 	fmt.Printf("Applied DestChainConfigUpdates to OnRamp: %v\n", onRampCid)
 
-	// Create TransferInstruction to ccip party
-	transferFactoryResponse, err = transferInstructionClient.GetTransferFactoryWithResponse(t.Context(), transferInstructionV1.GetFactoryRequest{
-		ChoiceArguments: map[string]any{
-			"expectedAdmin": registryAdmin,
-			"transfer": map[string]any{
-				"sender":   partyUser,
-				"receiver": partyCCIP,
-				"amount":   "2.00",
-				"instrumentId": map[string]any{
-					"admin": registryAdmin,
-					"id":    "Amulet",
-				},
-				"lock":          nil,
-				"requestedAt":   time.Now().Add(time.Minute * -1).Format(time.RFC3339),
-				"executeBefore": time.Now().Add(time.Hour * 24).Format(time.RFC3339),
-				"inputHoldingCids": []string{
-					tokenHoldingCid,
-				},
-				"meta": map[string]any{
-					"values": map[string]any{},
-				},
-			},
-			"extraArgs": map[string]any{
-				"context": map[string]any{
-					"values": map[string]any{},
-				},
-				"meta": map[string]any{
-					"values": map[string]any{},
-				},
-			},
-		},
-		ExcludeDebugFields: nil,
+	// =========================
+	// |     Call CCIPSend     |
+	// =========================
+
+	ccipApi := CCIPApi{
+		Participant: ccipParticipant,
+		CCIPParty:   partyCCIP,
+	}
+
+	for range 3 {
+		CCIPSend(t, ccipApi, userParticipant, partyUser, partyCCIP, destChainSelector1, instrumentIdAmt, transferInstructionClient, registryAdmin)
+	}
+
+	// Check token holdings for the CCIP party
+	tokenHoldings, err := GetActiveContractsForPartyInterface(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+		PackageId:  "#splice-api-token-holding-v1",
+		ModuleName: "Splice.Api.Token.HoldingV1",
+		EntityName: "Holding",
 	})
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, transferFactoryResponse.StatusCode())
-
-	transferFactoryCid := transferFactoryResponse.JSON200.FactoryId
-	fmt.Println("TransferFactory Cid: ", transferFactoryCid)
-
-	disclosedContracts = nil
-	for _, contract := range transferFactoryResponse.JSON200.ChoiceContext.DisclosedContracts {
-		id, err := TemplateIdFromString(contract.TemplateId)
-		require.NoError(t, err)
-		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
-		require.NoError(t, err)
-		disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
-			TemplateId:       id,
-			ContractId:       contract.ContractId,
-			CreatedEventBlob: createdEventBlob,
-			SynchronizerId:   contract.SynchronizerId,
-		})
+	fmt.Printf("User Party %s has %d token holdings after CCIPSend\n", partyUser, len(tokenHoldings))
+	for _, holding := range tokenHoldings {
+		balance := holding.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()[2].GetValue().GetSum().(*apiv2.Value_Numeric).Numeric
+		fmt.Printf(" - Token Holding Cid: %s, Balance: %s\n", holding.GetCreatedEvent().GetContractId(), balance)
 	}
-	fmt.Println("Disclosed Contracts: ", disclosedContracts)
+}
 
-	choiceContext, err := ChoiceContextFromData(transferFactoryResponse.JSON200.ChoiceContext.ChoiceContextData)
+func CCIPSend(
+	t *testing.T,
+	ccipApi CCIPApi,
+	participant *Participant,
+	party string,
+	ccipParty string,
+	destChainSelector string,
+	feeToken *apiv2.Value,
+
+	transferInstructionClient *transferInstructionV1.ClientWithResponses,
+	registryAdmin string,
+) {
+	// Add authorization to the context
+	jwToken, err := getJWT()
 	require.NoError(t, err)
-	response, err = userParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+
+	// Query disclosures for CCIP contract - these would be served by off-chain CCIP infrastructure
+	feeQuoterDisclosure, err := ccipApi.GetFeeQuoter(t.Context())
+	require.NoError(t, err)
+	onRampDisclosure, err := ccipApi.GetOnRamp(t.Context())
+	require.NoError(t, err)
+	routerDisclosure, err := ccipApi.GetRouter(t.Context())
+	require.NoError(t, err)
+
+	// User queries their current TokenHoldings
+	tokenHoldings, err := GetActiveContractsForPartyInterface(ctx, participant, party, &apiv2.Identifier{
+		PackageId:  "#splice-api-token-holding-v1",
+		ModuleName: "Splice.Api.Token.HoldingV1",
+		EntityName: "Holding",
+	})
+	require.NoError(t, err)
+	// Use the first token Holding we find
+	tokenHolding := tokenHoldings[0]
+	tokenHoldingCid := tokenHolding.GetCreatedEvent().GetContractId()
+	fmt.Printf("Using token holding cid: %s for CCIPSend, balance: %v\n", tokenHoldingCid, tokenHolding.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()[2].GetValue().GetSum().(*apiv2.Value_Numeric).Numeric)
+
+	// Query TransferFactory from AMT registry
+	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := GetTransferFactory(ctx, transferInstructionClient, registryAdmin, party, ccipParty)
+	require.NoError(t, err)
+
+	// Call CCIPSend from User Participant on Router
+	response, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -632,106 +759,16 @@ func TestCCIPSend(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#splice-api-token-transfer-instruction-v1",
-								ModuleName: "Splice.Api.Token.TransferInstructionV1",
-								EntityName: "TransferFactory",
+								PackageId:  "#ccip-router",
+								ModuleName: "CCIP.Router",
+								EntityName: "Router",
 							},
-							ContractId: transferFactoryCid,
-							Choice:     "TransferFactory_Transfer",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{
-									Label: "expectedAdmin",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: registryAdmin}},
-								}, {
-									Label: "transfer",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-										{
-											Label: "sender",
-											Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyUser}},
-										}, {
-											Label: "receiver",
-											Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}},
-										}, {
-											Label: "amount",
-											Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "2.00"}},
-										}, {
-											Label: "instrumentId",
-											Value: instrumentIdAmt,
-										}, {
-											Label: "requestedAt",
-											Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().Add(time.Minute * -1).UnixMicro()}},
-										}, {
-											Label: "executeBefore",
-											Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().Add(time.Hour * 24).UnixMicro()}},
-										}, {
-											Label: "inputHoldingCids",
-											Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-												{
-													Sum: &apiv2.Value_ContractId{ContractId: tokenHoldingCid},
-												},
-											}}}},
-										}, {
-											Label: "meta",
-											Value: emptyMetadata,
-										},
-									}}}},
-								}, {
-									Label: "extraArgs",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-										{
-											Label: "context",
-											Value: choiceContext,
-										}, {
-											Label: "meta",
-											Value: emptyMetadata,
-										},
-									}}}},
-								},
-							}}}},
-						},
-					},
-				},
-			},
-			ActAs:              []string{partyUser},
-			DisclosedContracts: disclosedContracts,
-		},
-		TransactionFormat: nil,
-	})
-	require.NoError(t, err)
-	transferInstructionCid := ""
-	for _, event := range response.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			transferInstructionCid = e.Created.ContractId
-		}
-	}
-	fmt.Printf("Created TransferInstruction to CCIP Party: %s\n", transferInstructionCid)
-
-	// Call CCIPSend on the OnRamp
-
-	// Query disclosures for CCIP contract
-	feeQuoterDisclosure, err := QueryDisclosedContract(ctx, feeQuoterCid, ccipParticipant)
-	require.NoError(t, err)
-	onRampDisclosure, err := QueryDisclosedContract(ctx, onRampCid, ccipParticipant)
-	require.NoError(t, err)
-
-	response, err = userParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#ccip-onramp",
-								ModuleName: "CCIP.OnRamp",
-								EntityName: "OnRamp",
-							},
-							ContractId: onRampCid,
+							ContractId: routerDisclosure.ContractId,
 							Choice:     "CCIPSend",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{
 									Label: "destChainSelector",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: destChainSelector1}},
+									Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: destChainSelector}},
 								}, {
 									Label: "message",
 									Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -743,7 +780,7 @@ func TestCCIPSend(t *testing.T) {
 											Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "0xPayloadData"}},
 										}, {
 											Label: "feeToken",
-											Value: instrumentIdAmt,
+											Value: feeToken,
 										}, {
 											Label: "extraArgs",
 											Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "0x1234"}},
@@ -753,8 +790,16 @@ func TestCCIPSend(t *testing.T) {
 									Label: "feeInput",
 									Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 										{
-											Label: "transfer",
-											Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferInstructionCid}},
+											Label: "transferFactory",
+											Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}},
+										},
+										{
+											Label: "inputHoldingCids",
+											Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+												{
+													Sum: &apiv2.Value_ContractId{ContractId: tokenHoldingCid},
+												},
+											}}}},
 										}, {
 											Label: "extraArgs",
 											Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -770,18 +815,21 @@ func TestCCIPSend(t *testing.T) {
 									}}}},
 								}, {
 									Label: "caller",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyUser}},
+									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: party}},
+								}, {
+									Label: "onRamp",
+									Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: onRampDisclosure.ContractId}},
 								}, {
 									Label: "feeQuoter",
-									Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: feeQuoterCid}},
+									Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: feeQuoterDisclosure.ContractId}},
 								},
 							}}}},
 						},
 					},
 				},
 			},
-			ActAs:              []string{partyUser},
-			DisclosedContracts: append(disclosedContracts, feeQuoterDisclosure, onRampDisclosure),
+			ActAs:              []string{party},
+			DisclosedContracts: append(transferFactoryDisclosures, feeQuoterDisclosure, onRampDisclosure, routerDisclosure),
 		},
 		TransactionFormat: nil,
 	})
@@ -794,7 +842,7 @@ func TestCCIPSend(t *testing.T) {
 			}
 		}
 	}
-	fmt.Printf("Sent CCIP Message using OnRamp, event: %v\n", ccipMessageSentCid)
+	fmt.Printf("Sent CCIP Message using Router, event: %v\n", ccipMessageSentCid)
 }
 
 func TestMessageSentListener(t *testing.T) {
@@ -806,7 +854,7 @@ func TestMessageSentListener(t *testing.T) {
 	ccipParticipant, err := NewParticipant("participant1.admin-api.localhost:8080", "participant1.grpc-ledger-api.localhost:8080")
 	require.NoError(t, err)
 
-	onRampDar, err := os.ReadFile("../../contracts/ccip/onramp/.daml/dist/onramp-1.0.0.dar")
+	onRampDar, err := os.ReadFile("../../contracts/ccip/onramp/.daml/dist/ccip-onramp-1.0.0.dar")
 	require.NoError(t, err)
 	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{onRampDar}, ccipParticipant)
 	require.NoError(t, err)
@@ -860,7 +908,10 @@ func TestMessageSentListener(t *testing.T) {
 			for _, event := range update.GetTransaction().GetEvents() {
 				if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 					if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-						fmt.Printf("CCIPMessageSent: %+v\n", event.GetCreated())
+						fmt.Println("CCIPMessageSent event received:")
+						marshalledEvent := protojson.Format(event)
+						fmt.Println(string(marshalledEvent))
+						fmt.Println("==============================")
 					}
 				}
 			}
