@@ -20,9 +20,9 @@ template OnRamp
     where
         signatory owner
 
-        -- // ================================================================
-        -- // │                             Fees                             │
-        -- // ================================================================
+        -- ================================================================
+        -- │                             Fees                             │
+        -- ================================================================
 
         nonconsuming choice GetFee : Decimal
             with
@@ -62,6 +62,7 @@ template OnRamp
                 feeQuoter : ContractId FeeQuoter.FeeQuoter
             controller caller
             do
+                 -- Lookup destChainConfig
                 case Map.lookup destChainSelector destChainConfigs of
                     None -> abort "Unknown destChainSelector"
                     Some config -> do

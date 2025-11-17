@@ -5,6 +5,9 @@ import Daml.Script
 import DA.Assert
 import DA.Crypto.Text
 import DA.Text qualified as Text
+import DA.Optional
+
+import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 
@@ -64,6 +67,23 @@ setup = script do
     encodeSmall256 === Some "00000000000000000000000000000000000000000000000000000000000f4240"
     encodeNegative256 === None
     debug("uint256 encoding edge cases passed")
+
+    debug ("--- InstrumentId Encoding Test ---")
+    party <- allocateParty "testParty"
+
+    let encodedPartyId = MessageCodecV1.encodePartyId party
+    let decodedPartyId = fromSome (MessageCodecV1.decodePartyId encodedPartyId)
+    decodedPartyId === party
+
+    let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = party
+            id = "LINK"
+
+    let encodedInstrumentId = MessageCodecV1.encodeInstrumentId instrumentId
+    let decodedInstrumentId = fromSome (MessageCodecV1.decodeInstrumentId encodedInstrumentId)
+    decodedInstrumentId === instrumentId
+
+    debug ("--- PASS ---")
 
     -- Test full MessageV1 encoding
     let wantMsg : BytesHex = Text.asciiToLower "01000000000000007b00000000000001c8000000000000031514f611f19236c999e05a62c9804f757a22553d2b50146b968538a8b1692451f18588c808e8d1702d5e3d07d000061a8014cd1722f3947def4cf144679da39c4c32bdc3568114b6d4805bf6943c5875c0c7b67eda24b2bdacbf6e0018636f6d706c65782064657374696e6174696f6e20626c6f6200870100000000000000000000000000000000000000000000000000000000000f424014ed3ee8542acd9e483c658350ad4984483eb0afdc14c283f6085a391df8e3f78ddc49c6b4701612283814c22ff98123e0785520915c5bd97e83ac649180a114bcd565166cafb25d53079c7e6522c18c2c0e39c30010746f6b656e206578747261206461746100176d657373616765207769746820746f6b656e2064617461"

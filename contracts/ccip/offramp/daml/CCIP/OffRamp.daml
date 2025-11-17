@@ -1,0 +1,107 @@
+module CCIP.OffRamp where
+
+import DA.Assert
+import DA.Foldable qualified as Foldable
+import DA.Crypto.Text (BytesHex)
+import DA.List qualified as List
+import DA.Map qualified as Map
+import DA.Optional (fromSomeNote)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.Interfaces.Any2CantonMessageReceiver
+import qualified CCIP.MessageCodecV1
+
+template OffRamp
+    with
+        owner : Party
+
+        sourceChainConfigs : Map.Map (Numeric 0) SourceChainConfig
+    where
+        signatory owner
+
+        -- ===============================================================
+        -- |                            CCVs                             |
+        -- ===============================================================
+
+        nonconsuming choice OffRamp_GetCCVsForMessage : ([ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], Int)
+            with
+                encodedMessage : BytesHex
+                receiver : ContractId CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver
+                -- tokenAdminRegistry : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                caller : Party
+            controller caller
+            do
+                let message = fromSomeNote "failed to decode message" (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+
+                -- fetch receiver
+                receiverIface <- fetch receiver
+                (view receiverIface).ccipOwner === owner
+
+                -- look up source chain config
+                case Map.lookup message.sourceChainSelector sourceChainConfigs of
+                    None -> abort "Unknown sourceChainSelector"
+                    Some sourceChainConfig -> do
+                        -- get CCVs from token pool if applicable
+                        requiredPoolCCVs <- case message.tokenTransfer of
+                            [] -> return []
+                            [tokenTransfer] -> do
+                                let localToken = fromSomeNote "failed to decode local token" (CCIP.MessageCodecV1.decodeInstrumentId tokenTransfer.destTokenAddress)
+                                getCCVsForPool localToken message.sourceChainSelector tokenTransfer.amount message.finality tokenTransfer.extraData
+                            _ -> abort "Invalid number of tokens"
+
+                        -- get CCVs from receiver
+                        (requiredReceiverCCVs, optionalReceiverCCVs, useDefaultCCVs, optionalThreshold) <- exercise receiver CCIP.Interfaces.Any2CantonMessageReceiver.Any2CantonMessageReceiver_GetCCVs with
+                            sourceChainSelector = message.sourceChainSelector
+                            caller = owner
+
+                        let laneMandatedCCVs = sourceChainConfig.laneMandatedCCVs
+                        let defaultCCVs = sourceChainConfig.defaultCCVs
+
+                        -- if useDefaultCCVs is true, add defaultCCVs to requiredCCVs
+                        let requiredCCVs = if useDefaultCCVs
+                            then List.foldr (\ccv acc -> if ccv `elem` acc then acc else ccv :: acc) [] (requiredPoolCCVs ++ requiredReceiverCCVs ++ laneMandatedCCVs ++ defaultCCVs)
+                            else List.foldr (\ccv acc -> if ccv `elem` acc then acc else ccv :: acc) [] (requiredPoolCCVs ++ requiredReceiverCCVs ++ laneMandatedCCVs)
+
+                        return (requiredCCVs, optionalReceiverCCVs, 0)
+
+        -- ================================================================
+        -- │                           Config                             │
+        -- ================================================================
+
+        choice ApplySourceChainConfigUpdates : ContractId OffRamp
+            with
+                updates : [SourceChainConfigArgs]
+            controller owner
+            do
+                Foldable.mapA_ (\update -> do
+                    -- validate update
+                    assertMsg ("sourceChainSelector must be non-zero" <> show update.sourceChainSelector) (update.sourceChainSelector /= 0.0)
+                    assertMsg ("onRamp must be non-empty" <> show update.sourceChainConfig.onRamp) (update.sourceChainConfig.onRamp /= "")
+                    return ()
+                    ) updates
+
+                let newSourceChainConfigs = foldl (\acc update -> Map.insert update.sourceChainSelector update.sourceChainConfig acc) sourceChainConfigs updates
+                create this with
+                    sourceChainConfigs = newSourceChainConfigs
+
+getCCVsForPool : Splice.Api.Token.HoldingV1.InstrumentId {- -> ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry -} -> Numeric 0 -> Numeric 0 -> Int -> BytesHex -> Update ([ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier])
+getCCVsForPool localToken sourceChainSelector amount finality extraData = do
+    pure ([])
+
+-- Configs
+
+data SourceChainConfigArgs = SourceChainConfigArgs
+    with
+        sourceChainSelector : Numeric 0
+        sourceChainConfig : SourceChainConfig
+    deriving (Eq, Show)
+
+data SourceChainConfig = SourceChainConfig
+    with
+        isEnabled : Bool
+        onRamp : BytesHex
+        defaultCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+        laneMandatedCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+    deriving (Eq, Show)

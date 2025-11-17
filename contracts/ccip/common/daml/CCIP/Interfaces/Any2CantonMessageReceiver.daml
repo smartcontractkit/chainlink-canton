@@ -1,0 +1,28 @@
+module CCIP.Interfaces.Any2CantonMessageReceiver where
+
+import qualified CCIP.Client
+import qualified CCIP.Interfaces.CrossChainVerifier
+
+interface IAny2CantonMessageReceiver where
+    viewtype Any2CantonMessageReceiverView
+
+    any2CantonMessageReceiver_getCCVsImpl : ContractId IAny2CantonMessageReceiver -> Numeric 0 -> Update ([ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], Bool, Int)
+    any2CantonMessageReceiver_ccipReceiveImpl : ContractId IAny2CantonMessageReceiver -> Any2CantonMessageReceiver_CCIPReceive -> Update ()
+
+    nonconsuming choice Any2CantonMessageReceiver_GetCCVs : ([ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], Bool, Int)
+        with
+            sourceChainSelector : Numeric 0
+            caller : Party
+        controller caller
+        do any2CantonMessageReceiver_getCCVsImpl this self sourceChainSelector
+
+    nonconsuming choice Any2CantonMessageReceiver_CCIPReceive : ()
+        with
+            message : CCIP.Client.Any2CantonMessage
+        controller (view this).ccipOwner
+        do any2CantonMessageReceiver_ccipReceiveImpl this self arg
+
+data Any2CantonMessageReceiverView = Any2CantonMessageReceiverView
+    with
+        ccipOwner : Party
+    deriving (Eq, Show)

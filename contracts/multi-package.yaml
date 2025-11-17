@@ -1,8 +1,10 @@
 packages:
   - coin
+  - ccip/ccipreceiver
   - ccip/ccvs
   - ccip/common
   - ccip/feequoter
   - ccip/onramp
+  - ccip/offramp
   - ccip/router
   - ccip/test

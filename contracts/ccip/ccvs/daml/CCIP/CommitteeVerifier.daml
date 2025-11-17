@@ -22,7 +22,7 @@ template CommitteeVerifier
         ccipOwner : Party
         storageLocation : Text
 
-        -- config
+        -- config TODO: Refactor this out, to allow updating without recreating the contract
         threshold : Int
         signers : [BytesHex] 
     where
@@ -86,7 +86,6 @@ template CommitteeVerifier
                 -- Check threshold requirement
                 assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold) 
                     (validSignerCount >= threshold)
-                
 
                 pure()
 

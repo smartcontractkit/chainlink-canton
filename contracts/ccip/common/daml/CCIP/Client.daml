@@ -1,6 +1,9 @@
 module CCIP.Client(
-    Canton2AnyMessage(..)
+    Canton2AnyMessage(..),
+    Any2CantonMessage(..)
 ) where
+
+import DA.Crypto.Text (BytesHex)
 
 import Splice.Api.Token.HoldingV1
 
@@ -10,4 +13,13 @@ data Canton2AnyMessage = Canton2AnyMessage
         payload : Text
         feeToken : Splice.Api.Token.HoldingV1.InstrumentId
         extraArgs : Text
+    deriving (Eq, Show)
+
+data Any2CantonMessage = Any2CantonMessage
+    with
+        messageId : BytesHex
+        sourceChainSelector : Numeric 0
+        sender : BytesHex
+        payload : BytesHex
+        -- Add token amounts
     deriving (Eq, Show)

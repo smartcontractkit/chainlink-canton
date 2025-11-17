@@ -8,6 +8,8 @@ module CCIP.MessageCodecV1
   , encodeUint32
   , encodeUint64
   , encodeUint256
+  , encodeInstrumentId
+  , encodePartyId
   , extractBytes
   , decodeMessageV1
   , decodeUint8
@@ -15,12 +17,15 @@ module CCIP.MessageCodecV1
   , decodeUint32
   , decodeUint64
   , decodeUint256
+  , decodeInstrumentId
+  , decodePartyId
   ) where
 
 import DA.Crypto.Text
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 
+import qualified Splice.Api.Token.HoldingV1
 
 data MessageV1 = MessageV1
     with
@@ -106,6 +111,16 @@ encodeTokenTransferV1 tokenTransfer =
     <> fromSome (encodeUint16 (byteCount tokenTransfer.extraData))
     <> tokenTransfer.extraData
 
+encodeInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
+encodeInstrumentId instrumentId =
+    let
+        partyId = encodePartyId instrumentId.admin
+        id = DA.Crypto.Text.toHex instrumentId.id
+    in
+        (fromSome (encodeUint8 (byteCount partyId)))
+        <> partyId
+        <> (fromSome (encodeUint8 (byteCount id)))
+        <> id
 
 encodeUint8 : Int -> Optional BytesHex
 encodeUint8 n =
@@ -188,7 +203,12 @@ encodeUint256 n =
             paddedHex = padLeft 64 "0" hexStr
         in
             Some paddedHex
-        
+
+encodePartyId : Party -> BytesHex
+encodePartyId party =
+    let partyText = partyToText party
+    in
+        DA.Crypto.Text.toHex partyText
 
 -- Helpers
 
@@ -360,6 +380,40 @@ decodeUint256 hex =
         case hexToDecimalString hex of
             Some decStr -> Some (parseDecimal decStr)
             None -> None
+
+decodeInstrumentId : BytesHex -> Optional Splice.Api.Token.HoldingV1.InstrumentId
+decodeInstrumentId encoded =
+    do
+        -- Extract partyId length (1 byte)
+        partyIdLenHex <- extractBytes encoded 0 1
+        partyIdLen <- decodeUint8 partyIdLenHex
+        
+        -- Extract partyId hex
+        partyIdHex <- extractBytes encoded 1 partyIdLen
+        
+        -- Decode partyId
+        admin <- decodePartyId partyIdHex
+        
+        -- Extract id length (1 byte)
+        idLenHex <- extractBytes encoded (1 + partyIdLen) 1
+        idLen <- decodeUint8 idLenHex
+        
+        -- Extract id hex
+        idHex <- extractBytes encoded (2 + partyIdLen) idLen
+        
+        -- Decode id from hex to Int
+        id <- DA.Crypto.Text.fromHex idHex
+        
+        return Splice.Api.Token.HoldingV1.InstrumentId
+            { admin = admin
+            , id = id
+            }
+
+decodePartyId : BytesHex -> Optional Party
+decodePartyId hex =
+    let partyText = fromSome(DA.Crypto.Text.fromHex hex)
+    in
+        partyFromText partyText
 
 -- Helpers
 
