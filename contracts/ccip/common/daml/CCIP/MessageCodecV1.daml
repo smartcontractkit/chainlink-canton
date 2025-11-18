@@ -784,3 +784,9 @@ decodeTokenTransferV1 encoded =
                 , extraData = extraDataHex
                 }]
 
+messageId : MessageV1 -> BytesHex
+messageId message =
+    let
+        encodedMessage = encodeMessageV1 message
+    in
+        keccak256 encodedMessage

@@ -1,16 +1,18 @@
 module CCIP.OffRamp where
-
+-- now
 import DA.Assert
 import DA.Foldable qualified as Foldable
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.List qualified as List
 import DA.Map qualified as Map
-import DA.Optional (fromSomeNote)
+import DA.Optional (fromSome, fromSomeNote)
 
 import qualified Splice.Api.Token.HoldingV1
 
+import qualified CCIP.Client
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.Any2CantonMessageReceiver
+import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 
 template OffRamp
@@ -18,6 +20,8 @@ template OffRamp
         owner : Party
 
         sourceChainConfigs : Map.Map (Numeric 0) SourceChainConfig
+        -- TODO: shouldn't keep global config
+        executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
     where
         signatory owner
 
@@ -34,37 +38,89 @@ template OffRamp
             controller caller
             do
                 let message = fromSomeNote "failed to decode message" (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+                exercise self OffRamp_GetCCVsForDecodedMessage with
+                    message = message
+                    receiver = receiver
+                    caller = caller
 
+        nonconsuming choice OffRamp_GetCCVsForDecodedMessage : ([ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier], Int)
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                receiver : ContractId CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver
+                caller : Party
+            controller caller
+            do
                 -- fetch receiver
                 receiverIface <- fetch receiver
                 (view receiverIface).ccipOwner === owner
+                -- TODO: Need to somehow check that the correct receiver has been passed in
+                --message.receiver === show receiver
 
-                -- look up source chain config
-                case Map.lookup message.sourceChainSelector sourceChainConfigs of
-                    None -> abort "Unknown sourceChainSelector"
-                    Some sourceChainConfig -> do
-                        -- get CCVs from token pool if applicable
-                        requiredPoolCCVs <- case message.tokenTransfer of
-                            [] -> return []
-                            [tokenTransfer] -> do
-                                let localToken = fromSomeNote "failed to decode local token" (CCIP.MessageCodecV1.decodeInstrumentId tokenTransfer.destTokenAddress)
-                                getCCVsForPool localToken message.sourceChainSelector tokenTransfer.amount message.finality tokenTransfer.extraData
-                            _ -> abort "Invalid number of tokens"
+                sourceChainConfig <- exercise self GetSourceChainConfig with
+                    sourceChainSelector = message.sourceChainSelector
+                    caller = owner
 
-                        -- get CCVs from receiver
-                        (requiredReceiverCCVs, optionalReceiverCCVs, useDefaultCCVs, optionalThreshold) <- exercise receiver CCIP.Interfaces.Any2CantonMessageReceiver.Any2CantonMessageReceiver_GetCCVs with
-                            sourceChainSelector = message.sourceChainSelector
-                            caller = owner
+                -- get CCVs from token pool if applicable
+                requiredPoolCCVs <- case message.tokenTransfer of
+                    [] -> return []
+                    [tokenTransfer] -> do
+                        let localToken = fromSomeNote "failed to decode local token" (CCIP.MessageCodecV1.decodeInstrumentId tokenTransfer.destTokenAddress)
+                        getCCVsForPool localToken message.sourceChainSelector tokenTransfer.amount message.finality tokenTransfer.extraData
+                    _ -> abort "Invalid number of tokens"
 
-                        let laneMandatedCCVs = sourceChainConfig.laneMandatedCCVs
-                        let defaultCCVs = sourceChainConfig.defaultCCVs
+                -- get CCVs from receiver
+                (requiredReceiverCCVs, optionalReceiverCCVs, useDefaultCCVs, optionalThreshold) <- exercise receiver CCIP.Interfaces.Any2CantonMessageReceiver.Any2CantonMessageReceiver_GetCCVs with
+                    sourceChainSelector = message.sourceChainSelector
+                    caller = owner
 
-                        -- if useDefaultCCVs is true, add defaultCCVs to requiredCCVs
-                        let requiredCCVs = if useDefaultCCVs
-                            then List.foldr (\ccv acc -> if ccv `elem` acc then acc else ccv :: acc) [] (requiredPoolCCVs ++ requiredReceiverCCVs ++ laneMandatedCCVs ++ defaultCCVs)
-                            else List.foldr (\ccv acc -> if ccv `elem` acc then acc else ccv :: acc) [] (requiredPoolCCVs ++ requiredReceiverCCVs ++ laneMandatedCCVs)
 
-                        return (requiredCCVs, optionalReceiverCCVs, 0)
+                let laneMandatedCCVs = sourceChainConfig.laneMandatedCCVs
+                let defaultCCVs = sourceChainConfig.defaultCCVs
+                
+                -- if useDefaultCCVs is true, add defaultCCVs to requiredCCVs
+                let requiredCCVs = if useDefaultCCVs
+                    then List.dedupSort (requiredPoolCCVs ++ requiredReceiverCCVs ++ laneMandatedCCVs ++ defaultCCVs)
+                    else List.dedupSort (requiredPoolCCVs ++ requiredReceiverCCVs ++ laneMandatedCCVs)
+
+                pure (requiredCCVs, optionalReceiverCCVs, optionalThreshold)
+
+        -- returns (CCV address, CCV data) for all required and optional CCVs
+        nonconsuming choice OffRamp_EnsureCCVQuorumIsMet : [(ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier, BytesHex)]
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                receiver : ContractId CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver
+                ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+                ccvData : [BytesHex]
+                caller : Party
+            controller caller
+            do
+                assertMsg "ccvs and ccvData length mismatch" (length ccvs == length ccvData)
+
+                (requiredCCVs, optionalCCVs, threshold) <- exercise self OffRamp_GetCCVsForDecodedMessage with
+                    message = message
+                    receiver = receiver
+                    caller = caller
+
+                -- Verify all required CCVs are present and collect their data
+                requiredCCVsWithData <- forA requiredCCVs (\requiredCCV -> do
+                    case List.elemIndex requiredCCV ccvs of
+                        None -> abort ("Required CCV missing: " <> show requiredCCV)
+                        Some idx -> return (requiredCCV, ccvData List.!! idx)
+                    )
+
+                -- Collect optional CCVs and check that threshold is met
+                let optionalCCVsWithData = List.foldl (\acc optionalCCV ->
+                        case List.elemIndex optionalCCV ccvs of
+                            None -> acc
+                            Some idx -> acc ++ [(optionalCCV, ccvData List.!! idx)]
+                        ) [] optionalCCVs
+                
+                let optionalCCVsFound = length optionalCCVsWithData
+                assertMsg ("Optional CCV quorum not reached: required " <> show threshold <> ", found " <> show optionalCCVsFound) (optionalCCVsFound >= threshold)
+
+                let selectedOptionalCCVs = take threshold optionalCCVsWithData
+                pure (requiredCCVsWithData ++ selectedOptionalCCVs)
+
 
         -- ================================================================
         -- │                           Config                             │
@@ -86,9 +142,132 @@ template OffRamp
                 create this with
                     sourceChainConfigs = newSourceChainConfigs
 
+        nonconsuming choice GetSourceChainConfig : SourceChainConfig
+            with
+                sourceChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do
+                case Map.lookup sourceChainSelector sourceChainConfigs of
+                    None -> abort "Unknown sourceChainSelector"
+                    Some config -> return config
+
+        -- ================================================================
+        -- │                          Execution                           │
+        -- ================================================================
+
+        nonconsuming choice OffRamp_GetExecutionState : CCIP.Internal.MessageExecutionState
+            with
+                sourceChainSelector : Numeric 0
+                sequenceNumber : Numeric 0
+                sender : BytesHex
+                receiver : BytesHex
+                caller : Party
+            controller caller
+            do
+                let executionStateKey = calculateExecutionStateKey sourceChainSelector sequenceNumber sender receiver
+
+                case Map.lookup executionStateKey executionStates of
+                    None -> return CCIP.Internal.UNTOUCHED
+                    Some state -> return state
+
+        -- TODO: turn into function instead?
+        nonconsuming choice OffRamp_ExecuteSingleMessage : ()
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                messageId : BytesHex
+                receiver : ContractId CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver
+                ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+                ccvData : [BytesHex]
+                caller : Party
+            controller caller
+            do
+                ccvsAndData <- exercise self OffRamp_EnsureCCVQuorumIsMet with
+                    message = message
+                    receiver = receiver
+                    ccvs = ccvs
+                    ccvData = ccvData
+                    caller = caller
+
+                -- query each CCV to verify message
+                Foldable.mapA_ (\(ccvCid, ccvBlob) -> do
+                    exercise ccvCid CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
+                        message = message
+                        messageId = messageId
+                        ccvData = ccvBlob
+                        caller = caller
+                    ) ccvsAndData
+
+                -- call receiver
+                exercise receiver CCIP.Interfaces.Any2CantonMessageReceiver.Any2CantonMessageReceiver_CCIPReceive with
+                    message = CCIP.Client.Any2CantonMessage
+                        with
+                            messageId = messageId
+                            sourceChainSelector = message.sourceChainSelector
+                            sender = message.sender
+                            payload = message.messageData
+
+                pure ()
+
+        -- TODO: this shouldn't be postconsuming due to reentrancy concerns, need to refactor to use preconsuming choice and not exercise any choices on self
+        postconsuming choice OffRamp_Execute : ContractId OffRamp
+            with
+                encodedMessage : BytesHex
+                receiver : ContractId CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver
+                ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+                ccvData : [BytesHex]
+                caller : Party
+            controller caller
+            do
+                let message = fromSomeNote "failed to decode message" (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+                let messageId = keccak256 encodedMessage
+                
+                let executionStateKey = calculateExecutionStateKey message.sourceChainSelector message.sequenceNumber message.sender message.receiver
+
+                -- TODO: catch exceptions, but seems deprecated?
+                exercise self OffRamp_ExecuteSingleMessage with
+                    message = message
+                    messageId = messageId
+                    receiver = receiver
+                    ccvs = ccvs
+                    ccvData = ccvData
+                    caller = caller
+
+                -- update execution state
+                let newExecutionStates = Map.insert executionStateKey CCIP.Internal.SUCCESS executionStates
+                onRampCid <- create this with executionStates = newExecutionStates
+
+                -- emit event with new execution state
+                _ <- create ExecutionStateChanged
+                    with
+                        ccip_owner = owner
+                        event = ExecutionStateChangedEvent
+                            with
+                                sourceChainSelector = message.sourceChainSelector
+                                sequenceNumber = message.sequenceNumber
+                                messageId = messageId
+                                state = CCIP.Internal.SUCCESS
+                                returnData = ""
+                
+                pure onRampCid
+
+
+
 getCCVsForPool : Splice.Api.Token.HoldingV1.InstrumentId {- -> ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry -} -> Numeric 0 -> Numeric 0 -> Int -> BytesHex -> Update ([ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier])
 getCCVsForPool localToken sourceChainSelector amount finality extraData = do
     pure ([])
+
+-- TODO: Add test
+calculateExecutionStateKey : Numeric 0 -> Numeric 0 -> BytesHex -> BytesHex -> BytesHex
+calculateExecutionStateKey sourceChainSelector sequenceNumber sender receiver = do
+    keccak256 (
+        fromSome (CCIP.MessageCodecV1.encodeUint64 sourceChainSelector) <>
+        fromSome (CCIP.MessageCodecV1.encodeUint64 sequenceNumber) <>
+        fromSome (CCIP.MessageCodecV1.encodeUint8 ( byteCount sender )) <>
+        sender <>
+        fromSome (CCIP.MessageCodecV1.encodeUint8 ( byteCount receiver )) <>
+        receiver
+        )
 
 -- Configs
 
@@ -104,4 +283,22 @@ data SourceChainConfig = SourceChainConfig
         onRamp : BytesHex
         defaultCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
         laneMandatedCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+    deriving (Eq, Show)
+
+-- Events
+
+template ExecutionStateChanged 
+    with
+        ccip_owner : Party
+        event : ExecutionStateChangedEvent
+    where
+        signatory ccip_owner
+
+data ExecutionStateChangedEvent = ExecutionStateChangedEvent
+    with
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        state : CCIP.Internal.MessageExecutionState
+        returnData : BytesHex
     deriving (Eq, Show)

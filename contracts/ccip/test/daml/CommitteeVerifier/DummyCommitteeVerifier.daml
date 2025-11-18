@@ -1,0 +1,26 @@
+module CommitteeVerifier.DummyCommitteeVerifier where
+
+import CCIP.Interfaces.CrossChainVerifier
+
+template DummyCommitteeVerifier
+    with
+        owner : Party
+    where
+        signatory owner
+
+        interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
+            view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+                ccipOwner = owner
+                storageLocation = "ipfs://dummy"
+
+            crossChainVerifier_verifyMessageImpl self arg = do
+                debug ("DummyCommitteeVerifier: verifyMessage called with messageId: " <> show arg.messageId)
+                case arg.ccvData of
+                    "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
+                    _ -> do
+                        debug ("DummyCommitteeVerifier: Simulated successful verification")
+                        pure ()
+                        
+            crossChainVerifier_forwardToVerifierImpl self arg = do
+                debug ("DummyCommitteeVerifier: forwardToVerifier called with messageId: " <> show arg.messageId)
+                pure ""

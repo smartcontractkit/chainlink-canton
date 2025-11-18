@@ -1,5 +1,7 @@
 module OffRamp where
 
+import DA.Assert
+import DA.List qualified as List
 import DA.Map qualified as Map
 import DA.Optional
 
@@ -8,47 +10,43 @@ import Daml.Script
 import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.CCIPReceiver
-import qualified CCIP.CommitteeVerifier
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Interfaces.Any2CantonMessageReceiver
 import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.Internal
 import qualified CCIP.OffRamp
 
+import CommitteeVerifier.DummyCommitteeVerifier qualified as DummyCommitteeVerifier
+
 setup = script do
-    owner <- allocateParty "owner"
+    ccipOwner <- allocateParty "ccip-owner"
     user <- allocateParty "user"
 
-    ccv1 <- toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier <$> submit owner do 
-        createCmd CCIP.CommitteeVerifier.CommitteeVerifier with
-            owner = owner
-            ccipOwner = owner
-            storageLocation = "ipfs://example1"
-            threshold = 1
-            signers = ["02c1e9f6a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdefabcdefabcd"]
-    ccv2 <- toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier <$> submit owner do 
-        createCmd CCIP.CommitteeVerifier.CommitteeVerifier with
-            owner = owner
-            ccipOwner = owner
-            storageLocation = "ipfs://example2"
-            threshold = 2
-            signers = ["02c1e9f6a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdefabcdefabcd",
-                       "03b2e9f6a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdefabcdefabce"]
-    ccv3 <- toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier <$> submit owner do 
-        createCmd CCIP.CommitteeVerifier.CommitteeVerifier with
-            owner = owner
-            ccipOwner = owner
-            storageLocation = "ipfs://example3"
-            threshold = 3
-            signers = ["02c1e9f6a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdefabcdefabcd",
-                       "03b2e9f6a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdefabcdefabce",
-                       "04c3e9f6a1b2c3d4e5f60718293a4b5c6d7e8f901234567890abcdefabcdefabcf"]
+    -- Deploy multiple CCVs
 
-    offRamp <- submit owner do
+    ccv1Impl <- submit ccipOwner do 
+        createCmd DummyCommitteeVerifier.DummyCommitteeVerifier with
+            owner = ccipOwner
+    ccv1Disclosure <- fromSome <$> queryDisclosure ccipOwner ccv1Impl
+    let ccv1 = toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier ccv1Impl
+
+    ccv2 <- toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier <$> submit user do 
+        createCmd DummyCommitteeVerifier.DummyCommitteeVerifier with
+            owner = user
+
+    ccv3 <- toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier <$> submit user do 
+        createCmd DummyCommitteeVerifier.DummyCommitteeVerifier with
+            owner = user
+
+    debug ("Deployed CCVs: " <> show [ccv1, ccv2, ccv3])
+
+    offRamp <- submit ccipOwner do
         createCmd CCIP.OffRamp.OffRamp with
-            owner = owner
+            owner = ccipOwner
             sourceChainConfigs = Map.empty
+            executionStates = Map.empty
 
-    offRamp <- submit owner do
+    offRamp <- submit ccipOwner do
         exerciseCmd offRamp CCIP.OffRamp.ApplySourceChainConfigUpdates with
             updates = [
                 CCIP.OffRamp.SourceChainConfigArgs with
@@ -59,32 +57,32 @@ setup = script do
                         laneMandatedCCVs = []
                         defaultCCVs = [ccv1]
                 ]
-
-    disclosedOffRamp <- fromSome <$> queryDisclosure owner offRamp
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     debug ("Deployed OffRamp: " <> show offRamp)
     
     ccipReceiver <- submit user do
         createCmd CCIP.CCIPReceiver.CCIPReceiver with
             owner = user
-            ccipOwner = owner
-            requiredCCVs = [ccv2]
+            ccipOwner = ccipOwner
+            requiredCCVs = [ccv1, ccv2]
             optionalCCVs = [ccv3]
+            threshold = 0
     debug ("Deployed CCIPReceiver: " <> show ccipReceiver)
 
     let localToken = Splice.Api.Token.HoldingV1.InstrumentId with
-            admin = owner
+            admin = ccipOwner
             id = "LOCAL"
 
     let msg = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
             destChainSelector = 456.0
-            sequenceNumber = 789.0
+            sequenceNumber = 1.0
             onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
             offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
             finality = 2000
             gasLimit = 400000
             sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
-            receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
+            receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e" -- TODO: not checked on-chain
             destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
             tokenTransfer = [
                 CCIP.MessageCodecV1.TokenTransferV1
@@ -106,5 +104,99 @@ setup = script do
     debug ("Required CCVs: " <> show requiredCCVs)
     debug ("Optional CCVs: " <> show optionalCCVs)
     debug ("Threshold: " <> show threshold)
+
+    requiredCCVs === List.sort [ccv1, ccv2]
+    optionalCCVs === List.sort [ccv3]
+    threshold === 0
+
+    -- ======== Execute 1 ========
+    -- User calls execute on the OffRamp, passing the disclosures for OffRamp and default CCVs
+    offRamp <- submit (actAs user <> disclose disclosedOffRamp <> disclose ccv1Disclosure) do
+        exerciseCmd offRamp CCIP.OffRamp.OffRamp_Execute with
+            encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 msg
+            receiver = toInterfaceContractId @CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver ccipReceiver
+            caller = user
+            ccvs = requiredCCVs ++ optionalCCVs
+            -- CCVs:
+            --  ccv1 : default CCV, owned by ccipOwner, will succeed
+            --  ccv2 : required CCV by the receiver contract, owned by user, will succeed
+            --  ccv3 : optional CCV by the receiver contract, owned by user, will fail but due to threshold being 0 it is not queried at all
+            ccvData = ["00", "00", "01"]
+
+    -- re-query offRamp
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+
+    -- check execution state
+    executionState <- submit (actAs user <> disclose disclosedOffRamp) do
+        exerciseCmd offRamp CCIP.OffRamp.OffRamp_GetExecutionState with
+            sourceChainSelector = msg.sourceChainSelector
+            sequenceNumber = msg.sequenceNumber
+            sender = msg.sender
+            receiver = msg.receiver
+            caller = user
+    executionState === CCIP.Internal.SUCCESS
+
+    -- ======== Execute 2 ========
+    -- User calls execute on the OffRamp, with a failing required CCV - must fail
+    _ <- submitMustFail (actAs user <> disclose disclosedOffRamp <> disclose ccv1Disclosure) do
+        exerciseCmd offRamp CCIP.OffRamp.OffRamp_Execute with
+            encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 msg
+            receiver = toInterfaceContractId @CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver ccipReceiver
+            caller = user
+            ccvs = requiredCCVs ++ optionalCCVs
+            -- CCVs:
+            --  ccv1 : default CCV, owned by ccipOwner, will succeed
+            --  ccv2 : required CCV by the receiver contract, owned by user, will fail
+            ccvData = ["00", "01"]
+
+    -- ======== Execute 3 ========
+    ccipReceiver <- submit user do
+        createCmd CCIP.CCIPReceiver.CCIPReceiver with
+            owner = user
+            ccipOwner = ccipOwner
+            requiredCCVs = [ccv1, ccv2]
+            optionalCCVs = [ccv3]
+            threshold = 1
+    debug ("Deployed CCIPReceiver: " <> show ccipReceiver)
+    msg <- pure msg with sequenceNumber = 2.0
+    -- User calls execute on the OffRamp, with a failing optional CCV - must fail
+    _ <- submitMustFail (actAs user <> disclose disclosedOffRamp <> disclose ccv1Disclosure) do
+        exerciseCmd offRamp CCIP.OffRamp.OffRamp_Execute with
+            encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 msg
+            receiver = toInterfaceContractId @CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver ccipReceiver
+            caller = user
+            ccvs = requiredCCVs ++ optionalCCVs
+            -- CCVs:
+            --  ccv1 : default CCV, owned by ccipOwner, will succeed
+            --  ccv2 : required CCV by the receiver contract, owned by user, will succeed
+            --  ccv3 : optional CCV by the receiver contract, owned by user, will fail
+            ccvData = ["00", "00", "01"]
+
+    -- ======= Execute 4 ========
+    -- User calls execute on the OffRamp, with all CCVs succeeding - must succeed
+    offRamp <- submit (actAs user <> disclose disclosedOffRamp <> disclose ccv1Disclosure) do
+        exerciseCmd offRamp CCIP.OffRamp.OffRamp_Execute with
+            encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 msg
+            receiver = toInterfaceContractId @CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver ccipReceiver
+            caller = user
+            ccvs = requiredCCVs ++ optionalCCVs
+            -- CCVs:
+            --  ccv1 : default CCV, owned by ccipOwner, will succeed
+            --  ccv2 : required CCV by the receiver contract, owned by user, will succeed
+            --  ccv3 : optional CCV by the receiver contract, owned by user, will succeed
+            ccvData = ["00", "00", "00"]
+
+    -- re-query offRamp
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+
+    -- check execution state
+    executionState <- submit (actAs user <> disclose disclosedOffRamp) do
+        exerciseCmd offRamp CCIP.OffRamp.OffRamp_GetExecutionState with
+            sourceChainSelector = msg.sourceChainSelector
+            sequenceNumber = msg.sequenceNumber
+            sender = msg.sender
+            receiver = msg.receiver
+            caller = user
+    executionState === CCIP.Internal.SUCCESS
 
     pure ()
