@@ -74,3 +74,11 @@ func (a *CCIPApi) GetRouter(ctx context.Context) (*apiv2.DisclosedContract, erro
 		EntityName: "Router",
 	})
 }
+
+func (a *CCIPApi) GetCCV(ctx context.Context) (*apiv2.DisclosedContract, error) {
+	return a.getContract(ctx, &apiv2.Identifier{
+		PackageId:  "#ccip-committeeverifier",
+		ModuleName: "CCIP.CommitteeVerifier",
+		EntityName: "CommitteeVerifier",
+	})
+}
