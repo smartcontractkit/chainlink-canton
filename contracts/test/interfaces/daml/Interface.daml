@@ -1,0 +1,25 @@
+module Interface where
+
+interface IReceiver where
+    viewtype ReceiverView
+
+    receiver_getValueImpl : ContractId IReceiver -> Update Int
+    receiver_emitEventImpl : ContractId IReceiver -> Int -> Update ()
+
+    nonconsuming choice Receiver_GetValue : Int
+        with
+            caller : Party
+        controller (view this).owner
+        do receiver_getValueImpl this self
+
+    nonconsuming choice Receiver_EmitEvent : ()
+        with
+            eventValue : Int
+            caller : Party
+        controller (view this).owner
+        do receiver_emitEventImpl this self eventValue
+
+data ReceiverView = ReceiverView
+    with
+        owner : Party
+    deriving (Eq, Show)

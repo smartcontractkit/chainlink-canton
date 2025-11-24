@@ -8,3 +8,8 @@ packages:
   - ccip/offramp
   - ccip/router
   - ccip/test
+
+  - test/interfaces
+  - test/proxy
+  - test/receiver
+  - test/test

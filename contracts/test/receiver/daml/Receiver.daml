@@ -1,0 +1,31 @@
+module Receiver where
+
+import Interface
+
+template ReceiverImplementation
+    with
+        owner : Party
+        value : Int
+    where
+        signatory owner
+
+        interface instance IReceiver for ReceiverImplementation where
+            view = ReceiverView with
+                owner = owner
+
+            receiver_getValueImpl self = do
+                return value
+
+            receiver_emitEventImpl self eventValue = do
+                create EmitEvent with
+                    owner = owner
+                    eventValue = eventValue
+                return ()
+
+
+template EmitEvent
+    with
+        owner : Party
+        eventValue : Int
+    where
+        signatory owner
