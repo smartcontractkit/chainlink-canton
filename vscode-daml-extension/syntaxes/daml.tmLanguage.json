@@ -1,0 +1,68 @@
+{
+  "scopeName": "source.daml",
+  "patterns": [
+    {
+      "comment": "Line comment",
+      "name": "comment.line.double-dash.daml",
+      "match": "--.*$"
+    },
+    {
+      "comment": "Block comment",
+      "name": "comment.block.daml",
+      "begin": "\\{-",
+      "end": "-\\}"
+    },
+    {
+      "comment": "Strings",
+      "name": "string.quoted.double.daml",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.daml",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "comment": "Control Keywords",
+      "name": "keyword.control.daml",
+      "match": "\\b(if|then|else|case|of|do|return|pure|let|in)\\b"
+    },
+    {
+      "comment": "Definition Keywords",
+      "name": "keyword.other.daml",
+      "match": "\\b(module|import|qualified|hiding|where|template|with|signatory|ensure|interface|instance|for|view|nonconsuming|choice|controller|deriving|type|data|class|as|observer|agreement|preconsuming|postconsuming|key|maintainer)\\b"
+    },
+    {
+      "comment": "Storage/Types",
+      "name": "storage.type.daml",
+      "match": "\\b(Int|Decimal|Text|Bool|Party|Date|Time|List|Optional|Map|Update|ContractId|Numeric|Any|Void)\\b"
+    },
+    {
+      "comment": "Boolean constants",
+      "name": "constant.language.boolean.daml",
+      "match": "\\b(True|False)\\b"
+    },
+    {
+      "comment": "Numeric constants",
+      "name": "constant.numeric.daml",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    },
+    {
+      "comment": "Operators",
+      "name": "keyword.operator.daml",
+      "match": "(\\=|\\:|\\->|\\<-|\\.|\\<>|\\=\\=|\\/\\=|\\>|\\<|\\>\\=|\\<\\=|\\+|\\-|\\*|\\/|\\&\\&|\\|\\|)"
+    },
+    {
+      "comment": "Functions/Variables (Lower case start)",
+      "name": "entity.name.function.daml",
+      "match": "\\b[a-z][a-zA-Z0-9_]*\\b"
+    },
+    {
+      "comment": "Types/Constructors (Capitalized)",
+      "name": "entity.name.type.daml",
+      "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+    }
+  ]
+}

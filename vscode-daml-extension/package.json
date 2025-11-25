@@ -1,0 +1,26 @@
+{
+  "name": "daml-syntax",
+  "publisher": "local",
+  "displayName": "DAML Syntax",
+  "description": "Syntax highlighting for DAML files",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "daml",
+      "aliases": ["DAML", "daml"],
+      "extensions": [".daml"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "daml",
+      "scopeName": "source.daml",
+      "path": "./syntaxes/daml.tmLanguage.json"
+    }]
+  }
+}
