@@ -51,7 +51,7 @@ func TestCCIPExecute(t *testing.T) {
 	// Upload the CCIP Receiver Dar only to the userParticipant
 	ccipReceiverDar, err := os.ReadFile("../../contracts/ccip/ccipreceiver/.daml/dist/ccip-receiver-1.0.0.dar")
 	require.NoError(t, err)
-	packageIDs, err = UploadDARstoMultipleParticipants(ctx, [][]byte{ccipReceiverDar}, ccipParticipant, userParticipant)
+	packageIDs, err = UploadDARstoMultipleParticipants(ctx, [][]byte{ccipReceiverDar}, userParticipant)
 	require.NoError(t, err)
 	fmt.Printf("Uploaded CCIPReceiver to userParticipant: %s\n", packageIDs)
 
@@ -394,7 +394,6 @@ func TestCCIPExecute(t *testing.T) {
 		[]byte(offRampCid),
 		0,
 		100_000,
-
 		[]byte("sender"),
 		[]byte("receiver"),
 		[]byte("destblob"),
