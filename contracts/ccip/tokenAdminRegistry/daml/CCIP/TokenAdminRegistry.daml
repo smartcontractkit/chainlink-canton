@@ -1,0 +1,159 @@
+module CCIP.TokenAdminRegistry where
+
+import DA.Map qualified as Map
+import DA.Optional qualified as Optional
+
+import qualified Splice.Api.Token.HoldingV1
+
+template TokenAdminRegistry
+    with
+        owner : Party
+
+        tokenConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenConfig
+    where
+        signatory owner
+
+        nonconsuming choice TokenAdminRegistry_GetTokenConfig : Optional TokenConfig
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                case Map.lookup instrumentId tokenConfigs of
+                    None -> return None
+                    Some config ->
+                        return (Some config)
+
+  -- ================================================================
+  -- │                  Administrator functions                     │
+  -- ================================================================
+
+        choice TokenAdminRegistry_SetPool : ContractId TokenAdminRegistry
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                optTokenPoolOwner : Optional Party
+                caller : Party
+            controller caller
+            do
+                case Map.lookup instrumentId tokenConfigs of
+                    None ->
+                        abort "TokenAdminRegistry_SetPool: No config for instrument"
+                    Some config ->
+                        case config.admin of
+                            None ->
+                                abort "TokenAdminRegistry_SetPool: No admin set for instrument"
+                            Some admin ->
+                                if admin /= caller then
+                                    abort "TokenAdminRegistry_SetPool: Caller is not the admin"
+                                else do
+                                    let updatedConfig = config
+                                            with
+                                                tokenPoolOwner = optTokenPoolOwner
+                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                    create this with tokenConfigs = updatedMap
+
+        choice TokenAdminRegistry_AcceptAdminRole : ContractId TokenAdminRegistry
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                case Map.lookup instrumentId tokenConfigs of
+                    None ->
+                        abort "TokenAdminRegistry_AcceptAdminRole: No config for instrument"
+                    Some config ->
+                        case config.pendingAdmin of
+                            None ->
+                                abort "TokenAdminRegistry_AcceptAdminRole: No pending admin to accept"
+                            Some pendingAdmin ->
+                                if pendingAdmin /= caller then
+                                    abort "TokenAdminRegistry_AcceptAdminRole: Caller is not the pending admin"
+                                else do
+                                    let updatedConfig = config with
+                                            admin = Some pendingAdmin
+                                            pendingAdmin = None
+                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                    create this with tokenConfigs = updatedMap
+
+        choice TokenAdminRegistry_TransferAdminRole : ContractId TokenAdminRegistry
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                newAdmin : Party
+                caller : Party
+            controller caller
+            do
+                case Map.lookup instrumentId tokenConfigs of
+                    None ->
+                        abort "TokenAdminRegistry_TransferAdminRole: No config for instrument"
+                    Some config ->
+                        case config.admin of
+                            None ->
+                                abort "TokenAdminRegistry_TransferAdminRole: No admin to transfer"
+                            Some currentAdmin ->
+                                if currentAdmin /= caller then
+                                    abort "TokenAdminRegistry_TransferAdminRole: Caller is not the current admin"
+                                else do
+                                    let updatedConfig = config with admin = Some newAdmin
+                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                    create this with tokenConfigs = updatedMap
+
+  -- ================================================================
+  -- │                    Administrator config                      │
+  -- ================================================================
+
+        nonconsuming choice TokenAdminRegistry_IsAdministrator : Bool
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                administrator : Party
+                caller : Party
+            controller caller
+            do
+                case Map.lookup instrumentId tokenConfigs of
+                    None -> return False
+                    Some config ->
+                        return (config.admin == Some administrator)
+        
+        -- Propose a new administrator for a token
+        -- Can only be called if no admin is currently set
+        -- Can be called by the admin of the instrument, or the CCIP owner/owner of this registry
+        choice TokenAdminRegistry_ProposeAdministrator : ContractId TokenAdminRegistry
+            with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                newAdmin : Party
+                caller : Party
+            controller caller
+            do
+                -- Authorization check: caller must be either the owner or the admin of the instrument
+                let isOwner = caller == owner
+                    isAdmin = caller == instrumentId.admin
+                if not (isOwner || isAdmin) then
+                    abort "TokenAdminRegistry_ProposeAdministrator: Caller must be either the registry owner or the token admin"
+                else
+                    case Map.lookup instrumentId tokenConfigs of
+                        None -> do
+                            -- Config doesn't exist, create new entry
+                            let newConfig = TokenConfig with
+                                    admin = None
+                                    pendingAdmin = Some newAdmin
+                                    tokenPoolOwner = None
+                                updatedMap = Map.insert instrumentId newConfig tokenConfigs
+                            create this with tokenConfigs = updatedMap
+                        Some config ->
+                            if Optional.isSome config.admin then
+                                abort "TokenAdminRegistry_ProposeAdministrator: Admin already set"
+                            else do
+                                -- Config exists but admin is not set, update it
+                                let updatedConfig = config with pendingAdmin = Some newAdmin
+                                    updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                create this with tokenConfigs = updatedMap
+
+
+
+
+
+data TokenConfig = TokenConfig
+    with 
+        admin : Optional Party
+        pendingAdmin : Optional Party
+        tokenPoolOwner : Optional Party
+    deriving (Eq, Show)

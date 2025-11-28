@@ -16,10 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
-
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
+	"github.com/smartcontractkit/chainlink-canton-internal/src/protocol"
 )
 
 func TestCCIPExecute(t *testing.T) {
@@ -213,8 +212,8 @@ func TestCCIPExecute(t *testing.T) {
 	// =========================
 
 	// CCIP Party deploys CCIP contracts
-	sourceChainSelector := 1111111111
-	destChainSelector := 2222222222
+	sourceChainSelector := uint64(1111111111)
+	destChainSelector := uint64(2222222222)
 	_ = sourceChainSelector
 	_ = destChainSelector
 
@@ -280,7 +279,7 @@ func TestCCIPExecute(t *testing.T) {
 										&apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 											{
 												Label: "sourceChainSelector",
-												Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.Itoa(sourceChainSelector)}},
+												Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.Itoa(int(sourceChainSelector))}},
 											}, {
 												Label: "sourceChainConfig",
 												Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -387,8 +386,8 @@ func TestCCIPExecute(t *testing.T) {
 	_ = ccipApi
 
 	message, err := protocol.NewMessage(
-		protocol.ChainSelector(sourceChainSelector),
-		protocol.ChainSelector(destChainSelector),
+		sourceChainSelector,
+		destChainSelector,
 		0,
 		[]byte("123456"),
 		[]byte(offRampCid),

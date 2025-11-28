@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -186,6 +187,9 @@ func GetActiveContracts(ctx context.Context, participant *Participant) ([]*apiv2
 			events = append(events, c.ActiveContract.GetCreatedEvent())
 		}
 	}
+	slices.SortFunc(events, func(a, b *apiv2.CreatedEvent) int {
+		return a.GetCreatedAt().AsTime().Compare(b.GetCreatedAt().AsTime())
+	})
 	return events, nil
 }
 
@@ -225,6 +229,9 @@ func GetActiveContractsForParty(ctx context.Context, participant *Participant, p
 			events = append(events, c.ActiveContract.GetCreatedEvent())
 		}
 	}
+	slices.SortFunc(events, func(a, b *apiv2.CreatedEvent) int {
+		return a.GetCreatedAt().AsTime().Compare(b.GetCreatedAt().AsTime())
+	})
 	return events, nil
 }
 
@@ -268,6 +275,9 @@ func GetActiveContractsForPartyTemplateId(ctx context.Context, participant *Part
 			activeContracts = append(activeContracts, c.ActiveContract)
 		}
 	}
+	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
+		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
+	})
 	return activeContracts, nil
 }
 
@@ -312,6 +322,9 @@ func GetActiveContractsForPartyInterface(ctx context.Context, participant *Parti
 			activeContracts = append(activeContracts, c.ActiveContract)
 		}
 	}
+	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
+		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
+	})
 	return activeContracts, nil
 }
 

@@ -8,6 +8,9 @@ packages:
   - ccip/offramp
   - ccip/router
   - ccip/test
+  - ccip/tokenAdminRegistry
+  - ccip/pools/lockReleaseTokenPool
+  - ccip/pools/interfaces
 
   - test/interfaces
   - test/proxy

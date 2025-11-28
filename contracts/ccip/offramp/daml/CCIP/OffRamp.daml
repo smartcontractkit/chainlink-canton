@@ -14,6 +14,7 @@ import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.Any2CantonMessageReceiver
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.TokenAdminRegistry
 
 template OffRamp
     with
@@ -250,6 +251,30 @@ template OffRamp
                                 returnData = ""
                 
                 pure onRampCid
+
+        -- Called by the token pool to mark a message as executed
+        choice OffRamp_ExecuteFromPool : ContractId OffRamp
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                caller : Party
+            controller caller
+            do
+                -- verify that the token admin registry is owned by the same owner as this OffRamp
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                assertMsg "OffRamp_ExecuteFromPool: tokenAdminRegistry owner mismatch" (tokenAdminRegistry.owner == owner)
+                -- Get token config from token admin registry
+                tokenConfigOpt <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
+                    instrumentId = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId (List.head message.tokenTransfer).destTokenAddress)
+                    caller = caller
+                let config = fromSomeNote "OffRamp_ExecuteFromPool: No token pool set for instrument" tokenConfigOpt
+                let tokenPoolOwner = fromSomeNote "OffRamp_ExecuteFromPool: No token pool owner set for instrument" config.tokenPoolOwner
+                assertMsg "OffRamp_ExecuteFromPool: Caller is not the token pool owner" (tokenPoolOwner == caller)
+
+                let executionStateKey = calculateExecutionStateKey message.sourceChainSelector message.sequenceNumber message.sender message.receiver
+
+                let newExecutionStates = Map.insert executionStateKey CCIP.Internal.SUCCESS executionStates
+                create this with executionStates = newExecutionStates
 
 
 

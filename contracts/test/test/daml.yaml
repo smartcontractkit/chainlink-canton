@@ -4,6 +4,7 @@ source: daml
 version: 1.0.0
 build-options:
   - "-Wno-crypto-text-is-alpha"
+  - "-Wno-template-interface-depends-on-daml-script"
 data-dependencies:
 dependencies:
   - daml-prim

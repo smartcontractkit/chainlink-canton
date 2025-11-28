@@ -701,7 +701,7 @@ func TestCCIPSend(t *testing.T) {
 		EntityName: "Holding",
 	})
 	require.NoError(t, err)
-	fmt.Printf("User Party %s has %d token holdings after CCIPSend\n", partyCCIP, len(tokenHoldings))
+	fmt.Printf("CCIP Party %s has %d token holdings after CCIPSend\n", partyCCIP, len(tokenHoldings))
 	for _, holding := range tokenHoldings {
 		balance := holding.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()[2].GetValue().GetSum().(*apiv2.Value_Numeric).Numeric
 		fmt.Printf(" - Token Holding Cid: %s, Balance: %s\n", holding.GetCreatedEvent().GetContractId(), balance)

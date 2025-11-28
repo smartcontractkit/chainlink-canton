@@ -1,0 +1,82 @@
+module CCIP.Interfaces.TokenPool where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.OffRamp
+import qualified CCIP.TokenAdminRegistry
+
+interface ITokenPool where
+    viewtype TokenPoolView
+
+    tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+    tokenPool_releaseOrMintImpl : ContractId ITokenPool -> TokenPool_ReleaseOrMint -> Update ReleaseOrMintResult
+    tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
+
+    nonconsuming choice TokenPool_GetRequiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+        with
+            message : CCIP.MessageCodecV1.MessageV1
+            caller : Party
+        controller caller
+        do tokenPool_getRequiredCCVsImpl this self arg
+
+    nonconsuming choice TokenPool_ReleaseOrMint : ReleaseOrMintResult
+        with
+            encodedMessage : BytesHex
+            ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+            ccvData : [BytesHex]
+            caller : Party
+            tokenInput : TokenInput
+            offRampCid : ContractId CCIP.OffRamp.OffRamp
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+        controller caller
+        do tokenPool_releaseOrMintImpl this self arg
+
+    nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
+        with
+            message : CCIP.MessageCodecV1.MessageV1
+            caller : Party
+            tokenPoolHoldings : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        controller caller
+        do tokenPool_lockOrBurnImpl this self arg
+
+
+
+data TokenPoolView = TokenPoolView
+    with
+        owner : Party
+        ccipOwner : Party
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+    deriving (Eq, Show)
+
+data TokenInput = TokenInput
+    with
+        transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+        tokenPoolHoldings : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data ReleaseOrMintResult = ReleaseOrMintResult
+    with
+        output : ReleaseOrMintResult_Output
+        poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data ReleaseOrMintResult_Output
+    = ReleaseOrMintResult_Pending
+        with
+            transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    | ReleaseOrMintResult_Completed
+        with
+            receiverHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data LockOrBurnResult = LockOrBurnResult
+    with
+        poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)

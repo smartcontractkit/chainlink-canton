@@ -1,0 +1,189 @@
+module LockReleaseTokenPool where
+
+import Daml.Script
+
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+import DA.TextMap qualified as TextMap
+
+import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.LockReleaseTokenPool
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.OffRamp
+import qualified CCIP.TokenAdminRegistry
+
+import qualified Coin.Registry
+import qualified Coin.Holding
+
+import CommitteeVerifier.DummyCommitteeVerifier qualified as DummyCommitteeVerifier
+
+setup = script do
+    assetIssuer <- allocateParty "assetIssuer"
+    tokenPoolOwner <- allocateParty "tokenPoolOwner"
+    ccipOwner <- allocateParty "ccipOwner"
+    user <- allocateParty "user"
+
+    let iId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = assetIssuer
+            id = "TEST"
+    let encoded = CCIP.MessageCodecV1.encodeInstrumentId iId
+    debug ("AssetIssuer " <> partyToText assetIssuer)
+    debug ("AssetIssuer show: " <> show assetIssuer)
+    let encodedIssuer = CCIP.MessageCodecV1.encodePartyId assetIssuer
+    debug ("Encoded AssetIssuer: " <> encodedIssuer)
+    debug ("Encoded InstrumentId: " <> encoded)
+
+    -- Create LINK Holding
+    let instrumentIdLINK = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = assetIssuer
+            id = "LINK"
+    -- Create Registry
+    registry <- submit assetIssuer do
+        createCmd Coin.Registry.CoinRegistry with
+            issuer = assetIssuer
+            instrumentId = instrumentIdLINK
+            meta = Splice.Api.Token.MetadataV1.emptyMetadata
+    disclosedRegistry <- fromSome <$> queryDisclosure assetIssuer registry
+    -- mint to tokenPoolOwner
+    tokenPoolOwnerPreApproval <- submit tokenPoolOwner do
+        createCmd Coin.Registry.MintPreapproval with
+            sender = assetIssuer
+            receiver = tokenPoolOwner
+    bmResult <- submit assetIssuer do
+        exerciseCmd (toInterfaceContractId @Splice.Api.Token.BurnMintV1.BurnMintFactory registry) Splice.Api.Token.BurnMintV1.BurnMintFactory_BurnMint with
+            expectedAdmin = assetIssuer
+            instrumentId = instrumentIdLINK
+            inputHoldingCids = []
+            outputs = [
+                Splice.Api.Token.BurnMintV1.BurnMintOutput {
+                    owner = tokenPoolOwner,
+                    amount = 1000000.0,
+                    context = Splice.Api.Token.MetadataV1.ChoiceContext with -- add pre-approval cid to choice context
+                        values = TextMap.fromList [(Coin.Registry.mintPreapprovalContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenPoolOwnerPreApproval)]
+                }]
+            extraActors = []
+            extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                meta = Splice.Api.Token.MetadataV1.emptyMetadata
+    let tokenHoldingCids = bmResult.outputCids
+    -- query disclosures for all tokenHoldingCids
+    coinHoldings <- query @Coin.Holding.CoinHolding tokenPoolOwner
+    disclosedTokenHoldings <- mapA (\(cid, _) -> fromSome <$> queryDisclosure tokenPoolOwner cid) coinHoldings
+
+    -- Create CCV
+    ccvImpl <- submit ccipOwner do
+        createCmd DummyCommitteeVerifier.DummyCommitteeVerifier with
+            owner = ccipOwner
+    disclosedCCV <- fromSome <$> queryDisclosure ccipOwner ccvImpl
+    let ccv = toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier ccvImpl
+    debug ("Deployed CCV: " <> show ccv)
+
+    -- Deploy OffRamp
+    offRamp <- submit ccipOwner do
+        createCmd CCIP.OffRamp.OffRamp with
+            owner = ccipOwner
+            sourceChainConfigs = Map.empty
+            executionStates = Map.empty
+
+    offRamp <- submit ccipOwner do
+        exerciseCmd offRamp CCIP.OffRamp.ApplySourceChainConfigUpdates with
+            updates = [
+                CCIP.OffRamp.SourceChainConfigArgs with
+                    sourceChainSelector = 123.0
+                    sourceChainConfig = CCIP.OffRamp.SourceChainConfig with
+                        isEnabled = True
+                        onRamp = "f611F19236c999E05a62c9804F757A22553d2b50"
+                        laneMandatedCCVs = []
+                        defaultCCVs = []
+                ]
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    debug ("Deployed OffRamp: " <> show offRamp)
+
+    -- Deploy TokenAdminRegistry
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    debug ("Deployed TokenAdminRegistry: " <> show tokenAdminRegistry)
+
+    -- Create Token Pool
+    tokenPool <- submit tokenPoolOwner do
+        createCmd CCIP.LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = tokenPoolOwner
+            instrumentId = instrumentIdLINK
+            decimals = 6
+            requiredCCVs = [ccv]
+    disclosedTokenPool <- fromSome <$> queryDisclosure tokenPoolOwner tokenPool
+    debug ("Deployed Token Pool: " <> show tokenPool)
+
+    -- assetIssuer calls proposeAdmin on TokenAdminRegistry to set admin for LINK
+    tokenAdminRegistry <- submit (actAs assetIssuer <> disclose disclosedTokenAdminRegistry) do
+        exerciseCmd tokenAdminRegistry CCIP.TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+            instrumentId = instrumentIdLINK
+            newAdmin = assetIssuer
+            caller = assetIssuer
+    debug ("Proposed admin for LINK: " <> show tokenAdminRegistry)
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs assetIssuer <> disclose disclosedTokenAdminRegistry) do
+        exerciseCmd tokenAdminRegistry CCIP.TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+            instrumentId = instrumentIdLINK
+            caller = assetIssuer
+    debug ("Accepted admin role for LINK: " <> show tokenAdminRegistry)
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs assetIssuer <> disclose disclosedTokenAdminRegistry) do
+        exerciseCmd tokenAdminRegistry CCIP.TokenAdminRegistry.TokenAdminRegistry_SetPool with
+            instrumentId = instrumentIdLINK
+            optTokenPoolOwner = Some tokenPoolOwner
+            caller = assetIssuer
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    debug ("Configured TokenAdminRegistry for LINK: " <> show tokenAdminRegistry)
+
+    -- user calls execute on the token pool to release tokens
+    let msg = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = 123.0
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
+            offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
+            finality = 2000
+            gasLimit = 400000
+            sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
+            receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e" -- TODO: not checked on-chain
+            destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
+            tokenTransfer = [
+                CCIP.MessageCodecV1.TokenTransferV1
+                    with
+                        amount = 1000000.0
+                        sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
+                        sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
+                        destTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId instrumentIdLINK
+                        tokenReceiver = CCIP.MessageCodecV1.encodePartyId user
+                        extraData = "746f6b656e2065787472612064617461"]
+            messageData = "6d657373616765207769746820746f6b656e2064617461"
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 msg
+
+    let allDisclosures = foldl (<>) (disclose disclosedTokenPool <> disclose disclosedCCV <> disclose disclosedRegistry <> disclose disclosedOffRamp <> disclose disclosedTokenAdminRegistry) (map disclose disclosedTokenHoldings)
+    releaseResult <- submit (actAs user <> allDisclosures) do
+        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.TokenPool.ITokenPool tokenPool) CCIP.Interfaces.TokenPool.TokenPool_ReleaseOrMint with
+            encodedMessage = encodedMessage
+            ccvs = [ccv]
+            ccvData = ["dummyCCVData"]
+            caller = user
+            tokenInput = CCIP.Interfaces.TokenPool.TokenInput with
+                transferFactory = toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory registry
+                tokenPoolHoldings = tokenHoldingCids
+                extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    meta = Splice.Api.Token.MetadataV1.emptyMetadata    
+            offRampCid = offRamp
+            tokenAdminRegistryCid = tokenAdminRegistry
+    debug ("ReleaseOrMint result: " <> show releaseResult)
+    pure ()
