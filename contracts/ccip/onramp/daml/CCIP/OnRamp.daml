@@ -1,14 +1,20 @@
 module CCIP.OnRamp where
 
+import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable qualified as Foldable
+import DA.List qualified as List
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex)
+import DA.Optional (fromSomeNote)
+import DA.Time (addRelTime, seconds)
 
-import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.TransferInstructionV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
 
 import CCIP.Client (Canton2AnyMessage)
-import CCIP.FeeQuoter qualified as FeeQuoter
+import qualified CCIP.FeeQuoter
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.TokenAdminRegistry
 
 template OnRamp
     with
@@ -29,11 +35,11 @@ template OnRamp
                 destChainSelector : Numeric 0
                 message : Canton2AnyMessage
                 caller : Party
-                feeQuoter : ContractId FeeQuoter.FeeQuoter
+                feeQuoter : ContractId CCIP.FeeQuoter.FeeQuoter
             controller caller
             do
                 -- Use FeeQuoter to calculate fees
-                exercise feeQuoter FeeQuoter.GetValidatedFee
+                exercise feeQuoter CCIP.FeeQuoter.GetValidatedFee
                     with
                         destChainSelector = destChainSelector
                         message = message
@@ -59,7 +65,7 @@ template OnRamp
                 message : Canton2AnyMessage
                 feeInput : FeeInput
                 caller : Party
-                feeQuoter : ContractId FeeQuoter.FeeQuoter
+                feeQuoter : ContractId CCIP.FeeQuoter.FeeQuoter
             controller caller
             do
                  -- Lookup destChainConfig
@@ -67,7 +73,7 @@ template OnRamp
                     None -> abort "Unknown destChainSelector"
                     Some config -> do
                         -- User FeeQuoter to calculate fees
-                        fee <- exercise feeQuoter FeeQuoter.GetValidatedFee
+                        fee <- exercise feeQuoter CCIP.FeeQuoter.GetValidatedFee
                             with
                                 destChainSelector = destChainSelector
                                 message = message
@@ -86,9 +92,9 @@ template OnRamp
                                 extraArgs = feeInput.extraArgs
                         -- check that the acceptance was completed
                         case acceptResult.output of
-                            TransferInstructionResult_Completed _ -> return ()
-                            TransferInstructionResult_Failed -> abort "Transfer instruction failed"
-                            TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ -> return ()
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction failed"
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
 
                         let newSequenceNumber = config.sequenceNumber + 1.0
                         let updatedDestChainConfig = config with sequenceNumber = newSequenceNumber
@@ -100,6 +106,7 @@ template OnRamp
                             with
                                 ccip_owner = owner
                                 sender = caller
+                                verifiers = [] -- TODO: get verifiers from CCVs
                                 event = CCIPMessageSentEvent
                                     with
                                         destChainSelector = destChainSelector
@@ -112,6 +119,161 @@ template OnRamp
                         return CCIPSendResult
                             with
                                 onRamp = onRampCid
+                                ccipMessageSent = ccipMessageSentCid
+
+        -- Called by Token Pools to prepare a message
+        nonconsuming choice OnRamp_PrepareMessage : PrepareResult
+            with
+                destChainSelector : Numeric 0
+                message : Canton2AnyMessage
+                tokenTransfer : [CCIP.MessageCodecV1.TokenTransferV1]
+                caller : Party
+            controller caller
+            do
+                -- Lookup destChainConfig
+                case Map.lookup destChainSelector destChainConfigs of
+                    None -> abort "Unknown destChainSelector"
+                    Some config -> do
+                        -- Create Message
+                        let newMessage = CCIP.MessageCodecV1.MessageV1
+                                with
+                                    sourceChainSelector = staticConfig.chainSelector
+                                    destChainSelector = destChainSelector
+                                    sequenceNumber = config.sequenceNumber + 1.0
+                                    onRampAddress = "" -- TODO: onRampAddress
+                                    offRampAddress = config.offRamp
+                                    finality = 2000
+                                    gasLimit = 400000
+                                    sender = CCIP.MessageCodecV1.encodePartyId caller
+                                    receiver = message.receiver
+                                    destBlob = "12345678" -- TODO: destBlob
+                                    tokenTransfer = tokenTransfer
+                                    messageData = message.payload
+
+                        let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 newMessage
+                        let messageId = keccak256 encodedMessage
+
+                        return PrepareResult
+                            with
+                                message = newMessage
+                                messageId = messageId
+
+
+        choice OnRamp_ForwardFromPool : ForwardResult
+            with
+                prepareResult : PrepareResult
+                messageSender : Party
+                feeInput : ForwardFeeInput
+                caller : Party
+                verifierBlobs : [BytesHex]
+                verifierObservers : [Party]
+                feeQuoter : ContractId CCIP.FeeQuoter.FeeQuoter
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            controller caller, messageSender -- can only be called by a token pool owner + the message sender
+            do
+                -- verify that the token admin registry is owned by the same owner as this OnRamp
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                assertMsg "OnRamp_ForwardFromPool: tokenAdminRegistry owner mismatch" (tokenAdminRegistry.owner == owner)
+                -- Get the token config from the token admin registry
+                let token = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId (List.head prepareResult.message.tokenTransfer).sourceTokenAddress)
+                tokenConfigOpt <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig
+                    with
+                        instrumentId = token
+                        caller = caller
+                let config = fromSomeNote "OnRamp_ForwardFromPool: No token pool set for instrument" tokenConfigOpt
+                -- Assert that this choice is being called by the token pool owner
+                let tokenPoolOwner = fromSomeNote "OnRamp_ForwardFromPool: No token pool owner set for instrument" config.tokenPoolOwner
+                assertMsg ("OnRamp_ForwardFromPool: token pool owner mismatch, caller: " <> show caller <> ", owner: " <> show tokenPoolOwner) (tokenPoolOwner == caller)
+                -- Assert that the message sender matches the input
+                let sender = fromSomeNote "OnRamp_ForwardFromPool: failed to decode message sender" (CCIP.MessageCodecV1.decodePartyId prepareResult.message.sender)
+                assertMsg "OnRamp_ForwardFromPool: message sender mismatch" (messageSender == sender)
+
+                -- Lookup destChainConfig
+                case Map.lookup prepareResult.message.destChainSelector destChainConfigs of
+                    None -> abort "Unknown destChainSelector"
+                    Some config -> do
+                        debug ("OnRamp_ForwardFromPool: preparing to forward message: " <> show prepareResult)
+                        -- User FeeQuoter to calculate fees - TODO
+                        (tokenTransferFee, _, _) <- exercise feeQuoter CCIP.FeeQuoter.FeeQuoter_GetTokenTransferFee
+                            with
+                                destChainSelector = prepareResult.message.destChainSelector
+                                token = token
+                                caller = caller
+
+                        -- TODO: Need to convert the fee which is USD to token amount based on token price
+                        debug ("OnRamp_ForwardFromPool: calculated token transfer fee: " <> show tokenTransferFee)
+
+                        -- use TransferFactory to create a transfer instruction to the owner party
+                        now <- getTime
+                        transferResult <- exercise feeInput.transferFactory Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer
+                            with
+                                expectedAdmin = token.admin
+                                transfer = Splice.Api.Token.TransferInstructionV1.Transfer
+                                    with
+                                        sender = messageSender
+                                        receiver = owner
+                                        amount = tokenTransferFee
+                                        instrumentId = feeInput.instrumentId
+                                        requestedAt = now
+                                        executeBefore = addRelTime now (seconds 5) -- TODO
+                                        inputHoldingCids = feeInput.inputHoldingCids
+                                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+                                extraArgs = feeInput.extraArgs
+                        ownerHoldings <- case transferResult.output of
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed holdings -> return holdings
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> 
+                                abort "Transfer instruction creation failed"
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending ti -> do
+                                -- accept the incoming TransferInstruction as payment
+                                acceptResult <- exercise ti Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
+                                    with
+                                        extraArgs = feeInput.extraArgs
+                                -- check that the acceptance was completed
+                                case acceptResult.output of
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction failed"
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed completed -> return completed
+                        
+                        debug ("OnRamp_ForwardFromPool: fee payment completed, owner holdings: " <> show ownerHoldings)
+
+                        -- Update status
+                        let newSequenceNumber = config.sequenceNumber + 1.0
+                        let updatedDestChainConfig = config with sequenceNumber = newSequenceNumber
+                        let newDestChainConfigs = Map.insert prepareResult.message.destChainSelector updatedDestChainConfig destChainConfigs
+                        onRampCid <- create this with destChainConfigs = newDestChainConfigs
+
+                        debug ("OnRamp_ForwardFromPool: creating CCIPMessageSent")
+
+                        -- Create Message
+                        let newMessage = prepareResult.message
+                                with -- don't take these values from the prepareResult, to avoid caller modifying them
+                                    sourceChainSelector = staticConfig.chainSelector
+                                    sequenceNumber = newSequenceNumber
+                                    onRampAddress = "" -- TODO: onRampAddress
+                                    offRampAddress = config.offRamp
+                                    sender = CCIP.MessageCodecV1.encodePartyId sender
+                        let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 newMessage
+                        let messageId = keccak256 encodedMessage
+
+
+                        ccipMessageSentCid <- create CCIPMessageSent
+                            with
+                                ccip_owner = owner
+                                sender = caller
+                                verifiers = verifierObservers
+                                event = CCIPMessageSentEvent
+                                    with
+                                        destChainSelector = prepareResult.message.destChainSelector
+                                        sequenceNumber = newSequenceNumber
+                                        messageId = messageId
+                                        encodedMessage = encodedMessage
+                                        receipts = []
+                                        verifierBlobs = verifierBlobs
+
+                        return ForwardResult
+                            with
+                                onRamp = onRampCid
+                                messageId = messageId
                                 ccipMessageSent = ccipMessageSentCid
                 
 
@@ -163,17 +325,45 @@ data CCIPSendResult = CCIPSendResult
         ccipMessageSent : ContractId CCIPMessageSent
     deriving (Eq, Show)
 
+-- Forwarding from Token Pools
+
+data PrepareResult = PrepareResult 
+    with
+        message : CCIP.MessageCodecV1.MessageV1
+        messageId : BytesHex
+    deriving (Eq, Show)
+
+data ForwardFeeInput = ForwardFeeInput
+    with
+        -- The instrumentId of the fee token
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        -- The transfer factory CID for the fee token
+        transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        -- The extraArgs retrieved from the asset's registry, to be passed to the accept choice
+        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+        -- The user's holdings to be used to pay the fee
+        inputHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data ForwardResult = ForwardResult
+    with
+        onRamp : ContractId OnRamp
+        messageId : BytesHex
+        ccipMessageSent : ContractId CCIPMessageSent
+    deriving (Eq, Show)
+
 -- Events
 
 template CCIPMessageSent
     with
         ccip_owner : Party
         sender : Party
+        verifiers : [Party]
 
         event : CCIPMessageSentEvent
     where
         signatory ccip_owner
-        observer sender
+        observer sender, verifiers
 
 data CCIPMessageSentEvent = CCIPMessageSentEvent
     with
@@ -209,7 +399,8 @@ data DestChainConfigArgs = DestChainConfigArgs
 data DestChainConfig = DestChainConfig
     with
         sequenceNumber : Numeric 0
-        defaultExecutor : Text
+        defaultExecutor : BytesHex
         laneMandatedCCVs : [Text]
         defaultCCVs : [Text]
+        offRamp : BytesHex
     deriving (Eq, Show)

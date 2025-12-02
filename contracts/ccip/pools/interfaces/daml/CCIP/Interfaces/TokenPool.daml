@@ -6,9 +6,12 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
+import qualified CCIP.Client
+import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OffRamp
+import qualified CCIP.OnRamp
 import qualified CCIP.TokenAdminRegistry
 
 interface ITokenPool where
@@ -30,23 +33,29 @@ interface ITokenPool where
             encodedMessage : BytesHex
             ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
             ccvData : [BytesHex]
-            caller : Party
             tokenInput : TokenInput
             offRampCid : ContractId CCIP.OffRamp.OffRamp
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            caller : Party
         controller caller
         do tokenPool_releaseOrMintImpl this self arg
 
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
-            message : CCIP.MessageCodecV1.MessageV1
+            destChainSelector : Numeric 0
+            message : CCIP.Client.Canton2AnyMessage
+            tokenInput : TokenInput
+            feeInput : FeeInput
+            senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding] -- TODO: Probably should handle sending and paying fee from same holdings?
+            onRampCid : ContractId CCIP.OnRamp.OnRamp
+            feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             caller : Party
-            tokenPoolHoldings : [ContractId Splice.Api.Token.HoldingV1.Holding]
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
 
 
-
+-- View of the TokenPool
 data TokenPoolView = TokenPoolView
     with
         owner : Party
@@ -54,11 +63,29 @@ data TokenPoolView = TokenPoolView
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     deriving (Eq, Show)
 
+-- Pool specific input data, provided by the Pool API
 data TokenInput = TokenInput
     with
+        -- The transfer factory CID for the pool's asset
         transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        -- The extraArgs passed to the transfer factory when creating transfer instructions
         extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+        -- The holdings in the pool
+        --  On Release, these holdings will be used to release tokens
+        --  On Lock, these holdings are optional and will be used to combine UTXOs with the incoming locked tokens
         tokenPoolHoldings : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data FeeInput = FeeInput
+    with
+        -- The instrumentId of the fee token
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        -- The transfer factory CID for the fee token
+        transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        -- The extraArgs retrieved from the asset's registry, to be passed to the accept choice
+        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+        -- The user's holdings to be used to pay the fee
+        inputHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
 data ReleaseOrMintResult = ReleaseOrMintResult
@@ -69,14 +96,15 @@ data ReleaseOrMintResult = ReleaseOrMintResult
 
 data ReleaseOrMintResult_Output
     = ReleaseOrMintResult_Pending
-        with
-            transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+        with transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
     | ReleaseOrMintResult_Completed
-        with
-            receiverHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        with receiverHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
 data LockOrBurnResult = LockOrBurnResult
     with
+        -- The new holdings in the pool after locking
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        -- The fee token change returned to the sender after paying the fee
+        senderChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)

@@ -67,6 +67,7 @@ setup = script do
             owner = owner
             feeTokens = Map.empty
             destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.empty
             priceUpdaters = [owner]
@@ -114,11 +115,12 @@ setup = script do
             destChainConfigs = Map.empty
 
     --apply destChainConfig for destChainSelector1
-    let destChainConfig = OnRamp.DestChainConfig with
+    let destChainConfig = OnRamp.DestChainConfig withde
             sequenceNumber = 0.0
             defaultExecutor = ""
             laneMandatedCCVs = []
             defaultCCVs = []
+            offRamp = ""
     onRamp <- submit owner do
         exerciseCmd onRamp OnRamp.ApplyDestChainConfigUpdates with
             destChainConfigArgs = [
@@ -158,6 +160,7 @@ setup = script do
                 payload = "0xPayloadData"
                 feeToken = instrumentIdLINK
                 extraArgs = ""
+                tokenAmounts = []
             feeInput = OnRamp.FeeInput with
                 transfer = pendingTransfer
                 extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
@@ -199,6 +202,7 @@ setup = script do
                 payload = "0xPayloadData"
                 feeToken = instrumentIdLINK
                 extraArgs = ""
+                tokenAmounts = []
             feeInput = OnRamp.FeeInput with
                 transfer = pendingTransfer
                 extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with

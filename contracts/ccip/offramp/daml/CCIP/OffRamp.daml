@@ -207,6 +207,7 @@ template OffRamp
                             sourceChainSelector = message.sourceChainSelector
                             sender = message.sender
                             payload = message.messageData
+                            tokenAmounts = []
 
                 pure ()
 
@@ -260,6 +261,7 @@ template OffRamp
                 caller : Party
             controller caller
             do
+                let messageId = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 message)
                 -- verify that the token admin registry is owned by the same owner as this OffRamp
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 assertMsg "OffRamp_ExecuteFromPool: tokenAdminRegistry owner mismatch" (tokenAdminRegistry.owner == owner)
@@ -268,13 +270,30 @@ template OffRamp
                     instrumentId = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId (List.head message.tokenTransfer).destTokenAddress)
                     caller = caller
                 let config = fromSomeNote "OffRamp_ExecuteFromPool: No token pool set for instrument" tokenConfigOpt
+                -- Assert that this choice is being called by the token pool owner
                 let tokenPoolOwner = fromSomeNote "OffRamp_ExecuteFromPool: No token pool owner set for instrument" config.tokenPoolOwner
                 assertMsg "OffRamp_ExecuteFromPool: Caller is not the token pool owner" (tokenPoolOwner == caller)
 
+                -- Check if message has already been executed
                 let executionStateKey = calculateExecutionStateKey message.sourceChainSelector message.sequenceNumber message.sender message.receiver
-
-                let newExecutionStates = Map.insert executionStateKey CCIP.Internal.SUCCESS executionStates
-                create this with executionStates = newExecutionStates
+                case Map.lookup executionStateKey executionStates of
+                    Some CCIP.Internal.SUCCESS -> abort "OffRamp_ExecuteFromPool: Message has already been executed"
+                    _ -> do
+                        let newExecutionStates = Map.insert executionStateKey CCIP.Internal.SUCCESS executionStates
+                        onRampCid <- create this with executionStates = newExecutionStates
+                        -- emit event with new execution state
+                        _ <- create ExecutionStateChanged
+                            with
+                                ccip_owner = owner
+                                event = ExecutionStateChangedEvent
+                                    with
+                                        sourceChainSelector = message.sourceChainSelector
+                                        sequenceNumber = message.sequenceNumber
+                                        messageId = messageId
+                                        state = CCIP.Internal.SUCCESS
+                                        returnData = ""
+                        -- return new onRampCid
+                        pure onRampCid
 
 
 

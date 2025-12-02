@@ -19,6 +19,7 @@ template FeeQuoter
         -- | can be used to set a premium or discount for a specific fee token.
         feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId Decimal
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
+        tokenTransferFeeConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig
 
         usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
@@ -68,6 +69,7 @@ template FeeQuoter
         -- │                         Fee Quoting                          │
         -- ================================================================
 
+        -- deprecated
         nonconsuming choice GetValidatedFee : Decimal
             with
                 destChainSelector : Numeric 0
@@ -87,7 +89,33 @@ template FeeQuoter
                 let fee = networkFee / feeTokenPrice.price
 
                 return fee
-                
+
+        nonconsuming choice FeeQuoter_GetTokenTransferFee : (Decimal, Int, Int)
+            with
+                destChainSelector : Numeric 0
+                token : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                case Map.lookup token tokenTransferFeeConfigs of
+                    Some config -> return (config.feeUSD, config.destGasOverhead, config.destBytesOverhead)
+                    None -> do
+                        -- Use default fee from dest chain config
+                        -- For simplicity, we assume a single default dest chain config here.
+                        -- In a real implementation, you might want to pass the destChainSelector as an argument.
+                        let defaultConfig = fromSomeNote "No dest chain configs available" (Map.lookup destChainSelector destChainConfigs)
+                        return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
+
+        nonconsuming choice FeeQuoter_QuoteGasForExec : (Int, Decimal, Decimal, Decimal)
+            with
+                destChainSelector : Numeric 0
+                nonCalldataGas : Int
+                calldataSize : Int
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                return (0, 0.0, 0.0, 0.0) -- TODO
 
         -- ================================================================
         -- │                         Fee Tokens                           │
@@ -171,6 +199,13 @@ data DestChainConfig = DestChainConfig
         -- | The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
         defaultTokenFeeUSD : Decimal --         │ Default token fee charged per token transfer.
         defaultTokenDestGasOverhead : Int --  ──╯ Default gas charged to execute a token transfer on the destination chain.
+    deriving (Eq, Show)
+
+data TokenTransferFeeConfig = TokenTransferFeeConfig
+    with
+        feeUSD : Decimal
+        destGasOverhead : Int
+        destBytesOverhead : Int
     deriving (Eq, Show)
 
 data TimestampedPrice = TimestampedPrice

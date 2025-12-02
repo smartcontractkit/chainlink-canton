@@ -23,4 +23,4 @@ template DummyCommitteeVerifier
                         
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 debug ("DummyCommitteeVerifier: forwardToVerifier called with messageId: " <> show arg.messageId)
-                pure ""
+                pure ("verifierBlobDummy", owner)

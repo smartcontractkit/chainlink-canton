@@ -20,6 +20,7 @@ template CommitteeVerifier
         owner : Party
 
         ccipOwner : Party
+        messageSentObserver : Party
         storageLocation : Text
 
         -- config TODO: Refactor this out, to allow updating without recreating the contract
@@ -89,7 +90,7 @@ template CommitteeVerifier
 
                 pure()
 
-        nonconsuming choice CommitteeVerifier_ForwardToVerifier : BytesHex
+        nonconsuming choice CommitteeVerifier_ForwardToVerifier : (BytesHex, Party)
             with
                 message : CCIP.MessageCodecV1.MessageV1
                 messageId : BytesHex
@@ -99,10 +100,7 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
-                -- only callable by owner or ccipOwner
-                assertMsg "Not authorized" (caller == owner || caller == ccipOwner)
-
-                pure "49ff34ed"
+                pure ("49ff34ed", messageSentObserver)
 
 
 -- Parse signature data into a list of (r, s) tuples

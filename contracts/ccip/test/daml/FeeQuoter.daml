@@ -29,6 +29,7 @@ setup = script do
             owner = owner
             feeTokens = Map.empty
             destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.empty
             priceUpdaters = [owner]
@@ -191,6 +192,7 @@ setup = script do
                 payload = "Test message payload"
                 feeToken = instrumentIdLINK
                 extraArgs = ""
+                tokenAmounts = []
             caller = owner
     -- LINK: 20.00, networkFeeUSD: 1.0 => 0.05 LINK
     debug ("GetValidatedFee result: " <> show result)
@@ -205,6 +207,7 @@ setup = script do
                 payload = "Test message payload"
                 feeToken = instrumentIdUSDC
                 extraArgs = ""
+                tokenAmounts = []
             caller = owner
     -- USDC: 1.00, networkFeeUSD: 0.5 => 0.5 USDC
     debug ("GetValidatedFee result: " <> show result)
