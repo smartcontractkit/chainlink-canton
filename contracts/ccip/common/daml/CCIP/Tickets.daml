@@ -1,0 +1,114 @@
+-- | Ticket contracts for cross-participant CCIP communication.
+-- All tickets are defined in CCIP's DAR so CCIP's participant can fetch and consume them.
+module CCIP.Tickets where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified CCIP.MessageCodecV1
+
+-- | Ticket issued by TokenPool after locking tokens for outbound transfer.
+-- Consumed by PerPartyRouter.CCIPSend to include token transfer in the message.
+template TokenSendTicket
+    with
+        -- Authorization
+        poolOwner : Party              -- Signatory: proves pool created this
+        ccipOwner : Party              -- Can consume this ticket
+        sender : Party                 -- Observer: the user who locked tokens
+
+        -- Pool identification (for TokenAdminRegistry verification)
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+
+        -- Token transfer details (becomes TokenTransferV1 in message)
+        sourceTokenAddress : BytesHex  -- Encoded instrumentId
+        amount : Numeric 0             -- Amount locked
+        destTokenAddress : BytesHex    -- Token address on destination chain
+        tokenReceiver : BytesHex       -- Receiver address on destination chain (BytesHex!)
+        extraData : BytesHex           -- Optional extra data for destination
+    where
+        signatory poolOwner
+        observer ccipOwner, sender
+
+        choice TokenSendTicket_Consume : CCIP.MessageCodecV1.TokenTransferV1
+            controller ccipOwner
+            do
+                pure CCIP.MessageCodecV1.TokenTransferV1 with
+                    amount = amount
+                    sourcePoolAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
+                    sourceTokenAddress = sourceTokenAddress
+                    destTokenAddress = destTokenAddress
+                    tokenReceiver = tokenReceiver
+                    extraData = extraData
+
+
+-- | Ticket issued by CCV after processing a message for outbound attestation.
+-- Consumed by PerPartyRouter.CCIPSend to include verifier data in the event.
+template CCVTicket
+    with
+        -- Authorization
+        ccvOwner : Party               -- Signatory: proves CCV created this
+        ccipOwner : Party              -- Can consume this ticket
+        sender : Party                 -- Observer: the user who requested forwarding
+
+        -- Verifier data (included in CCIPMessageSent event)
+        verifierBlob : BytesHex        -- Opaque data for the verifier
+        verifierObserver : Party       -- Party to observe CCIPMessageSent
+    where
+        signatory ccvOwner
+        observer ccipOwner, sender
+
+        choice CCVTicket_Consume : (BytesHex, Party)
+            controller ccipOwner
+            do pure (verifierBlob, verifierObserver)
+
+
+-- | Ticket issued by CCV after verifying an inbound message.
+-- Consumed by PerPartyRouter.Execute to prove message verification.
+template CCVVerifyTicket
+    with
+        -- Authorization
+        ccvOwner : Party               -- Signatory: proves CCV verified this
+        ccipOwner : Party              -- Can consume this ticket
+        caller : Party                 -- Observer: who requested verification
+
+        -- Message binding
+        messageHash : BytesHex         -- keccak256 of encoded message
+
+        -- Verification metadata
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+    where
+        signatory ccvOwner
+        observer ccipOwner, caller
+
+        choice CCVVerifyTicket_Consume : ()
+            controller ccipOwner
+            do pure ()
+
+
+-- | Ticket issued by PerPartyRouter after successful message verification.
+-- Consumed by TokenPool.Release to authorize token release.
+template ExecutionTicket
+    with
+        -- Authorization
+        ccipOwner : Party              -- Signatory: proves router verified this
+        receiver : Party               -- Observer: who can use this ticket
+
+        -- Message identification
+        messageHash : BytesHex         -- keccak256 of encoded message
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+
+        -- Token transfer info (from the verified message)
+        hasTokenTransfer : Bool
+        tokenAmount : Optional (Numeric 0)
+        destTokenAddress : Optional BytesHex
+        tokenReceiver : Optional Party  -- Decoded from message
+    where
+        signatory ccipOwner
+        observer receiver
+
+        choice ExecutionTicket_Consume : ()
+            controller receiver
+            do pure ()
