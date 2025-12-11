@@ -1,0 +1,349 @@
+-- | Per-party router for CCIP message sending and receiving.
+-- Each party has their own router with isolated state, eliminating contention.
+module CCIP.PerPartyRouter where
+
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Optional (fromSomeNote, fromOptional)
+import DA.Foldable (forA_)
+
+import qualified CCIP.GlobalConfig
+import qualified CCIP.FeeQuoter
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.Tickets
+import qualified CCIP.TokenAdminRegistry
+import qualified CCIP.Internal
+
+
+-- | Factory for creating PerPartyRouters.
+-- Fully self-service: anyone who can see and exercise the factory can create their router.
+template PerPartyRouterFactory
+    with
+        ccipOwner : Party
+        globalOnRampConfigCid : ContractId CCIP.GlobalConfig.GlobalOnRampConfig
+        globalOffRampConfigCid : ContractId CCIP.GlobalConfig.GlobalOffRampConfig
+        feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+        tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+    where
+        signatory ccipOwner
+
+        -- Self-service router creation
+        -- The partyOwner controls this choice, so they must be able to see the factory
+        nonconsuming choice CreateRouter : ContractId PerPartyRouter
+            with
+                partyOwner : Party
+            controller partyOwner
+            do
+                create PerPartyRouter with
+                    ccipOwner = ccipOwner
+                    partyOwner = partyOwner
+                    globalOnRampConfigCid = globalOnRampConfigCid
+                    globalOffRampConfigCid = globalOffRampConfigCid
+                    feeQuoterCid = feeQuoterCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    outboundSequenceNumbers = Map.empty
+                    executionStates = Map.empty
+
+
+-- | Per-party router combining OnRamp and OffRamp functionality.
+-- Each party has their own router with isolated state.
+template PerPartyRouter
+    with
+        ccipOwner : Party
+        partyOwner : Party
+
+        -- Global config references
+        globalOnRampConfigCid : ContractId CCIP.GlobalConfig.GlobalOnRampConfig
+        globalOffRampConfigCid : ContractId CCIP.GlobalConfig.GlobalOffRampConfig
+        feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+        tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+
+        -- Per-party OnRamp state: sequence numbers per destination chain
+        outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
+
+        -- Per-party OffRamp state: execution states per message
+        executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
+    where
+        signatory ccipOwner
+        observer partyOwner
+
+        -- ================================================================
+        -- |                     SEND (OnRamp)                            |
+        -- ================================================================
+
+        -- | Send a CCIP message with optional token transfer.
+        choice CCIPSend : CCIPSendResult
+            with
+                destChainSelector : Numeric 0
+                receiver : BytesHex              -- Destination address (BytesHex for cross-chain)
+                payload : BytesHex               -- Arbitrary message data
+                executionGasLimit : Int          -- Gas limit for execution
+                ccipReceiveGasLimit : Int        -- Gas limit for callback
+                -- Optional token transfer
+                tokenSendTicket : Optional (ContractId CCIP.Tickets.TokenSendTicket)
+                -- CCV tickets for verifier attestations (open question - simplified for now)
+                ccvTickets : [ContractId CCIP.Tickets.CCVTicket]
+            controller partyOwner
+            do
+                -- 1. Fetch global config
+                globalConfig <- fetch globalOnRampConfigCid
+                assertMsg "Invalid global config owner" (globalConfig.ccipOwner == ccipOwner)
+
+                destConfigOpt <- exercise globalOnRampConfigCid
+                    CCIP.GlobalConfig.GetDestChainConfig with
+                        destChainSelector = destChainSelector
+                        caller = partyOwner
+                destConfig <- case destConfigOpt of
+                    None -> abort "Unknown destination chain"
+                    Some c -> do
+                        assertMsg "Destination chain disabled" c.isEnabled
+                        pure c
+
+                -- 2. Process optional token transfer ticket
+                tokenTransfer <- case tokenSendTicket of
+                    None -> pure None
+                    Some ticketCid -> do
+                        ticket <- fetch ticketCid
+                        assertMsg "TokenSendTicket: ccipOwner mismatch"
+                            (ticket.ccipOwner == ccipOwner)
+                        assertMsg "TokenSendTicket: sender mismatch"
+                            (ticket.sender == partyOwner)
+
+                        -- Verify pool is registered
+                        configOpt <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
+                                instrumentId = ticket.instrumentId
+                                caller = partyOwner
+                        config <- case configOpt of
+                            None -> abort "TokenSendTicket: No config for instrument"
+                            Some c -> pure c
+                        assertMsg "TokenSendTicket: Pool owner not registered"
+                            (config.tokenPoolOwner == Some ticket.poolOwner)
+
+                        -- Consume ticket
+                        tt <- exercise ticketCid CCIP.Tickets.TokenSendTicket_Consume
+                        pure (Some tt)
+
+                -- 3. Process CCV tickets
+                ccvResults <- forA ccvTickets $ \ticketCid -> do
+                    ticket <- fetch ticketCid
+                    assertMsg "CCVTicket: ccipOwner mismatch" (ticket.ccipOwner == ccipOwner)
+                    assertMsg "CCVTicket: sender mismatch" (ticket.sender == partyOwner)
+                    exercise ticketCid CCIP.Tickets.CCVTicket_Consume
+
+                let (verifierBlobs, verifierObservers) = unzip ccvResults
+
+                -- 4. Compute CCV and executor hash (simplified for now)
+                let ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+                -- 5. Get and increment per-party sequence number
+                let currentSeqNum = fromOptional 0.0 (Map.lookup destChainSelector outboundSequenceNumbers)
+                let newSeqNum = currentSeqNum + 1.0
+
+                -- 6. Build message (encoding must match EVM exactly!)
+                let messageV1 = CCIP.MessageCodecV1.MessageV1 with
+                        sourceChainSelector = globalConfig.chainSelector
+                        destChainSelector = destChainSelector
+                        sequenceNumber = newSeqNum
+                        executionGasLimit = executionGasLimit
+                        ccipReceiveGasLimit = ccipReceiveGasLimit
+                        finality = 2000
+                        ccvAndExecutorHash = ccvAndExecutorHash
+                        onRampAddress = globalConfig.onRampAddress
+                        offRampAddress = destConfig.offRampAddress
+                        sender = CCIP.MessageCodecV1.encodePartyId partyOwner
+                        receiver = receiver
+                        destBlob = ""
+                        tokenTransfer = tokenTransfer
+                        messageData = payload
+
+                let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 messageV1
+                let msgId = keccak256 encodedMessage
+
+                -- 7. Update per-party sequence number
+                let newSeqNumbers = Map.insert destChainSelector newSeqNum outboundSequenceNumbers
+                routerCid <- create this with outboundSequenceNumbers = newSeqNumbers
+
+                -- 8. Emit event
+                ccipMessageSentCid <- create CCIPMessageSent with
+                    ccipOwner = ccipOwner
+                    sender = partyOwner
+                    verifiers = verifierObservers
+                    event = CCIPMessageSentEvent with
+                        destChainSelector = destChainSelector
+                        sequenceNumber = newSeqNum
+                        messageId = msgId
+                        encodedMessage = encodedMessage
+                        verifierBlobs = verifierBlobs
+
+                pure CCIPSendResult with
+                    router = routerCid
+                    ccipMessageSent = ccipMessageSentCid
+                    messageId = msgId
+
+        -- ================================================================
+        -- |                    RECEIVE (OffRamp)                         |
+        -- ================================================================
+
+        -- | Execute an inbound CCIP message.
+        choice Execute : ExecuteResult
+            with
+                encodedMessage : BytesHex
+                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
+            controller partyOwner
+            do
+                -- 1. Decode message
+                let message = fromSomeNote "Failed to decode message"
+                        (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+                let messageHash = keccak256 encodedMessage
+
+                -- 2. Verify receiver is this party
+                let receiverParty = fromSomeNote "Failed to decode receiver"
+                        (CCIP.MessageCodecV1.decodePartyId message.receiver)
+                assertMsg "Message not for this party" (receiverParty == partyOwner)
+
+                -- 3. Check execution state (duplicate prevention)
+                let currentState = fromOptional
+                        CCIP.Internal.UNTOUCHED
+                        (Map.lookup messageHash executionStates)
+
+                case currentState of
+                    CCIP.Internal.SUCCESS -> abort "Message already executed successfully"
+                    CCIP.Internal.IN_PROGRESS -> abort "Message execution in progress"
+                    _ -> pure ()  -- UNTOUCHED or FAILURE allowed
+
+                -- 4. Fetch and verify global config
+                globalConfig <- fetch globalOffRampConfigCid
+                assertMsg "Invalid global config owner" (globalConfig.ccipOwner == ccipOwner)
+
+                sourceConfigOpt <- exercise globalOffRampConfigCid
+                    CCIP.GlobalConfig.GetSourceChainConfig with
+                        sourceChainSelector = message.sourceChainSelector
+                        caller = partyOwner
+                sourceConfig <- case sourceConfigOpt of
+                    None -> abort "Unknown source chain"
+                    Some c -> do
+                        assertMsg "Source chain disabled" c.isEnabled
+                        pure c
+
+                -- 5. Consume CCV verification tickets
+                forA_ ccvVerifyTickets $ \ticketCid -> do
+                    ticket <- fetch ticketCid
+                    assertMsg "CCVVerifyTicket: ccipOwner mismatch" (ticket.ccipOwner == ccipOwner)
+                    assertMsg "CCVVerifyTicket: messageHash mismatch" (ticket.messageHash == messageHash)
+                    exercise ticketCid CCIP.Tickets.CCVVerifyTicket_Consume
+
+                -- 6. TODO: Verify required CCVs (see Open Questions)
+
+                -- 7. Extract token transfer info
+                let (hasTokenTransfer, tokenAmount, destTokenAddr, tokenReceiverParty) =
+                        case message.tokenTransfer of
+                            None -> (False, None, None, None)
+                            Some tt ->
+                                let trParty = CCIP.MessageCodecV1.decodePartyId tt.tokenReceiver
+                                in (True, Some tt.amount, Some tt.destTokenAddress, trParty)
+
+                -- 8. Update execution state to SUCCESS
+                let newStates = Map.insert messageHash CCIP.Internal.SUCCESS executionStates
+                routerCid <- create this with executionStates = newStates
+
+                -- 9. Emit event
+                _ <- create ExecutionStateChanged with
+                    ccipOwner = ccipOwner
+                    receiver = partyOwner
+                    event = ExecutionStateChangedEvent with
+                        sourceChainSelector = message.sourceChainSelector
+                        sequenceNumber = message.sequenceNumber
+                        messageId = messageHash
+                        state = CCIP.Internal.SUCCESS
+                        returnData = ""
+
+                -- 10. Create ExecutionTicket for token release
+                executionTicketCid <- create CCIP.Tickets.ExecutionTicket with
+                    ccipOwner = ccipOwner
+                    receiver = partyOwner
+                    messageHash = messageHash
+                    sourceChainSelector = message.sourceChainSelector
+                    sequenceNumber = message.sequenceNumber
+                    hasTokenTransfer = hasTokenTransfer
+                    tokenAmount = tokenAmount
+                    destTokenAddress = destTokenAddr
+                    tokenReceiver = tokenReceiverParty
+
+                pure ExecuteResult with
+                    router = routerCid
+                    executionTicket = executionTicketCid
+                    messageId = messageHash
+                    message = message
+                    state = CCIP.Internal.SUCCESS
+
+        -- | Query execution state for a message.
+        nonconsuming choice GetExecutionState : CCIP.Internal.MessageExecutionState
+            with
+                messageHash : BytesHex
+            controller partyOwner
+            do
+                pure (fromOptional CCIP.Internal.UNTOUCHED (Map.lookup messageHash executionStates))
+
+
+-- ================================================================
+-- |                     Result Types                             |
+-- ================================================================
+
+data CCIPSendResult = CCIPSendResult
+    with
+        router : ContractId PerPartyRouter
+        ccipMessageSent : ContractId CCIPMessageSent
+        messageId : BytesHex
+    deriving (Eq, Show)
+
+data ExecuteResult = ExecuteResult
+    with
+        router : ContractId PerPartyRouter
+        executionTicket : ContractId CCIP.Tickets.ExecutionTicket
+        messageId : BytesHex
+        message : CCIP.MessageCodecV1.MessageV1
+        state : CCIP.Internal.MessageExecutionState
+    deriving (Eq, Show)
+
+
+-- ================================================================
+-- |                       Events                                 |
+-- ================================================================
+
+template CCIPMessageSent
+    with
+        ccipOwner : Party
+        sender : Party
+        verifiers : [Party]
+        event : CCIPMessageSentEvent
+    where
+        signatory ccipOwner
+        observer sender, verifiers
+
+data CCIPMessageSentEvent = CCIPMessageSentEvent
+    with
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        encodedMessage : BytesHex
+        verifierBlobs : [BytesHex]
+    deriving (Eq, Show)
+
+template ExecutionStateChanged
+    with
+        ccipOwner : Party
+        receiver : Party
+        event : ExecutionStateChangedEvent
+    where
+        signatory ccipOwner
+        observer receiver
+
+data ExecutionStateChangedEvent = ExecutionStateChangedEvent
+    with
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        state : CCIP.Internal.MessageExecutionState
+        returnData : BytesHex
+    deriving (Eq, Show)
