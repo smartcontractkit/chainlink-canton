@@ -77,22 +77,22 @@ setup = script do
             sourceChainSelector = 123.0
             destChainSelector = 456.0
             sequenceNumber = 1.0
+            executionGasLimit = 400000
+            ccipReceiveGasLimit = 200000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
             offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
-            finality = 2000
-            gasLimit = 400000
             sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
             receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e" -- TODO: not checked on-chain
             destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
-            tokenTransfer = [
-                CCIP.MessageCodecV1.TokenTransferV1
-                    with
-                        amount = 1000000.0
-                        sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
-                        sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
-                        destTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId localToken
-                        tokenReceiver = "bcd565166cafb25d53079c7e6522c18c2c0e39c3"
-                        extraData = "746f6b656e2065787472612064617461"]
+            tokenTransfer = Some (CCIP.MessageCodecV1.TokenTransferV1 with
+                amount = 1000000.0
+                sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
+                sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
+                destTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId localToken
+                tokenReceiver = "bcd565166cafb25d53079c7e6522c18c2c0e39c3"
+                extraData = "746f6b656e2065787472612064617461")
             messageData = "6d657373616765207769746820746f6b656e2064617461"
 
     (requiredCCVs, optionalCCVs, threshold) <- submit (actAs user <> disclose disclosedOffRamp) do
