@@ -126,7 +126,7 @@ template OnRamp
             with
                 destChainSelector : Numeric 0
                 message : Canton2AnyMessage
-                tokenTransfer : [CCIP.MessageCodecV1.TokenTransferV1]
+                tokenTransfer : Optional CCIP.MessageCodecV1.TokenTransferV1
                 caller : Party
             controller caller
             do
@@ -143,7 +143,9 @@ template OnRamp
                                     onRampAddress = "" -- TODO: onRampAddress
                                     offRampAddress = config.offRamp
                                     finality = 2000
-                                    gasLimit = 400000
+                                    executionGasLimit = 400000
+                                    ccipReceiveGasLimit = 200000
+                                    ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000" -- TODO
                                     sender = CCIP.MessageCodecV1.encodePartyId caller
                                     receiver = message.receiver
                                     destBlob = "12345678" -- TODO: destBlob
@@ -175,7 +177,8 @@ template OnRamp
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 assertMsg "OnRamp_ForwardFromPool: tokenAdminRegistry owner mismatch" (tokenAdminRegistry.owner == owner)
                 -- Get the token config from the token admin registry
-                let token = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId (List.head prepareResult.message.tokenTransfer).sourceTokenAddress)
+                let tokenTransfer = fromSomeNote "OnRamp_ForwardFromPool: no token transfer in message" prepareResult.message.tokenTransfer
+                let token = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId tokenTransfer.sourceTokenAddress)
                 tokenConfigOpt <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig
                     with
                         instrumentId = token
