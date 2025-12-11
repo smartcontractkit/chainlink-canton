@@ -4,13 +4,14 @@ packages:
   - ccip/ccvs
   - ccip/common
   - ccip/feequoter
+  - ccip/tokenAdminRegistry
   - ccip/onramp
   - ccip/offramp
-  - ccip/router
-  - ccip/test
-  - ccip/tokenAdminRegistry
-  - ccip/pools/lockReleaseTokenPool
   - ccip/pools/interfaces
+  - ccip/pools/lockReleaseTokenPool
+  - ccip/router
+  - ccip/perpartyrouter
+  - ccip/test
 
   - test/interfaces
   - test/proxy
