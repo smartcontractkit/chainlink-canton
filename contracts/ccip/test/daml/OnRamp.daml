@@ -115,7 +115,7 @@ setup = script do
             destChainConfigs = Map.empty
 
     --apply destChainConfig for destChainSelector1
-    let destChainConfig = OnRamp.DestChainConfig withde
+    let destChainConfig = OnRamp.DestChainConfig with
             sequenceNumber = 0.0
             defaultExecutor = ""
             laneMandatedCCVs = []
