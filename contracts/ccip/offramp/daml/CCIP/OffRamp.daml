@@ -63,11 +63,10 @@ template OffRamp
 
                 -- get CCVs from token pool if applicable
                 requiredPoolCCVs <- case message.tokenTransfer of
-                    [] -> return []
-                    [tokenTransfer] -> do
+                    None -> return []
+                    Some tokenTransfer -> do
                         let localToken = fromSomeNote "failed to decode local token" (CCIP.MessageCodecV1.decodeInstrumentId tokenTransfer.destTokenAddress)
                         getCCVsForPool localToken message.sourceChainSelector tokenTransfer.amount message.finality tokenTransfer.extraData
-                    _ -> abort "Invalid number of tokens"
 
                 -- get CCVs from receiver
                 (requiredReceiverCCVs, optionalReceiverCCVs, useDefaultCCVs, optionalThreshold) <- exercise receiver CCIP.Interfaces.Any2CantonMessageReceiver.Any2CantonMessageReceiver_GetCCVs with
@@ -267,7 +266,7 @@ template OffRamp
                 assertMsg "OffRamp_ExecuteFromPool: tokenAdminRegistry owner mismatch" (tokenAdminRegistry.owner == owner)
                 -- Get token config from token admin registry
                 tokenConfigOpt <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
-                    instrumentId = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId (List.head message.tokenTransfer).destTokenAddress)
+                    instrumentId = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId (fromSomeNote "OffRamp_ExecuteFromPool: No token transfer in message" message.tokenTransfer).destTokenAddress)
                     caller = caller
                 let config = fromSomeNote "OffRamp_ExecuteFromPool: No token pool set for instrument" tokenConfigOpt
                 -- Assert that this choice is being called by the token pool owner
