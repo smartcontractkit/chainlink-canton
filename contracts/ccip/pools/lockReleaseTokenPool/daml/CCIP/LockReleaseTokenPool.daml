@@ -86,7 +86,7 @@ template LockReleaseTokenPool
             controller caller
             do
                 let message = fromSomeNote "Failed to decode MessageV1" (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
-                let tokenTransferInput = head message.tokenTransfer
+                let tokenTransferInput = fromSomeNote "LockReleaseTokenPool_ReleaseOrMint: no token transfer in message" message.tokenTransfer
                 let instrument = fromSome (CCIP.MessageCodecV1.decodeInstrumentId tokenTransferInput.destTokenAddress)
                 -- Verify that the message is for the correct instrument
                 assertMsg "LockReleaseTokenPool_ReleaseOrMint: Message instrumentId mismatch" (instrument == instrumentId)
@@ -211,7 +211,7 @@ template LockReleaseTokenPool
                     with
                         destChainSelector = destChainSelector
                         message = message
-                        tokenTransfer = [tokenTransfer]
+                        tokenTransfer = Some tokenTransfer
                         caller = caller
 
                 debug ("LockReleaseTokenPool_LockOrBurn: Prepared message: " <> show prepareResult)
