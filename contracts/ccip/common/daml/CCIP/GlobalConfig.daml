@@ -1,0 +1,87 @@
+-- | Global configuration contracts for CCIP.
+-- Shared across all PerPartyRouters, owned by ccipOwner.
+-- Uses nonconsuming choices for reads to avoid contention.
+module CCIP.GlobalConfig where
+
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
+
+
+-- | Configuration for a destination chain (outbound messages).
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool
+        defaultExecutor : BytesHex
+        offRampAddress : BytesHex
+        -- CCV configuration (for future use - see Open Questions)
+        laneMandatedCCVOwners : [Party]
+        defaultCCVOwners : [Party]
+    deriving (Eq, Show)
+
+
+-- | Configuration for a source chain (inbound messages).
+data SourceChainConfig = SourceChainConfig
+    with
+        isEnabled : Bool
+        onRampAddress : BytesHex
+        -- CCV configuration (for future use - see Open Questions)
+        laneMandatedCCVOwners : [Party]
+        defaultCCVOwners : [Party]
+    deriving (Eq, Show)
+
+
+-- | Global configuration for outbound messages.
+-- Owned by ccipOwner, read by all PerPartyRouters.
+template GlobalOnRampConfig
+    with
+        ccipOwner : Party
+        chainSelector : Numeric 0          -- This chain's selector
+        onRampAddress : BytesHex           -- This chain's onRamp address
+        destChainConfigs : Map.Map (Numeric 0) DestChainConfig
+    where
+        signatory ccipOwner
+
+        -- Anyone can read config (nonconsuming = no contention)
+        nonconsuming choice GetDestChainConfig : Optional DestChainConfig
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do pure (Map.lookup destChainSelector destChainConfigs)
+
+        -- Only owner can update
+        choice UpdateDestChainConfig : ContractId GlobalOnRampConfig
+            with
+                destChainSelector : Numeric 0
+                config : DestChainConfig
+            controller ccipOwner
+            do
+                let newConfigs = Map.insert destChainSelector config destChainConfigs
+                create this with destChainConfigs = newConfigs
+
+
+-- | Global configuration for inbound messages.
+-- Owned by ccipOwner, read by all PerPartyRouters.
+template GlobalOffRampConfig
+    with
+        ccipOwner : Party
+        chainSelector : Numeric 0          -- This chain's selector
+        sourceChainConfigs : Map.Map (Numeric 0) SourceChainConfig
+    where
+        signatory ccipOwner
+
+        nonconsuming choice GetSourceChainConfig : Optional SourceChainConfig
+            with
+                sourceChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do pure (Map.lookup sourceChainSelector sourceChainConfigs)
+
+        choice UpdateSourceChainConfig : ContractId GlobalOffRampConfig
+            with
+                sourceChainSelector : Numeric 0
+                config : SourceChainConfig
+            controller ccipOwner
+            do
+                let newConfigs = Map.insert sourceChainSelector config sourceChainConfigs
+                create this with sourceChainConfigs = newConfigs
