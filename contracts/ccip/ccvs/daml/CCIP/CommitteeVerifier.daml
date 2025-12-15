@@ -5,7 +5,9 @@ import DA.Optional (fromSomeNote)
 
 import qualified Splice.Api.Token.HoldingV1
 
+import qualified CCIP.CCVRegistry
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.Tickets
 import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Crypto.DerEncoding
@@ -20,15 +22,15 @@ template CommitteeVerifier
         owner : Party
 
         ccipOwner : Party
+        versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")
         messageSentObserver : Party
         storageLocation : Text
 
-        -- config TODO: Refactor this out, to allow updating without recreating the contract
         threshold : Int
-        signers : [BytesHex] 
+        signers : [BytesHex]
     where
         signatory owner
-        ensure storageLocation /= "" && threshold > 0 && length signers >= threshold
+        ensure storageLocation /= "" && threshold > 0 && length signers >= threshold && versionTag /= ""
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -38,14 +40,17 @@ template CommitteeVerifier
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
                     with
+                        ccvRegistryCid = arg.ccvRegistryCid
                         message = arg.message
                         messageId = arg.messageId
                         ccvData = arg.ccvData
+                        receiver = arg.receiver
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
                     with
+                        ccvRegistryCid = arg.ccvRegistryCid
                         message = arg.message
                         messageId = arg.messageId
                         feeToken = arg.feeToken
@@ -53,28 +58,31 @@ template CommitteeVerifier
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
 
-        nonconsuming choice CommitteeVerifier_VerifyMessage : ()
+        -- | Verify an inbound message and issue a CCVVerifyTicket via CCVRegistry.
+        nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
             with
+                ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 message : CCIP.MessageCodecV1.MessageV1
                 messageId : BytesHex
                 ccvData : BytesHex
-
+                receiver : Party
                 caller : Party
             controller caller
             do
-                let verifierVersion = fromSomeNote "Failed to extract verifier version" (CCIP.MessageCodecV1.extractBytes ccvData 0 (byteCount versionTagV1_7_0))
-                assertMsg "Invalid CCV Version" (verifierVersion == versionTagV1_7_0)
+                -- Verify version tag matches
+                let verifierVersion = fromSomeNote "Failed to extract verifier version" (CCIP.MessageCodecV1.extractBytes ccvData 0 (byteCount versionTag))
+                assertMsg "Invalid CCV Version" (verifierVersion == versionTag)
 
-                let signatureLength = fromSomeNote "Failed to extract signature length" (CCIP.MessageCodecV1.decodeUint16 (fromSomeNote "Failed to extract signature length bytes" (CCIP.MessageCodecV1.extractBytes ccvData (byteCount versionTagV1_7_0) 2)))
-                assertMsg "Invalid CCV data" ((byteCount ccvData) == ((byteCount versionTagV1_7_0) + 2 + signatureLength))
+                let signatureLength = fromSomeNote "Failed to extract signature length" (CCIP.MessageCodecV1.decodeUint16 (fromSomeNote "Failed to extract signature length bytes" (CCIP.MessageCodecV1.extractBytes ccvData (byteCount versionTag) 2)))
+                assertMsg "Invalid CCV data" ((byteCount ccvData) == ((byteCount versionTag) + 2 + signatureLength))
                 let numberOfSignatures = signatureLength / signature_length
                 assertMsg "Insufficient signatures provided" (numberOfSignatures >= threshold)
-                let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes ccvData (byteCount versionTagV1_7_0 + 2) signatureLength)
+                let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes ccvData (byteCount versionTag + 2) signatureLength)
                 -- split signatureData into r and s components
                 let signatures = parseSignatures signatureData
 
                 -- calculate the signed hash
-                let signedHash = keccak256 (versionTagV1_7_0 <> (CCIP.MessageCodecV1.encodeMessageV1 message))
+                let signedHash = keccak256 (versionTag <> (CCIP.MessageCodecV1.encodeMessageV1 message))
 
                 -- verify signatures
                 let validSigners = findValidSigners signedHash signatures signers
@@ -83,15 +91,28 @@ template CommitteeVerifier
                 -- check that number of valid signers == numer of signatures provided
                 -- if it isn't this either means duplicate signatures or signatures from non-signers have been provided
                 assertMsg "Invalid signatures detected" (validSignerCount == numberOfSignatures)
-                
+
                 -- Check threshold requirement
-                assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold) 
+                assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold)
                     (validSignerCount >= threshold)
 
-                pure()
+                -- Calculate message hash for the ticket
+                let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 message)
 
-        nonconsuming choice CommitteeVerifier_ForwardToVerifier : (BytesHex, Party)
+                -- Issue verify ticket via CCVRegistry
+                -- CCVRegistry extracts version tag from first 4 bytes of ccvData
+                exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
+                    ccvOwner = owner
+                    ccvData = ccvData  -- Contains version tag in first 4 bytes
+                    messageHash = messageHash
+                    sourceChainSelector = message.sourceChainSelector
+                    sequenceNumber = message.sequenceNumber
+                    receiver = receiver
+
+        -- | Forward message for verification and issue a CCVTicket via CCVRegistry.
+        nonconsuming choice CommitteeVerifier_ForwardToVerifier : ContractId CCIP.Tickets.CCVTicket
             with
+                ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 message : CCIP.MessageCodecV1.MessageV1
                 messageId : BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
@@ -100,7 +121,15 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
-                pure ("49ff34ed", messageSentObserver)
+                -- Build verifierBlob with version tag as first 4 bytes
+                let verifierBlob = versionTag  -- In simple case, blob is just version tag
+                -- Issue CCV ticket via CCVRegistry
+                -- CCVRegistry extracts version tag from first 4 bytes of verifierBlob
+                exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
+                    ccvOwner = owner
+                    verifierBlob = verifierBlob  -- Contains version tag in first 4 bytes
+                    messageSentObservers = [messageSentObserver]
+                    sender = caller
 
 
 -- Parse signature data into a list of (r, s) tuples

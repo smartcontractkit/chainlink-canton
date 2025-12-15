@@ -1,0 +1,71 @@
+-- | Registry for Cross-Chain Verifiers.
+-- Stateless ticket-issuing authority - no registration required.
+-- The ccipOwner signatory ensures only authorized tickets are created.
+module CCIP.CCVRegistry where
+
+import DA.Crypto.Text (BytesHex)
+import DA.Optional (fromSomeNote)
+
+import qualified CCIP.CCVId
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.Tickets
+
+
+-- | Registry for Cross-Chain Verifiers.
+-- Stateless - the ccipOwner signatory is the security guarantee.
+template CCVRegistry
+    with
+        ccipOwner : Party
+    where
+        signatory ccipOwner
+
+        -- | Issue a CCV ticket for outbound message (forwardToVerifier equivalent).
+        -- Called by CCV after processing send request.
+        -- The version tag is extracted from the first 4 bytes of verifierBlob.
+        nonconsuming choice CCVRegistry_IssueCCVTicket : ContractId CCIP.Tickets.CCVTicket
+            with
+                ccvOwner : Party  -- Controller - becomes part of CCVId
+                verifierBlob : BytesHex  -- Contains version tag in first 4 bytes
+                messageSentObservers : [Party]
+                sender : Party
+            controller ccvOwner
+            do
+                -- Extract version tag from first 4 bytes of verifierBlob
+                let versionTag = fromSomeNote "CCVRegistry: Failed to extract version tag from verifierBlob"
+                        (CCIP.MessageCodecV1.extractBytes verifierBlob 0 4)
+                let ccvId = CCIP.CCVId.makeCCVId versionTag ccvOwner
+
+                create CCIP.Tickets.CCVTicket with
+                    ccvId = ccvId
+                    ccvOwner = ccvOwner
+                    ccipOwner = ccipOwner
+                    sender = sender
+                    verifierBlob = verifierBlob
+                    messageSentObservers = messageSentObservers
+
+        -- | Issue a CCV verify ticket for inbound message verification.
+        -- Called by CCV after successful verification.
+        -- The version tag is extracted from the first 4 bytes of ccvData.
+        nonconsuming choice CCVRegistry_IssueVerifyTicket : ContractId CCIP.Tickets.CCVVerifyTicket
+            with
+                ccvOwner : Party  -- Controller - becomes part of CCVId
+                ccvData : BytesHex  -- Contains version tag in first 4 bytes
+                messageHash : BytesHex
+                sourceChainSelector : Numeric 0
+                sequenceNumber : Numeric 0
+                receiver : Party
+            controller ccvOwner
+            do
+                -- Extract version tag from first 4 bytes of ccvData
+                let versionTag = fromSomeNote "CCVRegistry: Failed to extract version tag from ccvData"
+                        (CCIP.MessageCodecV1.extractBytes ccvData 0 4)
+                let ccvId = CCIP.CCVId.makeCCVId versionTag ccvOwner
+
+                create CCIP.Tickets.CCVVerifyTicket with
+                    ccvId = ccvId
+                    ccvOwner = ccvOwner
+                    ccipOwner = ccipOwner
+                    caller = receiver
+                    messageHash = messageHash
+                    sourceChainSelector = sourceChainSelector
+                    sequenceNumber = sequenceNumber

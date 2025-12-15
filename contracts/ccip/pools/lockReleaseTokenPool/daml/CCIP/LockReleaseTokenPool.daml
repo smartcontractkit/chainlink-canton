@@ -1,25 +1,17 @@
+-- | lock/release token pool for ccip token transfers.
+-- note: this module needs to be redesigned to work with perpartyrouter and ticket pattern.
 module CCIP.LockReleaseTokenPool where
 
-import DA.Crypto.Text (BytesHex, keccak256)
-import DA.Foldable qualified as Foldable
-import DA.Numeric (cast)
-import DA.List ((\\), unique, head)
-import DA.Optional (fromSome, fromSomeNote)
-import DA.Time (addRelTime, seconds)
+import DA.List (unique)
 
 import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
-import qualified Splice.Api.Token.TransferInstructionV1
 
-import qualified CCIP.Client
-import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.OffRamp
-import qualified CCIP.OnRamp
-import qualified CCIP.TokenAdminRegistry
 
+
+-- | lock/release token pool - currently stubbed out pending redesign for perpartyrouter.
 template LockReleaseTokenPool
     with
         ccipOwner : Party
@@ -44,28 +36,12 @@ template LockReleaseTokenPool
                         caller = arg.caller
 
             tokenPool_releaseOrMintImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_ReleaseOrMint
-                    with
-                        encodedMessage = arg.encodedMessage
-                        ccvs = arg.ccvs
-                        ccvData = arg.ccvData
-                        caller = arg.caller
-                        tokenInput = arg.tokenInput
-                        offRampCid = arg.offRampCid
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                -- stubbed: needs redesign for perpartyrouter ticket pattern
+                abort "TODO"
 
             tokenPool_lockOrBurnImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_LockOrBurn
-                    with
-                        destChainSelector = arg.destChainSelector
-                        message = arg.message
-                        tokenInput = arg.tokenInput
-                        feeInput = arg.feeInput
-                        senderInputCids = arg.senderInputCids
-                        onRampCid = arg.onRampCid
-                        feeQuoterCid = arg.feeQuoterCid
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        caller = arg.caller
+                -- stubbed: needs redesign for perpartyrouter ticket pattern
+                abort "TODO"
 
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
             with
@@ -73,220 +49,3 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do return requiredCCVs
-
-        nonconsuming choice LockReleaseTokenPool_ReleaseOrMint : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
-            with
-                encodedMessage : BytesHex
-                ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
-                ccvData : [BytesHex]
-                caller : Party
-                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-                offRampCid : ContractId CCIP.OffRamp.OffRamp
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-            controller caller
-            do
-                let message = fromSomeNote "Failed to decode MessageV1" (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
-                let tokenTransferInput = fromSomeNote "LockReleaseTokenPool_ReleaseOrMint: no token transfer in message" message.tokenTransfer
-                let instrument = fromSome (CCIP.MessageCodecV1.decodeInstrumentId tokenTransferInput.destTokenAddress)
-                -- Verify that the message is for the correct instrument
-                assertMsg "LockReleaseTokenPool_ReleaseOrMint: Message instrumentId mismatch" (instrument == instrumentId)
-                let tokenReceiver = fromSome (CCIP.MessageCodecV1.decodePartyId tokenTransferInput.tokenReceiver)
-
-                let messageId = keccak256 encodedMessage
-                -- Assert that all required CCVs are provided
-                -- TODO: no need for the user to pass ccvs in, we can just use requiredCCVs directly?
-                assertMsg "ccvs and ccvData length mismatch" (length ccvs == length ccvData)
-                let missingCCVs = requiredCCVs \\ ccvs
-                if not (null missingCCVs) then
-                    abort "LockReleaseTokenPool_ReleaseOrMint: Missing required CCVs"
-                else do
-                    -- Query each CCV to verify the message
-                    Foldable.mapA_ (\(ccvCid, ccvDatum) ->
-                        exercise ccvCid CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage
-                            with
-                                message = message
-                                messageId = messageId
-                                ccvData = ccvDatum
-                                caller = caller
-                        ) (zip ccvs ccvData)
-                    
-                    -- TODO Rate limiting
-
-                    -- Release the tokens from the holdings by creating a TransferInstruction to the tokenReceiver
-                    let decimalAmount = (cast @10 tokenTransferInput.amount) / (10.0 ^ decimals)
-
-                    -- Mark message as executed with OffRamp 
-                    _ <- exercise offRampCid CCIP.OffRamp.OffRamp_ExecuteFromPool
-                        with
-                            message = message
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            caller = poolOwner
-
-                    now <- getTime
-                    transferResult <- exercise tokenInput.transferFactory Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer
-                        with
-                            expectedAdmin = instrument.admin
-                            transfer = Splice.Api.Token.TransferInstructionV1.Transfer
-                                with
-                                    sender = poolOwner
-                                    receiver = tokenReceiver
-                                    amount = decimalAmount
-                                    instrumentId = instrument
-                                    requestedAt = now
-                                    executeBefore = addRelTime now (seconds 5) -- TODO, make configurable especially for native
-                                    inputHoldingCids = tokenInput.tokenPoolHoldings
-                                    meta = Splice.Api.Token.MetadataV1.emptyMetadata
-                            extraArgs = tokenInput.extraArgs
-                    case transferResult.output of
-                        Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction creation failed"
-                        Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending pending -> do
-                            -- TODO: Only accept if the receiver is the caller
-                            -- Transfer is pending, accept it on behalf of the receiver
-                            acceptResult <- exercise pending Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
-                                with
-                                    extraArgs = tokenInput.extraArgs
-                            -- check that the acceptance was completed
-                            case acceptResult.output of
-                                Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverHoldingCids -> 
-                                    -- Transfer completed
-                                    return CCIP.Interfaces.TokenPool.ReleaseOrMintResult
-                                    with
-                                        output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed
-                                            with
-                                                receiverHoldingCids = receiverHoldingCids
-                                        poolChangeCids = transferResult.senderChangeCids
-                                Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ -> 
-                                    -- Transfer still pending
-                                    return CCIP.Interfaces.TokenPool.ReleaseOrMintResult
-                                        with
-                                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending
-                                                with
-                                                    transferInstructionCid = pending
-                                            poolChangeCids = transferResult.senderChangeCids
-                                Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction failed"
-                        Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed tiCid -> do
-                            return CCIP.Interfaces.TokenPool.ReleaseOrMintResult
-                                with
-                                    output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed
-                                        with
-                                            receiverHoldingCids = tiCid
-                                    poolChangeCids = transferResult.senderChangeCids
-
-        nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
-            with
-                destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
-                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-                feeInput : CCIP.Interfaces.TokenPool.FeeInput
-                senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-                onRampCid : ContractId CCIP.OnRamp.OnRamp
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                caller : Party
-            controller caller
-            do
-                debug ("LockReleaseTokenPool_LockOrBurn: Starting LockOrBurn for message: " <> show message)
-                -- verify that the onRamp is owned by the same owner as this pool
-                -- TODO: This is currently failing
-                -- onRamp <- fetch onRampCid
-                -- assertMsg "LockReleaseTokenPool_LockOrBurn: onRamp owner mismatch" (onRamp.owner == ccipOwner)
-                -- Create tokenTransfer
-                tokenTransfer <- case message.tokenAmounts of
-                    [] -> abort "LockReleaseTokenPool_LockOrBurn: No tokenTransfer provided in message"
-                    ([tt]) -> do
-                        -- Verify that the message is for the correct instrument
-                        assertMsg "LockReleaseTokenPool_LockOrBurn: Message instrumentId mismatch" (tt.instrumentId == instrumentId) 
-                        return CCIP.MessageCodecV1.TokenTransferV1
-                            with
-                                amount = tt.amount -- TODO: get actual amount from user input
-                                sourcePoolAddress = ""
-                                sourceTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
-                                destTokenAddress = ""
-                                tokenReceiver = ""
-                                extraData = ""
-                    _ -> abort "LockReleaseTokenPool_LockOrBurn: Multiple tokenTransfers not supported"
-                        
-                -- Call OnRamp to prepare the message
-                prepareResult <- exercise onRampCid CCIP.OnRamp.OnRamp_PrepareMessage
-                    with
-                        destChainSelector = destChainSelector
-                        message = message
-                        tokenTransfer = Some tokenTransfer
-                        caller = caller
-
-                debug ("LockReleaseTokenPool_LockOrBurn: Prepared message: " <> show prepareResult)
-
-                -- Forward message to CCVs
-                -- Call each required CCV to get verifier blobs and observers
-                results <- mapA (\ccvCid -> do
-                    exercise ccvCid CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_ForwardToVerifier
-                        with
-                            message = prepareResult.message
-                            messageId = prepareResult.messageId
-                            feeToken = feeInput.instrumentId
-                            feeTokenAmount = 1.0 -- TODO: get actual fee amount from FeeQuoter/prepareResult
-                            verifierArgs = ""
-                            caller = caller
-                    ) requiredCCVs
-                let (verifierBlobs, verifiers) = unzip results
-
-                debug ("LockReleaseTokenPool_LockOrBurn: Verifier blobs: " <> show verifierBlobs)
-                debug ("LockReleaseTokenPool_LockOrBurn: Verifier observers: " <> show verifiers)
-                
-                -- Forward to OnRamp
-                forwardResult <- exercise onRampCid CCIP.OnRamp.OnRamp_ForwardFromPool
-                    with
-                        prepareResult = prepareResult
-                        feeInput = CCIP.OnRamp.ForwardFeeInput
-                            with
-                                instrumentId = feeInput.instrumentId
-                                transferFactory = feeInput.transferFactory
-                                extraArgs = feeInput.extraArgs
-                                inputHoldingCids = feeInput.inputHoldingCids
-                        caller = poolOwner
-                        messageSender = caller
-                        verifierBlobs = verifierBlobs -- TODO: get verifier blobs from CCVs
-                        verifierObservers = verifiers -- TODO: get verifiers from CCVs
-                        feeQuoter = feeQuoterCid
-                        tokenAdminRegistryCid = tokenAdminRegistryCid
-
-                debug ("LockReleaseTokenPool_LockOrBurn: Forwarded message result: " <> show forwardResult)
-
-                -- use TransferFactory to create a transfer instruction to the token pool owner party to lock the tokens
-                let decimalAmount = (cast @10 tokenTransfer.amount) / (10.0 ^ decimals)
-                now <- getTime
-                transferResult <- exercise feeInput.transferFactory Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer
-                    with
-                        expectedAdmin = message.feeToken.admin
-                        transfer = Splice.Api.Token.TransferInstructionV1.Transfer
-                            with
-                                sender = caller
-                                receiver = poolOwner
-                                amount = decimalAmount
-                                instrumentId = message.feeToken
-                                requestedAt = now
-                                executeBefore = addRelTime now (seconds 5) -- TODO
-                                inputHoldingCids = senderInputCids
-                                meta = Splice.Api.Token.MetadataV1.emptyMetadata
-                        extraArgs = tokenInput.extraArgs
-                ownerHoldings <- case transferResult.output of
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed holdings -> return holdings
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> 
-                        abort "Transfer instruction creation failed"
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending ti -> do
-                        -- accept the incoming TransferInstruction as payment
-                        acceptResult <- exercise ti Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
-                            with
-                                extraArgs = feeInput.extraArgs
-                        -- check that the acceptance was completed
-                        case acceptResult.output of
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction failed"
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed completed -> return completed
-                
-                debug ("OnRamp_ForwardFromPool: fee payment completed, owner holdings: " <> show ownerHoldings)
-
-                return CCIP.Interfaces.TokenPool.LockOrBurnResult
-                    with
-                        poolChangeCids = []
-                        senderChangeCids = []

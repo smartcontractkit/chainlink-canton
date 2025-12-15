@@ -5,11 +5,11 @@ packages:
   - ccip/common
   - ccip/feequoter
   - ccip/tokenAdminRegistry
+  - ccip/ccvRegistry
   - ccip/onramp
   - ccip/offramp
   - ccip/pools/interfaces
   - ccip/pools/lockReleaseTokenPool
-  - ccip/router
   - ccip/perpartyrouter
   - ccip/test
 

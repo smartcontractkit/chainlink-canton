@@ -1,409 +1,191 @@
+-- | onramp for ccip message sending, called by perpartyrouter.
 module CCIP.OnRamp where
 
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable qualified as Foldable
-import DA.List qualified as List
-import DA.Map qualified as Map
-import DA.Optional (fromSomeNote)
-import DA.Time (addRelTime, seconds)
+
+import qualified CCIP.CCVId
+import qualified CCIP.GlobalConfig
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.Tickets
+import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
-import qualified Splice.Api.Token.TransferInstructionV1
 
-import CCIP.Client (Canton2AnyMessage)
-import qualified CCIP.FeeQuoter
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.TokenAdminRegistry
 
 template OnRamp
     with
-        owner : Party
-
-        staticConfig : StaticConfig
-
-        destChainConfigs : Map.Map (Numeric 0) DestChainConfig
+        ccipOwner : Party
+        environmentId : Text
     where
-        signatory owner
+        signatory ccipOwner
 
-        -- ================================================================
-        -- │                             Fees                             │
-        -- ================================================================
-
-        nonconsuming choice GetFee : Decimal
+        -- | Get required CCVs for outbound message.
+        -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
+        -- Does NOT include sender's router CCVs - we don't know what the receiver requires.
+        nonconsuming choice GetRequiredCCVsForSend : [CCIP.CCVId.CCVId]
             with
-                destChainSelector : Numeric 0
-                message : Canton2AnyMessage
-                caller : Party
-                feeQuoter : ContractId CCIP.FeeQuoter.FeeQuoter
-            controller caller
-            do
-                -- Use FeeQuoter to calculate fees
-                exercise feeQuoter CCIP.FeeQuoter.GetValidatedFee
-                    with
-                        destChainSelector = destChainSelector
-                        message = message
-                        caller = caller
-
-        -- ================================================================
-        -- │                          Messaging                           │
-        -- ================================================================
-
-        nonconsuming choice GetExpectedNextSequenceNumber : Numeric 0
-            with
-                destChainSelector : Numeric 0
-                caller : Party
-            controller caller
-            do
-                case Map.lookup destChainSelector destChainConfigs of
-                    None -> abort "Unknown destChainSelector"
-                    Some config -> return (config.sequenceNumber + 1.0)
-
-        choice CCIPSend : CCIPSendResult
-            with 
-                destChainSelector : Numeric 0
-                message : Canton2AnyMessage
-                feeInput : FeeInput
-                caller : Party
-                feeQuoter : ContractId CCIP.FeeQuoter.FeeQuoter
-            controller caller
-            do
-                 -- Lookup destChainConfig
-                case Map.lookup destChainSelector destChainConfigs of
-                    None -> abort "Unknown destChainSelector"
-                    Some config -> do
-                        -- User FeeQuoter to calculate fees
-                        fee <- exercise feeQuoter CCIP.FeeQuoter.GetValidatedFee
-                            with
-                                destChainSelector = destChainSelector
-                                message = message
-                                caller = caller
-
-                        -- Verify feeInput covers fee and the receiver is the owner
-                        feeInputContract <- fetch feeInput.transfer
-                        let amount = (view feeInputContract).transfer.amount
-                        let receiver = (view feeInputContract).transfer.receiver
-                        assertMsg ("Fee input amount " <> show amount <> " is less than required fee " <> show fee) (amount >= fee)
-                        assertMsg ("Fee input receiver is not the owner") (receiver == owner)
-
-                        -- accept the incoming TransferInstruction as payment
-                        acceptResult <- exercise feeInput.transfer Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
-                            with
-                                extraArgs = feeInput.extraArgs
-                        -- check that the acceptance was completed
-                        case acceptResult.output of
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ -> return ()
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction failed"
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
-
-                        let newSequenceNumber = config.sequenceNumber + 1.0
-                        let updatedDestChainConfig = config with sequenceNumber = newSequenceNumber
-                        let newDestChainConfigs = Map.insert destChainSelector updatedDestChainConfig destChainConfigs
-
-                        onRampCid <- create this with destChainConfigs = newDestChainConfigs
-
-                        ccipMessageSentCid <- create CCIPMessageSent
-                            with
-                                ccip_owner = owner
-                                sender = caller
-                                verifiers = [] -- TODO: get verifiers from CCVs
-                                event = CCIPMessageSentEvent
-                                    with
-                                        destChainSelector = destChainSelector
-                                        sequenceNumber = newSequenceNumber
-                                        messageId = "TODO: generate messageId"
-                                        encodedMessage = "TODO: encode message"
-                                        receipts = []
-                                        verifierBlobs = []
-
-                        return CCIPSendResult
-                            with
-                                onRamp = onRampCid
-                                ccipMessageSent = ccipMessageSentCid
-
-        -- Called by Token Pools to prepare a message
-        nonconsuming choice OnRamp_PrepareMessage : PrepareResult
-            with
-                destChainSelector : Numeric 0
-                message : Canton2AnyMessage
-                tokenTransfer : Optional CCIP.MessageCodecV1.TokenTransferV1
-                caller : Party
-            controller caller
-            do
-                -- Lookup destChainConfig
-                case Map.lookup destChainSelector destChainConfigs of
-                    None -> abort "Unknown destChainSelector"
-                    Some config -> do
-                        -- Create Message
-                        let newMessage = CCIP.MessageCodecV1.MessageV1
-                                with
-                                    sourceChainSelector = staticConfig.chainSelector
-                                    destChainSelector = destChainSelector
-                                    sequenceNumber = config.sequenceNumber + 1.0
-                                    onRampAddress = "" -- TODO: onRampAddress
-                                    offRampAddress = config.offRamp
-                                    finality = 2000
-                                    executionGasLimit = 400000
-                                    ccipReceiveGasLimit = 200000
-                                    ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000" -- TODO
-                                    sender = CCIP.MessageCodecV1.encodePartyId caller
-                                    receiver = message.receiver
-                                    destBlob = "12345678" -- TODO: destBlob
-                                    tokenTransfer = tokenTransfer
-                                    messageData = message.payload
-
-                        let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 newMessage
-                        let messageId = keccak256 encodedMessage
-
-                        return PrepareResult
-                            with
-                                message = newMessage
-                                messageId = messageId
-
-
-        choice OnRamp_ForwardFromPool : ForwardResult
-            with
-                prepareResult : PrepareResult
-                messageSender : Party
-                feeInput : ForwardFeeInput
-                caller : Party
-                verifierBlobs : [BytesHex]
-                verifierObservers : [Party]
-                feeQuoter : ContractId CCIP.FeeQuoter.FeeQuoter
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-            controller caller, messageSender -- can only be called by a token pool owner + the message sender
-            do
-                -- verify that the token admin registry is owned by the same owner as this OnRamp
-                tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                assertMsg "OnRamp_ForwardFromPool: tokenAdminRegistry owner mismatch" (tokenAdminRegistry.owner == owner)
-                -- Get the token config from the token admin registry
-                let tokenTransfer = fromSomeNote "OnRamp_ForwardFromPool: no token transfer in message" prepareResult.message.tokenTransfer
-                let token = fromSomeNote "failed to decode instrumentId" (CCIP.MessageCodecV1.decodeInstrumentId tokenTransfer.sourceTokenAddress)
-                tokenConfigOpt <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig
-                    with
-                        instrumentId = token
-                        caller = caller
-                let config = fromSomeNote "OnRamp_ForwardFromPool: No token pool set for instrument" tokenConfigOpt
-                -- Assert that this choice is being called by the token pool owner
-                let tokenPoolOwner = fromSomeNote "OnRamp_ForwardFromPool: No token pool owner set for instrument" config.tokenPoolOwner
-                assertMsg ("OnRamp_ForwardFromPool: token pool owner mismatch, caller: " <> show caller <> ", owner: " <> show tokenPoolOwner) (tokenPoolOwner == caller)
-                -- Assert that the message sender matches the input
-                let sender = fromSomeNote "OnRamp_ForwardFromPool: failed to decode message sender" (CCIP.MessageCodecV1.decodePartyId prepareResult.message.sender)
-                assertMsg "OnRamp_ForwardFromPool: message sender mismatch" (messageSender == sender)
-
-                -- Lookup destChainConfig
-                case Map.lookup prepareResult.message.destChainSelector destChainConfigs of
-                    None -> abort "Unknown destChainSelector"
-                    Some config -> do
-                        debug ("OnRamp_ForwardFromPool: preparing to forward message: " <> show prepareResult)
-                        -- User FeeQuoter to calculate fees - TODO
-                        (tokenTransferFee, _, _) <- exercise feeQuoter CCIP.FeeQuoter.FeeQuoter_GetTokenTransferFee
-                            with
-                                destChainSelector = prepareResult.message.destChainSelector
-                                token = token
-                                caller = caller
-
-                        -- TODO: Need to convert the fee which is USD to token amount based on token price
-                        debug ("OnRamp_ForwardFromPool: calculated token transfer fee: " <> show tokenTransferFee)
-
-                        -- use TransferFactory to create a transfer instruction to the owner party
-                        now <- getTime
-                        transferResult <- exercise feeInput.transferFactory Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer
-                            with
-                                expectedAdmin = token.admin
-                                transfer = Splice.Api.Token.TransferInstructionV1.Transfer
-                                    with
-                                        sender = messageSender
-                                        receiver = owner
-                                        amount = tokenTransferFee
-                                        instrumentId = feeInput.instrumentId
-                                        requestedAt = now
-                                        executeBefore = addRelTime now (seconds 5) -- TODO
-                                        inputHoldingCids = feeInput.inputHoldingCids
-                                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
-                                extraArgs = feeInput.extraArgs
-                        ownerHoldings <- case transferResult.output of
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed holdings -> return holdings
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> 
-                                abort "Transfer instruction creation failed"
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending ti -> do
-                                -- accept the incoming TransferInstruction as payment
-                                acceptResult <- exercise ti Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
-                                    with
-                                        extraArgs = feeInput.extraArgs
-                                -- check that the acceptance was completed
-                                case acceptResult.output of
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed -> abort "Transfer instruction failed"
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ -> abort "Transfer instruction is still pending"
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed completed -> return completed
-                        
-                        debug ("OnRamp_ForwardFromPool: fee payment completed, owner holdings: " <> show ownerHoldings)
-
-                        -- Update status
-                        let newSequenceNumber = config.sequenceNumber + 1.0
-                        let updatedDestChainConfig = config with sequenceNumber = newSequenceNumber
-                        let newDestChainConfigs = Map.insert prepareResult.message.destChainSelector updatedDestChainConfig destChainConfigs
-                        onRampCid <- create this with destChainConfigs = newDestChainConfigs
-
-                        debug ("OnRamp_ForwardFromPool: creating CCIPMessageSent")
-
-                        -- Create Message
-                        let newMessage = prepareResult.message
-                                with -- don't take these values from the prepareResult, to avoid caller modifying them
-                                    sourceChainSelector = staticConfig.chainSelector
-                                    sequenceNumber = newSequenceNumber
-                                    onRampAddress = "" -- TODO: onRampAddress
-                                    offRampAddress = config.offRamp
-                                    sender = CCIP.MessageCodecV1.encodePartyId sender
-                        let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 newMessage
-                        let messageId = keccak256 encodedMessage
-
-
-                        ccipMessageSentCid <- create CCIPMessageSent
-                            with
-                                ccip_owner = owner
-                                sender = caller
-                                verifiers = verifierObservers
-                                event = CCIPMessageSentEvent
-                                    with
-                                        destChainSelector = prepareResult.message.destChainSelector
-                                        sequenceNumber = newSequenceNumber
-                                        messageId = messageId
-                                        encodedMessage = encodedMessage
-                                        receipts = []
-                                        verifierBlobs = verifierBlobs
-
-                        return ForwardResult
-                            with
-                                onRamp = onRampCid
-                                messageId = messageId
-                                ccipMessageSent = ccipMessageSentCid
-                
-
-        -- ================================================================
-        -- │                           Config                             │
-        -- ================================================================
-
-        nonconsuming choice GetStaticConfig : StaticConfig
-            with
-                caller : Party
-            controller caller
-            do
-                return staticConfig
-
-        choice ApplyDestChainConfigUpdates : ContractId OnRamp
-            with
-                destChainConfigArgs : [DestChainConfigArgs]
-            controller owner
-            do
-                Foldable.mapA_ (\dcaa -> do
-                    assertMsg ("destChainSelector must be non-zero: " <> show dcaa.destChainSelector)(dcaa.destChainSelector /= 0.0)
-                    assertMsg ("destChainSelector must not equal local chainSelector: " <> show dcaa.destChainSelector)(dcaa.destChainSelector /= staticConfig.chainSelector)
-                    ) destChainConfigArgs
-
-                let newDestChainConfigs = foldl (\acc dcaa -> Map.insert dcaa.destChainSelector dcaa.destChainConfig acc) destChainConfigs destChainConfigArgs
-                create this with destChainConfigs = newDestChainConfigs
-        
-        nonconsuming choice GetDestChainConfig : DestChainConfig
-            with
                 destChainSelector : Numeric 0
-                caller : Party
-            controller caller
+                hasTokenTransfer : Bool
+                instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
+            controller ccipOwner
             do
-                case Map.lookup destChainSelector destChainConfigs of
-                    None -> abort "Unknown destChainSelector"
-                    Some config -> return config
+                -- 1. Get lane-mandated CCVs from GlobalConfig
+                destConfigOpt <- exercise globalConfigCid
+                    CCIP.GlobalConfig.GetDestChainConfig with
+                        destChainSelector = destChainSelector
+                        caller = ccipOwner
+                let laneMandatedCCVs = case destConfigOpt of
+                        None -> []
+                        Some config -> config.laneMandatedCCVs
 
-data FeeInput = FeeInput
+                -- 2. Get pool's required CCVs (if token transfer)
+                poolCCVs <- case (hasTokenTransfer, instrumentId) of
+                    (True, Some instId) -> do
+                        configOpt <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
+                                instrumentId = instId
+                                caller = ccipOwner
+                        pure (case configOpt of
+                            None -> []
+                            Some config -> config.requiredCCVs)
+                    _ -> pure []
+
+                -- 3. Get default CCVs (if no other CCVs specified)
+                let defaultCCVs = case destConfigOpt of
+                        None -> []
+                        Some config ->
+                            if null laneMandatedCCVs && null poolCCVs
+                            then config.defaultCCVs
+                            else []
+
+                -- Combine and dedupe
+                pure (CCIP.CCVId.dedupCCVIds (laneMandatedCCVs ++ poolCCVs ++ defaultCCVs))
+
+        -- | process a ccip send request from a perpartyrouter.
+        -- note: tokenSendTicket was already validated at issuance via TokenAdminRegistry_IssueSendTicket
+        nonconsuming choice CCIPSendFromRouter : CCIPSendFromRouterResult
+            with
+                routerPartyOwner : Party
+                routerEnvironmentId : Text
+
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+
+                destChainSelector : Numeric 0
+                receiver : BytesHex
+                payload : BytesHex
+                executionGasLimit : Int
+                ccipReceiveGasLimit : Int
+
+                currentSequenceNumber : Numeric 0
+
+                tokenSendTicket : Optional (ContractId CCIP.Tickets.TokenSendTicket)
+                ccvTickets : [ContractId CCIP.Tickets.CCVTicket]
+
+            controller ccipOwner
+            do
+                -- validate router environment matches
+                assertMsg "onramp: router environmentid mismatch"
+                    (routerEnvironmentId == environmentId)
+
+                -- fetch and validate global config
+                globalConfig <- fetch globalConfigCid
+                assertMsg "onramp: globalconfig ccipowner mismatch"
+                    (globalConfig.ccipOwner == ccipOwner)
+
+                destConfigOpt <- exercise globalConfigCid
+                    CCIP.GlobalConfig.GetDestChainConfig with
+                        destChainSelector = destChainSelector
+                        caller = ccipOwner
+                destConfig <- case destConfigOpt of
+                    None -> abort "onramp: unknown destination chain"
+                    Some c -> do
+                        assertMsg "onramp: destination chain disabled" c.isEnabled
+                        pure c
+
+                -- process optional token transfer ticket
+                -- ticket was already validated at issuance via TokenAdminRegistry_IssueSendTicket
+                (tokenTransfer, instrumentId) <- case tokenSendTicket of
+                    None -> pure (None, None)
+                    Some ticketCid -> do
+                        ticket <- fetch ticketCid
+                        assertMsg "onramp: tokensendticket ccipowner mismatch"
+                            (ticket.ccipOwner == ccipOwner)
+                        assertMsg "onramp: tokensendticket sender mismatch"
+                            (ticket.sender == routerPartyOwner)
+                        tt <- exercise ticketCid CCIP.Tickets.TokenSendTicket_Consume
+                        pure (Some tt, Some ticket.instrumentId)
+
+                -- get required CCVs for this send (no router CCVs - sender doesn't know receiver's requirements)
+                let hasTokenTransfer = isSome tokenTransfer
+                requiredCCVIds <- exercise self GetRequiredCCVsForSend with
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    destChainSelector = destChainSelector
+                    hasTokenTransfer = hasTokenTransfer
+                    instrumentId = instrumentId
+
+                -- process ccv tickets and collect provided CCVIds
+                ccvResults <- forA ccvTickets $ \ticketCid -> do
+                    ticket <- fetch ticketCid
+                    assertMsg "onramp: ccvticket ccipowner mismatch"
+                        (ticket.ccipOwner == ccipOwner)
+                    assertMsg "onramp: ccvticket sender mismatch"
+                        (ticket.sender == routerPartyOwner)
+                    exercise ticketCid CCIP.Tickets.CCVTicket_Consume
+
+                -- CCVTicket_Consume now returns (CCVId, BytesHex, [Party])
+                let providedCCVIds = map (\(ccvId, _, _) -> ccvId) ccvResults
+                let verifierBlobs = map (\(_, blob, _) -> blob) ccvResults
+                let allMessageSentObservers = concatMap (\(_, _, obs) -> obs) ccvResults
+
+                -- validate all required CCVs are covered
+                Foldable.forA_ requiredCCVIds $ \requiredId ->
+                    assertMsg ("onramp: missing required CCV " <> requiredId)
+                        (requiredId `elem` providedCCVIds)
+
+                let ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+                let newSequenceNumber = currentSequenceNumber + 1.0
+
+                -- build message
+                let messageV1 = CCIP.MessageCodecV1.MessageV1 with
+                        sourceChainSelector = globalConfig.chainSelector
+                        destChainSelector = destChainSelector
+                        sequenceNumber = newSequenceNumber
+                        executionGasLimit = executionGasLimit
+                        ccipReceiveGasLimit = ccipReceiveGasLimit
+                        finality = 2000
+                        ccvAndExecutorHash = ccvAndExecutorHash
+                        onRampAddress = globalConfig.onRampAddress
+                        offRampAddress = destConfig.offRampAddress
+                        sender = CCIP.MessageCodecV1.encodePartyId routerPartyOwner
+                        receiver = receiver
+                        destBlob = ""
+                        tokenTransfer = tokenTransfer
+                        messageData = payload
+
+                let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 messageV1
+                let messageId = keccak256 encodedMessage
+
+                pure CCIPSendFromRouterResult with
+                    messageId = messageId
+                    encodedMessage = encodedMessage
+                    newSequenceNumber = newSequenceNumber
+                    destChainSelector = destChainSelector
+                    verifierBlobs = verifierBlobs
+                    messageSentObservers = allMessageSentObservers
+
+
+data CCIPSendFromRouterResult = CCIPSendFromRouterResult
     with
-        -- The TransferInstruction that will be used to pay the fee for the message
-        transfer : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
-        -- The extraArgs retrieved from the asset's registry, to be passed to the accept choice
-        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
-    deriving (Eq, Show)
-
-data CCIPSendResult = CCIPSendResult
-    with
-        onRamp : ContractId OnRamp
-        ccipMessageSent : ContractId CCIPMessageSent
-    deriving (Eq, Show)
-
--- Forwarding from Token Pools
-
-data PrepareResult = PrepareResult 
-    with
-        message : CCIP.MessageCodecV1.MessageV1
-        messageId : BytesHex
-    deriving (Eq, Show)
-
-data ForwardFeeInput = ForwardFeeInput
-    with
-        -- The instrumentId of the fee token
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        -- The transfer factory CID for the fee token
-        transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
-        -- The extraArgs retrieved from the asset's registry, to be passed to the accept choice
-        extraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
-        -- The user's holdings to be used to pay the fee
-        inputHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-    deriving (Eq, Show)
-
-data ForwardResult = ForwardResult
-    with
-        onRamp : ContractId OnRamp
-        messageId : BytesHex
-        ccipMessageSent : ContractId CCIPMessageSent
-    deriving (Eq, Show)
-
--- Events
-
-template CCIPMessageSent
-    with
-        ccip_owner : Party
-        sender : Party
-        verifiers : [Party]
-
-        event : CCIPMessageSentEvent
-    where
-        signatory ccip_owner
-        observer sender, verifiers
-
-data CCIPMessageSentEvent = CCIPMessageSentEvent
-    with
-        destChainSelector : Numeric 0
-        sequenceNumber : Numeric 0
         messageId : BytesHex
         encodedMessage : BytesHex
-        receipts : [Receipt]
-        verifierBlobs : [BytesHex]
-    deriving (Eq, Show)
-
-data Receipt = Receipt
-    with
-        destGasLimit : Numeric 0
-        destBytesOverhead : Numeric 0
-        feeTokenAmount : Decimal
-        extraArgs : BytesHex
-    deriving (Eq, Show)
-
--- Configs
-
-data StaticConfig = StaticConfig
-    with
-        chainSelector : Numeric 0
-    deriving (Eq, Show)     
-
-data DestChainConfigArgs = DestChainConfigArgs
-    with
+        newSequenceNumber : Numeric 0
         destChainSelector : Numeric 0
-        destChainConfig : DestChainConfig
-    deriving (Eq, Show)
-
-data DestChainConfig = DestChainConfig
-    with
-        sequenceNumber : Numeric 0
-        defaultExecutor : BytesHex
-        laneMandatedCCVs : [Text]
-        defaultCCVs : [Text]
-        offRamp : BytesHex
+        verifierBlobs : [BytesHex]
+        messageSentObservers : [Party]
     deriving (Eq, Show)
