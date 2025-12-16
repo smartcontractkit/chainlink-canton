@@ -1,0 +1,214 @@
+module CommitteeVerifier.Test where
+
+import Daml.Script
+
+import DA.Crypto.Text (keccak256)
+import DA.Foldable (forA_)
+
+import CCIP.CommitteeVerifier qualified as CommitteeVerifier
+
+import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
+
+setup = script do
+    owner <- allocateParty "owner"
+
+    let msg = PayloadBuilder.testMessage1
+    let encodedMsg = PayloadBuilder.testMessage1Encoded
+    debug ("Encoded message: " <> encodedMsg)
+    let preimage = CommitteeVerifier.versionTagV1_7_0 <> encodedMsg
+    debug ("Preimage for hashing: " <> preimage)
+    let hashedMsg = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> encodedMsg)
+    debug ("Hashed message: " <> hashedMsg)
+
+    -- Validate signatures individually
+    forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
+        let verified = CommitteeVerifier.validateSignature hashedMsg pubKey r s
+        assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
+
+    
+
+    debug ("===== Test1 =====")
+    -- single signer, threshold 1
+    let indices1 = [0]
+    let pubKeys1 = PayloadBuilder.getPubkeysForIndices indices1
+    let ccvData = PayloadBuilder.getCCVDataForIndices indices1
+    ccv1 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 1
+            signers = pubKeys1
+    submit owner do
+        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = ccvData
+            caller = owner
+    debug ("===== Passed Test1 =====")
+
+    debug ("===== Test2 =====")
+    -- multiple signers, threshold 3
+    let indices2 = [0, 1, 2, 3, 4]
+    let pubKeys2 = PayloadBuilder.getPubkeysForIndices indices2
+    let ccvData2 = PayloadBuilder.getCCVDataForIndices indices2
+    ccv2 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 3
+            signers = pubKeys2
+    submit owner do
+        exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = ccvData2
+            caller = owner
+    debug ("===== Passed Test2 =====")
+
+    debug ("===== Test3 =====")
+    -- insufficient signers, threshold 20 - ccv creation should fail
+    let indices3 = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    let pubKeys3 = PayloadBuilder.getPubkeysForIndices indices3
+    let ccvData3 = PayloadBuilder.getCCVDataForIndices indices3
+    ccv3 <- submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 20
+            signers = pubKeys3
+    debug ("===== Passed Test3 =====")
+
+    debug ("===== Test4 =====")
+    -- submit with invalid signatures, threshold of 3 met, should fail
+    let pubKeys4 = PayloadBuilder.getPubkeysForIndices [0, 2, 4, 6, 8, 10]
+    let ccvData4 = PayloadBuilder.getCCVDataForIndices [0, 1, 2, 3, 4, 5]
+    ccv4 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 3
+            signers = pubKeys4
+    submitMustFail owner do
+        exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = ccvData4
+            caller = owner
+    debug ("===== Passed Test4 =====")
+
+    debug ("===== Test5 =====")
+    -- submit with invalid signatures, threshold not met
+    let pubKeys5 = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]
+    let ccvData5 = PayloadBuilder.getCCVDataForIndices [5, 6, 7, 8, 9]
+    ccv5 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 4
+            signers = pubKeys5
+    submitMustFail owner do
+        exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = ccvData5
+            caller = owner
+    debug ("===== Passed Test5 =====")
+
+    debug ("===== Test6 =====")
+    -- submit duplicate signatures, should fail
+    let pubKeys6 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
+    let ccvData6 = PayloadBuilder.getCCVDataForIndices [0, 1, 2, 0]
+    ccv6 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 3
+            signers = pubKeys6
+    submitMustFail owner do
+        exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = ccvData6
+            caller = owner
+    debug ("===== Passed Test6 =====")
+
+    debug ("===== Test7 =====")
+    -- try to create without any signers, should fail
+    ccv7 <- submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 0
+            signers = []
+    debug ("===== Passed Test7 =====")
+
+    debug ("===== Test8 =====")
+    -- try to create without a storage location, should fail
+    ccv8 <- submitMustFail owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = ""
+            threshold = 1
+            signers = PayloadBuilder.getPubkeysForIndices [0]
+    debug ("===== Passed Test8 =====")
+
+    debug ("===== Test9 =====")
+    -- pass invalid ccvData
+    let pubKeys9 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
+    ccv9 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            owner = owner
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            threshold = 2
+            signers = pubKeys9
+    submitMustFail owner do
+        exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = --generate random invalid ccvData
+                "01234567" <> -- invalid version tag
+                "0004" <>     -- signature length too long
+                "deadbeef"    -- invalid signature data
+            caller = owner
+    submitMustFail owner do
+        exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = --generate random invalid ccvData
+                CommitteeVerifier.versionTagV1_7_0 <> -- version tag
+                "ffff" <>     -- signature length too long
+                "deadbeef"    -- invalid signature data
+            caller = owner
+    submitMustFail owner do
+        exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            message = msg
+            messageId = hashedMsg
+            ccvData = --generate random invalid ccvData
+                CommitteeVerifier.versionTagV1_7_0 <> -- version tag
+                "0001" <>     -- signature length too short
+                "deadbeef"    -- invalid signature data
+            caller = owner
+    
+    debug ("===== Passed Test9 =====")
+
+    debug ("===== All Tests Passed =====")
+
+    pure()

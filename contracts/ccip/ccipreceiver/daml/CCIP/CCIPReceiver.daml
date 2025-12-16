@@ -1,0 +1,39 @@
+module CCIP.CCIPReceiver where
+
+import qualified CCIP.Client
+import qualified CCIP.Interfaces.Any2CantonMessageReceiver
+import qualified CCIP.Interfaces.CrossChainVerifier
+
+template CCIPReceiver
+    with
+        owner : Party
+
+        ccipOwner : Party
+
+        requiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+        optionalCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+        threshold : Int
+    where
+        signatory owner
+
+        interface instance CCIP.Interfaces.Any2CantonMessageReceiver.IAny2CantonMessageReceiver for CCIPReceiver where
+            view = CCIP.Interfaces.Any2CantonMessageReceiver.Any2CantonMessageReceiverView with
+                ccipOwner = ccipOwner
+
+            any2CantonMessageReceiver_getCCVsImpl self sourceChainSelector = do
+                -- Implement your logic to return requiredCCVs, optionalCCVs, useDefaultCCVs, and optionalThreshold
+                return (requiredCCVs, optionalCCVs, True, threshold)
+
+            any2CantonMessageReceiver_ccipReceiveImpl self arg = do
+                -- Implement your message handling logic here
+                create MessageReceived with
+                    owner = owner
+                    message = arg.message
+                return ()
+
+template MessageReceived
+    with
+        owner : Party
+        message : CCIP.Client.Any2CantonMessage
+    where
+        signatory owner

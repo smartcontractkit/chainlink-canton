@@ -1,0 +1,10 @@
+sdk-version: 3.4.8
+name: test-interfaces
+source: daml
+version: 1.0.0
+build-options:
+  - "-Wno-crypto-text-is-alpha"
+data-dependencies:
+dependencies:
+  - daml-prim
+  - daml-stdlib

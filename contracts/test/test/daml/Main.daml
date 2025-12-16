@@ -1,0 +1,43 @@
+module Main where
+
+import DA.Optional
+
+import Daml.Script
+
+import qualified Interface
+import qualified Proxy
+import qualified Receiver
+
+setup = script do
+  ccipOwner <- allocateParty "ccipOwner"
+  ccipUser <- allocateParty "ccipUser"
+
+  receiver <- submit ccipUser do
+    createCmd Receiver.ReceiverImplementation with
+      owner = ccipUser
+      value = 42
+
+  _ <- submit ccipUser do
+    exerciseCmd (toInterfaceContractId @Interface.IReceiver receiver) Interface.Receiver_EmitEvent with
+      eventValue = 123
+      caller = ccipUser
+
+  proxy <- submit ccipOwner do
+    createCmd Proxy.Proxy with
+      owner = ccipOwner
+
+  proxyDisclosure <- fromSome <$> queryDisclosure ccipOwner proxy
+
+  _ <- submit (actAs ccipUser <> disclose proxyDisclosure) do
+    exerciseCmd proxy Proxy.Proxy_EmitEvent with
+      receiver = toInterfaceContractId @Interface.IReceiver receiver
+      eventValue = 456
+      caller = ccipUser
+
+  _ <- submit (actAs ccipUser <> disclose proxyDisclosure) do
+    exerciseCmd proxy Proxy.Proxy_EmitValue with
+      receiver = toInterfaceContractId @Interface.IReceiver receiver
+      caller = ccipUser
+  
+
+  pure()

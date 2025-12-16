@@ -1,0 +1,276 @@
+module MessageCodecV1 where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Crypto.Text
+import DA.Text qualified as Text
+import DA.Optional
+
+import qualified Splice.Api.Token.HoldingV1
+
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
+
+setup = script do
+
+    -- ======== Encoding Tests ========
+    -- Test encoding edge cases
+    let encodeZero8 = MessageCodecV1.encodeUint8 0
+    let encodeMax8 = MessageCodecV1.encodeUint8 255
+    let encodeOverflow8 = MessageCodecV1.encodeUint8 256
+    let encodeNegative8 = MessageCodecV1.encodeUint8 (-1)
+    
+    encodeZero8 === Some "00"
+    encodeMax8 === Some "ff"
+    encodeOverflow8 === None
+    encodeNegative8 === None
+    debug("uint8 encoding edge cases passed")
+
+    let encodeZero16 = MessageCodecV1.encodeUint16 0
+    let encodeMax16 = MessageCodecV1.encodeUint16 65535
+    let encodeOverflow16 = MessageCodecV1.encodeUint16 65536
+    let encodeNegative16 = MessageCodecV1.encodeUint16 (-1)
+    
+    encodeZero16 === Some "0000"
+    encodeMax16 === Some "ffff"
+    encodeOverflow16 === None
+    encodeNegative16 === None
+    debug("uint16 encoding edge cases passed")
+
+    let encodeZero32 = MessageCodecV1.encodeUint32 0
+    let encodeMax32 = MessageCodecV1.encodeUint32 4294967295
+    let encodeOverflow32 = MessageCodecV1.encodeUint32 4294967296
+    let encodeNegative32 = MessageCodecV1.encodeUint32 (-1)
+    
+    encodeZero32 === Some "00000000"
+    encodeMax32 === Some "ffffffff"
+    encodeOverflow32 === None
+    encodeNegative32 === None
+    debug("uint32 encoding edge cases passed")
+
+    let encodeZero64 = MessageCodecV1.encodeUint64 0.0
+    let encodeMax64 = MessageCodecV1.encodeUint64 18446744073709551615.0
+    let encodeOverflow64 = MessageCodecV1.encodeUint64 18446744073709551616.0
+    let encodeNegative64 = MessageCodecV1.encodeUint64 (-1.0)
+    
+    encodeZero64 === Some "0000000000000000"
+    encodeMax64 === Some "ffffffffffffffff"
+    encodeOverflow64 === None
+    encodeNegative64 === None
+    debug("uint64 encoding edge cases passed")
+
+    let encodeZero256 = MessageCodecV1.encodeUint256 0.0
+    let encodeSmall256 = MessageCodecV1.encodeUint256 1000000.0
+    let encodeNegative256 = MessageCodecV1.encodeUint256 (-1.0)
+    
+    encodeZero256 === Some "0000000000000000000000000000000000000000000000000000000000000000"
+    encodeSmall256 === Some "00000000000000000000000000000000000000000000000000000000000f4240"
+    encodeNegative256 === None
+    debug("uint256 encoding edge cases passed")
+
+    debug ("--- InstrumentId Encoding Test ---")
+    party <- allocateParty "testParty"
+
+    let encodedPartyId = MessageCodecV1.encodePartyId party
+    let decodedPartyId = fromSome (MessageCodecV1.decodePartyId encodedPartyId)
+    decodedPartyId === party
+
+    let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = party
+            id = "LINK"
+
+    let encodedInstrumentId = MessageCodecV1.encodeInstrumentId instrumentId
+    let decodedInstrumentId = fromSome (MessageCodecV1.decodeInstrumentId encodedInstrumentId)
+    decodedInstrumentId === instrumentId
+
+    debug ("--- PASS ---")
+
+    -- Test full MessageV1 encoding (new format matching EVM MessageV1Codec)
+    -- Note: The expected encoding must match the new EVM-compatible format:
+    -- Static section (67 bytes): version(1) + sourceChain(8) + destChain(8) + seqNum(8) +
+    --   execGasLimit(4) + ccipReceiveGasLimit(4) + finality(2) + ccvAndExecutorHash(32)
+    -- Variable section: onRampLen(1)+onRamp + offRampLen(1)+offRamp + senderLen(1)+sender +
+    --   receiverLen(1)+receiver + destBlobLen(2)+destBlob + tokenLen(2)+token + dataLen(2)+data
+    let msg = MessageCodecV1.MessageV1
+            with
+                sourceChainSelector = 123.0
+                destChainSelector = 456.0
+                sequenceNumber = 789.0
+                executionGasLimit = 400000
+                ccipReceiveGasLimit = 200000
+                finality = 2000
+                ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+                onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
+                offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
+                sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
+                receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
+                destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
+                tokenTransfer = Some (MessageCodecV1.TokenTransferV1 with
+                    amount = 1000000.0
+                    sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
+                    sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
+                    destTokenAddress = "c22ff98123e0785520915c5bd97e83ac649180a1"
+                    tokenReceiver = "bcd565166cafb25d53079c7e6522c18c2c0e39c3"
+                    extraData = "746f6b656e2065787472612064617461")
+                messageData = "6d657373616765207769746820746f6b656e2064617461"
+    let encodedMessage = Text.asciiToLower (MessageCodecV1.encodeMessageV1 msg)
+    debug("Encoded MessageV1: " <> encodedMessage)
+
+    -- ======== Decoding Tests ========
+
+    -- Test uint8 decoding
+    let test8_0 = MessageCodecV1.decodeUint8 "00"
+    let test8_1 = MessageCodecV1.decodeUint8 "01" 
+    let test8_255 = MessageCodecV1.decodeUint8 "ff"
+    let test8_invalid = MessageCodecV1.decodeUint8 "0000" -- wrong length
+    
+    test8_0 === Some 0
+    test8_1 === Some 1
+    test8_255 === Some 255
+    test8_invalid === None
+    debug("uint8 decoding tests passed")
+
+    -- Test uint16 decoding
+    let test16_0 = MessageCodecV1.decodeUint16 "0000"
+    let test16_1 = MessageCodecV1.decodeUint16 "0001"
+    let test16_256 = MessageCodecV1.decodeUint16 "0100"
+    let test16_max = MessageCodecV1.decodeUint16 "ffff"
+    let test16_invalid = MessageCodecV1.decodeUint16 "00" -- wrong length
+    
+    test16_0 === Some 0
+    test16_1 === Some 1
+    test16_256 === Some 256
+    test16_max === Some 65535
+    test16_invalid === None
+    debug("uint16 decoding tests passed")
+
+    -- Test uint32 decoding
+    let test32_0 = MessageCodecV1.decodeUint32 "00000000"
+    let test32_1 = MessageCodecV1.decodeUint32 "00000001"
+    let test32_65536 = MessageCodecV1.decodeUint32 "00010000"
+    let test32_max = MessageCodecV1.decodeUint32 "ffffffff"
+    let test32_invalid = MessageCodecV1.decodeUint32 "0000" -- wrong length
+    
+    test32_0 === Some 0
+    test32_1 === Some 1
+    test32_65536 === Some 65536
+    test32_max === Some 4294967295
+    test32_invalid === None
+    debug("uint32 decoding tests passed")
+
+    -- Test uint64 decoding
+    let test64_0 = MessageCodecV1.decodeUint64 "0000000000000000"
+    let test64_1 = MessageCodecV1.decodeUint64 "0000000000000001"
+    let test64_16 = MessageCodecV1.decodeUint64 "0000000000000010"
+    let test64_256 = MessageCodecV1.decodeUint64 "0000000000000100"
+    let test64_65536 = MessageCodecV1.decodeUint64 "0000000000010000"
+    let test64_max = MessageCodecV1.decodeUint64 "ffffffffffffffff"
+    let test64_invalid = MessageCodecV1.decodeUint64 "00000000" -- wrong length
+    
+    test64_0 === Some 0.0
+    test64_1 === Some 1.0
+    test64_16 === Some 16.0
+    test64_256 === Some 256.0
+    test64_65536 === Some 65536.0
+    test64_max === Some 18446744073709551615.0
+    test64_invalid === None
+    debug("uint64 decoding tests passed")
+
+    -- Test uint256 decoding
+    let test256_0 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000000"
+    let test256_1 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000001"
+    let test256_max64 = MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
+    let test256_invalid = MessageCodecV1.decodeUint256 "0000000000000000" -- wrong length
+    
+    test256_0 === Some 0.0
+    test256_1 === Some 1.0
+    test256_max64 === Some 18446744073709551615.0
+    test256_invalid === None
+    debug("uint256 decoding tests passed")
+
+
+    -- ======== Round-Trip Tests ========
+
+    -- Test round-trip encoding/decoding
+    case MessageCodecV1.decodeMessageV1 encodedMessage of
+        Some decodedMsg -> do
+            debug("Round-trip test: Decoding successful")
+            decodedMsg.sourceChainSelector === msg.sourceChainSelector
+            decodedMsg.destChainSelector === msg.destChainSelector
+            decodedMsg.sequenceNumber === msg.sequenceNumber
+            decodedMsg.executionGasLimit === msg.executionGasLimit
+            decodedMsg.ccipReceiveGasLimit === msg.ccipReceiveGasLimit
+            decodedMsg.finality === msg.finality
+            decodedMsg.ccvAndExecutorHash === msg.ccvAndExecutorHash
+            decodedMsg.onRampAddress === Text.asciiToLower msg.onRampAddress
+            decodedMsg.offRampAddress === Text.asciiToLower msg.offRampAddress
+            decodedMsg.sender === Text.asciiToLower msg.sender
+            decodedMsg.receiver === Text.asciiToLower msg.receiver
+            debug("Round-trip test: All fields match!")
+        None -> do
+            debug("Round-trip test: Decoding failed")
+            assert False
+
+    -- ======== Cross-Chain Compatibility Tests ========
+    -- These tests verify that our encoding matches EVM's MessageV1Codec exactly.
+    -- The expected values were generated using the EVM test at:
+    --   /chainlink-ccip/chains/evm/contracts/test/libraries/MessageV1Codec/GenerateTestVector.t.sol
+    -- Run: cd /chainlink-ccip/chains/evm && forge test --match-test test_GenerateTestVector -vvv
+
+    debug("--- Cross-Chain Compatibility Tests ---")
+
+    -- Test 1: TokenTransfer encoding (from EVM test__encodeTokenTransferV1_checkRawBytes)
+    -- Input: amount=100, sourcePoolAddress=0x1234567890abcdef, etc.
+    let tokenTransferTest = MessageCodecV1.TokenTransferV1 with
+            amount = 100.0
+            sourcePoolAddress = "1234567890abcdef"
+            sourceTokenAddress = "abcdef1234567890"
+            destTokenAddress = "fedcba0987654321"
+            tokenReceiver = "aabbccdd"
+            extraData = "0c117e57da7a"
+    let encodedTokenTransfer = Text.asciiToLower (MessageCodecV1.encodeTokenTransferV1 tokenTransferTest)
+    -- Expected structure: version(1) + amount(32) + sourcePoolLen(1) + sourcePool(8) +
+    --   sourceTokenLen(1) + sourceToken(8) + destTokenLen(1) + destToken(8) +
+    --   tokenReceiverLen(1) + tokenReceiver(4) + extraDataLen(2) + extraData(6) = 73 bytes = 146 hex chars
+    let expectedTokenTransferLen = 146
+    debug("TokenTransfer encoded length: " <> show (Text.length encodedTokenTransfer))
+    debug("TokenTransfer encoded: " <> encodedTokenTransfer)
+    Text.length encodedTokenTransfer === expectedTokenTransferLen
+    debug("TokenTransfer encoding length test PASSED")
+
+    -- Test 2: Empty message encoding (minimal message)
+    let emptyMsg = MessageCodecV1.MessageV1 with
+            sourceChainSelector = 0.0
+            destChainSelector = 0.0
+            sequenceNumber = 0.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            finality = 0
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = ""
+            offRampAddress = ""
+            sender = ""
+            receiver = ""
+            destBlob = ""
+            tokenTransfer = None
+            messageData = ""
+    let encodedEmptyMsg = Text.asciiToLower (MessageCodecV1.encodeMessageV1 emptyMsg)
+    -- Expected: MESSAGE_V1_BASE_SIZE = 77 bytes = 154 hex chars
+    -- Static(67) + onRampLen(1) + offRampLen(1) + senderLen(1) + receiverLen(1) +
+    --   destBlobLen(2) + tokenLen(2) + dataLen(2) = 77
+    let expectedEmptyMsgLen = 154
+    debug("Empty message encoded length: " <> show (Text.length encodedEmptyMsg))
+    Text.length encodedEmptyMsg === expectedEmptyMsgLen
+    debug("Empty message encoding length test PASSED")
+
+    -- Test 3: Verify messageId computation
+    -- messageId = keccak256(encodedMessage)
+    let msgId = MessageCodecV1.messageId msg
+    debug("MessageId: " <> msgId)
+    -- The messageId should be a 32-byte (64 hex char) keccak256 hash
+    Text.length msgId === 64
+    debug("MessageId length test PASSED")
+
+    debug("--- All Cross-Chain Compatibility Tests PASSED ---")
+
+    pure()

@@ -1,0 +1,47 @@
+module CCIP.Interfaces.CrossChainVerifier where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
+import qualified CCIP.CCVRegistry
+import qualified CCIP.Tickets
+
+interface ICrossChainVerifier where
+    viewtype CrossChainVerifierView
+
+    crossChainVerifier_verifyMessageImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_VerifyMessage -> Update (ContractId CCIP.Tickets.CCVVerifyTicket)
+    crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId CCIP.Tickets.CCVTicket)
+
+    -- | Verify an inbound message and return a CCVVerifyTicket.
+    nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
+        with
+            ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
+            message : MessageCodecV1.MessageV1
+            messageId : BytesHex
+            ccvData : BytesHex
+            receiver : Party
+            caller : Party
+        controller caller
+        do crossChainVerifier_verifyMessageImpl this self arg
+
+    -- | Forward message for verification and return a CCVTicket.
+    nonconsuming choice CrossChainVerifier_ForwardToVerifier : ContractId CCIP.Tickets.CCVTicket
+        with
+            ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
+            message : MessageCodecV1.MessageV1
+            messageId : BytesHex
+            feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+            feeTokenAmount : Decimal
+            verifierArgs : BytesHex
+            caller : Party
+        controller caller
+        do crossChainVerifier_forwardToVerifierImpl this self arg
+
+
+data CrossChainVerifierView = CrossChainVerifierView
+    with
+        ccipOwner : Party
+        storageLocation : Text
+    deriving (Eq, Show)

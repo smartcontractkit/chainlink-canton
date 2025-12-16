@@ -1,0 +1,121 @@
+module CommitteeVerifier.PayloadBuilder where
+
+import DA.Crypto.Text (BytesHex, byteCount)
+import DA.List ((!!))
+import DA.Optional (fromSome)
+
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.CommitteeVerifier
+
+testMessage1 : CCIP.MessageCodecV1.MessageV1
+testMessage1 = CCIP.MessageCodecV1.MessageV1 with
+    sourceChainSelector = 123.0
+    destChainSelector = 456.0
+    sequenceNumber = 789.0
+    executionGasLimit = 400000
+    ccipReceiveGasLimit = 200000
+    finality = 2000
+    ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+    onRampAddress = "f611F19236c999E05a62c9804F757A22553d2b50"
+    offRampAddress = "6B968538A8b1692451F18588C808E8D1702D5e3D"
+    sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
+    receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
+    destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
+    tokenTransfer = Some (CCIP.MessageCodecV1.TokenTransferV1 with
+        amount = 1000000.0
+        sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
+        sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
+        destTokenAddress = "c22ff98123e0785520915c5bd97e83ac649180a1"
+        tokenReceiver = "bcd565166cafb25d53079c7e6522c18c2c0e39c3"
+        extraData = "746f6b656e2065787472612064617461")
+    messageData = "6d657373616765207769746820746f6b656e2064617461"
+
+testMessage1Encoded : BytesHex
+testMessage1Encoded = CCIP.MessageCodecV1.encodeMessageV1 testMessage1
+
+-- Predefined keys and signatures for testing
+-- To generate: https://goplay.tools/snippet/85GQSwzg6YT
+
+pubkeys : [BytesHex]
+pubkeys = [
+        "04a08b68909c312335fabd6d7a5c33f605fdf2347829e623e294d60213694436864bb4dc0ea461c047e7a18f712fe0665a66df93387cd40468a52d44f14235c0ab",
+        "04fd43dcd90450f29f0d3d9d08b9874bd3c0c7e06ee9dab2b0427f56e8f5c1b3325a6ec0c7af8edf4e1d0a86b6ffd0e17d26f5e1a376ed96acd3b9d46c2737545c",
+        "0445cdfd03ec2ac916935dd3b1384e5ba2e4a249bc33c243899e0ec0f6932908f3c517e8fc724ca89f7bb4a176c10fb7c38aaa5789488f793c216f67249a1d28a0",
+        "04a67d6fefb3a9b372c1476a8e31f7ed5b0328ddb618df895d5b183b525bbabc093eb5056159fa044dc5e72ceb2530e9d79a8a685436205c768748fed277242815",
+        "04f4a2914072517b6fe3ba5e7a3ed436ef616cbe8a059cebb9d372aed004b7f0fa4d18325e2fd2dcb9a4b765062b5afbbd8ee732f764fafb830e633b1a0790b208",
+        "047dfece6bcf400f17e5728f7125c29d69ba63bb6d2fee5fe390e577c9d0b9d9f5a596ae294d40f24f0dde669286ca9a49c0d1e1dc279c6085859a9644fb73a8f4",
+        "04fafb0e637deabd618ff9a933cc5c900b3f8b75142f4e7e1da0394378a5544d7bb59aad4d24f4f3808853eeafc465d57331f2bffa2dbed98a323a343441f04b29",
+        "047dded77bf90b1518d167820d29bc3305121042d6a3f2d1325ff7aa7ede37b127142f3ca457e6e13c5cc8f542183a8bc386469188d559c0a4f3499b87f321bacc",
+        "049536b0e3713165c42b424246716f32883cb778023028380c11e4bf6c6350e9803fd59137464babc51e14450765d46ac189316e63ccfaea40b8a354538a8c7fa9",
+        "04d2912a13212c06795dfac9fc46060275869ab29628afcfce6f7a9a82e40ecb5973cdfc7b47ea8241eac2e73d44a56c7657a4fad4c2cd3a479e1a4a27e620c9d7",
+        "04ab715d862c730cf3c417e3af41fa9be66ecb89886d15af9cf40e66dc7c2c0dbaad92cbf6169f49db51809ff232b6df9d35ece30a7c3ac56f1c4d2332e8ac453a",
+        "04e8c8295e40ee18987fb330105ee27834231b3ba47fad83dbd7f2bbe8b134fcb2fe3986898086fc9c5db50c0d91b644fdada091c8dc8d0819d33e336e36bd683f",
+        "041f6ea5c0f3a12b4e7cddc8f2afcf9a1a46a0a34edf3f3d724dd9df47187a641d467623bf19a780f33557b116962001eb28e516959111ba7cbbbd4d17c107d012",
+        "045684b91dc99a1ccd5deed5f85cb0ca5a215c026d24cb48fb5f4543908a499eee4c2e2495faaadbebabed8c1df370e34b552525270efedd04296abab5b12f72e1",
+        "0434793ba6e640d1620ebfb5038b7a6b63abe8e153e24a6d012fe5da7c9ab225ee72fd7861c64d13c7d7d821c9f091abce5ccc57f94a26a0848ae56b18cea73b77",
+        "040665befb357ab2ff36b1d43399c712d12a4ef25f603192433d53f2e166c2235da3ff5cd961141246ba964be1c1a97ac9794895dbb38d9feddc589d575323f2d9",
+        "04e8a8156f1e0a0da807470257a3bb06613943dda7aa402c5b1f9458323a8ae5bfa67c608397ba9b840ac0ec67687cc8425dbf16d388fa5d193c4e66070d913339",
+        "04ea9427af469936605eec17bbbd39b5ee1c2b87af664ad70c56f60409faaa10222ba531138dbd3fd76bff597942859a919afb9d3818bccfaa046f13acbced2d61",
+        "04e184ac8384ea82996306b84fb7bece0ba78ca3cad814e38995fbed4dc7ad285b5707460937d37fb60b4a997bfa94a4aa54a27a6a856a2f2823e673a59b2a7724",
+        "043cd023ae7c586deb9b79e564160c20ccc024739706bf6f9ea48c6b3b57de8c59bf12ddd86065e39e90be1b0e6792b16a480070761ca6099fe534a20df8d38e4c"
+    ]
+
+rValues : [BytesHex]
+rValues = [
+        "66f5a39916385c3534fc13896ff7afed6d93dc089f94b409a34f17ea0102d3cc",
+        "fd7d5a9aebd5ef8ac54f88d734a33df7179684588839ef46b0e6d989a9977e9d",
+        "a7dbadbbc877b50de6527ff4e85f49fb86d6ea02a27962c58151626107116567",
+        "b470e1e9e497def5eeec8e6de37ff8afdaa586268d7ed249491b8bb7b75eb9e7",
+        "4baa2581cc554d1e7f58a9cabaee7152cc88b6853d6664d55dccc9bfe7dbb004",
+        "b1bf31038b88f7313d61fccd4eb7471dbb41b86148b4cfc6186465641dc44e7d",
+        "0d824ddc2185a607a777e48c3cb8553e06b3f9b33e7305a4c502f93f10109bff",
+        "e20c0455c5e141df2470722b82f23192c524687f04180b0057292ced3d17b661",
+        "f8f70555e4079beabfd80232e96b8809106c9bafdaebe11e4899430061eb57a7",
+        "4d0d99a474b1b462838a6b5cab2c29481581b2cdfbe81c41883d3c12600da9ca",
+        "46e09ddf17220dd3655bad480d392629b37d199480c172c50adce4239d469e4a",
+        "ddc9ce6ff18c9ab858e3bb3c96e619194d277eb4a6400894dadfc6669be29b86",
+        "1f1d20111dceab890246725f0be6f8b05fe4e5bbb6aaafac1128076ee2cd290a",
+        "f3e8886955d3b75caea02783082ffa68d961f3b9f520993da99e871317751626",
+        "6459a68fbcd000955ec44d86109788d16695428d1ffa95013efa794b144236fc",
+        "4fcd6d98c86d81291cbb2cb5c1382d286d0dfcc6ffde643f588227f93900b4d8",
+        "6bc9230f063a38b3ad8a4a7908e07a27a4d7167ecdc10c5274085277cb6fbdbf",
+        "5451300826fc8ee38d32c4131076fc40bfe0353bab5c11f214bbca4930d65d82",
+        "9951bbc75e113d16231a608075993a9e5e17eb57555433ba7804c9aeabee1800",
+        "e12e4380528b1c34142743fe93c9f2cfbb1a73c68dbd6c46def88e188a0100ff"
+    ]
+
+sValues : [BytesHex]
+sValues = [
+        "4af56f73f7e4ab320ceefb95bf1965759baf77b7e48e1047e6c229d4115f2ce4",
+        "0076ba017706ba812a94e43397b4e091f38eae2c4d84cf950b646c631e2afcae",
+        "6e18344c866367698c0ea7e14e82333941f6b84ba01c1864ac997334a6391323",
+        "78b1412bd671a5fbfce6a6c61e1264839aa3524c1ffddb40949233958d554942",
+        "6a7e219892146d2307e8fe408157c70f6942b56d787db87de172e897b7db99b1",
+        "1ea947a49e10bdba88e17ec248a5f1a48302c08d9b20220c8232b25d81883b0f",
+        "6f16c283eb535c5b0571949ee06049f930e605d95b739c009be40260c116026b",
+        "2559de8c6904e0ca19ef1ccf415d13516fbcbf425d06753670e910d92b17fc48",
+        "1775a52c8b1e69403ed71e9d3037de7b09f4888d075468b1cc4b7e2ab3b320b7",
+        "556bad9cfd84d9089b1c068610c4f0d75dd92417a989c014a69d5917906358eb",
+        "467f84b628b5b441b6d3c8169b2e8721273aab5b7779ebc03aeed0edeb1eea06",
+        "41574df575b735a635b09f556abee610242a245d4f171b5ac2ceaba410ec73ac",
+        "72e88d9aeb550efa3082ecd1511f981ace71348c81ffca2066d9c1f9287c28e1",
+        "720020c89502210c7fbd176fae71ed25167373694dd9cae0b494ec2b32d64291",
+        "5ce43225c4ef0a7c206e20540e68138220fae9caf5c65b4a0038679a8fc7470f",
+        "64fb2c92ce4c7b928ae385e483c5ed371f6c3d47a5df8540cd70b31401e69684",
+        "55147faba3a70694f1a1e0f8d04e39b6b97192ea07a51797afd89d2c05440ba7",
+        "4c2f366950935bc63a0a8f68c98d405817b19f86bc19435ae9a1f1a70384b33d",
+        "1733332df45f845a86d06d353fd7133ed28e4f1b64b56b18019378f4a32034fa",
+        "49c66b53710d8a6dec1290680931f6d0b533c178e7cd8cedcbef35b369dac32c"
+    ]
+
+getPubkeysForIndices : [Int] -> [BytesHex]
+getPubkeysForIndices indices = map (\i -> pubkeys !! i) indices
+
+getCCVDataForIndices : [Int] -> BytesHex
+getCCVDataForIndices indices = 
+    let signatures = map (\i -> rValues !! i <> sValues !! i) indices
+        concatenatedSignatures = foldl (<>) "" signatures
+        signatureLength = byteCount concatenatedSignatures
+    in CCIP.CommitteeVerifier.versionTagV1_7_0 
+       <> fromSome(CCIP.MessageCodecV1.encodeUint16 signatureLength)
+       <> concatenatedSignatures

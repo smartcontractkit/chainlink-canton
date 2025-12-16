@@ -1,0 +1,216 @@
+module FeeQuoter where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Map qualified as Map
+
+import CCIP.FeeQuoter
+import qualified CCIP.Client
+
+import Splice.Api.Token.HoldingV1
+
+setup = script do
+    owner <- allocateParty "owner"
+
+    let instrumentIdLINK = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+    let instrumentIdUSDC = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "USDC"
+
+    let destChainSelector1 : Numeric 0 = 1234567890.0
+    let destChainSelector2 : Numeric 0 = 9876543210.0
+
+    -- Create FeeQuoter
+    fq <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            feeTokens = Map.empty
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.empty
+            priceUpdaters = [owner]
+
+    -- Apply price updates for destChainSelector1 and instrumentIdLINK
+    fq <- submit owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = [ 
+                        TokenPriceUpdate with
+                            instrumentId = instrumentIdLINK
+                            usdPerToken = 17.77
+                    ]
+                gasPriceUpdates = [
+                        GasPriceUpdate with
+                            destChainSelector = destChainSelector1
+                            usdPerUnitGas = 0.045
+                    ]
+            caller = owner
+
+    -- retrieve prices and assert
+    result <- submit owner do
+        exerciseCmd fq GetTokenPrice with
+            instrumentId = instrumentIdLINK
+            caller = owner
+    debug result
+    result.price === 17.77
+
+    result <- submit owner do
+        exerciseCmd fq GetDestinationChainGasPrice with
+            destChainSelector = destChainSelector1
+            caller = owner
+    debug result
+    result.price === 0.045
+
+    -- Apply prices again, this time for two chains and two instruments
+    fq <- submit owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = [ 
+                        (TokenPriceUpdate with
+                            instrumentId = instrumentIdLINK
+                            usdPerToken = 20.00),
+                        (TokenPriceUpdate with
+                            instrumentId = instrumentIdUSDC
+                            usdPerToken = 1.00)
+                    ]
+                gasPriceUpdates = [
+                        (GasPriceUpdate with
+                            destChainSelector = destChainSelector1
+                            usdPerUnitGas = 0.050),
+                        (GasPriceUpdate with
+                            destChainSelector = destChainSelector2
+                            usdPerUnitGas = 0.075)
+                    ]
+            caller = owner
+
+    -- retrieve prices for both and assert
+    result <- submit owner do
+        exerciseCmd fq GetTokenPrice with
+            instrumentId = instrumentIdLINK
+            caller = owner
+    debug result
+    result.price === 20.00
+    
+    result <- submit owner do 
+        exerciseCmd fq GetTokenPrice with
+            instrumentId = instrumentIdUSDC
+            caller = owner
+    debug result
+    result.price === 1.00
+
+    result <- submit owner do
+        exerciseCmd fq GetDestinationChainGasPrice with
+            destChainSelector = destChainSelector1
+            caller = owner
+    debug result
+    result.price === 0.05
+
+    result <- submit owner do
+        exerciseCmd fq GetDestinationChainGasPrice with
+            destChainSelector = destChainSelector2
+            caller = owner
+    debug result
+    result.price === 0.075
+
+    -- test ApplyDestChainConfigUpdates
+    let destChainConfig1 = DestChainConfig with
+            isEnabled = True
+            maxDataBytes = 5000
+            destGasOverhead = 30000
+            destGasPerPayloadByteBase = 12
+            defaultTxGasLimit = 500000
+            maxPerMsgGasLimit = 2000000
+            chainFamilySelector = "2812d52c"
+            networkFeeUSD = 1.0
+            defaultTokenFeeUSD = 0.50
+            defaultTokenDestGasOverhead = 0
+    let destChainConfig2 = DestChainConfig with
+            isEnabled = True
+            maxDataBytes = 8000
+            destGasOverhead = 40000
+            destGasPerPayloadByteBase = 15
+            defaultTxGasLimit = 800000
+            maxPerMsgGasLimit = 3000000
+            chainFamilySelector = "ac77ffec"
+            networkFeeUSD = 0.5
+            defaultTokenFeeUSD = 0.25
+            defaultTokenDestGasOverhead = 0
+    fq <- submit owner do
+        exerciseCmd fq ApplyDestChainConfigUpdates with
+            destChainConfigArgs = [
+                    (DestChainConfigArgs with
+                        destChainSelector = destChainSelector1
+                        destChainConfig = destChainConfig1),
+                    (DestChainConfigArgs with
+                        destChainSelector = destChainSelector2
+                        destChainConfig = destChainConfig2)
+                ]
+
+    result <- submit owner do
+        exerciseCmd fq GetDestChainConfig with
+            destChainSelector = destChainSelector1
+            caller = owner
+    debug result
+    result === destChainConfig1
+    result <- submit owner do
+        exerciseCmd fq GetDestChainConfig with
+            destChainSelector = destChainSelector2
+            caller = owner
+    debug result
+    result === destChainConfig2
+
+    -- try setting an invalid config (defaultTxGasLimit = 0), should fail
+    let invalidDestChainConfig = destChainConfig1 with defaultTxGasLimit = 0
+    submitMustFail owner do
+        exerciseCmd fq ApplyDestChainConfigUpdates with
+            destChainConfigArgs = [
+                    (DestChainConfigArgs with
+                        destChainSelector = destChainSelector1
+                        destChainConfig = invalidDestChainConfig)
+                ]
+
+    -- try setting an invalid config (invalid chainFamilySelector), should fail
+    let invalidDestChainConfig = destChainConfig1 with chainFamilySelector = "12345678"
+    submitMustFail owner do
+        exerciseCmd fq ApplyDestChainConfigUpdates with
+            destChainConfigArgs = [
+                    (DestChainConfigArgs with
+                        destChainSelector = destChainSelector1
+                        destChainConfig = invalidDestChainConfig)
+                ]
+
+    -- check GetValidatedFee to dest chain 1
+    result <- submit owner do
+        exerciseCmd fq GetValidatedFee with
+            destChainSelector = destChainSelector1
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0xReceiverAddress"
+                payload = "Test message payload"
+                feeToken = instrumentIdLINK
+                extraArgs = ""
+                tokenAmounts = []
+            caller = owner
+    -- LINK: 20.00, networkFeeUSD: 1.0 => 0.05 LINK
+    debug ("GetValidatedFee result: " <> show result)
+    result === 0.05
+
+    -- check GetValidatedFee to dest chain 2
+    result <- submit owner do
+        exerciseCmd fq GetValidatedFee with
+            destChainSelector = destChainSelector2
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0xReceiverAddress"
+                payload = "Test message payload"
+                feeToken = instrumentIdUSDC
+                extraArgs = ""
+                tokenAmounts = []
+            caller = owner
+    -- USDC: 1.00, networkFeeUSD: 0.5 => 0.5 USDC
+    debug ("GetValidatedFee result: " <> show result)
+    result === 0.5
+
+    pure()

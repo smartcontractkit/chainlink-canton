@@ -1,0 +1,69 @@
+-- | global configuration for ccip, shared across all perpartyrouters.
+module CCIP.GlobalConfig where
+
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
+
+import qualified CCIP.CCVId
+
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool
+        defaultExecutor : BytesHex
+        offRampAddress : BytesHex
+        laneMandatedCCVs : [CCIP.CCVId.CCVId]
+        defaultCCVs : [CCIP.CCVId.CCVId]
+    deriving (Eq, Show)
+
+data SourceChainConfig = SourceChainConfig
+    with
+        isEnabled : Bool
+        onRampAddress : BytesHex
+        laneMandatedCCVs : [CCIP.CCVId.CCVId]
+        defaultCCVs : [CCIP.CCVId.CCVId]
+    deriving (Eq, Show)
+
+template GlobalConfig
+    with
+        ccipOwner : Party
+        environmentId : Text
+
+        chainSelector : Numeric 0
+        onRampAddress : BytesHex
+
+        destChainConfigs : Map.Map (Numeric 0) DestChainConfig
+        sourceChainConfigs : Map.Map (Numeric 0) SourceChainConfig
+    where
+        signatory ccipOwner
+
+        nonconsuming choice GetDestChainConfig : Optional DestChainConfig
+            with
+                destChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do pure (Map.lookup destChainSelector destChainConfigs)
+
+        nonconsuming choice GetSourceChainConfig : Optional SourceChainConfig
+            with
+                sourceChainSelector : Numeric 0
+                caller : Party
+            controller caller
+            do pure (Map.lookup sourceChainSelector sourceChainConfigs)
+
+        choice UpdateDestChainConfig : ContractId GlobalConfig
+            with
+                destChainSelector : Numeric 0
+                config : DestChainConfig
+            controller ccipOwner
+            do
+                let newConfigs = Map.insert destChainSelector config destChainConfigs
+                create this with destChainConfigs = newConfigs
+
+        choice UpdateSourceChainConfig : ContractId GlobalConfig
+            with
+                sourceChainSelector : Numeric 0
+                config : SourceChainConfig
+            controller ccipOwner
+            do
+                let newConfigs = Map.insert sourceChainSelector config sourceChainConfigs
+                create this with sourceChainConfigs = newConfigs

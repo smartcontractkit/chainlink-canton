@@ -1,0 +1,51 @@
+-- | lock/release token pool for ccip token transfers.
+-- note: this module needs to be redesigned to work with perpartyrouter and ticket pattern.
+module CCIP.LockReleaseTokenPool where
+
+import DA.List (unique)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.MessageCodecV1
+
+
+-- | lock/release token pool - currently stubbed out pending redesign for perpartyrouter.
+template LockReleaseTokenPool
+    with
+        ccipOwner : Party
+        poolOwner : Party
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        decimals : Int
+        requiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+    where
+        signatory poolOwner
+        ensure unique requiredCCVs
+
+        interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
+            view = CCIP.Interfaces.TokenPool.TokenPoolView with
+                owner = poolOwner
+                ccipOwner = ccipOwner
+                instrumentId = instrumentId
+
+            tokenPool_getRequiredCCVsImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_GetRequiredCCVs
+                    with
+                        message = arg.message
+                        caller = arg.caller
+
+            tokenPool_releaseOrMintImpl self arg = do
+                -- stubbed: needs redesign for perpartyrouter ticket pattern
+                abort "TODO"
+
+            tokenPool_lockOrBurnImpl self arg = do
+                -- stubbed: needs redesign for perpartyrouter ticket pattern
+                abort "TODO"
+
+        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+            with
+                message : CCIP.MessageCodecV1.MessageV1
+                caller : Party
+            controller caller
+            do return requiredCCVs

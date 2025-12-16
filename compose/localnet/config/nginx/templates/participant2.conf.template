@@ -38,3 +38,12 @@ server {
         grpc_pass grpc://canton:${CANTON_PARTICIPANT_ADMIN_API_PORT_PREFIX}02;
     }
 }
+
+server {
+    listen 8080;
+    server_name participant2.wallet.localhost;
+    location /api/validator {
+        rewrite ^\/(.*) /$1 break;
+        proxy_pass http://splice:${SPLICE_VALIDATOR_ADMIN_API_PORT_PREFIX}02/api/validator;
+    }
+}

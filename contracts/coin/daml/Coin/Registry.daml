@@ -11,7 +11,7 @@ import DA.Optional
 import Splice.Api.Token.BurnMintV1
 import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.MetadataV1
-import Splice.Api.Token.TransferInstructionV1
+import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
 
 template CoinRegistry
     with 
@@ -68,8 +68,8 @@ template CoinRegistry
                     admin = issuer
                     meta
         
-        interface instance TransferFactory for CoinRegistry where
-            view = TransferFactoryView with
+        interface instance Api.Token.TransferInstructionV1.TransferFactory for CoinRegistry where
+            view = Api.Token.TransferInstructionV1.TransferFactoryView with
                 admin = issuer
                 meta = meta
 
@@ -115,8 +115,8 @@ template CoinRegistry
                         
                 archive inputCid
 
-                pure TransferInstructionResult with
-                    output = TransferInstructionResult_Pending with
+                pure Api.Token.TransferInstructionV1.TransferInstructionResult with
+                    output = Api.Token.TransferInstructionV1.TransferInstructionResult_Pending with
                         transferInstructionCid = transferInstructionCid
                     senderChangeCids = senderChangeCids
                     meta = emptyMetadata
@@ -124,7 +124,7 @@ template CoinRegistry
             
             transferFactory_publicFetchImpl _self arg = do
                 arg.expectedAdmin === issuer
-                pure TransferFactoryView with
+                pure Api.Token.TransferInstructionV1.TransferFactoryView with
                     admin = issuer
                     meta = meta
 
@@ -167,7 +167,6 @@ template MintRole
             do
                 result <- exercise (coerceContractId @_ @BurnMintFactory registry) BurnMintFactory_BurnMint with
                     expectedAdmin = issuer
-                    sender = minter
                     instrumentId = instrumentId
                     inputHoldingCids = []
                     outputs = outputs

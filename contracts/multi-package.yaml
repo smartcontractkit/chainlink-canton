@@ -1,7 +1,19 @@
 packages:
   - coin
-  - splice
-  - ccip
-  - ccipreceiver
-  - mcms/mcms
-  - mcms/dummyreceiver
+  - ccip/ccipreceiver
+  - ccip/ccvs
+  - ccip/common
+  - ccip/feequoter
+  - ccip/tokenAdminRegistry
+  - ccip/ccvRegistry
+  - ccip/onramp
+  - ccip/offramp
+  - ccip/pools/interfaces
+  - ccip/pools/lockReleaseTokenPool
+  - ccip/perpartyrouter
+  - ccip/test
+
+  - test/interfaces
+  - test/proxy
+  - test/receiver
+  - test/test

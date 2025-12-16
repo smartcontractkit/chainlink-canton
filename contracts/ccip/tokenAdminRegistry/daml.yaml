@@ -1,0 +1,13 @@
+sdk-version: 3.4.8
+name: ccip-tokenadminregistry
+source: daml
+version: 1.0.0
+build-options:
+  - "-Wno-crypto-text-is-alpha"
+data-dependencies:
+  - ../../dependencies/splice-api-token-metadata-v1-1.0.0.dar
+  - ../../dependencies/splice-api-token-holding-v1-1.0.0.dar
+  - ../common/.daml/dist/ccip-common-1.0.0.dar
+dependencies:
+  - daml-prim
+  - daml-stdlib

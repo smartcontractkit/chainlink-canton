@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +51,7 @@ type Participant struct {
 	StateServiceClient   apiv2.StateServiceClient
 	CommandServiceClient apiv2.CommandServiceClient
 	UpdateServiceClient  apiv2.UpdateServiceClient
+	VersionServiceClient apiv2.VersionServiceClient
 }
 
 func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
@@ -70,6 +72,7 @@ func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
 		StateServiceClient:           apiv2.NewStateServiceClient(ledgerApiClient),
 		CommandServiceClient:         apiv2.NewCommandServiceClient(ledgerApiClient),
 		UpdateServiceClient:          apiv2.NewUpdateServiceClient(ledgerApiClient),
+		VersionServiceClient:         apiv2.NewVersionServiceClient(ledgerApiClient),
 	}, nil
 }
 
@@ -184,7 +187,145 @@ func GetActiveContracts(ctx context.Context, participant *Participant) ([]*apiv2
 			events = append(events, c.ActiveContract.GetCreatedEvent())
 		}
 	}
+	slices.SortFunc(events, func(a, b *apiv2.CreatedEvent) int {
+		return a.GetCreatedAt().AsTime().Compare(b.GetCreatedAt().AsTime())
+	})
 	return events, nil
+}
+
+func GetActiveContractsForParty(ctx context.Context, participant *Participant, party string) ([]*apiv2.CreatedEvent, error) {
+	var events []*apiv2.CreatedEvent
+	offset, err := GetCurrentOffset(ctx, participant)
+	if err != nil {
+		return nil, err
+	}
+	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: offset,
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				party: {
+					Cumulative: []*apiv2.CumulativeFilter{
+						{
+							IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active contracts using wildcard filter: %w", err)
+	}
+	defer activeContractsResponse.CloseSend()
+	for {
+		activeContract, err := activeContractsResponse.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive active contracts: %w", err)
+		}
+		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			events = append(events, c.ActiveContract.GetCreatedEvent())
+		}
+	}
+	slices.SortFunc(events, func(a, b *apiv2.CreatedEvent) int {
+		return a.GetCreatedAt().AsTime().Compare(b.GetCreatedAt().AsTime())
+	})
+	return events, nil
+}
+
+func GetActiveContractsForPartyTemplateId(ctx context.Context, participant *Participant, party string, templateId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
+	var activeContracts []*apiv2.ActiveContract
+	offset, err := GetCurrentOffset(ctx, participant)
+	if err != nil {
+		return nil, err
+	}
+	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: offset,
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				party: {
+					Cumulative: []*apiv2.CumulativeFilter{
+						{
+							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
+								TemplateId:              templateId,
+								IncludeCreatedEventBlob: true,
+							}},
+						},
+					},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active contracts using wildcard filter: %w", err)
+	}
+	defer activeContractsResponse.CloseSend()
+	for {
+		activeContract, err := activeContractsResponse.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive active contracts: %w", err)
+		}
+		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			activeContracts = append(activeContracts, c.ActiveContract)
+		}
+	}
+	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
+		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
+	})
+	return activeContracts, nil
+}
+
+func GetActiveContractsForPartyInterface(ctx context.Context, participant *Participant, party string, interfaceId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
+	var activeContracts []*apiv2.ActiveContract
+	offset, err := GetCurrentOffset(ctx, participant)
+	if err != nil {
+		return nil, err
+	}
+	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: offset,
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				party: {
+					Cumulative: []*apiv2.CumulativeFilter{
+						{
+							IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
+								InterfaceId:             interfaceId,
+								IncludeInterfaceView:    true,
+								IncludeCreatedEventBlob: true,
+							}},
+						},
+					},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active contracts using wildcard filter: %w", err)
+	}
+	defer activeContractsResponse.CloseSend()
+	for {
+		activeContract, err := activeContractsResponse.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to receive active contracts: %w", err)
+		}
+		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			activeContracts = append(activeContracts, c.ActiveContract)
+		}
+	}
+	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
+		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
+	})
+	return activeContracts, nil
 }
 
 func QueryDisclosedContract(ctx context.Context, contractId string, participant *Participant) (*apiv2.DisclosedContract, error) {
@@ -233,6 +374,18 @@ func QueryDisclosedContract(ctx context.Context, contractId string, participant 
 	return nil, fmt.Errorf("failed to find active contract with id %s", contractId)
 }
 
+func TemplateIdFromString(s string) (*apiv2.Identifier, error) {
+	split := strings.Split(s, ":")
+	if len(split) != 3 {
+		return nil, fmt.Errorf("invalid template id format: %s", s)
+	}
+	return &apiv2.Identifier{
+		PackageId:  split[0],
+		ModuleName: split[1],
+		EntityName: split[2],
+	}, nil
+}
+
 func TestCoin(t *testing.T) {
 	jwToken, err := getJWT()
 	require.NoError(t, err)
@@ -249,6 +402,10 @@ func TestCoin(t *testing.T) {
 	require.NoError(t, err)
 	participant5, err := NewParticipant("participant5.admin-api.localhost:8080", "participant5.grpc-ledger-api.localhost:8080")
 	require.NoError(t, err)
+
+	version, err := participant1.VersionServiceClient.GetLedgerApiVersion(ctx, &apiv2.GetLedgerApiVersionRequest{})
+	require.NoError(t, err)
+	fmt.Println(version.Version)
 
 	// Upload the DARs to all participants
 	coinDar, err := os.ReadFile("../../contracts/coin/.daml/dist/coin-0.0.1.dar")
@@ -812,13 +969,13 @@ func TestCoin(t *testing.T) {
 var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 	{
 		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}},
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
 	},
 }}}}
 
 var emptyChoiceContext = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 	{
 		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}},
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
 	},
 }}}}

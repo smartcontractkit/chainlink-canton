@@ -1,7 +1,8 @@
 module Coin.Utils where
 
 import DA.Time
-import DA.Map
+import DA.TextMap (TextMap)
+import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1
 
@@ -14,9 +15,9 @@ class ToAnyValue a where
 
 -- | Convenience function to create maps that contain an optional value if it is
 -- set. See its use sites for examples.
-addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> DA.Map.Map Text AnyValue -> DA.Map.Map Text AnyValue
+addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
 addOptionalAnyValue _k None m = m
-addOptionalAnyValue k (Some value) m = DA.Map.insert k (toAnyValue value) m
+addOptionalAnyValue k (Some value) m = TextMap.insert k (toAnyValue value) m
 
 -- | Attempt to parse a value from AnyValue.
 --
@@ -28,7 +29,7 @@ class FromAnyValue a where
 -- | Lookup and decode a value within a choice context.
 lookupFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text (Optional a)
 lookupFromContext context k = do
-  case DA.Map.lookup k context.values of
+  case TextMap.lookup k context.values of
     None -> pure None
     Some av -> case fromAnyValue av of
       Left err -> fail $ "Failed to decode context value for '" <> k <> "': " <> err

@@ -1,0 +1,103 @@
+-- | ticket contracts for cross-participant ccip communication.
+module CCIP.Tickets where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified CCIP.CCVId
+import qualified CCIP.MessageCodecV1
+
+
+-- | ticket issued by tokenpool (via TokenAdminRegistry) after locking tokens for outbound transfer.
+template TokenSendTicket
+    with
+        poolOwner : Party
+        ccipOwner : Party
+        sender : Party
+
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+
+        sourceTokenAddress : BytesHex
+        amount : Numeric 0
+        destTokenAddress : BytesHex
+        tokenReceiver : BytesHex
+        extraData : BytesHex
+    where
+        signatory poolOwner
+        observer ccipOwner, sender
+
+        choice TokenSendTicket_Consume : CCIP.MessageCodecV1.TokenTransferV1
+            controller ccipOwner
+            do
+                pure CCIP.MessageCodecV1.TokenTransferV1 with
+                    amount = amount
+                    sourcePoolAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
+                    sourceTokenAddress = sourceTokenAddress
+                    destTokenAddress = destTokenAddress
+                    tokenReceiver = tokenReceiver
+                    extraData = extraData
+
+
+-- | ticket issued by the ccv (via CCVRegistry) for outbound attestation.
+template CCVTicket
+    with
+        ccvId : CCIP.CCVId.CCVId         -- Full CCV identifier (versionTag@partyId)
+        ccvOwner : Party
+        ccipOwner : Party
+        sender : Party
+
+        verifierBlob : BytesHex
+        messageSentObservers : [Party]
+    where
+        signatory ccvOwner
+        observer ccipOwner, sender
+
+        choice CCVTicket_Consume : (CCIP.CCVId.CCVId, BytesHex, [Party])
+            controller ccipOwner
+            do pure (ccvId, verifierBlob, messageSentObservers)
+
+
+-- | ticket issued by ccv (via CCVRegistry) after verifying an inbound message.
+template CCVVerifyTicket
+    with
+        ccvId : CCIP.CCVId.CCVId         -- Full CCV identifier (versionTag@partyId)
+        ccvOwner : Party
+        ccipOwner : Party
+        caller : Party
+
+        messageHash : BytesHex
+
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+    where
+        signatory ccvOwner
+        observer ccipOwner, caller
+
+        choice CCVVerifyTicket_Consume : CCIP.CCVId.CCVId
+            controller ccipOwner
+            do pure ccvId
+
+
+-- | ticket issued by perpartyrouter after successful message verification.
+-- consumed by tokenpool.release to authorize token release.
+template TokenReceiveTicket
+    with
+        ccipOwner : Party
+        receiver : Party
+
+        messageHash : BytesHex
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+
+        hasTokenTransfer : Bool
+        tokenAmount : Optional (Numeric 0)
+        destTokenAddress : Optional BytesHex
+        tokenReceiver : Optional Party
+    where
+        signatory ccipOwner
+        observer receiver
+
+        choice TokenReceiveTicket_Consume : ()
+            controller receiver
+            do pure ()

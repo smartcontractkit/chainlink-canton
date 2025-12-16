@@ -1,0 +1,8 @@
+module CCIP.Internal where
+
+data MessageExecutionState
+  = UNTOUCHED
+  | IN_PROGRESS
+  | SUCCESS
+  | FAILURE
+  deriving (Eq, Show)

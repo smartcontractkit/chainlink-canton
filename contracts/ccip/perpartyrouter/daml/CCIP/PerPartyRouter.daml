@@ -1,0 +1,334 @@
+-- | per-party router for ccip message sending and receiving.
+module CCIP.PerPartyRouter where
+
+import DA.Map qualified as Map
+import DA.Set qualified as Set
+import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Optional (fromOptional)
+
+import qualified CCIP.CCVId
+import qualified CCIP.GlobalConfig
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.OnRamp
+import qualified CCIP.OffRamp
+import qualified CCIP.Tickets
+import qualified CCIP.TokenAdminRegistry
+import qualified CCIP.Internal
+
+import qualified Splice.Api.Token.HoldingV1
+
+
+-- | factory for creating perpartyrouters.
+-- note: no stored cids - users pass all cids via explicit disclosure
+template PerPartyRouterFactory
+    with
+        ccipOwner : Party
+        environmentId : Text
+        registeredParties : Set.Set Party
+    where
+        signatory ccipOwner
+
+        choice CreateRouter : CreateRouterResult
+            with
+                partyOwner : Party
+            controller partyOwner
+            do
+                assertMsg "router already exists for this party"
+                    (not (Set.member partyOwner registeredParties))
+
+                routerCid <- create PerPartyRouter with
+                    ccipOwner = ccipOwner
+                    partyOwner = partyOwner
+                    environmentId = environmentId
+                    outboundSequenceNumbers = Map.empty
+                    executionStates = Map.empty
+                    receiverRequiredCCVs = []
+
+                newFactoryCid <- create this with
+                    registeredParties = Set.insert partyOwner registeredParties
+
+                pure CreateRouterResult with
+                    router = routerCid
+                    factory = newFactoryCid
+
+        nonconsuming choice HasRouter : Bool
+            with
+                partyOwner : Party
+                caller : Party
+            controller caller
+            do pure (Set.member partyOwner registeredParties)
+
+
+data CreateRouterResult = CreateRouterResult
+    with
+        router : ContractId PerPartyRouter
+        factory : ContractId PerPartyRouterFactory
+    deriving (Eq, Show)
+
+
+-- | per-party router - state container with delegation to onramp/offramp.
+-- note: no stored cids - users pass all cids via explicit disclosure
+template PerPartyRouter
+    with
+        ccipOwner : Party
+        partyOwner : Party
+        environmentId : Text
+        -- only per-party state, no stored cids
+        outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
+        executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
+    where
+        signatory ccipOwner
+        observer partyOwner
+
+        -- | send a ccip message with optional token transfer.
+        -- note: tokenSendTicket was already validated at issuance via TokenAdminRegistry_IssueSendTicket
+        choice CCIPSend : CCIPSendResult
+            with
+                onRampCid : ContractId CCIP.OnRamp.OnRamp
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+
+                destChainSelector : Numeric 0
+                receiver : BytesHex
+                payload : BytesHex
+                executionGasLimit : Int
+                ccipReceiveGasLimit : Int
+
+                tokenSendTicket : Optional (ContractId CCIP.Tickets.TokenSendTicket)
+                ccvTickets : [ContractId CCIP.Tickets.CCVTicket]
+            controller partyOwner
+            do
+                -- validate onramp
+                onRamp <- fetch onRampCid
+                assertMsg "router: onramp ccipowner mismatch"
+                    (onRamp.ccipOwner == ccipOwner)
+                assertMsg "router: onramp environmentid mismatch"
+                    (onRamp.environmentId == environmentId)
+
+                let currentSeqNum = fromOptional 0.0
+                        (Map.lookup destChainSelector outboundSequenceNumbers)
+
+                -- delegate to onramp (no router CCVs passed - sender doesn't know receiver's requirements)
+                result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerEnvironmentId = environmentId
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    destChainSelector = destChainSelector
+                    receiver = receiver
+                    payload = payload
+                    executionGasLimit = executionGasLimit
+                    ccipReceiveGasLimit = ccipReceiveGasLimit
+                    currentSequenceNumber = currentSeqNum
+                    tokenSendTicket = tokenSendTicket
+                    ccvTickets = ccvTickets
+
+                -- update state
+                let newSeqNumbers = Map.insert
+                        result.destChainSelector
+                        result.newSequenceNumber
+                        outboundSequenceNumbers
+                routerCid <- create this with outboundSequenceNumbers = newSeqNumbers
+
+                -- emit event
+                ccipMessageSentCid <- create CCIPMessageSent with
+                    ccipOwner = ccipOwner
+                    sender = partyOwner
+                    observers = result.messageSentObservers
+                    event = CCIPMessageSentEvent with
+                        destChainSelector = result.destChainSelector
+                        sequenceNumber = result.newSequenceNumber
+                        messageId = result.messageId
+                        encodedMessage = result.encodedMessage
+                        verifierBlobs = result.verifierBlobs
+
+                pure CCIPSendResult with
+                    router = routerCid
+                    ccipMessageSent = ccipMessageSentCid
+                    messageId = result.messageId
+
+        -- | execute an inbound ccip message.
+        choice Execute : ExecuteResult
+            with
+                offRampCid : ContractId CCIP.OffRamp.OffRamp
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                encodedMessage : BytesHex
+                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
+                receiverRequiredCCVs : [CCIP.CCVId.CCVId]
+            controller partyOwner
+            do
+                -- validate offramp
+                offRamp <- fetch offRampCid
+                assertMsg "router: offramp ccipowner mismatch"
+                    (offRamp.ccipOwner == ccipOwner)
+                assertMsg "router: offramp environmentid mismatch"
+                    (offRamp.environmentId == environmentId)
+
+                -- check execution state (replay prevention)
+                let messageHash = keccak256 encodedMessage
+                let currentState = fromOptional
+                        CCIP.Internal.UNTOUCHED
+                        (Map.lookup messageHash executionStates)
+
+                case currentState of
+                    CCIP.Internal.SUCCESS -> abort "message already executed successfully"
+                    CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
+                    _ -> pure ()
+
+                -- delegate to offramp (which issues TokenReceiveTicket via TokenAdminRegistry)
+                -- pass receiver's required CCVs - receiver gets to specify their verification requirements
+                result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerEnvironmentId = environmentId
+                    receiverRequiredCCVs = receiverRequiredCCVs
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    encodedMessage = encodedMessage
+                    ccvVerifyTickets = ccvVerifyTickets
+
+                -- update state
+                let newStates = Map.insert result.messageHash CCIP.Internal.SUCCESS executionStates
+                routerCid <- create this with executionStates = newStates
+
+                -- emit event
+                _ <- create ExecutionStateChanged with
+                    ccipOwner = ccipOwner
+                    receiver = partyOwner
+                    event = ExecutionStateChangedEvent with
+                        sourceChainSelector = result.sourceChainSelector
+                        sequenceNumber = result.sequenceNumber
+                        messageId = result.messageHash
+                        state = CCIP.Internal.SUCCESS
+                        returnData = ""
+
+                pure ExecuteResult with
+                    router = routerCid
+                    tokenReceiveTicket = result.tokenReceiveTicket
+                    messageId = result.messageHash
+                    message = result.message
+                    state = CCIP.Internal.SUCCESS
+
+        nonconsuming choice GetExecutionState : CCIP.Internal.MessageExecutionState
+            with
+                messageHash : BytesHex
+            controller partyOwner
+            do
+                pure (fromOptional CCIP.Internal.UNTOUCHED (Map.lookup messageHash executionStates))
+
+        nonconsuming choice GetSequenceNumber : Numeric 0
+            with
+                destChainSelector : Numeric 0
+            controller partyOwner
+            do
+                pure (fromOptional 0.0 (Map.lookup destChainSelector outboundSequenceNumbers))
+
+        -- | Update receiver's required CCVs for inbound messages.
+        choice UpdateReceiverRequiredCCVs : ContractId PerPartyRouter
+            with
+                newReceiverRequiredCCVs : [CCIP.CCVId.CCVId]
+            controller partyOwner
+            do
+                create this with receiverRequiredCCVs = newReceiverRequiredCCVs
+
+        -- | Get receiver's required CCVs for this router only (not combined with lane/pool CCVs).
+        nonconsuming choice GetReceiverRequiredCCVs : [CCIP.CCVId.CCVId]
+            with
+                caller : Party
+            controller caller
+            do pure receiverRequiredCCVs
+
+        -- | Get all required CCVs for sending a message (combined from all sources).
+        -- Thin wrapper that calls OnRamp. Does NOT pass receiver CCVs (sender doesn't know receiver's requirements).
+        nonconsuming choice GetRequiredCCVsForSend : [CCIP.CCVId.CCVId]
+            with
+                onRampCid : ContractId CCIP.OnRamp.OnRamp
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                destChainSelector : Numeric 0
+                hasTokenTransfer : Bool
+                instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
+            controller partyOwner
+            do
+                exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    destChainSelector = destChainSelector
+                    hasTokenTransfer = hasTokenTransfer
+                    instrumentId = instrumentId
+
+        -- | Get all required CCVs for executing a message (combined from all sources).
+        -- Thin wrapper that calls OffRamp with receiver's required CCVs.
+        nonconsuming choice GetRequiredCCVsForExecute : [CCIP.CCVId.CCVId]
+            with
+                offRampCid : ContractId CCIP.OffRamp.OffRamp
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                sourceChainSelector : Numeric 0
+                hasTokenTransfer : Bool
+                instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
+            controller partyOwner
+            do
+                exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecute with
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    receiverRequiredCCVs = receiverRequiredCCVs
+                    sourceChainSelector = sourceChainSelector
+                    hasTokenTransfer = hasTokenTransfer
+                    instrumentId = instrumentId
+
+
+data CCIPSendResult = CCIPSendResult
+    with
+        router : ContractId PerPartyRouter
+        ccipMessageSent : ContractId CCIPMessageSent
+        messageId : BytesHex
+    deriving (Eq, Show)
+
+data ExecuteResult = ExecuteResult
+    with
+        router : ContractId PerPartyRouter
+        -- TODO: should be Optional
+        tokenReceiveTicket : ContractId CCIP.Tickets.TokenReceiveTicket
+        messageId : BytesHex
+        message : CCIP.MessageCodecV1.MessageV1
+        state : CCIP.Internal.MessageExecutionState
+    deriving (Eq, Show)
+
+
+template CCIPMessageSent
+    with
+        ccipOwner : Party
+        sender : Party
+        observers : [Party]
+        event : CCIPMessageSentEvent
+    where
+        signatory ccipOwner
+        observer sender, observers
+
+data CCIPMessageSentEvent = CCIPMessageSentEvent
+    with
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        encodedMessage : BytesHex
+        verifierBlobs : [BytesHex]
+    deriving (Eq, Show)
+
+template ExecutionStateChanged
+    with
+        ccipOwner : Party
+        receiver : Party
+        event : ExecutionStateChangedEvent
+    where
+        signatory ccipOwner
+        observer receiver
+
+data ExecutionStateChangedEvent = ExecutionStateChangedEvent
+    with
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        state : CCIP.Internal.MessageExecutionState
+        returnData : BytesHex
+    deriving (Eq, Show)

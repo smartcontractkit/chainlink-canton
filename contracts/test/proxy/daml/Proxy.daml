@@ -1,0 +1,36 @@
+module Proxy where
+
+import Interface
+
+template Proxy
+    with
+        owner : Party
+    where
+        signatory owner
+
+        choice Proxy_GetValue : Int
+            with
+                receiver : ContractId Interface.IReceiver
+                caller : Party
+            controller caller
+            do
+                exercise receiver Interface.Receiver_GetValue with caller = caller
+
+        nonconsuming choice Proxy_EmitEvent : ()
+            with
+                receiver : ContractId Interface.IReceiver
+                eventValue : Int
+                caller : Party
+            controller caller
+            do
+                exercise receiver Interface.Receiver_EmitEvent with eventValue = eventValue, caller = caller
+
+        nonconsuming choice Proxy_EmitValue : ()
+            with
+                receiver : ContractId Interface.IReceiver
+                caller : Party
+            controller caller
+            do
+                val <- exercise receiver Interface.Receiver_GetValue with caller = caller
+                debug ("Proxy: Retrieved value from receiver: " <> show val)
+                exercise receiver Interface.Receiver_EmitEvent with eventValue = val, caller = caller
