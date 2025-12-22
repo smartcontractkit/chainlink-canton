@@ -1,0 +1,132 @@
+module MCMSPoc.GroupVoting where
+
+import DA.List ((!!) , sort)
+import DA.Map qualified as Map
+import DA.Foldable (forA_)
+import DA.Action (when, unless)
+import MCMSPoc.Types
+
+-- | Verify that provided signers meet the hierarchical group quorum requirements
+-- This is the core multi-sig verification algorithm
+--
+-- Algorithm:
+-- 1. Validate signers are in strictly increasing address order
+-- 2. Look up each signer in the config
+-- 3. Count votes per group
+-- 4. When a group reaches quorum, propagate 1 vote to parent
+-- 5. Verify root group (0) reaches its quorum
+verifyGroupVoting : [Text] -> MultisigConfig -> Either Text ()
+verifyGroupVoting signerAddrs config = do
+  -- Validate signers are in increasing order
+  validateSignerOrder signerAddrs
+
+  -- Build address -> SignerInfo lookup
+  let signerMap = buildSignerMap config.signers
+
+  -- Process each signature and count votes
+  finalVotes <- processAllSignatures signerAddrs signerMap config
+
+  -- Check root group met quorum
+  let rootQuorum = config.groupQuorums !! 0
+  when (rootQuorum == 0) $
+    Left "E_MISSING_CONFIG: root group has no quorum set"
+
+  let rootVotes = finalVotes !! 0
+  when (rootVotes < rootQuorum) $
+    Left $ "E_INSUFFICIENT_SIGNERS: root group needs " <> show rootQuorum <>
+           " but only got " <> show rootVotes
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Validate that signer addresses are in strictly increasing order
+-- This prevents replay/duplication and ensures deterministic verification
+validateSignerOrder : [Text] -> Either Text ()
+validateSignerOrder [] = Right ()
+validateSignerOrder [_] = Right ()
+validateSignerOrder addrs = do
+  forA_ (zip addrs (drop 1 addrs)) $ \(a, b) ->
+    unless (a < b) $
+      Left "E_SIGNERS_NOT_SORTED: signer addresses must be in strictly increasing order"
+
+-- | Build a map from address to signer info for O(1) lookup
+buildSignerMap : [SignerInfo] -> Map.Map Text SignerInfo
+buildSignerMap signers =
+  Map.fromList $ map (\s -> (s.signerAddress, s)) signers
+
+-- | Process all signatures and return final vote counts per group
+processAllSignatures : [Text] -> Map.Map Text SignerInfo -> MultisigConfig -> Either Text [Int]
+processAllSignatures signerAddrs signerMap config = do
+  let initialVotes = replicate numGroups 0
+  foldlM (processSingleSignature signerMap config) initialVotes signerAddrs
+
+-- | Monadic fold left for Either
+foldlM : (b -> a -> Either Text b) -> b -> [a] -> Either Text b
+foldlM _ acc [] = Right acc
+foldlM f acc (x :: xs) = do
+  acc' <- f acc x
+  foldlM f acc' xs
+
+-- | Process a single signature and update vote counts
+-- When a group reaches quorum, propagate vote to parent
+processSingleSignature : Map.Map Text SignerInfo -> MultisigConfig -> [Int] -> Text -> Either Text [Int]
+processSingleSignature signerMap config votes signerAddr = do
+  -- Look up signer
+  signer <- case Map.lookup signerAddr signerMap of
+    None -> Left $ "E_INVALID_SIGNER: address " <> signerAddr <> " not in config"
+    Some s -> Right s
+
+  -- Add vote to signer's group and propagate if needed
+  propagateVote config votes signer.signerGroup
+
+-- | Add a vote to a group and propagate up the tree if quorum is reached
+-- This is the core hierarchical voting logic
+propagateVote : MultisigConfig -> [Int] -> Int -> Either Text [Int]
+propagateVote config votes groupIdx = do
+  -- Increment vote count for this group
+  let newVotes = incrementAt groupIdx votes
+  let newCount = newVotes !! groupIdx
+  let quorum = config.groupQuorums !! groupIdx
+
+  -- Check if we just reached quorum (not exceeded - only propagate once)
+  if newCount /= quorum then
+    -- Did not just reach quorum, no propagation
+    Right newVotes
+  else if groupIdx == 0 then
+    -- Root group reached quorum, we're done
+    Right newVotes
+  else do
+    -- Propagate vote to parent group
+    let parentIdx = config.groupParents !! groupIdx
+    propagateVote config newVotes parentIdx
+
+-- | Increment value at index in list
+incrementAt : Int -> [Int] -> [Int]
+incrementAt idx lst =
+  [ if i == idx then v + 1 else v | (i, v) <- zip [0..(length lst - 1)] lst ]
+
+-- ===========================================================================
+-- UTILITY FUNCTIONS
+-- ===========================================================================
+
+-- | Sort addresses in increasing order
+sortAddresses : [Text] -> [Text]
+sortAddresses = sort
+
+-- | Check if a set of signers can meet the quorum
+canMeetQuorum : [Text] -> MultisigConfig -> Bool
+canMeetQuorum signerAddrs config =
+  case verifyGroupVoting (sortAddresses signerAddrs) config of
+    Left _ -> False
+    Right () -> True
+
+-- | Count how many valid signatures are in a set
+countValidSignatures : [Text] -> MultisigConfig -> Int
+countValidSignatures addrs config =
+  length $ filter (\addr -> isValidSignerAddr addr config) addrs
+
+-- | Check if address is a valid signer
+isValidSignerAddr : Text -> MultisigConfig -> Bool
+isValidSignerAddr addr config =
+  any (\s -> s.signerAddress == addr) config.signers

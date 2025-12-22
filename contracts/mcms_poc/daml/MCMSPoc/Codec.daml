@@ -1,0 +1,263 @@
+module MCMSPoc.Codec
+  ( encodeSetConfigParams
+  , decodeSetConfigParams
+  , SetConfigParams(..)
+  , encodeUint8
+  , encodeUint32
+  , decodeUint8
+  , decodeUint32
+  , extractBytes
+  , encodeText
+  , decodeText
+  , encodeList
+  , decodeList
+  , encodeBool
+  , decodeBool
+  ) where
+
+import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
+import qualified DA.Text as Text
+import DA.Optional (fromSome)
+import DA.Foldable ()
+import MCMSPoc.Types (SignerInfo(..))
+
+-- ===========================================================================
+-- SET CONFIG PARAMETERS
+-- ===========================================================================
+
+-- | Parameters for set_config admin operation
+-- Encoded format:
+--   numSigners (1 byte)
+--   for each signer:
+--     addressLen (1 byte) + address (variable)
+--     signerIndex (4 bytes)
+--     signerGroup (4 bytes)
+--   numQuorums (1 byte) + quorums (numQuorums * 4 bytes)
+--   numParents (1 byte) + parents (numParents * 4 bytes)
+--   clearRoot (1 byte)
+data SetConfigParams = SetConfigParams
+  with
+    signers : [SignerInfo]
+    groupQuorums : [Int]
+    groupParents : [Int]
+    clearRoot : Bool
+  deriving (Show, Eq)
+
+-- | Encode SetConfigParams to bytes
+encodeSetConfigParams : SetConfigParams -> BytesHex
+encodeSetConfigParams params =
+  let
+    -- Encode signers
+    signersEncoded = encodeList params.signers encodeSignerInfo
+
+    -- Encode quorums
+    quorumsEncoded = encodeList params.groupQuorums (fromSome . encodeUint32)
+
+    -- Encode parents
+    parentsEncoded = encodeList params.groupParents (fromSome . encodeUint32)
+
+    -- Encode clearRoot
+    clearRootEncoded = encodeBool params.clearRoot
+  in
+    signersEncoded <> quorumsEncoded <> parentsEncoded <> clearRootEncoded
+
+-- | Decode SetConfigParams from bytes
+decodeSetConfigParams : BytesHex -> Optional SetConfigParams
+decodeSetConfigParams encoded = do
+  -- Decode signers
+  (signers, offset1) <- decodeList encoded 0 decodeSignerInfo
+
+  -- Decode quorums
+  (quorums, offset2) <- decodeList encoded offset1 decodeUint32WithOffset
+
+  -- Decode parents
+  (parents, offset3) <- decodeList encoded offset2 decodeUint32WithOffset
+
+  -- Decode clearRoot
+  clearRootHex <- extractBytes encoded offset3 1
+  clearRoot <- decodeBool clearRootHex
+
+  return SetConfigParams
+    { signers = signers
+    , groupQuorums = quorums
+    , groupParents = parents
+    , clearRoot = clearRoot
+    }
+
+-- ===========================================================================
+-- SIGNER INFO ENCODING
+-- ===========================================================================
+
+-- | Encode a single SignerInfo
+-- Format: addressLen (1 byte) + address (raw bytes) + signerIndex (4 bytes) + signerGroup (4 bytes)
+-- Note: signerAddress is already hex (e.g., "1375dc8a..."), so we use it directly
+-- The addressLen is the number of BYTES (not hex chars), so 40 hex chars = 20 bytes
+encodeSignerInfo : SignerInfo -> BytesHex
+encodeSignerInfo si =
+  let
+    -- signerAddress is already a hex string like "1375dc8a4c1476e6628b03216545e5cdcbff3f84"
+    -- byteCount gives us the number of bytes this hex represents
+    addressLen = byteCount si.signerAddress
+  in
+    fromSome (encodeUint8 addressLen)
+    <> si.signerAddress  -- Already hex, use directly
+    <> fromSome (encodeUint32 si.signerIndex)
+    <> fromSome (encodeUint32 si.signerGroup)
+
+-- | Decode a SignerInfo starting at offset, returns (SignerInfo, newOffset)
+decodeSignerInfo : BytesHex -> Int -> Optional (SignerInfo, Int)
+decodeSignerInfo encoded offset = do
+  -- Decode address length (in bytes)
+  addrLenHex <- extractBytes encoded offset 1
+  addrLen <- decodeUint8 addrLenHex
+
+  -- Decode address - the extracted bytes ARE the hex address string
+  -- addrLen is in bytes, so we extract addrLen bytes (= addrLen * 2 hex chars)
+  addrHex <- extractBytes encoded (offset + 1) addrLen
+  -- addrHex IS the address - no further conversion needed
+
+  -- Decode signerIndex
+  indexHex <- extractBytes encoded (offset + 1 + addrLen) 4
+  index <- decodeUint32 indexHex
+
+  -- Decode signerGroup
+  groupHex <- extractBytes encoded (offset + 1 + addrLen + 4) 4
+  group <- decodeUint32 groupHex
+
+  let newOffset = offset + 1 + addrLen + 4 + 4
+  return (SignerInfo addrHex index group, newOffset)
+
+-- ===========================================================================
+-- PRIMITIVE ENCODING/DECODING (from MessageCodecV1 patterns)
+-- ===========================================================================
+
+-- | Extract bytes from a hex string
+extractBytes : BytesHex -> Int -> Int -> Optional BytesHex
+extractBytes bs start len =
+  let totalLen = byteCount bs
+      endPos = start + len
+  in
+    if start >= 0 && len >= 0 && start <= totalLen && endPos <= totalLen
+    then Some(Text.take (len*2) (Text.drop (start*2) bs))
+    else None
+
+-- | Encode uint8 (1 byte)
+encodeUint8 : Int -> Optional BytesHex
+encodeUint8 n =
+  if n < 0 || n > 255 then None
+  else Some (padLeft 2 "0" (intToHex n))
+
+-- | Decode uint8 (1 byte)
+decodeUint8 : BytesHex -> Optional Int
+decodeUint8 hex =
+  if byteCount hex /= 1 then None
+  else fromHex hex
+
+-- | Encode uint32 (4 bytes)
+encodeUint32 : Int -> Optional BytesHex
+encodeUint32 n =
+  if n < 0 || n > 4294967295 then None
+  else Some (padLeft 8 "0" (intToHex n))
+
+-- | Decode uint32 (4 bytes)
+decodeUint32 : BytesHex -> Optional Int
+decodeUint32 hex =
+  if byteCount hex /= 4 then None
+  else fromHex hex
+
+-- | Decode uint32 with offset, returns (value, newOffset)
+decodeUint32WithOffset : BytesHex -> Int -> Optional (Int, Int)
+decodeUint32WithOffset encoded offset = do
+  hex <- extractBytes encoded offset 4
+  value <- decodeUint32 hex
+  return (value, offset + 4)
+
+-- | Encode text as length-prefixed bytes
+encodeText : Text -> BytesHex
+encodeText t =
+  let hex = toHex t
+      len = byteCount hex
+  in fromSome (encodeUint8 len) <> hex
+
+-- | Decode length-prefixed text starting at offset
+decodeText : BytesHex -> Int -> Optional (Text, Int)
+decodeText encoded offset = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  textHex <- extractBytes encoded (offset + 1) len
+  text <- fromHex textHex
+  return (text, offset + 1 + len)
+
+-- | Encode bool (1 byte: 0 = False, 1 = True)
+encodeBool : Bool -> BytesHex
+encodeBool b = if b then "01" else "00"
+
+-- | Decode bool (1 byte)
+decodeBool : BytesHex -> Optional Bool
+decodeBool hex =
+  if hex == "01" then Some True
+  else if hex == "00" then Some False
+  else None
+
+-- | Encode a list with length prefix
+encodeList : [a] -> (a -> BytesHex) -> BytesHex
+encodeList items encoder =
+  let
+    lenEncoded = fromSome (encodeUint8 (length items))
+    itemsEncoded = foldl (\acc item -> acc <> encoder item) "" items
+  in
+    lenEncoded <> itemsEncoded
+
+-- | Decode a list with length prefix
+decodeList : BytesHex -> Int -> (BytesHex -> Int -> Optional (a, Int)) -> Optional ([a], Int)
+decodeList encoded offset decoder = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  decodeListItems encoded (offset + 1) len decoder []
+
+-- | Helper to decode list items
+decodeListItems : BytesHex -> Int -> Int -> (BytesHex -> Int -> Optional (a, Int)) -> [a] -> Optional ([a], Int)
+decodeListItems encoded offset 0 _ acc = Some (reverse acc, offset)
+decodeListItems encoded offset remaining decoder acc = do
+  (item, newOffset) <- decoder encoded offset
+  decodeListItems encoded newOffset (remaining - 1) decoder (item :: acc)
+
+-- ===========================================================================
+-- HELPERS
+-- ===========================================================================
+
+-- | Convert int to hex string
+intToHex : Int -> Text
+intToHex 0 = "0"
+intToHex n = intToHexHelper n ""
+
+intToHexHelper : Int -> Text -> Text
+intToHexHelper 0 acc = acc
+intToHexHelper n acc =
+  let
+    remainder = n % 16
+    quotient = n / 16
+    hexChar = case remainder of
+      0 -> "0"; 1 -> "1"; 2 -> "2"; 3 -> "3"
+      4 -> "4"; 5 -> "5"; 6 -> "6"; 7 -> "7"
+      8 -> "8"; 9 -> "9"; 10 -> "a"; 11 -> "b"
+      12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
+      _ -> "0"
+  in
+    intToHexHelper quotient (hexChar <> acc)
+
+-- | Pad string on the left
+padLeft : Int -> Text -> Text -> Text
+padLeft targetLength padStr str =
+  let
+    currentLength = Text.length str
+    paddingNeeded = targetLength - currentLength
+  in
+    if paddingNeeded <= 0 then str
+    else padHelper paddingNeeded padStr <> str
+
+padHelper : Int -> Text -> Text
+padHelper n padStr =
+  if n <= 0 then ""
+  else padStr <> padHelper (n - 1) padStr
+

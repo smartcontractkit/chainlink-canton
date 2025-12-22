@@ -1,0 +1,79 @@
+module MCMSPoc.Counter where
+
+import MCMSPoc.MCMSReceiver
+
+-- ===========================================================================
+-- COUNTER CONTRACT (Implements MCMSReceiver)
+-- ===========================================================================
+
+-- | Simple counter contract that can be controlled by MCMS
+-- Demonstrates the MCMSReceiver interface for direct MCMS calls
+--
+-- Key fields:
+--   - environmentId: Stable identifier (e.g., "counter-prod-v1")
+--     This doesn't change when contract state updates (unlike ContractId)
+--   - MCMS validates: op.targetAddress == environmentId
+template Counter
+  with
+    owner : Party                              -- Same ccip_owner party as MCMS
+    environmentId : Text                       -- Stable identifier for MCMS targeting
+    value : Int                                -- Current counter value
+  where
+    signatory owner
+
+    -- Implement MCMSReceiver interface
+    interface instance MCMSReceiver for Counter where
+      view = MCMSReceiverView with owner; environmentId
+
+      mcmsEntrypoint functionName operationData = do
+        case functionName of
+          "increment" -> do
+            -- Increment counter (operationData ignored)
+            newCid <- create this with value = value + 1
+            pure (toInterfaceContractId @MCMSReceiver newCid)
+
+          "set_value" -> do
+            -- Set value from operationData
+            -- Format: just the integer as decimal string
+            let newValue = parseDecimalToInt operationData
+            newCid <- create this with value = newValue
+            pure (toInterfaceContractId @MCMSReceiver newCid)
+
+          "reset" -> do
+            -- Reset to zero
+            newCid <- create this with value = 0
+            pure (toInterfaceContractId @MCMSReceiver newCid)
+
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+    -- =========================================================================
+    -- QUERIES (Anyone can call with contract disclosure)
+    -- =========================================================================
+
+    -- | Get current value (non-consuming query)
+    -- Anyone with contract visibility can query
+    nonconsuming choice GetValue : Int
+      with
+        viewer : Party
+      controller viewer
+      do pure value
+
+    -- | Get environment ID (non-consuming query)
+    -- Anyone with contract visibility can query
+    nonconsuming choice GetEnvironmentIdChoice : Text
+      with
+        viewer : Party
+      controller viewer
+      do pure environmentId
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Simple decimal string to int parser for POC
+-- In production, use proper parsing
+parseDecimalToInt : Text -> Int
+parseDecimalToInt t =
+  -- For POC, default to 0 if can't parse
+  -- In real implementation, would properly parse decimal string
+  0

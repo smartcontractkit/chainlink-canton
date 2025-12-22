@@ -1,0 +1,58 @@
+-- | Shared test helpers for MCMS POC tests
+module MCMSPoc.TestHelpers where
+
+import DA.Crypto.Text (BytesHex)
+import MCMSPoc.Types (MultisigConfig(..), SignerInfo(..), Op(..), RootMetadata(..))
+import MCMSPoc.Crypto (RawSignature(..), replicateText)
+
+-- ===========================================================================
+-- TEST HELPERS
+-- ===========================================================================
+
+-- | Create a simple 2-of-3 signer config
+-- All signers in group 0 (root group)
+make2of3Config : MultisigConfig
+make2of3Config = MultisigConfig
+  { signers =
+      [ SignerInfo "0x1111111111111111111111111111111111111111" 0 0
+      , SignerInfo "0x2222222222222222222222222222222222222222" 1 0
+      , SignerInfo "0x3333333333333333333333333333333333333333" 2 0
+      ]
+  , groupQuorums = [2] <> replicate 31 0  -- Root group needs 2
+  , groupParents = replicate 32 0          -- All point to root
+  }
+
+-- | Create test operation
+makeTestOp : Int -> Text -> Int -> Text -> Op
+makeTestOp chainId mcmsId nonce functionName = Op
+  { chainId
+  , multisigId = mcmsId
+  , nonce
+  , targetAddress = "counter"
+  , functionName
+  , operationData = ""
+  }
+
+-- | Create test metadata
+makeTestMetadata : Int -> Text -> Int -> Int -> RootMetadata
+makeTestMetadata chainId mcmsId preOpCount postOpCount = RootMetadata
+  { chainId
+  , multisigId = mcmsId
+  , preOpCount
+  , postOpCount
+  , overridePreviousRoot = False
+  }
+
+-- | Create a mock signature for testing
+-- NOTE: These won't verify cryptographically - use real signatures in production
+makeMockSignature : Text -> RawSignature
+makeMockSignature _addr = RawSignature
+  { publicKey = "04" <> replicateText 128 "0"  -- 65 bytes uncompressed
+  , r = replicateText 64 "0"                    -- 32 bytes
+  , s = replicateText 64 "0"                    -- 32 bytes
+  }
+
+-- | Empty merkle proof (for testing leaf == root case)
+emptyMerkleProof : [BytesHex]
+emptyMerkleProof = []
+

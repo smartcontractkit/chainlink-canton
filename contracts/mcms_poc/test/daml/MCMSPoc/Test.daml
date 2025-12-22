@@ -1,0 +1,54 @@
+-- | Main test module for MCMS POC
+-- Re-exports all test modules for easy execution
+--
+-- Test organization:
+--   - CryptoTest.daml     : Cryptographic function verification (keccak256, merkle proofs, etc.)
+--   - GroupVotingTest.daml: Group voting algorithm tests (2-of-3, hierarchical groups)
+--   - FlowTest.daml       : Full MCMS flow tests (SetRoot, replay protection)
+--   - TestHelpers.daml    : Shared test utilities
+module MCMSPoc.Test where
+
+import Daml.Script
+
+-- Import all test modules
+import MCMSPoc.CryptoTest
+import MCMSPoc.GroupVotingTest
+import MCMSPoc.FlowTest
+
+-- ===========================================================================
+-- MASTER TEST RUNNER
+-- ===========================================================================
+
+-- | Run all tests across all modules
+testAll : Script ()
+testAll = script do
+  debug "=========================================="
+  debug "MCMS POC - Running All Tests"
+  debug "=========================================="
+
+  -- Crypto tests
+  debug ""
+  debug "--- Crypto Tests ---"
+  testAllCrypto
+
+  -- Group voting tests
+  debug ""
+  debug "--- Group Voting Tests ---"
+  testGroupVoting
+  testHierarchicalGroups
+  testGroupVotingEdgeCases
+  testDuplicateSignerRejection
+
+  -- Flow tests
+  debug ""
+  debug "--- Flow Tests ---"
+  testFullFlow
+  testFullFlowWithRealSignatures
+  testReplayProtection
+  testNonceOrdering
+  testRootExpiry
+
+  debug ""
+  debug "=========================================="
+  debug "All MCMS POC tests completed! ✓"
+  debug "=========================================="

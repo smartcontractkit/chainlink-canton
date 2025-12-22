@@ -13,6 +13,9 @@ packages:
   - ccip/perpartyrouter
   - ccip/test
 
+  - mcms_poc
+  - mcms_poc/test
+
   - test/interfaces
   - test/proxy
   - test/receiver

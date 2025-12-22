@@ -1,0 +1,330 @@
+-- Uses native keccak256 and secp256k1 for on-chain verification
+--
+-- ARCHITECTURE:
+--   MCMSPoc verifies signatures and merkle proofs, then calls target contracts directly.
+--   Target contracts implement MCMSReceiver interface with stable environmentId.
+--
+-- Direct Invocation Pattern:
+--   1. Anyone submits: proofs + signatures + targetCid
+--   2. MCMS validates proofs and signatures on-chain
+--   3. MCMS calls target.getEnvironmentId() and verifies against op.targetAddress
+--   4. MCMS calls target.mcmsEntrypoint(functionName, operationData)
+--   5. ccip_owner authority flows through the call chain
+module MCMSPoc.Main where
+
+import DA.Map qualified as Map
+import DA.List ((!!))
+import DA.Action (unless)
+import DA.Crypto.Text (BytesHex)
+import MCMSPoc.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), emptyConfig, emptyRootMetadata, emptyExpiringRoot, numGroups, maxNumSigners, zeroHash, roleToText)
+import MCMSPoc.GroupVoting
+import MCMSPoc.Crypto
+import MCMSPoc.MCMSReceiver (MCMSReceiver, MCMSReceiver_GetEnvironmentId(..), MCMSReceiver_Entrypoint(..))
+import MCMSPoc.Codec (decodeSetConfigParams, SetConfigParams(..))
+
+template MCMSPoc
+  with
+    owner : Party                              -- ccip_owner party
+    role : Role                                -- Proposer (simplified to single role)
+    chainId : Int                              -- Chain ID for validation
+    mcmsId : Text                              -- MCMS instance identifier
+    config : MultisigConfig                    -- Signer configuration
+    seenHashes : Map.Map BytesHex Bool         -- Replay protection
+    expiringRoot : ExpiringRoot                -- Current merkle root
+    rootMetadata : RootMetadata                -- Metadata for current root
+  where
+    signatory owner
+
+    -- | Set signer configuration
+    -- Validates the configuration and optionally clears the root
+    choice SetConfig : ContractId MCMSPoc
+      with
+        newSigners : [SignerInfo]
+        newGroupQuorums : [Int]
+        newGroupParents : [Int]
+        clearRoot : Bool
+      controller owner
+      do
+        let newConfig = MultisigConfig newSigners newGroupQuorums newGroupParents
+
+        -- Basic validation
+        assertMsg "E_TOO_MANY_SIGNERS" $ length newSigners <= maxNumSigners
+        assertMsg "E_WRONG_QUORUM_LENGTH" $ length newGroupQuorums == numGroups
+        assertMsg "E_WRONG_PARENTS_LENGTH" $ length newGroupParents == numGroups
+
+        -- Validate group tree structure
+        assertMsg "E_ROOT_NOT_SELF_PARENT" $ (newGroupParents !! 0) == 0
+
+        -- Optionally clear the root
+        let newExpiringRoot = if clearRoot
+              then expiringRoot with root = ""
+              else expiringRoot
+
+        create this with
+          config = newConfig
+          expiringRoot = newExpiringRoot
+
+    -- | Set new merkle root with on-chain signature verification
+    -- All verification happens on-chain using native keccak256 and secp256k1
+    -- ANYONE can submit - security comes from signature verification
+    choice SetRoot : ContractId MCMSPoc
+      with
+        submitter : Party                      -- Anyone can submit
+        newRoot : BytesHex                     -- New merkle root hash
+        validUntil : Time                      -- Expiration time
+        metadata : RootMetadata                -- Root metadata
+        metadataProof : [BytesHex]             -- Merkle proof for metadata leaf
+        signatures : [RawSignature]            -- Raw ECDSA signatures
+      controller submitter
+      do
+        now <- getTime
+
+        -- 1. Compute signed hash ON-CHAIN using keccak256
+        let signedHash = computeSignedHashNative newRoot validUntil
+
+        -- 2. Check not seen before (replay prevention)
+        assertMsg ("E_ALREADY_SEEN_HASH: " <> signedHash) $
+          not $ Map.member signedHash seenHashes
+
+        -- 3. Validate timestamps
+        assertMsg "E_ROOT_EXPIRED" $ now < validUntil
+
+        -- 4. Validate metadata matches this MCMS
+        assertMsg ("E_WRONG_CHAIN_ID: expected " <> show chainId) $
+          metadata.chainId == chainId
+        assertMsg ("E_WRONG_MULTISIG: expected " <> mcmsId) $
+          metadata.multisigId == mcmsId
+        assertMsg ("E_WRONG_PRE_OP_COUNT: expected " <> show expiringRoot.opCount) $
+          metadata.preOpCount == expiringRoot.opCount
+
+        -- 5. Validate op counts
+        assertMsg "E_INVALID_OP_COUNTS" $
+          metadata.preOpCount <= metadata.postOpCount
+
+        -- 6. Check pending operations
+        unless metadata.overridePreviousRoot $
+          assertMsg "E_PENDING_OPS" $
+            expiringRoot.opCount == rootMetadata.postOpCount
+
+        -- 7. Verify ALL signatures ON-CHAIN using secp256k1
+        let validSignerAddrs = verifySignatures signedHash signatures
+        assertMsg "E_NO_VALID_SIGNATURES" $
+          not $ null validSignerAddrs
+
+        -- 8. Verify metadata Merkle proof ON-CHAIN using keccak256
+        let metadataLeaf = hashMetadataLeafNative metadata
+        assertMsg "E_INVALID_MERKLE_PROOF" $
+          verifyMerkleProof newRoot metadataLeaf metadataProof
+
+        -- 9. Verify group voting with validated signer addresses
+        let sortedSignerAddrs = sortAddresses validSignerAddrs
+        case verifyGroupVoting sortedSignerAddrs config of
+          Left err -> abort err
+          Right () -> pure ()
+
+        -- 10. Update state
+        create this with
+          seenHashes = Map.insert signedHash True seenHashes
+          expiringRoot = ExpiringRoot newRoot validUntil expiringRoot.opCount
+          rootMetadata = metadata
+
+    -- =========================================================================
+    -- DIRECT EXECUTION (Main Flow)
+    -- =========================================================================
+
+    -- | Execute an operation directly on a target contract
+    -- This is the main execution flow:
+    --   1. Validate merkle proof against the root set by SetRoot
+    --   2. Call target.getEnvironmentId() and verify it matches op.targetAddress
+    --   3. Call target.mcmsEntrypoint(functionName, operationData)
+    --
+    -- ANYONE CAN EXECUTE - Security comes from merkle proof verification:
+    --   1. SetRoot already validated signatures from required signers
+    --   2. SetRoot stored the merkle root on-chain
+    --   3. This function validates the merkle proof against the stored root
+    --   4. operationData is part of the merkle leaf, so it's cryptographically bound
+    choice ExecuteOp : ContractId MCMSPoc
+      with
+        submitter : Party                          -- Anyone can submit
+        targetCid : ContractId MCMSReceiver        -- Caller provides current ContractId
+        op : Op                                    -- Operation details
+        opProof : [BytesHex]                       -- Merkle proof
+      controller submitter
+      do
+        now <- getTime
+
+        -- 1. Validate operation targets this MCMS
+        assertMsg ("E_WRONG_CHAIN_ID: op targets " <> show op.chainId) $
+          op.chainId == chainId
+        assertMsg ("E_WRONG_MULTISIG: op targets " <> op.multisigId) $
+          op.multisigId == mcmsId
+
+        -- 2. Check nonce matches current opCount
+        assertMsg ("E_WRONG_NONCE: expected " <> show expiringRoot.opCount <> " got " <> show op.nonce) $
+          op.nonce == expiringRoot.opCount
+
+        -- 3. Check root not expired
+        assertMsg "E_ROOT_EXPIRED" $ now <= expiringRoot.validUntil
+
+        -- 4. Check we haven't executed all ops for this root
+        assertMsg "E_NO_MORE_OPS" $ expiringRoot.opCount < rootMetadata.postOpCount
+
+        -- 5. Verify merkle proof ON-CHAIN using keccak256
+        let opLeaf = hashOpLeafNative op
+        assertMsg "E_INVALID_OP_MERKLE_PROOF" $
+          verifyMerkleProof expiringRoot.root opLeaf opProof
+
+        -- 6. Verify target contract's environmentId matches op.targetAddress
+        targetEnvId <- exercise targetCid MCMSReceiver_GetEnvironmentId with c = owner
+        assertMsg ("E_WRONG_TARGET: expected " <> op.targetAddress <> " got " <> targetEnvId) $
+          targetEnvId == op.targetAddress
+
+        -- 7. Call target's mcmsEntrypoint (MCMS is ccip_owner, authority passes through)
+        _ <- exercise targetCid MCMSReceiver_Entrypoint with
+          caller = owner
+          functionName = op.functionName
+          operationData = op.operationData
+
+        -- 8. Increment opCount (operation executed)
+        create this with
+          expiringRoot = expiringRoot with opCount = expiringRoot.opCount + 1
+
+    -- =========================================================================
+    -- SELF-DISPATCH (MCMS Operations)
+    -- =========================================================================
+
+    -- | Execute an operation targeting MCMS itself (dispatch to self)
+    -- Similar to Aptos pattern - validates proof and dispatches internally
+    -- Parameters are decoded from op.operationData (like Aptos BCS deserialization)
+    -- No contractId needed since we're targeting ourselves
+    --
+    -- Supported functions:
+    --   - "set_config": Update signer configuration (params in operationData)
+    --   - "clear_root": Clear the current merkle root (no params needed)
+    --
+    -- ANYONE CAN EXECUTE - Security comes from merkle proof verification:
+    --   1. SetRoot already validated signatures from required signers
+    --   2. SetRoot stored the merkle root on-chain
+    --   3. This function validates the merkle proof against the stored root
+    --   4. operationData is part of the merkle leaf, so it's cryptographically bound
+    choice ExecuteMcmsOp : ContractId MCMSPoc
+      with
+        submitter : Party                          -- Anyone can submit
+        op : Op                                    -- Operation details (params encoded in operationData)
+        opProof : [BytesHex]                       -- Merkle proof
+      controller submitter
+      do
+        now <- getTime
+
+        -- 1. Validate operation targets this MCMS (self-dispatch)
+        assertMsg ("E_WRONG_CHAIN_ID: op targets " <> show op.chainId) $
+          op.chainId == chainId
+        assertMsg ("E_WRONG_MULTISIG: op targets " <> op.multisigId) $
+          op.multisigId == mcmsId
+
+        -- 2. Verify targetAddress is "self" or matches mcmsId
+        assertMsg ("E_NOT_SELF_DISPATCH: targetAddress must be 'self' or mcmsId") $
+          op.targetAddress == "self" || op.targetAddress == mcmsId
+
+        -- 3. Check nonce matches current opCount
+        assertMsg ("E_WRONG_NONCE: expected " <> show expiringRoot.opCount <> " got " <> show op.nonce) $
+          op.nonce == expiringRoot.opCount
+
+        -- 4. Check root not expired
+        assertMsg "E_ROOT_EXPIRED" $ now <= expiringRoot.validUntil
+
+        -- 5. Check we haven't executed all ops for this root
+        assertMsg "E_NO_MORE_OPS" $ expiringRoot.opCount < rootMetadata.postOpCount
+
+        -- 6. Verify merkle proof ON-CHAIN using keccak256
+        let opLeaf = hashOpLeafNative op
+        assertMsg "E_INVALID_OP_MERKLE_PROOF" $
+          verifyMerkleProof expiringRoot.root opLeaf opProof
+
+        -- 7. Dispatch to internal admin function based on functionName
+        --    Decode parameters from op.operationData (like Aptos BCS)
+        case op.functionName of
+          "set_config" -> do
+            -- Decode config params from operationData (like Aptos bcs_stream::deserialize)
+            case decodeSetConfigParams op.operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode set_config params"
+              Some params -> do
+                let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
+
+                -- Basic validation
+                assertMsg "E_TOO_MANY_SIGNERS" $ length newConfig.signers <= maxNumSigners
+                assertMsg "E_WRONG_QUORUM_LENGTH" $ length newConfig.groupQuorums == numGroups
+                assertMsg "E_WRONG_PARENTS_LENGTH" $ length newConfig.groupParents == numGroups
+                assertMsg "E_ROOT_NOT_SELF_PARENT" $ (newConfig.groupParents !! 0) == 0
+
+                let newExpiringRoot = if params.clearRoot
+                      then expiringRoot with root = "", opCount = expiringRoot.opCount + 1
+                      else expiringRoot with opCount = expiringRoot.opCount + 1
+
+                create this with
+                  config = newConfig
+                  expiringRoot = newExpiringRoot
+
+          "clear_root" -> do
+            -- Clear the current merkle root (no params needed)
+            create this with
+              expiringRoot = expiringRoot with root = "", opCount = expiringRoot.opCount + 1
+
+          _ -> abort $ "E_UNKNOWN_ADMIN_FUNCTION: " <> op.functionName
+
+    -- =========================================================================
+    -- View Functions
+    -- =========================================================================
+
+    -- | Check if an operation can be executed
+    nonconsuming choice CanExecuteOp : Bool
+      with
+        submitter : Party                      -- Anyone can query
+        op : Op
+      controller submitter
+      do
+        now <- getTime
+        pure $
+          op.chainId == chainId &&
+          op.multisigId == mcmsId &&
+          op.nonce == expiringRoot.opCount &&
+          now <= expiringRoot.validUntil &&
+          expiringRoot.opCount < rootMetadata.postOpCount
+
+    -- | Get current state
+    nonconsuming choice GetState : MCMSPocState
+      with
+        submitter : Party                      -- Anyone can query
+      controller submitter
+      do
+        pure MCMSPocState with
+          role
+          opCount = expiringRoot.opCount
+          postOpCount = rootMetadata.postOpCount
+          validUntil = expiringRoot.validUntil
+          hasActiveRoot = expiringRoot.root /= ""
+          numSigners = length config.signers
+
+-- ===========================================================================
+-- VIEW TYPES
+-- ===========================================================================
+
+-- | View of MCMS state
+data MCMSPocState = MCMSPocState
+  with
+    role : Role
+    opCount : Int
+    postOpCount : Int
+    validUntil : Time
+    hasActiveRoot : Bool
+    numSigners : Int
+  deriving (Show, Eq)
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Create mcmsId from base ID and role
+-- e.g., makeMcmsId "mcms-001" Proposer = "mcms-001-proposer"
+makeMcmsId : Text -> Role -> Text
+makeMcmsId baseId r = baseId <> "-" <> roleToText r

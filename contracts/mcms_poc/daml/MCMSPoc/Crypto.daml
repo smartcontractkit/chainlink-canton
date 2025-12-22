@@ -1,0 +1,232 @@
+module MCMSPoc.Crypto where
+
+import DA.Crypto.Text (BytesHex, keccak256, secp256k1WithEcdsaOnly)
+import DA.Text qualified as T
+import DA.Time (subTime)
+import DA.Date (Month(..), datetime)
+import MCMSPoc.Types
+
+-- ===========================================================================
+-- RAW SIGNATURE TYPE
+-- ===========================================================================
+
+-- | Raw signature with public key
+-- Signature is raw format (r || s), each 32 bytes = 64 bytes total
+data RawSignature = RawSignature
+  with
+    publicKey : BytesHex    -- Uncompressed public key (65 bytes: 04 || X || Y)
+    r : BytesHex            -- Signature r component (32 bytes)
+    s : BytesHex            -- Signature s component (32 bytes)
+  deriving (Show, Eq)
+
+-- ===========================================================================
+-- SIGNATURE VERIFICATION (Trustless)
+-- ===========================================================================
+
+-- | Verify a secp256k1 signature and return the signer address if valid
+verifyAndGetSignerAddress : BytesHex -> RawSignature -> Optional BytesHex
+verifyAndGetSignerAddress messageHash sig =
+  let
+    derSignature = rawToDerSignature sig.r sig.s
+    derPublicKey = secp256k1PublicKeyToDer sig.publicKey
+  in
+    if secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
+      then Some (publicKeyToAddress sig.publicKey)
+      else None
+
+-- | Verify multiple signatures and return list of valid signer addresses
+verifySignatures : BytesHex -> [RawSignature] -> [BytesHex]
+verifySignatures messageHash sigs =
+  [ addr | sig <- sigs
+         , Some addr <- [verifyAndGetSignerAddress messageHash sig]
+  ]
+
+-- | Convert uncompressed public key to Ethereum address
+publicKeyToAddress : BytesHex -> BytesHex
+publicKeyToAddress pubKey =
+  let
+    keyData = if T.take 2 pubKey == "04"
+              then T.drop 2 pubKey
+              else pubKey
+    fullHash = keccak256 keyData
+    hashLen = T.length fullHash
+  in
+    T.drop (hashLen - 40) fullHash
+
+-- ===========================================================================
+-- DER ENCODING
+-- ===========================================================================
+
+-- | Convert raw ECDSA signature (r, s) to DER format
+rawToDerSignature : BytesHex -> BytesHex -> BytesHex
+rawToDerSignature r s =
+  let
+    rTrimmed = trimLeadingZeros r
+    sTrimmed = trimLeadingZeros s
+    rWithPrefix = if highBitSet rTrimmed then "00" <> rTrimmed else rTrimmed
+    sWithPrefix = if highBitSet sTrimmed then "00" <> sTrimmed else sTrimmed
+
+    rLen = T.length rWithPrefix / 2
+    sLen = T.length sWithPrefix / 2
+    rLenHex = byteToHex rLen
+    sLenHex = byteToHex sLen
+
+    contentLen = 2 + rLen + 2 + sLen
+    totalLenHex = byteToHex contentLen
+  in
+    "30" <> totalLenHex <> "02" <> rLenHex <> rWithPrefix <> "02" <> sLenHex <> sWithPrefix
+
+-- | Convert uncompressed secp256k1 public key to DER SubjectPublicKeyInfo format
+secp256k1PublicKeyToDer : BytesHex -> BytesHex
+secp256k1PublicKeyToDer uncompressedKey =
+  "3056301006072a8648ce3d020106052b8104000a034200" <> uncompressedKey
+
+-- | Trim leading zero bytes
+trimLeadingZeros : BytesHex -> BytesHex
+trimLeadingZeros hex
+  | T.length hex > 2 && T.take 2 hex == "00" = trimLeadingZeros (T.drop 2 hex)
+  | T.length hex == 0 = "00"
+  | otherwise = hex
+
+-- | Check if high bit is set
+highBitSet : BytesHex -> Bool
+highBitSet hex =
+  T.take 1 hex `elem` ["8", "9", "a", "b", "c", "d", "e", "f", "A", "B", "C", "D", "E", "F"]
+
+-- | Convert integer to 2-char hex
+byteToHex : Int -> BytesHex
+byteToHex n
+  | n < 0 || n > 255 = error "byteToHex: value must be 0-255"
+  | n < 16 = "0" <> intToHexDigit n
+  | otherwise = intToHexDigit (n / 16) <> intToHexDigit (n % 16)
+
+intToHexDigit : Int -> Text
+intToHexDigit n = case n of
+  0 -> "0"; 1 -> "1"; 2 -> "2"; 3 -> "3"
+  4 -> "4"; 5 -> "5"; 6 -> "6"; 7 -> "7"
+  8 -> "8"; 9 -> "9"; 10 -> "a"; 11 -> "b"
+  12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
+  _ -> "0"
+
+-- ===========================================================================
+-- NATIVE HASH FUNCTIONS (Replace placeholders in Types.daml)
+-- ===========================================================================
+
+-- | Compute signed hash for SetRoot using keccak256
+-- Matches Solidity: ECDSA.toEthSignedMessageHash(keccak256(abi.encode(root, validUntil)))
+computeSignedHashNative : BytesHex -> Time -> BytesHex
+computeSignedHashNative root validUntil =
+  let
+    innerData = root <> timeToHex validUntil
+    innerHash = keccak256 innerData
+    ethPrefix = "19457468657265756d205369676e6564204d6573736167653a0a3332"
+    prefixedData = ethPrefix <> innerHash
+  in
+    keccak256 prefixedData
+
+-- | Hash an operation to get its Merkle leaf using keccak256
+hashOpLeafNative : Op -> BytesHex
+hashOpLeafNative op =
+  let
+    encoded = padLeft32 (intToHex op.chainId)
+           <> asciiToHex op.multisigId
+           <> padLeft32 (intToHex op.nonce)
+           <> asciiToHex op.targetAddress
+           <> asciiToHex op.functionName
+           <> op.operationData
+  in
+    keccak256 encoded
+
+-- | Hash metadata to get its Merkle leaf using keccak256
+hashMetadataLeafNative : RootMetadata -> BytesHex
+hashMetadataLeafNative meta =
+  let
+    encoded = padLeft32 (intToHex meta.chainId)
+           <> asciiToHex meta.multisigId
+           <> padLeft32 (intToHex meta.preOpCount)
+           <> padLeft32 (intToHex meta.postOpCount)
+           <> (if meta.overridePreviousRoot then "01" else "00")
+  in
+    keccak256 encoded
+
+-- ===========================================================================
+-- MERKLE PROOF VERIFICATION
+-- ===========================================================================
+
+-- | Verify a Merkle proof on-chain using keccak256
+verifyMerkleProof : BytesHex -> BytesHex -> [BytesHex] -> Bool
+verifyMerkleProof root leaf proof =
+  let computedRoot = foldl hashPair leaf proof
+  in computedRoot == root
+
+-- | Hash a pair of nodes (sorted, OpenZeppelin style)
+hashPair : BytesHex -> BytesHex -> BytesHex
+hashPair a b =
+  if a < b
+    then keccak256 (a <> b)
+    else keccak256 (b <> a)
+
+-- ===========================================================================
+-- HELPERS
+-- ===========================================================================
+
+padLeft32 : BytesHex -> BytesHex
+padLeft32 hex =
+  let len = T.length hex
+  in if len >= 64
+     then T.take 64 hex
+     else replicateText (64 - len) "0" <> hex
+
+replicateText : Int -> Text -> Text
+replicateText n t
+  | n <= 0 = ""
+  | otherwise = t <> replicateText (n - 1) t
+
+intToHex : Int -> BytesHex
+intToHex n
+  | n == 0 = "0"
+  | n < 0 = error "intToHex: negative numbers not supported"
+  | otherwise = intToHexHelperTop n ""
+
+intToHexHelperTop : Int -> BytesHex -> BytesHex
+intToHexHelperTop 0 acc = acc
+intToHexHelperTop x acc = intToHexHelperTop (x / 16) (intToHexDigit (x % 16) <> acc)
+
+timeToHex : Time -> BytesHex
+timeToHex _ = padLeft32 "0"  -- Placeholder
+
+asciiToHex : Text -> BytesHex
+asciiToHex t = asciiToHexHelperTop t ""
+
+asciiToHexHelperTop : Text -> BytesHex -> BytesHex
+asciiToHexHelperTop txt acc =
+  if T.length txt == 0
+    then acc
+    else
+      let c = T.take 1 txt
+          rest = T.drop 1 txt
+          code = charToCode c
+      in asciiToHexHelperTop rest (acc <> byteToHex code)
+
+charToCode : Text -> Int
+charToCode c
+  | c == "0" = 48 | c == "1" = 49 | c == "2" = 50 | c == "3" = 51
+  | c == "4" = 52 | c == "5" = 53 | c == "6" = 54 | c == "7" = 55
+  | c == "8" = 56 | c == "9" = 57
+  | c == "a" = 97 | c == "b" = 98 | c == "c" = 99 | c == "d" = 100
+  | c == "e" = 101 | c == "f" = 102 | c == "g" = 103 | c == "h" = 104
+  | c == "i" = 105 | c == "j" = 106 | c == "k" = 107 | c == "l" = 108
+  | c == "m" = 109 | c == "n" = 110 | c == "o" = 111 | c == "p" = 112
+  | c == "q" = 113 | c == "r" = 114 | c == "s" = 115 | c == "t" = 116
+  | c == "u" = 117 | c == "v" = 118 | c == "w" = 119 | c == "x" = 120
+  | c == "y" = 121 | c == "z" = 122
+  | c == "A" = 65 | c == "B" = 66 | c == "C" = 67 | c == "D" = 68
+  | c == "E" = 69 | c == "F" = 70 | c == "G" = 71 | c == "H" = 72
+  | c == "I" = 73 | c == "J" = 74 | c == "K" = 75 | c == "L" = 76
+  | c == "M" = 77 | c == "N" = 78 | c == "O" = 79 | c == "P" = 80
+  | c == "Q" = 81 | c == "R" = 82 | c == "S" = 83 | c == "T" = 84
+  | c == "U" = 85 | c == "V" = 86 | c == "W" = 87 | c == "X" = 88
+  | c == "Y" = 89 | c == "Z" = 90
+  | c == "_" = 95 | c == "-" = 45 | c == "." = 46 | c == " " = 32
+  | otherwise = 63
+

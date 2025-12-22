@@ -1,0 +1,12 @@
+sdk-version: 3.4.9
+name: mcms-poc-test
+version: 1.9.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+  - ../.daml/dist/mcms-poc-1.9.0.dar
+build-options:
+  - -Wno-upgrade-interfaces
+  - -Wno-crypto-text-is-alpha

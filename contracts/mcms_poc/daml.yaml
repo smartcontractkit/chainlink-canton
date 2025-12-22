@@ -1,0 +1,11 @@
+sdk-version: 3.4.9
+name: mcms-poc
+version: 1.9.0
+source: daml
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+build-options:
+  - -Wno-upgrade-interfaces
+  - -Wno-crypto-text-is-alpha
