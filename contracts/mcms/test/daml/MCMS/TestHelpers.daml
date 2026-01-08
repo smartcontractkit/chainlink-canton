@@ -1,9 +1,9 @@
--- | Shared test helpers for MCMS POC tests
-module MCMSPoc.TestHelpers where
+-- | Shared test helpers for MCMS tests
+module MCMS.TestHelpers where
 
 import DA.Crypto.Text (BytesHex)
-import MCMSPoc.Types (MultisigConfig(..), SignerInfo(..), Op(..), RootMetadata(..))
-import MCMSPoc.Crypto (RawSignature(..), replicateText)
+import MCMS.Types (MultisigConfig(..), SignerInfo(..), Op(..), RootMetadata(..))
+import MCMS.Crypto (RawSignature(..), replicateText)
 
 -- ===========================================================================
 -- TEST HELPERS
@@ -28,7 +28,7 @@ makeTestOp chainId mcmsId nonce functionName = Op
   { chainId
   , multisigId = mcmsId
   , nonce
-  , targetAddress = "counter"
+  , targetInstanceId = "counter"
   , functionName
   , operationData = ""
   }

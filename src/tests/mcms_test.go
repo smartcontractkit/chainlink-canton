@@ -17,13 +17,13 @@ import (
 )
 
 // ===========================================================================
-// MCMS POC INTEGRATION TEST
+// MCMS INTEGRATION TEST
 // ===========================================================================
 
-// TestMCMSPoc_SetRootWithRealSignatures tests the full MCMS flow with real
+// TestMCMS_SetRootWithRealSignatures tests the full MCMS flow with real
 // cryptographic signatures, verifying that Canton's native crypto verification
 // works correctly.
-func TestMCMSPoc_SetRootWithRealSignatures(t *testing.T) {
+func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	// Skip if not running integration tests
 	if os.Getenv("INTEGRATION_TEST") == "" {
 		t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run.")
@@ -41,13 +41,13 @@ func TestMCMSPoc_SetRootWithRealSignatures(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Upload MCMS POC DAR
-	mcmsPocDar, err := os.ReadFile("../../contracts/mcms_poc/.daml/dist/mcms-poc-1.9.0.dar")
+	// Upload MCMS DAR
+	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
 	require.NoError(t, err)
 
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsPocDar}, participant)
+	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
-	fmt.Printf("Uploaded MCMS POC DAR: %s\n", packageIDs)
+	fmt.Printf("Uploaded MCMS DAR: %s\n", packageIDs)
 
 	// Allocate party
 	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
@@ -74,17 +74,17 @@ func TestMCMSPoc_SetRootWithRealSignatures(t *testing.T) {
 	fmt.Printf("Signer 3: %s\n", FormatSignerInfo(signer3))
 
 	// ===========================================================================
-	// Step 2: Create MCMS POC Contract
+	// Step 2: Create MCMS Contract
 	// ===========================================================================
-	fmt.Println("\n=== Step 2: Create MCMS POC Contract ===")
+	fmt.Println("\n=== Step 2: Create MCMS Contract ===")
 
 	chainId := 1
 	baseMcmsId := "mcms-test-001"
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
 
-	mcmsCid, err := createMCMSPoc(ctx, participant, mcmsOwner, chainId, mcmsId)
+	mcmsCid, err := createMCMS(ctx, participant, mcmsOwner, chainId, mcmsId)
 	require.NoError(t, err)
-	fmt.Printf("Created MCMSPoc: %s\n", mcmsCid)
+	fmt.Printf("Created MCMS: %s\n", mcmsCid)
 
 	// ===========================================================================
 	// Step 3: Configure Signers (2-of-3)
@@ -94,7 +94,7 @@ func TestMCMSPoc_SetRootWithRealSignatures(t *testing.T) {
 	config := New2of3Config(signers)
 	mcmsCid, err = setMCMSConfig(ctx, participant, mcmsOwner, mcmsCid, config)
 	require.NoError(t, err)
-	fmt.Printf("Configured MCMSPoc with 2-of-3 config: %s\n", mcmsCid)
+	fmt.Printf("Configured MCMS with 2-of-3 config: %s\n", mcmsCid)
 
 	// ===========================================================================
 	// Step 4: Build Proposal with Operation
@@ -166,7 +166,7 @@ func TestMCMSPoc_SetRootWithRealSignatures(t *testing.T) {
 	mcmsCid, err = setMCMSRoot(ctx, participant, mcmsOwner, mcmsCid,
 		proposal.GetRoot(), validUntil, &proposal.Metadata, metadataProof, signatures)
 	require.NoError(t, err)
-	fmt.Printf("SetRoot succeeded! New MCMSPoc CID: %s\n", mcmsCid)
+	fmt.Printf("SetRoot succeeded! New MCMS CID: %s\n", mcmsCid)
 
 	// ===========================================================================
 	// Step 8: Test Complete
@@ -176,7 +176,7 @@ func TestMCMSPoc_SetRootWithRealSignatures(t *testing.T) {
 	fmt.Println("\n=== Step 8: Test Complete ===")
 	fmt.Println("SetRoot with real ECDSA signatures verified ✓")
 	fmt.Println("Canton's native crypto verification working correctly ✓")
-	fmt.Printf("Final MCMSPoc CID: %s\n", mcmsCid)
+	fmt.Printf("Final MCMS CID: %s\n", mcmsCid)
 
 	fmt.Println("\n=== TEST PASSED ===")
 }
@@ -522,7 +522,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 // HELPER FUNCTIONS
 // ===========================================================================
 
-func createMCMSPoc(ctx context.Context, participant *Participant, owner string, chainId int, mcmsId string) (string, error) {
+func createMCMS(ctx context.Context, participant *Participant, owner string, chainId int, mcmsId string) (string, error) {
 	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
 	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
 	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -541,9 +541,9 @@ func createMCMSPoc(ctx context.Context, participant *Participant, owner string, 
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
@@ -575,7 +575,7 @@ func createMCMSPoc(ctx context.Context, participant *Participant, owner string, 
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to create MCMSPoc: %w", err)
+		return "", fmt.Errorf("failed to create MCMS: %w", err)
 	}
 
 	return createRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId(), nil
@@ -608,9 +608,9 @@ func setMCMSConfig(ctx context.Context, participant *Participant, owner string, 
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetConfig",
@@ -633,14 +633,14 @@ func setMCMSConfig(ctx context.Context, participant *Participant, owner string, 
 		return "", fmt.Errorf("failed to SetConfig: %w", err)
 	}
 
-	// Find the new MCMSPoc contract ID
+	// Find the new MCMS contract ID
 	for _, event := range exerciseRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSPoc" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
 			return created.GetContractId(), nil
 		}
 	}
 
-	return "", fmt.Errorf("MCMSPoc contract not found in SetConfig response")
+	return "", fmt.Errorf("MCMS contract not found in SetConfig response")
 }
 
 func setMCMSRoot(ctx context.Context, participant *Participant, owner string, mcmsCid string,
@@ -682,9 +682,9 @@ func setMCMSRoot(ctx context.Context, participant *Participant, owner string, mc
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
@@ -709,14 +709,14 @@ func setMCMSRoot(ctx context.Context, participant *Participant, owner string, mc
 		return "", fmt.Errorf("failed to SetRoot: %w", err)
 	}
 
-	// Find the new MCMSPoc contract ID
+	// Find the new MCMS contract ID
 	for _, event := range exerciseRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSPoc" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
 			return created.GetContractId(), nil
 		}
 	}
 
-	return "", fmt.Errorf("MCMSPoc contract not found in SetRoot response")
+	return "", fmt.Errorf("MCMS contract not found in SetRoot response")
 }
 
 func makeInt64List(count int, value int64) []*apiv2.Value {

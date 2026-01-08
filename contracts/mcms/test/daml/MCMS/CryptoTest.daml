@@ -1,14 +1,14 @@
--- | Crypto verification tests for MCMS POC
+-- | Crypto verification tests for MCMS
 -- Verifies Canton's crypto implementation matches the Go implementation
--- Uses hardcoded values from Go tests (src/tests/mcms_poc_test.go)
-module MCMSPoc.CryptoTest where
+-- Uses hardcoded values from Go tests (src/tests/mcms_test.go)
+module MCMS.CryptoTest where
 
 import DA.Date (datetime, Month(..))
 import DA.Crypto.Text (keccak256)
 import DA.Text qualified as T
 import Daml.Script
-import MCMSPoc.Crypto (publicKeyToAddress, hashPair, verifyMerkleProof, hashOpLeafNative, hashMetadataLeafNative, computeSignedHashNative, rawToDerSignature, replicateText)
-import MCMSPoc.Types (Op(..), RootMetadata(..))
+import MCMS.Crypto (publicKeyToAddress, hashPair, verifyMerkleProof, hashOpLeafNative, hashMetadataLeafNative, computeSignedHashNative, rawToDerSignature, replicateText)
+import MCMS.Types (Op(..), RootMetadata(..))
 
 -- ===========================================================================
 -- CRYPTO VERIFICATION TESTS
@@ -112,7 +112,7 @@ testCryptoHashOpLeaf = script do
   -- op[0].chainId = 1
   -- op[0].multisigId = "test-mcms-proposer"
   -- op[0].nonce = 0
-  -- op[0].targetAddress = "counter"
+  -- op[0].targetInstanceId = "counter"
   -- op[0].functionName = "increment"
   -- op[0].operationData = ""
   -- op[0].leaf = "4b4fa101e8d3f8a353897651f725e63bfe1abe50dc5edc3b6f3ef466c5901a61"
@@ -120,7 +120,7 @@ testCryptoHashOpLeaf = script do
         { chainId = 1
         , multisigId = "test-mcms-proposer"
         , nonce = 0
-        , targetAddress = "counter"
+        , targetInstanceId = "counter"
         , functionName = "increment"
         , operationData = ""
         }

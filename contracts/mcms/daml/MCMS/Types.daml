@@ -1,4 +1,4 @@
-module MCMSPoc.Types where
+module MCMS.Types where
 
 import DA.Time (time)
 import DA.Date (date, Month(..))

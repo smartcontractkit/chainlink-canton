@@ -1,6 +1,6 @@
--- | MCMSReceiver Interface for MCMS POC
+-- | MCMSReceiver Interface for MCMS
 -- Target contracts implement this interface to receive calls from MCMS
-module MCMSPoc.MCMSReceiver where
+module MCMS.MCMSReceiver where
 
 import DA.Map qualified as Map
 

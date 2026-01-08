@@ -17,15 +17,15 @@ import (
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 )
 
-// TestMCMSPoc_ExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
-// 1. Deploy MCMS POC and Counter contracts
+// TestMCMS_ExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
+// 1. Deploy MCMS and Counter contracts
 // 2. Configure signers (2-of-3)
 // 3. Create proposal with "increment" operation
 // 4. Sign with 2 signers
 // 5. SetRoot with real signatures
 // 6. ExecuteOp - direct call to Counter via MCMSReceiver interface
 // 7. Verify counter value incremented
-func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
+func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	// Setup context with JWT auth
 	jwToken, err := getJWT()
 	require.NoError(t, err)
@@ -43,14 +43,14 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	// |   Setup: Upload DAR  |
 	// ========================
 
-	t.Log("Uploading MCMS POC DAR...")
+	t.Log("Uploading MCMS DAR...")
 
-	mcmsPocDar, err := os.ReadFile("../../contracts/mcms_poc/.daml/dist/mcms-poc-1.9.0.dar")
+	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
 	require.NoError(t, err)
 
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsPocDar}, participant)
+	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
-	t.Logf("Uploaded MCMS POC DAR, package IDs: %v", packageIDs)
+	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
 
 	// ========================
 	// |   Setup: Parties     |
@@ -97,10 +97,10 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	t.Logf("Counter Instance ID: %s", instanceId)
 
 	// ========================
-	// |   1. Create MCMS POC |
+	// |   1. Create MCMS |
 	// ========================
 
-	t.Log("Creating MCMS POC contract...")
+	t.Log("Creating MCMS contract...")
 
 	// Build signer info values
 	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
@@ -152,7 +152,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 		},
 	}}}
 
-	// Create MCMS POC contract (simplified - no ticket tracking)
+	// Create MCMS contract (simplified - no ticket tracking)
 	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
@@ -161,9 +161,9 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
@@ -190,7 +190,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
-	t.Logf("Created MCMS POC contract: %s", mcmsCid)
+	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// ========================
 	// |   2. Create Counter  |
@@ -206,8 +206,8 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Counter",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Counter",
 								EntityName: "Counter",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -311,9 +311,9 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
@@ -338,7 +338,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 
 	// Get new MCMS contract ID from exercise result
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSPoc" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -378,9 +378,9 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "ExecuteOp",
@@ -473,8 +473,8 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	// Also query the ACS to verify the counter value
 	t.Log("Querying counter via ACS...")
 	counterContracts, err := GetActiveContractsForPartyTemplateId(ctx, participant, ccipOwner, &apiv2.Identifier{
-		PackageId:  "#mcms-poc",
-		ModuleName: "MCMSPoc.Counter",
+		PackageId:  "#mcms",
+		ModuleName: "MCMS.Counter",
 		EntityName: "Counter",
 	})
 	require.NoError(t, err)
@@ -499,7 +499,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 
 	t.Log("✓ Full MCMS ExecuteOp flow test completed successfully!")
 	t.Log("Summary:")
-	t.Log("  1. Created MCMS POC with 2-of-3 config")
+	t.Log("  1. Created MCMS with 2-of-3 config")
 	t.Log("  2. Created Counter contract (implements MCMSReceiver)")
 	t.Log("  3. Built proposal with 'increment' operation targeting instanceId")
 	t.Log("  4. Signed with 2 signers (real ECDSA signatures)")
@@ -508,8 +508,8 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	t.Log("  7. Counter value = 1 ✓")
 }
 
-// TestMCMSPoc_SignatureVerificationFails tests that invalid signatures are rejected
-func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
+// TestMCMS_SignatureVerificationFails tests that invalid signatures are rejected
+func TestMCMS_SignatureVerificationFails(t *testing.T) {
 	// Setup context with JWT auth
 	jwToken, err := getJWT()
 	require.NoError(t, err)
@@ -524,9 +524,9 @@ func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upload DAR
-	mcmsPocDar, err := os.ReadFile("../../contracts/mcms_poc/.daml/dist/mcms-poc-1.9.0.dar")
+	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
 	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsPocDar}, participant)
+	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
 
 	// Setup party
@@ -588,7 +588,7 @@ func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
 	}}}
 
 	// Create MCMS contract
-	t.Log("Creating MCMS POC contract...")
+	t.Log("Creating MCMS contract...")
 	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
@@ -597,9 +597,9 @@ func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
@@ -626,7 +626,7 @@ func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
 	})
 	require.NoError(t, err)
 	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
-	t.Logf("Created MCMS POC contract: %s", mcmsCid)
+	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// Build a valid proposal
 	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
@@ -684,9 +684,9 @@ func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
@@ -719,8 +719,8 @@ func TestMCMSPoc_SignatureVerificationFails(t *testing.T) {
 	t.Log("✓ SetRoot correctly rejected invalid signatures")
 }
 
-// TestMCMSPoc_ReplayProtection tests that the same root cannot be set twice
-func TestMCMSPoc_ReplayProtection(t *testing.T) {
+// TestMCMS_ReplayProtection tests that the same root cannot be set twice
+func TestMCMS_ReplayProtection(t *testing.T) {
 	// Setup context with JWT auth
 	jwToken, err := getJWT()
 	require.NoError(t, err)
@@ -735,9 +735,9 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upload DAR
-	mcmsPocDar, err := os.ReadFile("../../contracts/mcms_poc/.daml/dist/mcms-poc-1.9.0.dar")
+	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
 	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsPocDar}, participant)
+	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
 
 	// Setup party
@@ -800,7 +800,7 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 	}}}
 
 	// Create MCMS contract
-	t.Log("Creating MCMS POC contract...")
+	t.Log("Creating MCMS contract...")
 	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
@@ -809,9 +809,9 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
@@ -838,7 +838,7 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 	})
 	require.NoError(t, err)
 	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
-	t.Logf("Created MCMS POC contract: %s", mcmsCid)
+	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// Build proposal
 	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
@@ -892,9 +892,9 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
@@ -920,7 +920,7 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 
 	// Get new MCMS contract ID
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSPoc" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -936,9 +936,9 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
@@ -967,13 +967,13 @@ func TestMCMSPoc_ReplayProtection(t *testing.T) {
 	t.Log("✓ Second SetRoot correctly rejected with E_ALREADY_SEEN_HASH (replay protection working)")
 }
 
-// TestMCMSPoc_GenerateDamlTestValues generates all cryptographic values needed for Daml unit tests.
-// Run this test and copy the output to contracts/mcms_poc/test/daml/MCMSPoc/FlowTest.daml
+// TestMCMS_GenerateDamlTestValues generates all cryptographic values needed for Daml unit tests.
+// Run this test and copy the output to contracts/mcms/test/daml/MCMS/FlowTest.daml
 // This uses FIXED values (not random) so the output is deterministic.
-func TestMCMSPoc_GenerateDamlTestValues(t *testing.T) {
+func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("=======================================================================")
 	t.Log("GENERATING DAML TEST VALUES")
-	t.Log("Copy these values to contracts/mcms_poc/test/daml/MCMSPoc/FlowTest.daml")
+	t.Log("Copy these values to contracts/mcms/test/daml/MCMS/FlowTest.daml")
 	t.Log("=======================================================================")
 
 	// Use fixed seed for deterministic output
@@ -1160,9 +1160,9 @@ func TestMCMSPoc_GenerateDamlTestValues(t *testing.T) {
 	t.Log("=======================================================================")
 }
 
-// TestMCMSPoc_GenerateMcmsOpTestValues generates and prints test values for MCMS self-dispatch operations
+// TestMCMS_GenerateMcmsOpTestValues generates and prints test values for MCMS self-dispatch operations
 // These values can be used in Daml unit tests for cross-verification
-func TestMCMSPoc_GenerateMcmsOpTestValues(t *testing.T) {
+func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 	t.Log("=======================================================================")
 	t.Log("GENERATING DAML TEST VALUES FOR MCMS OP (SELF-DISPATCH)")
 	t.Log("=======================================================================")
@@ -1360,9 +1360,9 @@ func TestMCMSPoc_GenerateMcmsOpTestValues(t *testing.T) {
 	t.Log("=======================================================================")
 }
 
-// TestMCMSPoc_ExecuteMcmsOp tests self-dispatch MCMS operations (Aptos pattern)
+// TestMCMS_ExecuteMcmsOp tests self-dispatch MCMS operations (Aptos pattern)
 // This demonstrates changing MCMS config via a signed proposal
-func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
+func TestMCMS_ExecuteMcmsOp(t *testing.T) {
 	// Setup context with JWT auth
 	jwToken, err := getJWT()
 	require.NoError(t, err)
@@ -1384,13 +1384,13 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upload DAR
-	t.Log("Uploading MCMS POC DAR...")
-	mcmsPocDar, err := os.ReadFile("../../contracts/mcms_poc/.daml/dist/mcms-poc-1.9.0.dar")
+	t.Log("Uploading MCMS DAR...")
+	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
 	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsPocDar}, participant)
+	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
 
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsPocDar}, randomUserParticipant)
+	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, randomUserParticipant)
 	require.NoError(t, err)
 
 	// Setup party
@@ -1429,10 +1429,10 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 	t.Logf("MCMS ID: %s", mcmsId)
 
 	// ========================
-	// |   1. Create MCMS POC |
+	// |   1. Create MCMS |
 	// ========================
 
-	t.Log("Creating MCMS POC contract...")
+	t.Log("Creating MCMS contract...")
 
 	// Build signer info values
 	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
@@ -1480,9 +1480,9 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 					Command: &apiv2.Command_Create{
 						Create: &apiv2.CreateCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
@@ -1509,7 +1509,7 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 	})
 	require.NoError(t, err)
 	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
-	t.Logf("Created MCMS POC contract: %s", mcmsCid)
+	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// ========================
 	// |   2. Build Proposal  |
@@ -1599,9 +1599,9 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "SetRoot",
@@ -1626,7 +1626,7 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 
 	// Get new contract ID from SetRoot result
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSPoc" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1689,9 +1689,9 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms-poc",
-								ModuleName: "MCMSPoc.Main",
-								EntityName: "MCMSPoc",
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
 							},
 							ContractId: mcmsCid,
 							Choice:     "ExecuteMcmsOp",
@@ -1722,7 +1722,7 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 	// ========================
 
 	// Query via GetActiveContracts with verbose to get the actual config
-	// Find the MCMSPoc contract with our mcmsId (the old one is archived, new one is active)
+	// Find the MCMS contract with our mcmsId (the old one is archived, new one is active)
 	var newNumSigners int64 = -1
 	var newQuorum int64 = -1
 	var newMcmsCid string
@@ -1752,7 +1752,7 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 		}
 		require.NoError(t, err)
 		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMSPoc" {
+			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMS" {
 				// Check if this is our MCMS by matching mcmsId
 				for _, field := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
 					if field.GetLabel() == "mcmsId" && field.GetValue().GetText() == mcmsId {
@@ -1791,7 +1791,7 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 
 	t.Log("✓ ExecuteMcmsOp test completed successfully!")
 	t.Log("Summary:")
-	t.Log("  1. Created MCMS POC with 2-of-3 config")
+	t.Log("  1. Created MCMS with 2-of-3 config")
 	t.Log("  2. Built MCMS proposal with set_config targeting 'self'")
 	t.Log("  3. Signed with 2 signers")
 	t.Log("  4. SetRoot with on-chain verification")

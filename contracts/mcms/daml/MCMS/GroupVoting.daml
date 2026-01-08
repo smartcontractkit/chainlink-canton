@@ -1,10 +1,10 @@
-module MCMSPoc.GroupVoting where
+module MCMS.GroupVoting where
 
 import DA.List ((!!) , sort)
 import DA.Map qualified as Map
 import DA.Foldable (forA_)
 import DA.Action (when, unless)
-import MCMSPoc.Types
+import MCMS.Types
 
 -- | Verify that provided signers meet the hierarchical group quorum requirements
 -- This is the core multi-sig verification algorithm

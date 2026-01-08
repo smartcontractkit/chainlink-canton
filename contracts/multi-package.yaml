@@ -13,8 +13,8 @@ packages:
   - ccip/perpartyrouter
   - ccip/test
 
-  - mcms_poc
-  - mcms_poc/test
+  - mcms
+  - mcms/test
 
   - test/interfaces
   - test/proxy

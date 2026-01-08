@@ -1,7 +1,7 @@
 -- Uses native keccak256 and secp256k1 for on-chain verification
 --
 -- ARCHITECTURE:
---   MCMSPoc verifies signatures and merkle proofs, then calls target contracts directly.
+--   MCMS verifies signatures and merkle proofs, then calls target contracts directly.
 --   Target contracts implement MCMSReceiver interface with stable instanceId.
 --
 -- Direct Invocation Pattern:
@@ -10,19 +10,19 @@
 --   3. MCMS calls target.getInstanceId() and verifies against op.targetInstanceId
 --   4. MCMS calls target.mcmsEntrypoint(functionName, operationData, contractIds)
 --   5. ccip_owner authority flows through the call chain
-module MCMSPoc.Main where
+module MCMS.Main where
 
 import DA.Map qualified as Map
 import DA.List ((!!))
 import DA.Action (unless)
 import DA.Crypto.Text (BytesHex)
-import MCMSPoc.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), emptyConfig, emptyRootMetadata, emptyExpiringRoot, numGroups, maxNumSigners, zeroHash, roleToText)
-import MCMSPoc.GroupVoting
-import MCMSPoc.Crypto
-import MCMSPoc.MCMSReceiver (MCMSReceiver, MCMSReceiver_GetInstanceId(..), MCMSReceiver_Entrypoint(..))
-import MCMSPoc.Codec (decodeSetConfigParams, SetConfigParams(..))
+import MCMS.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), numGroups, maxNumSigners, roleToText)
+import MCMS.GroupVoting
+import MCMS.Crypto
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_GetInstanceId(..), MCMSReceiver_Entrypoint(..))
+import MCMS.Codec (decodeSetConfigParams, SetConfigParams(..))
 
-template MCMSPoc
+template MCMS
   with
     owner : Party                              -- ccip_owner party
     role : Role                                -- Proposer (simplified to single role)
@@ -37,7 +37,7 @@ template MCMSPoc
 
     -- | Set signer configuration
     -- Validates the configuration and optionally clears the root
-    choice SetConfig : ContractId MCMSPoc
+    choice SetConfig : ContractId MCMS
       with
         newSigners : [SignerInfo]
         newGroupQuorums : [Int]
@@ -67,7 +67,7 @@ template MCMSPoc
     -- | Set new merkle root with on-chain signature verification
     -- All verification happens on-chain using native keccak256 and secp256k1
     -- ANYONE can submit - security comes from signature verification
-    choice SetRoot : ContractId MCMSPoc
+    choice SetRoot : ContractId MCMS
       with
         submitter : Party                      -- Anyone can submit
         newRoot : BytesHex                     -- New merkle root hash
@@ -143,7 +143,7 @@ template MCMSPoc
     --   2. SetRoot stored the merkle root on-chain
     --   3. This function validates the merkle proof against the stored root
     --   4. operationData is part of the merkle leaf, so it's cryptographically bound
-    choice ExecuteOp : ContractId MCMSPoc
+    choice ExecuteOp : ContractId MCMS
       with
         submitter : Party                          -- Anyone can submit
         targetCid : ContractId MCMSReceiver        -- Caller provides current ContractId
@@ -209,7 +209,7 @@ template MCMSPoc
     --   2. SetRoot stored the merkle root on-chain
     --   3. This function validates the merkle proof against the stored root
     --   4. operationData is part of the merkle leaf, so it's cryptographically bound
-    choice ExecuteMcmsOp : ContractId MCMSPoc
+    choice ExecuteMcmsOp : ContractId MCMS
       with
         submitter : Party                          -- Anyone can submit
         op : Op                                    -- Operation details (params encoded in operationData)
@@ -294,12 +294,12 @@ template MCMSPoc
           expiringRoot.opCount < rootMetadata.postOpCount
 
     -- | Get current state
-    nonconsuming choice GetState : MCMSPocState
+    nonconsuming choice GetState : MCMSState
       with
         submitter : Party                      -- Anyone can query
       controller submitter
       do
-        pure MCMSPocState with
+        pure MCMSState with
           role
           opCount = expiringRoot.opCount
           postOpCount = rootMetadata.postOpCount
@@ -312,7 +312,7 @@ template MCMSPoc
 -- ===========================================================================
 
 -- | View of MCMS state
-data MCMSPocState = MCMSPocState
+data MCMSState = MCMSState
   with
     role : Role
     opCount : Int

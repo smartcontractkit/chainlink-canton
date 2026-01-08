@@ -15,7 +15,7 @@ import (
 )
 
 // ===========================================================================
-// TYPES (matching Canton MCMSPoc.Types)
+// TYPES (matching Canton MCMS.Types)
 // ===========================================================================
 
 // MCMSRole matches Canton Role type
@@ -653,7 +653,7 @@ type SetConfigParams struct {
 }
 
 // EncodeSetConfigParams encodes SetConfigParams to hex bytes
-// Format matches Canton MCMSPoc.Codec.encodeSetConfigParams
+// Format matches Canton MCMS.Codec.encodeSetConfigParams
 func EncodeSetConfigParams(params SetConfigParams) string {
 	var buf []byte
 
@@ -703,7 +703,7 @@ func EncodeSetConfigParams(params SetConfigParams) string {
 }
 
 // DecodeSetConfigParams decodes SetConfigParams from hex bytes
-// Format matches Canton MCMSPoc.Codec.decodeSetConfigParams
+// Format matches Canton MCMS.Codec.decodeSetConfigParams
 func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 	data, err := hex.DecodeString(hexData)
 	if err != nil {

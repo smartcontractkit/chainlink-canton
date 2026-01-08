@@ -1,9 +1,9 @@
-module MCMSPoc.GroupVotingTest where
+module MCMS.GroupVotingTest where
 
 import Daml.Script
-import MCMSPoc.Types
-import MCMSPoc.GroupVoting
-import MCMSPoc.TestHelpers
+import MCMS.Types
+import MCMS.GroupVoting
+import MCMS.TestHelpers
 
 -- | Test the group voting algorithm with simple 2-of-3 config
 testGroupVoting : Script ()

@@ -1,6 +1,6 @@
-module MCMSPoc.Counter where
+module MCMS.Counter where
 
-import MCMSPoc.MCMSReceiver
+import MCMS.MCMSReceiver
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT EVENT (Emitted when mcmsEntrypoint is called)
