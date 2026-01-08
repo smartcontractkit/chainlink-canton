@@ -56,12 +56,12 @@ type MCMSConfig struct {
 
 // MCMSOp matches Canton Op
 type MCMSOp struct {
-	ChainId       int
-	MultisigId    string
-	Nonce         int
-	TargetAddress string
-	FunctionName  string
-	OperationData string // hex encoded
+	ChainId          int
+	MultisigId       string
+	Nonce            int
+	TargetInstanceId string
+	FunctionName     string
+	OperationData    string // hex encoded
 }
 
 // MCMSRootMetadata matches Canton RootMetadata
@@ -196,7 +196,7 @@ func HashOpLeaf(op MCMSOp) string {
 	encoded := PadLeft32(IntToHex(op.ChainId)) +
 		AsciiToHex(op.MultisigId) +
 		PadLeft32(IntToHex(op.Nonce)) +
-		AsciiToHex(op.TargetAddress) +
+		AsciiToHex(op.TargetInstanceId) +
 		AsciiToHex(op.FunctionName) +
 		op.OperationData
 
@@ -462,12 +462,12 @@ func BuildRawSignatureValue(sig RawSignature) map[string]interface{} {
 // BuildOpValue creates Canton Value for Op
 func BuildOpValue(op MCMSOp) map[string]interface{} {
 	return map[string]interface{}{
-		"chainId":       op.ChainId,
-		"multisigId":    op.MultisigId,
-		"nonce":         op.Nonce,
-		"targetAddress": op.TargetAddress,
-		"functionName":  op.FunctionName,
-		"operationData": op.OperationData,
+		"chainId":          op.ChainId,
+		"multisigId":       op.MultisigId,
+		"nonce":            op.Nonce,
+		"targetInstanceId": op.TargetInstanceId,
+		"functionName":     op.FunctionName,
+		"operationData":    op.OperationData,
 	}
 }
 
@@ -512,14 +512,14 @@ func NewMCMSProposal(chainId int, multisigId string, preOpCount int, overridePre
 }
 
 // AddOperation adds an operation to the proposal
-func (p *MCMSProposal) AddOperation(targetAddress, functionName, operationData string) *MCMSProposal {
+func (p *MCMSProposal) AddOperation(targetInstanceId, functionName, operationData string) *MCMSProposal {
 	op := MCMSOp{
-		ChainId:       p.ChainId,
-		MultisigId:    p.MultisigId,
-		Nonce:         p.Metadata.PostOpCount,
-		TargetAddress: targetAddress,
-		FunctionName:  functionName,
-		OperationData: operationData,
+		ChainId:          p.ChainId,
+		MultisigId:       p.MultisigId,
+		Nonce:            p.Metadata.PostOpCount,
+		TargetInstanceId: targetInstanceId,
+		FunctionName:     functionName,
+		OperationData:    operationData,
 	}
 	p.Operations = append(p.Operations, op)
 	p.Metadata.PostOpCount++

@@ -72,7 +72,7 @@ data Op = Op
     chainId : Int              -- Target chain ID
     multisigId : Text          -- MCMS instance identifier
     nonce : Int                -- Must match current opCount (enforces order)
-    targetAddress : Text       -- Target contract identifier (environmentId)
+    targetInstanceId : Text    -- Target contract identifier (instanceId)
     functionName : Text        -- Function to call
     operationData : Text       -- Serialized parameters (hex)
   deriving (Show, Eq)
@@ -131,7 +131,7 @@ hashOpLeaf op =
   show op.chainId <> ":" <>
   op.multisigId <> ":" <>
   show op.nonce <> ":" <>
-  op.targetAddress <> ":" <>
+  op.targetInstanceId <> ":" <>
   op.functionName <> ":" <>
   op.operationData
 

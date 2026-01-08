@@ -3,6 +3,28 @@ module MCMSPoc.Counter where
 import MCMSPoc.MCMSReceiver
 
 -- ===========================================================================
+-- MCMS ENTRYPOINT EVENT (Emitted when mcmsEntrypoint is called)
+-- ===========================================================================
+
+-- | Event emitted when Counter receives an MCMS call
+-- This contract is created and immediately archived to emit an event
+-- that can be observed in transaction trees
+template MCMSEntrypointEvent
+  with
+    owner : Party
+    instanceId : Text
+    functionName : Text
+    operationData : Text
+    contractIdsAsText : [Text]  -- Contract IDs converted to Text via show
+  where
+    signatory owner
+
+    -- Immediately archive after creation to make it a pure event
+    choice Archive_MCMSEntrypointEvent : ()
+      controller owner
+      do pure ()
+
+-- ===========================================================================
 -- COUNTER CONTRACT (Implements MCMSReceiver)
 -- ===========================================================================
 
@@ -10,25 +32,49 @@ import MCMSPoc.MCMSReceiver
 -- Demonstrates the MCMSReceiver interface for direct MCMS calls
 --
 -- Key fields:
---   - environmentId: Stable identifier (e.g., "counter-prod-v1")
+--   - instanceId: Stable identifier (e.g., "counter-prod-v1")
 --     This doesn't change when contract state updates (unlike ContractId)
---   - MCMS validates: op.targetAddress == environmentId
+--   - MCMS validates: op.targetInstanceId == instanceId
 template Counter
   with
     owner : Party                              -- Same ccip_owner party as MCMS
-    environmentId : Text                       -- Stable identifier for MCMS targeting
+    instanceId : Text                          -- Stable identifier for MCMS targeting
     value : Int                                -- Current counter value
   where
     signatory owner
 
     -- Implement MCMSReceiver interface
     interface instance MCMSReceiver for Counter where
-      view = MCMSReceiverView with owner; environmentId
+      view = MCMSReceiverView with owner; instanceId
 
-      mcmsEntrypoint functionName operationData = do
+      mcmsEntrypoint functionName operationData contractIds = do
+        -- Emit event with contractIds as text (can be verified in transaction events)
+        let contractIdsAsText = map show contractIds
+        _ <- create MCMSEntrypointEvent with
+          owner
+          instanceId
+          functionName
+          operationData
+          contractIdsAsText
+        -- Note: Event contract is left active so it appears in flat transaction events
+        -- In production, could be archived later or use a different event pattern
+
+        -- Log contractIds to demonstrate they were received and can be coerced
+        -- Note: We can't fetch `self` during a consuming choice (it's already being consumed)
+        -- In real usage, contractIds would contain OTHER contracts to interact with
+        case contractIds of
+          [] -> debug "Counter: no contractIds passed"
+          cids -> do
+            -- Demonstrate coerceContractId works by casting each to ContractId Counter
+            -- In production, you'd cast to the appropriate type for each contract
+            let counterCids : [ContractId Counter] = map coerceContractId cids
+            debug $ "Counter: received " <> show (length counterCids) <> " contractIds (coerced to Counter type)"
+
+        -- Dispatch to the appropriate function
         case functionName of
           "increment" -> do
             -- Increment counter (operationData ignored)
+            debug $ "Counter: incrementing value from " <> show value <> " to " <> show (value + 1)
             newCid <- create this with value = value + 1
             pure (toInterfaceContractId @MCMSReceiver newCid)
 
@@ -58,13 +104,13 @@ template Counter
       controller viewer
       do pure value
 
-    -- | Get environment ID (non-consuming query)
+    -- | Get instance ID (non-consuming query)
     -- Anyone with contract visibility can query
-    nonconsuming choice GetEnvironmentIdChoice : Text
+    nonconsuming choice GetInstanceIdChoice : Text
       with
         viewer : Party
       controller viewer
-      do pure environmentId
+      do pure instanceId
 
 -- ===========================================================================
 -- HELPER FUNCTIONS

@@ -25,51 +25,54 @@ data ArgValue
 data MCMSReceiverView = MCMSReceiverView
   with
     owner : Party
-    environmentId : Text  -- Stable identifier that doesn't change when contract updates
+    instanceId : Text  -- Stable identifier that doesn't change when contract updates
   deriving (Show, Eq)
 
 -- | MCMSReceiver interface
 -- Target contracts implement this to receive direct calls from MCMS
--- 
+--
 -- Key design:
---   - environmentId: Stable identifier (e.g., "onramp-mainnet-v1")
---   - MCMS validates environmentId matches op.targetAddress in the Merkle proof
+--   - instanceId: Stable identifier (e.g., "onramp-mainnet-v1")
+--   - MCMS validates instanceId matches op.targetInstanceId in the Merkle proof
 --   - Delegation pattern: ccip_owner authority flows from MCMS to target
 interface MCMSReceiver where
   viewtype MCMSReceiverView
 
   -- | Entry point for MCMS to call with verified operation
   -- MCMS has already verified the Merkle proof and signatures
-  -- 
+  --
   -- Parameters:
   --   functionName: The function to call (e.g., "increment", "setConfig")
   --   operationData: Serialized parameters (hex) - contract decodes this
+  --   contractIds: Array of untyped contract IDs that the target may need to invoke
+  --                Receiving contract uses coerceContractId to cast to specific types
   --
   -- Returns: New contract ID after operation
-  mcmsEntrypoint : Text -> Text -> Update (ContractId MCMSReceiver)
+  mcmsEntrypoint : Text -> Text -> [ContractId ()] -> Update (ContractId MCMSReceiver)
 
-  -- | Non-consuming choice to get environment ID (for validation)
-  nonconsuming choice MCMSReceiver_GetEnvironmentId : Text
+  -- | Non-consuming choice to get instance ID (for validation)
+  nonconsuming choice MCMSReceiver_GetInstanceId : Text
     with
       c : Party  -- Controller (anyone can query)
     controller c
     do
       let v = view this
-      pure v.environmentId
+      pure v.instanceId
 
   -- | Choice for MCMS to call with verified operation
   -- Only ccip_owner can call this (MCMS has ccip_owner as signatory)
   -- The implementation dispatches based on functionName
   choice MCMSReceiver_Entrypoint : ContractId MCMSReceiver
     with
-      caller : Party       -- Must be ccip_owner (MCMS passes this through)
-      functionName : Text  -- Function to execute
-      operationData : Text -- Serialized parameters (hex)
+      caller : Party             -- Must be ccip_owner (MCMS passes this through)
+      functionName : Text        -- Function to execute
+      operationData : Text       -- Serialized parameters (hex)
+      contractIds : [ContractId ()]  -- Untyped contract IDs for target to use
     controller caller
-    do 
+    do
       -- Call the interface method implementation
       -- `mcmsEntrypoint` is the abstract method that implementations provide
-      (this `mcmsEntrypoint` functionName) operationData
+      ((this `mcmsEntrypoint` functionName) operationData) contractIds
 
 -- ===========================================================================
 -- HELPER FUNCTIONS

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
@@ -91,9 +92,9 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	chainId := int64(1)
 	baseMcmsId := "mcms-integration-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
-	environmentId := "counter-env-" + uuid.New().String()[:8] // Stable environment ID for Counter
+	instanceId := "counter-env-" + uuid.New().String()[:8] // Stable instance ID for Counter
 	t.Logf("MCMS ID: %s", mcmsId)
-	t.Logf("Counter Environment ID: %s", environmentId)
+	t.Logf("Counter Instance ID: %s", instanceId)
 
 	// ========================
 	// |   1. Create MCMS POC |
@@ -211,7 +212,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
-								{Label: "environmentId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: environmentId}}},
+								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceId}}},
 								{Label: "value", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 							}},
 						},
@@ -232,9 +233,9 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	t.Log("Building proposal...")
 
 	// Build proposal with one "increment" operation
-	// Note: targetAddress is the environmentId, not the contract ID
+	// Note: targetInstanceId is the instanceId, not the contract ID
 	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
-	proposal.AddOperation(environmentId, "increment", "")
+	proposal.AddOperation(instanceId, "increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -357,7 +358,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
 			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
 			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
-			{Label: "targetAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetAddress}}},
+			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
 			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
 			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
 		},
@@ -389,6 +390,9 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
+									{Label: "contractIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+										{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}, // Pass Counter CID to verify contractIds flow
+									}}}}},
 								},
 							}}},
 						},
@@ -400,22 +404,67 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Get counter value and contract ID from the created event
+	// Get counter value, contract ID, and MCMSEntrypointEvent from the created events
 	var counterValue int64 = -1
 	var newCounterCid string
+	var eventFound bool
+	var eventInstanceId string
+	var eventFunctionName string
+	var eventOperationData string
+	var eventContractIdsAsText []string
+
 	for _, event := range executeOpRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "Counter" {
-			newCounterCid = created.GetContractId()
-			for _, field := range created.GetCreateArguments().GetFields() {
-				if field.GetLabel() == "value" {
-					counterValue = field.GetValue().GetInt64()
-					break
+		if created := event.GetCreated(); created != nil {
+			entityName := created.GetTemplateId().GetEntityName()
+
+			// Check for Counter contract
+			if entityName == "Counter" {
+				newCounterCid = created.GetContractId()
+				for _, field := range created.GetCreateArguments().GetFields() {
+					if field.GetLabel() == "value" {
+						counterValue = field.GetValue().GetInt64()
+						break
+					}
+				}
+			}
+
+			// Check for MCMSEntrypointEvent (emitted by Counter.mcmsEntrypoint)
+			if entityName == "MCMSEntrypointEvent" {
+				eventFound = true
+				for _, field := range created.GetCreateArguments().GetFields() {
+					switch field.GetLabel() {
+					case "instanceId":
+						eventInstanceId = field.GetValue().GetText()
+					case "functionName":
+						eventFunctionName = field.GetValue().GetText()
+					case "operationData":
+						eventOperationData = field.GetValue().GetText()
+					case "contractIdsAsText":
+						if listValue := field.GetValue().GetList(); listValue != nil {
+							for _, elem := range listValue.GetElements() {
+								eventContractIdsAsText = append(eventContractIdsAsText, elem.GetText())
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 	t.Logf("ExecuteOp succeeded, counter value from event: %d", counterValue)
 	require.NotEmpty(t, newCounterCid, "Should have new counter contract ID")
+
+	// Verify MCMSEntrypointEvent was emitted with correct data
+	require.True(t, eventFound, "MCMSEntrypointEvent should be emitted by Counter.mcmsEntrypoint")
+	assert.Equal(t, instanceId, eventInstanceId, "Event instanceId should match Counter instanceId")
+	assert.Equal(t, "increment", eventFunctionName, "Event functionName should be 'increment'")
+	assert.Equal(t, "", eventOperationData, "Event operationData should be empty for increment")
+
+	// Verify contractIds were passed through the chain
+	require.Len(t, eventContractIdsAsText, 1, "Should have 1 contractId passed through")
+	t.Logf("MCMSEntrypointEvent verified: instanceId=%s, functionName=%s, contractIdsAsText=%v",
+		eventInstanceId, eventFunctionName, eventContractIdsAsText)
+	// Note: The show representation in Daml may wrap the CID, so we just check it's not empty
+	assert.NotEmpty(t, eventContractIdsAsText[0], "contractIdsAsText[0] should contain the serialized Counter CID")
 
 	// ========================
 	// |   7. Verify Counter  |
@@ -452,7 +501,7 @@ func TestMCMSPoc_ExecuteOpFlow(t *testing.T) {
 	t.Log("Summary:")
 	t.Log("  1. Created MCMS POC with 2-of-3 config")
 	t.Log("  2. Created Counter contract (implements MCMSReceiver)")
-	t.Log("  3. Built proposal with 'increment' operation targeting environmentId")
+	t.Log("  3. Built proposal with 'increment' operation targeting instanceId")
 	t.Log("  4. Signed with 2 signers (real ECDSA signatures)")
 	t.Log("  5. SetRoot with on-chain verification")
 	t.Log("  6. ExecuteOp - MCMS directly calls Counter.MCMSReceiver_Entrypoint")
@@ -998,7 +1047,7 @@ func TestMCMSPoc_GenerateDamlTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", proposal.Operations[0].ChainId)
 	t.Logf("  , multisigId = \"%s\"", proposal.Operations[0].MultisigId)
 	t.Logf("  , nonce = %d", proposal.Operations[0].Nonce)
-	t.Logf("  , targetAddress = \"%s\"", proposal.Operations[0].TargetAddress)
+	t.Logf("  , targetInstanceId = \"%s\"", proposal.Operations[0].TargetInstanceId)
 	t.Logf("  , functionName = \"%s\"", proposal.Operations[0].FunctionName)
 	t.Logf("  , operationData = \"%s\"", proposal.Operations[0].OperationData)
 	t.Log("  }")
@@ -1211,7 +1260,7 @@ func TestMCMSPoc_GenerateMcmsOpTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", op.ChainId)
 	t.Logf("  , multisigId = \"%s\"", op.MultisigId)
 	t.Logf("  , nonce = %d", op.Nonce)
-	t.Logf("  , targetAddress = \"%s\"", op.TargetAddress)
+	t.Logf("  , targetInstanceId = \"%s\"", op.TargetInstanceId)
 	t.Logf("  , functionName = \"%s\"", op.FunctionName)
 	t.Logf("  , operationData = \"%s\"", op.OperationData)
 	t.Log("  }")
@@ -1619,7 +1668,7 @@ func TestMCMSPoc_ExecuteMcmsOp(t *testing.T) {
 			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
 			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
 			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
-			{Label: "targetAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetAddress}}},
+			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
 			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
 			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
 		},

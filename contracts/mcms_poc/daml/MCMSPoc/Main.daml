@@ -2,13 +2,13 @@
 --
 -- ARCHITECTURE:
 --   MCMSPoc verifies signatures and merkle proofs, then calls target contracts directly.
---   Target contracts implement MCMSReceiver interface with stable environmentId.
+--   Target contracts implement MCMSReceiver interface with stable instanceId.
 --
 -- Direct Invocation Pattern:
 --   1. Anyone submits: proofs + signatures + targetCid
 --   2. MCMS validates proofs and signatures on-chain
---   3. MCMS calls target.getEnvironmentId() and verifies against op.targetAddress
---   4. MCMS calls target.mcmsEntrypoint(functionName, operationData)
+--   3. MCMS calls target.getInstanceId() and verifies against op.targetInstanceId
+--   4. MCMS calls target.mcmsEntrypoint(functionName, operationData, contractIds)
 --   5. ccip_owner authority flows through the call chain
 module MCMSPoc.Main where
 
@@ -19,7 +19,7 @@ import DA.Crypto.Text (BytesHex)
 import MCMSPoc.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), emptyConfig, emptyRootMetadata, emptyExpiringRoot, numGroups, maxNumSigners, zeroHash, roleToText)
 import MCMSPoc.GroupVoting
 import MCMSPoc.Crypto
-import MCMSPoc.MCMSReceiver (MCMSReceiver, MCMSReceiver_GetEnvironmentId(..), MCMSReceiver_Entrypoint(..))
+import MCMSPoc.MCMSReceiver (MCMSReceiver, MCMSReceiver_GetInstanceId(..), MCMSReceiver_Entrypoint(..))
 import MCMSPoc.Codec (decodeSetConfigParams, SetConfigParams(..))
 
 template MCMSPoc
@@ -135,8 +135,8 @@ template MCMSPoc
     -- | Execute an operation directly on a target contract
     -- This is the main execution flow:
     --   1. Validate merkle proof against the root set by SetRoot
-    --   2. Call target.getEnvironmentId() and verify it matches op.targetAddress
-    --   3. Call target.mcmsEntrypoint(functionName, operationData)
+    --   2. Call target.getInstanceId() and verify it matches op.targetInstanceId
+    --   3. Call target.mcmsEntrypoint(functionName, operationData, contractIds)
     --
     -- ANYONE CAN EXECUTE - Security comes from merkle proof verification:
     --   1. SetRoot already validated signatures from required signers
@@ -149,6 +149,7 @@ template MCMSPoc
         targetCid : ContractId MCMSReceiver        -- Caller provides current ContractId
         op : Op                                    -- Operation details
         opProof : [BytesHex]                       -- Merkle proof
+        contractIds : [ContractId ()]              -- Untyped contract IDs for target to use
       controller submitter
       do
         now <- getTime
@@ -174,16 +175,17 @@ template MCMSPoc
         assertMsg "E_INVALID_OP_MERKLE_PROOF" $
           verifyMerkleProof expiringRoot.root opLeaf opProof
 
-        -- 6. Verify target contract's environmentId matches op.targetAddress
-        targetEnvId <- exercise targetCid MCMSReceiver_GetEnvironmentId with c = owner
-        assertMsg ("E_WRONG_TARGET: expected " <> op.targetAddress <> " got " <> targetEnvId) $
-          targetEnvId == op.targetAddress
+        -- 6. Verify target contract's instanceId matches op.targetInstanceId
+        targetInstId <- exercise targetCid MCMSReceiver_GetInstanceId with c = owner
+        assertMsg ("E_WRONG_TARGET: expected " <> op.targetInstanceId <> " got " <> targetInstId) $
+          targetInstId == op.targetInstanceId
 
         -- 7. Call target's mcmsEntrypoint (MCMS is ccip_owner, authority passes through)
         _ <- exercise targetCid MCMSReceiver_Entrypoint with
           caller = owner
           functionName = op.functionName
           operationData = op.operationData
+          contractIds = contractIds
 
         -- 8. Increment opCount (operation executed)
         create this with
@@ -222,9 +224,9 @@ template MCMSPoc
         assertMsg ("E_WRONG_MULTISIG: op targets " <> op.multisigId) $
           op.multisigId == mcmsId
 
-        -- 2. Verify targetAddress is "self" or matches mcmsId
-        assertMsg ("E_NOT_SELF_DISPATCH: targetAddress must be 'self' or mcmsId") $
-          op.targetAddress == "self" || op.targetAddress == mcmsId
+        -- 2. Verify targetInstanceId is "self" or matches mcmsId
+        assertMsg ("E_NOT_SELF_DISPATCH: targetInstanceId must be 'self' or mcmsId") $
+          op.targetInstanceId == "self" || op.targetInstanceId == mcmsId
 
         -- 3. Check nonce matches current opCount
         assertMsg ("E_WRONG_NONCE: expected " <> show expiringRoot.opCount <> " got " <> show op.nonce) $

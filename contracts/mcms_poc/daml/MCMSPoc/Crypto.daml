@@ -131,7 +131,7 @@ hashOpLeafNative op =
     encoded = padLeft32 (intToHex op.chainId)
            <> asciiToHex op.multisigId
            <> padLeft32 (intToHex op.nonce)
-           <> asciiToHex op.targetAddress
+           <> asciiToHex op.targetInstanceId
            <> asciiToHex op.functionName
            <> op.operationData
   in
