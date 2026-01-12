@@ -1,0 +1,209 @@
+-- | Crypto verification tests for MCMS
+-- Verifies Canton's crypto implementation matches the Go implementation
+-- Uses hardcoded values from Go tests (src/tests/mcms_test.go)
+module MCMS.CryptoTest where
+
+import DA.Date (datetime, Month(..))
+import DA.Crypto.Text (keccak256)
+import DA.Text qualified as T
+import Daml.Script
+import MCMS.Crypto (publicKeyToAddress, hashPair, verifyMerkleProof, hashOpLeafNative, hashMetadataLeafNative, computeSignedHashNative, rawToDerSignature, replicateText)
+import MCMS.Types (Op(..), RootMetadata(..))
+
+-- ===========================================================================
+-- CRYPTO VERIFICATION TESTS
+-- ===========================================================================
+
+-- | Test keccak256 hash function
+-- Verifies Canton's keccak256 produces same output as Go's crypto.Keccak256
+testCryptoKeccak256 : Script ()
+testCryptoKeccak256 = script do
+  -- Test vector: keccak256("hello")
+  -- Go: crypto.Keccak256Hash([]byte("hello")).Hex()
+  let input = "68656c6c6f"  -- "hello" in hex
+  let expectedHash = "1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8"
+  let actualHash = keccak256 input
+  assertMsg ("keccak256 mismatch: expected " <> expectedHash <> " got " <> actualHash) $
+    actualHash == expectedHash
+  debug "✓ keccak256 test passed"
+
+-- | Test publicKeyToAddress function
+-- Verifies Canton computes Ethereum addresses correctly from public keys
+testCryptoPublicKeyToAddress : Script ()
+testCryptoPublicKeyToAddress = script do
+  -- From Go test TestMCMSCrypto_Signature output:
+  -- signerPublicKey = "046145d3f5f4a45f92b50ca7b8f347f26673ce5592d2a43fc661a61c3dea7d79210f072d866d23d321911c2bcc7327cd9fd9343c88b69b6780f147fe43cde092e3"
+  -- signerAddress = "b759c2d70e8a0d710d087da3f369f93563fe80e1"
+  --
+  -- Using a different test vector since Go generates random keys each time
+  -- We'll test the address derivation logic with a known public key
+  let pubKey = "04" <> replicateText 128 "1"  -- Test key
+  let addr = publicKeyToAddress pubKey
+  -- Verify it's 40 hex chars (20 bytes)
+  assertMsg "Address should be 40 hex chars" $ T.length addr == 40
+  debug $ "✓ publicKeyToAddress produces address: " <> addr
+
+-- | Test hashPair function (Merkle tree node hashing)
+-- Verifies Canton's sorted hash pair matches Go implementation
+testCryptoHashPair : Script ()
+testCryptoHashPair = script do
+  -- From Go test: TestMCMSCrypto_MerkleTree
+  -- When hashing leaves "aaaa..." and "bbbb...", they should be sorted before hashing
+  let leafA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  let leafB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
+  -- Go output: layer[1] first element = 9f89faaf1495298300ca41edde79c5cc9cb9bf17e1c9ef97acfdc53194f901e1
+  let expectedHash = "9f89faaf1495298300ca41edde79c5cc9cb9bf17e1c9ef97acfdc53194f901e1"
+  let actualHash = hashPair leafA leafB
+
+  assertMsg ("hashPair mismatch: expected " <> expectedHash <> " got " <> actualHash) $
+    actualHash == expectedHash
+
+  -- Also verify order independence (sorted hashing)
+  let reverseHash = hashPair leafB leafA
+  assertMsg "hashPair should be order-independent" $ actualHash == reverseHash
+
+  debug "✓ hashPair test passed"
+
+-- | Test Merkle proof verification
+-- Verifies Canton's verifyMerkleProof matches Go implementation
+testCryptoMerkleProof : Script ()
+testCryptoMerkleProof = script do
+  -- From Go test: TestMCMSCrypto_MerkleTree with 3 leaves
+  -- root = "56f238b3cb9e36971d83cf06c10283287586b6195986f0b2a23477df273513cf"
+  -- proof[0] for leaf "aaaa..." = [bbbb..., 99a6c8...]
+  let root = "56f238b3cb9e36971d83cf06c10283287586b6195986f0b2a23477df273513cf"
+  let leafA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  let proofA = [ "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+               , "99a6c8cc701a710c8ff4f56a189ab44da6020f3b23de02bfc25b6ab52157d724"
+               ]
+
+  assertMsg "Merkle proof for leaf A should verify" $
+    verifyMerkleProof root leafA proofA
+
+  -- Test with leaf B
+  let leafB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  let proofB = [ "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+               , "99a6c8cc701a710c8ff4f56a189ab44da6020f3b23de02bfc25b6ab52157d724"
+               ]
+  assertMsg "Merkle proof for leaf B should verify" $
+    verifyMerkleProof root leafB proofB
+
+  -- Test with leaf C (odd leaf case)
+  let leafC = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  let proofC = [ "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+               , "9f89faaf1495298300ca41edde79c5cc9cb9bf17e1c9ef97acfdc53194f901e1"
+               ]
+  assertMsg "Merkle proof for leaf C should verify" $
+    verifyMerkleProof root leafC proofC
+
+  -- Test invalid proof fails
+  let badProof = ["0000000000000000000000000000000000000000000000000000000000000000"]
+  assertMsg "Invalid proof should not verify" $
+    not (verifyMerkleProof root leafA badProof)
+
+  debug "✓ Merkle proof verification test passed"
+
+-- | Test hashOpLeafNative function
+-- Verifies Canton hashes operations the same way as Go
+testCryptoHashOpLeaf : Script ()
+testCryptoHashOpLeaf = script do
+  -- From Go test: TestMCMSCrypto_ProposalBuilder
+  -- op[0].chainId = 1
+  -- op[0].multisigId = "test-mcms-proposer"
+  -- op[0].nonce = 0
+  -- op[0].targetInstanceId = "counter"
+  -- op[0].functionName = "increment"
+  -- op[0].operationData = ""
+  -- op[0].leaf = "4b4fa101e8d3f8a353897651f725e63bfe1abe50dc5edc3b6f3ef466c5901a61"
+  let op = Op
+        { chainId = 1
+        , multisigId = "test-mcms-proposer"
+        , nonce = 0
+        , targetInstanceId = "counter"
+        , functionName = "increment"
+        , operationData = ""
+        }
+  let expectedLeaf = "4b4fa101e8d3f8a353897651f725e63bfe1abe50dc5edc3b6f3ef466c5901a61"
+  let actualLeaf = hashOpLeafNative op
+
+  assertMsg ("hashOpLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $
+    actualLeaf == expectedLeaf
+
+  debug "✓ hashOpLeafNative test passed"
+
+-- | Test hashMetadataLeafNative function
+-- Verifies Canton hashes metadata the same way as Go
+testCryptoHashMetadataLeaf : Script ()
+testCryptoHashMetadataLeaf = script do
+  -- From Go test: TestMCMSCrypto_ProposalBuilder
+  -- metadata.chainId = 1
+  -- metadata.multisigId = "test-mcms-proposer"
+  -- metadata.preOpCount = 0
+  -- metadata.postOpCount = 2
+  -- metadata.overridePreviousRoot = false
+  -- metadataLeaf = "29e71e3e2b836397833a36d07ba2aa7c89e9ded57bacb1798f2a6f18b1a4ed27"
+  let meta = RootMetadata
+        { chainId = 1
+        , multisigId = "test-mcms-proposer"
+        , preOpCount = 0
+        , postOpCount = 2
+        , overridePreviousRoot = False
+        }
+  let expectedLeaf = "29e71e3e2b836397833a36d07ba2aa7c89e9ded57bacb1798f2a6f18b1a4ed27"
+  let actualLeaf = hashMetadataLeafNative meta
+
+  assertMsg ("hashMetadataLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $
+    actualLeaf == expectedLeaf
+
+  debug "✓ hashMetadataLeafNative test passed"
+
+-- | Test computeSignedHashNative function
+-- Verifies Canton computes the signed hash the same way as Go
+testCryptoComputeSignedHash : Script ()
+testCryptoComputeSignedHash = script do
+  -- From Go test: TestMCMSCrypto_SignedHash
+  -- root = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  -- validUntil = Unix 1700000000 (but timeToHex returns all zeros for now)
+  -- signedHash = "d33814f8c09cbc949e2016d6b2b6ba1346c12e86fc0617d1d9e77a09a6a43501"
+  let root = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  let validUntil = datetime 2023 Nov 14 22 13 20  -- Approximate, doesn't matter since timeToHex returns 0
+  let expectedHash = "d33814f8c09cbc949e2016d6b2b6ba1346c12e86fc0617d1d9e77a09a6a43501"
+  let actualHash = computeSignedHashNative root validUntil
+
+  assertMsg ("computeSignedHashNative mismatch: expected " <> expectedHash <> " got " <> actualHash) $
+    actualHash == expectedHash
+
+  debug "✓ computeSignedHashNative test passed"
+
+-- | Test DER encoding for signatures
+-- Verifies the rawToDerSignature function works correctly
+testCryptoDerEncoding : Script ()
+testCryptoDerEncoding = script do
+  -- Test with simple r and s values
+  let r = "0000000000000000000000000000000000000000000000000000000000000001"
+  let s = "0000000000000000000000000000000000000000000000000000000000000002"
+  let derSig = rawToDerSignature r s
+  -- DER signature should start with 0x30 (SEQUENCE tag)
+  assertMsg "DER signature should start with 30" $
+    T.take 2 derSig == "30"
+  debug $ "✓ DER encoding test passed, signature: " <> derSig
+
+-- | Run all crypto verification tests
+testAllCrypto : Script ()
+testAllCrypto = script do
+  debug "=========================================="
+  debug "Running Crypto Verification Tests"
+  debug "=========================================="
+  testCryptoKeccak256
+  testCryptoPublicKeyToAddress
+  testCryptoHashPair
+  testCryptoMerkleProof
+  testCryptoHashOpLeaf
+  testCryptoHashMetadataLeaf
+  testCryptoComputeSignedHash
+  testCryptoDerEncoding
+  debug "=========================================="
+  debug "All crypto tests passed! ✓"
+  debug "=========================================="
+

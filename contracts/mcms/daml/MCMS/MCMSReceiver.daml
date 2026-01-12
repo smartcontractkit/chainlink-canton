@@ -1,0 +1,111 @@
+-- | MCMSReceiver Interface for MCMS
+-- Target contracts implement this interface to receive calls from MCMS
+module MCMS.MCMSReceiver where
+
+import DA.Map qualified as Map
+
+-- ===========================================================================
+-- ARGUMENT VALUE TYPE
+-- ===========================================================================
+
+-- | Argument value sum type for passing different value types
+data ArgValue
+  = AV_Text Text
+  | AV_Int Int
+  | AV_Bool Bool
+  | AV_Party Party
+  | AV_Time Time
+  deriving (Show, Eq)
+
+-- ===========================================================================
+-- MCMS RECEIVER INTERFACE
+-- ===========================================================================
+
+-- | View for MCMSReceiver interface
+data MCMSReceiverView = MCMSReceiverView
+  with
+    owner : Party
+    instanceId : Text  -- Stable identifier that doesn't change when contract updates
+  deriving (Show, Eq)
+
+-- | MCMSReceiver interface
+-- Target contracts implement this to receive direct calls from MCMS
+--
+-- Key design:
+--   - instanceId: Stable identifier (e.g., "onramp-mainnet-v1")
+--   - MCMS validates instanceId matches op.targetInstanceId in the Merkle proof
+--   - Delegation pattern: ccip_owner authority flows from MCMS to target
+interface MCMSReceiver where
+  viewtype MCMSReceiverView
+
+  -- | Entry point for MCMS to call with verified operation
+  -- MCMS has already verified the Merkle proof and signatures
+  --
+  -- Parameters:
+  --   functionName: The function to call (e.g., "increment", "setConfig")
+  --   operationData: Serialized parameters (hex) - contract decodes this
+  --   contractIds: Array of untyped contract IDs that the target may need to invoke
+  --                Receiving contract uses coerceContractId to cast to specific types
+  --
+  -- Returns: New contract ID after operation
+  mcmsEntrypoint : Text -> Text -> [ContractId ()] -> Update (ContractId MCMSReceiver)
+
+  -- | Non-consuming choice to get instance ID (for validation)
+  nonconsuming choice MCMSReceiver_GetInstanceId : Text
+    with
+      c : Party  -- Controller (anyone can query)
+    controller c
+    do
+      let v = view this
+      pure v.instanceId
+
+  -- | Choice for MCMS to call with verified operation
+  -- Only ccip_owner can call this (MCMS has ccip_owner as signatory)
+  -- The implementation dispatches based on functionName
+  choice MCMSReceiver_Entrypoint : ContractId MCMSReceiver
+    with
+      caller : Party             -- Must be ccip_owner (MCMS passes this through)
+      functionName : Text        -- Function to execute
+      operationData : Text       -- Serialized parameters (hex)
+      contractIds : [ContractId ()]  -- Untyped contract IDs for target to use
+    controller caller
+    do
+      -- Call the interface method implementation
+      -- `mcmsEntrypoint` is the abstract method that implementations provide
+      ((this `mcmsEntrypoint` functionName) operationData) contractIds
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Parse Int from hex string (simple implementation)
+parseIntFromHex : Text -> Optional Int
+parseIntFromHex _ =
+  -- For POC, we use a simple approach: assume it's already a decimal string
+  -- In production, this would properly decode hex
+  None  -- TODO: implement proper hex parsing
+
+-- | Decode operation data for simple functions
+-- Format: "key1=value1;key2=value2"
+decodeOperationData : Text -> Map.Map Text Text
+decodeOperationData "" = Map.empty
+decodeOperationData _ =
+  -- Simple key=value parsing for POC
+  -- In production, this would use proper ABI decoding
+  Map.empty  -- Placeholder - implement proper parsing as needed
+
+-- | Extract a text value from decoded data
+getTextValue : Map.Map Text Text -> Text -> Update Text
+getTextValue m key =
+  case Map.lookup key m of
+    Some v -> pure v
+    None -> abort $ "Missing key: " <> key
+
+-- | Extract an int value from decoded data
+getIntValue : Map.Map Text Text -> Text -> Update Int
+getIntValue m key =
+  case Map.lookup key m of
+    Some v -> case parseIntFromHex v of
+      Some i -> pure i
+      None -> abort $ "Invalid int for key: " <> key
+    None -> abort $ "Missing key: " <> key

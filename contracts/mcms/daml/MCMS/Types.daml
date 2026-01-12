@@ -1,0 +1,168 @@
+module MCMS.Types where
+
+import DA.Time (time)
+import DA.Date (date, Month(..))
+
+-- ===========================================================================
+-- ROLES
+-- ===========================================================================
+
+-- | MCMS Roles (matches EVM/Aptos architecture)
+-- Each role has its own signer config and merkle root
+-- - Proposer: Can propose and execute operations
+data Role = Proposer
+  deriving (Show, Eq, Ord)
+
+-- | Convert role to text for identifiers
+roleToText : Role -> Text
+roleToText Proposer = "proposer"
+
+-- ===========================================================================
+-- CONSTANTS
+-- ===========================================================================
+
+-- | Number of signer groups (same as Solidity)
+numGroups : Int
+numGroups = 32
+
+-- | Maximum signers per role
+maxNumSigners : Int
+maxNumSigners = 200
+
+-- | Zero hash for empty values
+zeroHash : Text
+zeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+-- ===========================================================================
+-- SIGNER CONFIGURATION
+-- ===========================================================================
+
+-- | Information about a single signer
+data SignerInfo = SignerInfo
+  with
+    signerAddress : Text    -- EVM address (40 hex chars, lowercase)
+    signerIndex : Int       -- Position in signers list (0-indexed)
+    signerGroup : Int       -- Group assignment (0-31)
+  deriving (Show, Eq, Ord)
+
+-- | Multisig configuration
+-- Defines the signer set and hierarchical group structure
+data MultisigConfig = MultisigConfig
+  with
+    signers : [SignerInfo]       -- All signers (max 200)
+    groupQuorums : [Int]         -- Length 32, quorum per group (0 = disabled)
+    groupParents : [Int]         -- Length 32, parent group index (tree structure)
+  deriving (Show, Eq)
+
+-- | Empty configuration
+emptyConfig : MultisigConfig
+emptyConfig = MultisigConfig
+  { signers = []
+  , groupQuorums = replicate numGroups 0
+  , groupParents = replicate numGroups 0
+  }
+
+-- ===========================================================================
+-- OPERATIONS
+-- ===========================================================================
+
+-- | A single operation to execute
+data Op = Op
+  with
+    chainId : Int              -- Target chain ID
+    multisigId : Text          -- MCMS instance identifier
+    nonce : Int                -- Must match current opCount (enforces order)
+    targetInstanceId : Text    -- Target contract identifier (instanceId)
+    functionName : Text        -- Function to call
+    operationData : Text       -- Serialized parameters (hex)
+  deriving (Show, Eq)
+
+-- | Metadata about a merkle root
+data RootMetadata = RootMetadata
+  with
+    chainId : Int              -- Target chain ID
+    multisigId : Text          -- MCMS instance identifier
+    preOpCount : Int           -- Operations already executed
+    postOpCount : Int          -- Total operations after this root
+    overridePreviousRoot : Bool -- Allow override if ops pending
+  deriving (Show, Eq)
+
+-- | Empty metadata
+emptyRootMetadata : RootMetadata
+emptyRootMetadata = RootMetadata
+  { chainId = 0
+  , multisigId = ""
+  , preOpCount = 0
+  , postOpCount = 0
+  , overridePreviousRoot = False
+  }
+
+-- ===========================================================================
+-- ROOT STATE
+-- ===========================================================================
+
+-- | Current merkle root with expiration
+data ExpiringRoot = ExpiringRoot
+  with
+    root : Text                -- Merkle root hash (64 hex chars)
+    validUntil : Time          -- Expiration time
+    opCount : Int              -- Current operation counter
+  deriving (Show, Eq)
+
+-- | Empty root state
+emptyExpiringRoot : ExpiringRoot
+emptyExpiringRoot = ExpiringRoot
+  { root = ""
+  , validUntil = epoch
+  , opCount = 0
+  }
+  where
+    epoch = time (date 1970 Jan 1) 0 0 0
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Compute a placeholder leaf hash for an operation
+-- In production, this would be keccak256 - here we use concatenation
+hashOpLeaf : Op -> Text
+hashOpLeaf op =
+  "op:" <>
+  show op.chainId <> ":" <>
+  op.multisigId <> ":" <>
+  show op.nonce <> ":" <>
+  op.targetInstanceId <> ":" <>
+  op.functionName <> ":" <>
+  op.operationData
+
+-- | Compute a placeholder leaf hash for metadata
+hashMetadataLeaf : RootMetadata -> Text
+hashMetadataLeaf meta =
+  "meta:" <>
+  show meta.chainId <> ":" <>
+  meta.multisigId <> ":" <>
+  show meta.preOpCount <> ":" <>
+  show meta.postOpCount <> ":" <>
+  show meta.overridePreviousRoot
+
+-- | Compute signed hash (root || validUntil)
+-- In production: keccak256 with Ethereum signed message prefix
+computeSignedHash : Text -> Time -> Text
+computeSignedHash root validUntil =
+  "signed:" <> root <> ":" <> show validUntil
+
+-- ===========================================================================
+-- ADMIN PARAMETERS (for self-dispatch)
+-- ===========================================================================
+
+-- | Parameters for admin operations (self-dispatch)
+-- Each variant corresponds to an admin function
+data AdminParams
+  = AP_SetConfig
+      { apSigners : [SignerInfo]       -- New signers list
+      , apGroupQuorums : [Int]         -- New group quorums
+      , apGroupParents : [Int]         -- New group parents
+      , apClearRoot : Bool             -- Whether to clear the root
+      }
+  | AP_ClearRoot                       -- No parameters needed
+  deriving (Show, Eq)
