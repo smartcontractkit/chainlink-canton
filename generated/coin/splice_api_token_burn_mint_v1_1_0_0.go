@@ -61,7 +61,7 @@ func (t *BurnMintFactoryView) UnmarshalJSON(data []byte) error {
 type BurnMintFactoryBurnMint struct {
 	ExpectedAdmin    PARTY            `json:"expectedAdmin"`
 	InstrumentId     InstrumentId     `json:"instrumentId"`
-	InputHoldingCids []string         `json:"inputHoldingCids"`
+	InputHoldingCids []CONTRACT_ID    `json:"inputHoldingCids"`
 	Outputs          []BurnMintOutput `json:"outputs"`
 	ExtraActors      []PARTY          `json:"extraActors"`
 	ExtraArgs        ExtraArgs        `json:"extraArgs"`
@@ -94,7 +94,7 @@ func (t *BurnMintFactoryBurnMint) UnmarshalJSON(data []byte) error {
 
 // BurnMintFactoryBurnMintResult is a Record type
 type BurnMintFactoryBurnMintResult struct {
-	OutputCids []string `json:"outputCids"`
+	OutputCids []CONTRACT_ID `json:"outputCids"`
 }
 
 // toMap converts BurnMintFactoryBurnMintResult to a map for DAML arguments
@@ -175,9 +175,9 @@ func (t *BurnMintOutput) UnmarshalJSON(data []byte) error {
 
 // IBurnMintFactoryInterfaceID returns the interface ID for the IBurnMintFactory interface
 func IBurnMintFactoryInterfaceID(packageID *string) string {
-	pkgName := packageName
+	pkgID := PackageID
 	if packageID != nil {
-		pkgName = *packageID
+		pkgID = *packageID
 	}
-	return fmt.Sprintf("#%s:%s:%s", pkgName, "BurnMintV1", "BurnMintFactory")
+	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
 }

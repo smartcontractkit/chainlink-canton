@@ -117,9 +117,9 @@ func (t *Lock) UnmarshalJSON(data []byte) error {
 
 // IHoldingInterfaceID returns the interface ID for the IHolding interface
 func IHoldingInterfaceID(packageID *string) string {
-	pkgName := packageName
+	pkgID := PackageID
 	if packageID != nil {
-		pkgName = *packageID
+		pkgID = *packageID
 	}
-	return fmt.Sprintf("#%s:%s:%s", pkgName, "HoldingV1", "Holding")
+	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.HoldingV1", "Holding")
 }

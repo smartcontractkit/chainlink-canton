@@ -47,17 +47,17 @@ func (t *AnyContractView) UnmarshalJSON(data []byte) error {
 
 // AnyValue is a variant/union type
 type AnyValue struct {
-	AVText       *TEXT       `json:"AV_Text,omitempty"`
-	AVInt        *INT64      `json:"AV_Int,omitempty"`
-	AVDecimal    *NUMERIC    `json:"AV_Decimal,omitempty"`
-	AVBool       *BOOL       `json:"AV_Bool,omitempty"`
-	AVDate       *DATE       `json:"AV_Date,omitempty"`
-	AVTime       *TIMESTAMP  `json:"AV_Time,omitempty"`
-	AVRelTime    *RELTIME    `json:"AV_RelTime,omitempty"`
-	AVParty      *PARTY      `json:"AV_Party,omitempty"`
-	AVContractId *string     `json:"AV_ContractId,omitempty"`
-	AVList       *[]AnyValue `json:"AV_List,omitempty"`
-	AVMap        *MAP        `json:"AV_Map,omitempty"`
+	AVText       *TEXT        `json:"AV_Text,omitempty"`
+	AVInt        *INT64       `json:"AV_Int,omitempty"`
+	AVDecimal    *NUMERIC     `json:"AV_Decimal,omitempty"`
+	AVBool       *BOOL        `json:"AV_Bool,omitempty"`
+	AVDate       *DATE        `json:"AV_Date,omitempty"`
+	AVTime       *TIMESTAMP   `json:"AV_Time,omitempty"`
+	AVRelTime    *RELTIME     `json:"AV_RelTime,omitempty"`
+	AVParty      *PARTY       `json:"AV_Party,omitempty"`
+	AVContractId *CONTRACT_ID `json:"AV_ContractId,omitempty"`
+	AVList       *[]AnyValue  `json:"AV_List,omitempty"`
+	AVMap        *TEXTMAP     `json:"AV_Map,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for AnyValue
@@ -177,7 +177,7 @@ var _ VARIANT = (*AnyValue)(nil)
 
 // ChoiceContext is a Record type
 type ChoiceContext struct {
-	Values MAP `json:"values"`
+	Values TEXTMAP `json:"values"`
 }
 
 // toMap converts ChoiceContext to a map for DAML arguments
@@ -254,7 +254,7 @@ func (t *ExtraArgs) UnmarshalJSON(data []byte) error {
 
 // Metadata is a Record type
 type Metadata struct {
-	Values MAP `json:"values"`
+	Values TEXTMAP `json:"values"`
 }
 
 // toMap converts Metadata to a map for DAML arguments
@@ -279,9 +279,9 @@ func (t *Metadata) UnmarshalJSON(data []byte) error {
 
 // IAnyContractInterfaceID returns the interface ID for the IAnyContract interface
 func IAnyContractInterfaceID(packageID *string) string {
-	pkgName := packageName
+	pkgID := PackageID
 	if packageID != nil {
-		pkgName = *packageID
+		pkgID = *packageID
 	}
-	return fmt.Sprintf("#%s:%s:%s", pkgName, "MetadataV1", "AnyContract")
+	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.MetadataV1", "AnyContract")
 }

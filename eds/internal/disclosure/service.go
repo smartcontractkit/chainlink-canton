@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
 	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/ledger"

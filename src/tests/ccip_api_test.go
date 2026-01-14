@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 )
 
 func getDisclosedContract(ctx context.Context, participant *Participant, party string, templateId *apiv2.Identifier) (*apiv2.DisclosedContract, error) {

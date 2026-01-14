@@ -10,15 +10,16 @@
 package interactive
 
 import (
-	v2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	v1 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/interactive/transaction/v1"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
+
+	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	v1 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive/transaction/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
 )
 
 const (

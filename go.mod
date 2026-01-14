@@ -3,6 +3,7 @@ module github.com/smartcontractkit/chainlink-canton-internal
 go 1.25.3
 
 require (
+	github.com/digital-asset/dazl-client/v8 v8.7.1
 	github.com/ethereum/go-ethereum v1.16.7
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
@@ -15,7 +16,15 @@ require (
 	google.golang.org/protobuf v1.36.10
 )
 
+require (
+	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/rs/zerolog v1.34.0 // indirect
+)
+
 replace github.com/noders-team/go-daml => ../go-daml
+
+replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
 require (
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect

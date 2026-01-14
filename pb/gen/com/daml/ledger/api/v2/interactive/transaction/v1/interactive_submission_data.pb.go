@@ -10,12 +10,13 @@
 package transactionv1
 
 import (
-	v2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
+
+	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -590,7 +591,7 @@ const file_com_daml_ledger_api_v2_interactive_transaction_v1_interactive_submiss
 	"\bexercise\x18\x03 \x01(\v2;.com.daml.ledger.api.v2.interactive.transaction.v1.ExerciseH\x00R\bexercise\x12Y\n" +
 	"\brollback\x18\x04 \x01(\v2;.com.daml.ledger.api.v2.interactive.transaction.v1.RollbackH\x00R\brollbackB\v\n" +
 	"\tnode_typeB\xc4\x03\n" +
-	"5com.com.daml.ledger.api.v2.interactive.transaction.v1B\x1eInteractiveSubmissionDataProtoP\x01Z|github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/interactive/transaction/v1;transactionv1\xa2\x02\aCDLAVIT\xaa\x021Com.Daml.Ledger.Api.V2.Interactive.Transaction.V1\xca\x021Com\\Daml\\Ledger\\Api\\V2\\Interactive\\Transaction\\V1\xe2\x02=Com\\Daml\\Ledger\\Api\\V2\\Interactive\\Transaction\\V1\\GPBMetadata\xea\x028Com::Daml::Ledger::Api::V2::Interactive::Transaction::V1b\x06proto3"
+	"5com.com.daml.ledger.api.v2.interactive.transaction.v1B\x1eInteractiveSubmissionDataProtoP\x01Z|github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive/transaction/v1;transactionv1\xa2\x02\aCDLAVIT\xaa\x021Com.Daml.Ledger.Api.V2.Interactive.Transaction.V1\xca\x021Com\\Daml\\Ledger\\Api\\V2\\Interactive\\Transaction\\V1\xe2\x02=Com\\Daml\\Ledger\\Api\\V2\\Interactive\\Transaction\\V1\\GPBMetadata\xea\x028Com::Daml::Ledger::Api::V2::Interactive::Transaction::V1b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_interactive_transaction_v1_interactive_submission_data_proto_rawDescOnce sync.Once

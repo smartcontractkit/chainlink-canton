@@ -17,9 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
+const PackageID = "3fd403d741c2ea5312ac0f94ef5461ea209f0a933a96322618dd477a3510e442"
 const SDKVersion = "3.4.8"
-
-const packageName = "coin-0.0.1"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -57,7 +56,7 @@ type CoinHolding struct {
 
 // GetTemplateID returns the template ID for this template
 func (t CoinHolding) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Holding", "CoinHolding")
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Holding", "CoinHolding")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -91,7 +90,7 @@ func (t *CoinHolding) UnmarshalJSON(data []byte) error {
 // Transfer exercises the Transfer choice on this CoinHolding contract
 func (t CoinHolding) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Holding", "CoinHolding"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Holding", "CoinHolding"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -101,7 +100,7 @@ func (t CoinHolding) Transfer(contractID string, args Transfer) *model.ExerciseC
 // Archive exercises the Archive choice on this CoinHolding contract
 func (t CoinHolding) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Holding", "CoinHolding"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Holding", "CoinHolding"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -121,7 +120,7 @@ type CoinRegistry struct {
 
 // GetTemplateID returns the template ID for this template
 func (t CoinRegistry) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "CoinRegistry")
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "CoinRegistry")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -157,7 +156,7 @@ func (t *CoinRegistry) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this CoinRegistry contract
 func (t CoinRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "CoinRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "CoinRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -167,7 +166,7 @@ func (t CoinRegistry) Archive(contractID string) *model.ExerciseCommand {
 // TransferFactoryTransfer exercises the TransferFactory_Transfer choice on this CoinRegistry contract via the ITransferFactory interface
 func (t CoinRegistry) TransferFactoryTransfer(contractID string, args TransferFactoryTransfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "TransferFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "TransferFactory"),
 		ContractID: contractID,
 		Choice:     "TransferFactory_Transfer",
 		Arguments:  argsToMap(args),
@@ -177,7 +176,7 @@ func (t CoinRegistry) TransferFactoryTransfer(contractID string, args TransferFa
 // TransferFactoryPublicFetch exercises the TransferFactory_PublicFetch choice on this CoinRegistry contract via the ITransferFactory interface
 func (t CoinRegistry) TransferFactoryPublicFetch(contractID string, args TransferFactoryPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "TransferFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "TransferFactory"),
 		ContractID: contractID,
 		Choice:     "TransferFactory_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -187,7 +186,7 @@ func (t CoinRegistry) TransferFactoryPublicFetch(contractID string, args Transfe
 // BurnMintFactoryPublicFetch exercises the BurnMintFactory_PublicFetch choice on this CoinRegistry contract via the IBurnMintFactory interface
 func (t CoinRegistry) BurnMintFactoryPublicFetch(contractID string, args BurnMintFactoryPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "BurnMintFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "BurnMintFactory"),
 		ContractID: contractID,
 		Choice:     "BurnMintFactory_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -197,7 +196,7 @@ func (t CoinRegistry) BurnMintFactoryPublicFetch(contractID string, args BurnMin
 // BurnMintFactoryBurnMint exercises the BurnMintFactory_BurnMint choice on this CoinRegistry contract via the IBurnMintFactory interface
 func (t CoinRegistry) BurnMintFactoryBurnMint(contractID string, args BurnMintFactoryBurnMint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "BurnMintFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "BurnMintFactory"),
 		ContractID: contractID,
 		Choice:     "BurnMintFactory_BurnMint",
 		Arguments:  argsToMap(args),
@@ -220,7 +219,7 @@ type CoinTransferInstruction struct {
 
 // GetTemplateID returns the template ID for this template
 func (t CoinTransferInstruction) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Transfer", "CoinTransferInstruction")
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "CoinTransferInstruction")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -258,7 +257,7 @@ func (t *CoinTransferInstruction) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this CoinTransferInstruction contract
 func (t CoinTransferInstruction) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Transfer", "CoinTransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "CoinTransferInstruction"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -268,7 +267,7 @@ func (t CoinTransferInstruction) Archive(contractID string) *model.ExerciseComma
 // TransferInstructionAccept exercises the TransferInstruction_Accept choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 func (t CoinTransferInstruction) TransferInstructionAccept(contractID string, args TransferInstructionAccept) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Transfer", "TransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "TransferInstruction_Accept",
 		Arguments:  argsToMap(args),
@@ -278,7 +277,7 @@ func (t CoinTransferInstruction) TransferInstructionAccept(contractID string, ar
 // TransferInstructionReject exercises the TransferInstruction_Reject choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 func (t CoinTransferInstruction) TransferInstructionReject(contractID string, args TransferInstructionReject) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Transfer", "TransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "TransferInstruction_Reject",
 		Arguments:  argsToMap(args),
@@ -288,7 +287,7 @@ func (t CoinTransferInstruction) TransferInstructionReject(contractID string, ar
 // TransferInstructionWithdraw exercises the TransferInstruction_Withdraw choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 func (t CoinTransferInstruction) TransferInstructionWithdraw(contractID string, args TransferInstructionWithdraw) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Transfer", "TransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "TransferInstruction_Withdraw",
 		Arguments:  argsToMap(args),
@@ -298,7 +297,7 @@ func (t CoinTransferInstruction) TransferInstructionWithdraw(contractID string, 
 // TransferInstructionUpdate exercises the TransferInstruction_Update choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 func (t CoinTransferInstruction) TransferInstructionUpdate(contractID string, args TransferInstructionUpdate) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Transfer", "TransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "TransferInstruction_Update",
 		Arguments:  argsToMap(args),
@@ -317,7 +316,7 @@ type MintPreapproval struct {
 
 // GetTemplateID returns the template ID for this template
 func (t MintPreapproval) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "MintPreapproval")
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "MintPreapproval")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -351,7 +350,7 @@ func (t *MintPreapproval) UnmarshalJSON(data []byte) error {
 // MintPreapprovalMint exercises the MintPreapproval_Mint choice on this MintPreapproval contract
 func (t MintPreapproval) MintPreapprovalMint(contractID string, args MintPreapprovalMint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "MintPreapproval"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "MintPreapproval"),
 		ContractID: contractID,
 		Choice:     "MintPreapproval_Mint",
 		Arguments:  argsToMap(args),
@@ -361,7 +360,7 @@ func (t MintPreapproval) MintPreapprovalMint(contractID string, args MintPreappr
 // Archive exercises the Archive choice on this MintPreapproval contract
 func (t MintPreapproval) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "MintPreapproval"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "MintPreapproval"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -404,7 +403,7 @@ type MintRole struct {
 
 // GetTemplateID returns the template ID for this template
 func (t MintRole) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "MintRole")
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "MintRole")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -440,7 +439,7 @@ func (t *MintRole) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this MintRole contract
 func (t MintRole) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "MintRole"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "MintRole"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -450,7 +449,7 @@ func (t MintRole) Archive(contractID string) *model.ExerciseCommand {
 // MintRoleMint exercises the MintRole_Mint choice on this MintRole contract
 func (t MintRole) MintRoleMint(contractID string, args MintRoleMint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Registry", "MintRole"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "MintRole"),
 		ContractID: contractID,
 		Choice:     "MintRole_Mint",
 		Arguments:  argsToMap(args),

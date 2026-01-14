@@ -51,14 +51,14 @@ type ITransferInstruction interface {
 
 // Transfer2 is a Record type
 type Transfer2 struct {
-	Sender           PARTY        `json:"sender"`
-	Receiver         PARTY        `json:"receiver"`
-	Amount           NUMERIC      `json:"amount"`
-	InstrumentId     InstrumentId `json:"instrumentId"`
-	RequestedAt      TIMESTAMP    `json:"requestedAt"`
-	ExecuteBefore    TIMESTAMP    `json:"executeBefore"`
-	InputHoldingCids []string     `json:"inputHoldingCids"`
-	Meta             Metadata     `json:"meta"`
+	Sender           PARTY         `json:"sender"`
+	Receiver         PARTY         `json:"receiver"`
+	Amount           NUMERIC       `json:"amount"`
+	InstrumentId     InstrumentId  `json:"instrumentId"`
+	RequestedAt      TIMESTAMP     `json:"requestedAt"`
+	ExecuteBefore    TIMESTAMP     `json:"executeBefore"`
+	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
+	Meta             Metadata      `json:"meta"`
 }
 
 // toMap converts Transfer2 to a map for DAML arguments
@@ -174,7 +174,7 @@ func (t *TransferFactoryTransfer) UnmarshalJSON(data []byte) error {
 // TransferInstructionResult is a Record type
 type TransferInstructionResult struct {
 	Output           TransferInstructionResultOutput `json:"output"`
-	SenderChangeCids []string                        `json:"senderChangeCids"`
+	SenderChangeCids []CONTRACT_ID                   `json:"senderChangeCids"`
 	Meta             Metadata                        `json:"meta"`
 }
 
@@ -202,7 +202,7 @@ func (t *TransferInstructionResult) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionResultCompleted is a Record type
 type TransferInstructionResultCompleted struct {
-	ReceiverHoldingCids []string `json:"receiverHoldingCids"`
+	ReceiverHoldingCids []CONTRACT_ID `json:"receiverHoldingCids"`
 }
 
 // toMap converts TransferInstructionResultCompleted to a map for DAML arguments
@@ -285,14 +285,14 @@ var _ VARIANT = (*TransferInstructionResultOutput)(nil)
 
 // TransferInstructionResultPending is a Record type
 type TransferInstructionResultPending struct {
-	TransferInstructionCid string `json:"transferInstructionCid"`
+	TransferInstructionCid CONTRACT_ID `json:"transferInstructionCid"`
 }
 
 // toMap converts TransferInstructionResultPending to a map for DAML arguments
 func (t TransferInstructionResultPending) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"transferInstructionCid": string(t.TransferInstructionCid),
+		"transferInstructionCid": t.TransferInstructionCid,
 	}
 }
 
@@ -359,7 +359,7 @@ var _ VARIANT = (*TransferInstructionStatus)(nil)
 
 // TransferInstructionView is a Record type
 type TransferInstructionView struct {
-	OriginalInstructionCid *string                   `json:"originalInstructionCid"`
+	OriginalInstructionCid *CONTRACT_ID              `json:"originalInstructionCid"`
 	Transfer               Transfer2                 `json:"transfer"`
 	Status                 TransferInstructionStatus `json:"status"`
 	Meta                   Metadata                  `json:"meta"`
@@ -517,18 +517,18 @@ func (t *TransferPendingInternalWorkflow) UnmarshalJSON(data []byte) error {
 
 // ITransferFactoryInterfaceID returns the interface ID for the ITransferFactory interface
 func ITransferFactoryInterfaceID(packageID *string) string {
-	pkgName := packageName
+	pkgID := PackageID
 	if packageID != nil {
-		pkgName = *packageID
+		pkgID = *packageID
 	}
-	return fmt.Sprintf("#%s:%s:%s", pkgName, "TransferInstructionV1", "TransferFactory")
+	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.TransferInstructionV1", "TransferFactory")
 }
 
 // ITransferInstructionInterfaceID returns the interface ID for the ITransferInstruction interface
 func ITransferInstructionInterfaceID(packageID *string) string {
-	pkgName := packageName
+	pkgID := PackageID
 	if packageID != nil {
-		pkgName = *packageID
+		pkgID = *packageID
 	}
-	return fmt.Sprintf("#%s:%s:%s", pkgName, "TransferInstructionV1", "TransferInstruction")
+	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.TransferInstructionV1", "TransferInstruction")
 }
