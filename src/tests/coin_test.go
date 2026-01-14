@@ -410,9 +410,7 @@ func TestCoin(t *testing.T) {
 	// Upload the DARs to all participants
 	coinDar, err := os.ReadFile("../../contracts/coin/.daml/dist/coin-0.0.1.dar")
 	require.NoError(t, err)
-	spliceDar, err := os.ReadFile("../../contracts/splice/.daml/dist/splice-1.0.0.dar")
-	require.NoError(t, err)
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{coinDar, spliceDar}, participant1, participant2, participant3, participant4, participant5)
+	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{coinDar}, participant1, participant2, participant3, participant4, participant5)
 	require.NoError(t, err)
 	fmt.Printf("Uploaded coin DARs to all participants: %v\n", packageIDs)
 
@@ -534,7 +532,7 @@ func TestCoin(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#splice",
+								PackageId:  "#splice-api-token-burn-mint-v1",
 								ModuleName: "Splice.Api.Token.BurnMintV1",
 								EntityName: "BurnMintFactory",
 							},
@@ -543,9 +541,6 @@ func TestCoin(t *testing.T) {
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{
 									Label: "expectedAdmin",
-									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyAlice}},
-								}, {
-									Label: "sender",
 									Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyAlice}},
 								}, {
 									Label: "instrumentId",
@@ -569,9 +564,9 @@ func TestCoin(t *testing.T) {
 													Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 														{
 															Label: "values",
-															Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
+															Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: []*apiv2.TextMap_Entry{
 																{
-																	Key: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "mint-preapproval"}},
+																	Key: "mint-preapproval",
 																	Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
 																		Constructor: "AV_ContractId",
 																		Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: bobMintPreapprovalCid}},
@@ -626,7 +621,7 @@ func TestCoin(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#splice",
+								PackageId:  "#splice-api-token-transfer-instruction-v1",
 								ModuleName: "Splice.Api.Token.TransferInstructionV1",
 								EntityName: "TransferFactory",
 							},
@@ -716,7 +711,7 @@ func TestCoin(t *testing.T) {
 					Command: &apiv2.Command_Exercise{
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
-								PackageId:  "#splice",
+								PackageId:  "#splice-api-token-transfer-instruction-v1",
 								ModuleName: "Splice.Api.Token.TransferInstructionV1",
 								EntityName: "TransferInstruction",
 							},
@@ -918,9 +913,9 @@ func TestCoin(t *testing.T) {
 													Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 														{
 															Label: "values",
-															Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
+															Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: []*apiv2.TextMap_Entry{
 																{
-																	Key: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "mint-preapproval"}},
+																	Key: "mint-preapproval",
 																	Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
 																		Constructor: "AV_ContractId",
 																		Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: erinPreApprovalCid}},
