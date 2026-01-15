@@ -26,7 +26,7 @@ func (m *mockQuerier) GetAllContractsForParty(ctx context.Context, party string)
 	return m.contracts, nil
 }
 
-func createContract(moduleName, entityName, environmentID, contractID string) *ledger.ActiveContract {
+func createContract(moduleName, entityName, instanceID, contractID string) *ledger.ActiveContract {
 	return &ledger.ActiveContract{
 		CreatedEvent: &apiv2.CreatedEvent{
 			ContractId: contractID,
@@ -38,8 +38,8 @@ func createContract(moduleName, entityName, environmentID, contractID string) *l
 			CreateArguments: &apiv2.Record{
 				Fields: []*apiv2.RecordField{
 					{
-						Label: "environmentId",
-						Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: environmentID}},
+						Label: "instanceId",
+						Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}},
 					},
 				},
 			},
@@ -127,7 +127,7 @@ func TestRouter_CCIPSendDisclosuresEndpoint(t *testing.T) {
 	var response types.CCIPSendDisclosures
 	err := json.NewDecoder(w.Body).Decode(&response)
 	require.NoError(t, err)
-	assert.Equal(t, "mainnet-v1", response.EnvironmentID)
+	assert.Equal(t, "mainnet-v1", response.InstanceID)
 }
 
 func TestRouter_CCIPExecuteDisclosuresEndpoint(t *testing.T) {
@@ -143,7 +143,7 @@ func TestRouter_CCIPExecuteDisclosuresEndpoint(t *testing.T) {
 	var response types.CCIPExecuteDisclosures
 	err := json.NewDecoder(w.Body).Decode(&response)
 	require.NoError(t, err)
-	assert.Equal(t, "mainnet-v1", response.EnvironmentID)
+	assert.Equal(t, "mainnet-v1", response.InstanceID)
 }
 
 func TestRouter_CORSHeaders(t *testing.T) {

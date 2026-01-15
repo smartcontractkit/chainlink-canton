@@ -26,7 +26,7 @@ func (m *MockContractQuerier) GetAllContractsForParty(ctx context.Context, party
 	return m.Contracts, nil
 }
 
-func createMockContract(moduleName, entityName, environmentID, contractID string, blob []byte) *ledger.ActiveContract {
+func createMockContract(moduleName, entityName, instanceID, contractID string, blob []byte) *ledger.ActiveContract {
 	return &ledger.ActiveContract{
 		CreatedEvent: &apiv2.CreatedEvent{
 			ContractId: contractID,
@@ -38,9 +38,9 @@ func createMockContract(moduleName, entityName, environmentID, contractID string
 			CreateArguments: &apiv2.Record{
 				Fields: []*apiv2.RecordField{
 					{
-						Label: "environmentId",
+						Label: "instanceId",
 						Value: &apiv2.Value{
-							Sum: &apiv2.Value_Text{Text: environmentID},
+							Sum: &apiv2.Value_Text{Text: instanceID},
 						},
 					},
 				},
@@ -79,7 +79,7 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 		disclosures, err := svc.GetCCIPSendDisclosures(context.Background(), "mainnet-v1")
 		require.NoError(t, err)
 
-		assert.Equal(t, "mainnet-v1", disclosures.EnvironmentID)
+		assert.Equal(t, "mainnet-v1", disclosures.InstanceID)
 		assert.NotNil(t, disclosures.Contracts.Router)
 		assert.NotNil(t, disclosures.Contracts.OnRamp)
 		assert.NotNil(t, disclosures.Contracts.FeeQuoter)
@@ -89,13 +89,13 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 		assert.Equal(t, "Router", disclosures.Contracts.Router.TemplateID.EntityName)
 	})
 
-	t.Run("returns error for unknown environment", func(t *testing.T) {
+	t.Run("returns error for unknown instance", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{}
 		svc := NewService(mockQuerier, envConfig)
 
 		_, err := svc.GetCCIPSendDisclosures(context.Background(), "unknown-env")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unknown environment")
+		assert.Contains(t, err.Error(), "unknown instance")
 	})
 
 	t.Run("returns error when router not found", func(t *testing.T) {
@@ -112,11 +112,11 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 		assert.Contains(t, err.Error(), "router not found")
 	})
 
-	t.Run("filters by environmentId correctly", func(t *testing.T) {
+	t.Run("filters by instanceId correctly", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.Router", "Router", "testnet", "router-testnet", []byte("blob")),    // Wrong env
-				createMockContract("CCIP.Router", "Router", "mainnet-v1", "router-mainnet", []byte("blob")), // Correct env
+				createMockContract("CCIP.Router", "Router", "testnet", "router-testnet", []byte("blob")),    // Wrong instance
+				createMockContract("CCIP.Router", "Router", "mainnet-v1", "router-mainnet", []byte("blob")), // Correct instance
 				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1", "onramp-mainnet", []byte("blob")),
 				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1", "feequoter-mainnet", []byte("blob")),
 			},
@@ -178,7 +178,7 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 		disclosures, err := svc.GetCCIPExecuteDisclosures(context.Background(), "mainnet-v1")
 		require.NoError(t, err)
 
-		assert.Equal(t, "mainnet-v1", disclosures.EnvironmentID)
+		assert.Equal(t, "mainnet-v1", disclosures.InstanceID)
 		assert.NotNil(t, disclosures.Contracts.OffRamp)
 		assert.NotNil(t, disclosures.Contracts.CCV)
 		assert.NotNil(t, disclosures.Contracts.TokenAdminRegistry)
@@ -203,8 +203,8 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 	})
 }
 
-func TestExtractEnvironmentID(t *testing.T) {
-	t.Run("extracts environmentId from record", func(t *testing.T) {
+func TestExtractInstanceID(t *testing.T) {
+	t.Run("extracts instanceId from record", func(t *testing.T) {
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -212,17 +212,17 @@ func TestExtractEnvironmentID(t *testing.T) {
 					Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: "alice"}},
 				},
 				{
-					Label: "environmentId",
+					Label: "instanceId",
 					Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "mainnet-v1"}},
 				},
 			},
 		}
 
-		envID := ExtractEnvironmentID(record)
-		assert.Equal(t, "mainnet-v1", envID)
+		instID := ExtractInstanceID(record)
+		assert.Equal(t, "mainnet-v1", instID)
 	})
 
-	t.Run("returns empty string when environmentId not found", func(t *testing.T) {
+	t.Run("returns empty string when instanceId not found", func(t *testing.T) {
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -232,27 +232,27 @@ func TestExtractEnvironmentID(t *testing.T) {
 			},
 		}
 
-		envID := ExtractEnvironmentID(record)
-		assert.Equal(t, "", envID)
+		instID := ExtractInstanceID(record)
+		assert.Equal(t, "", instID)
 	})
 
 	t.Run("returns empty string for nil record", func(t *testing.T) {
-		envID := ExtractEnvironmentID(nil)
-		assert.Equal(t, "", envID)
+		instID := ExtractInstanceID(nil)
+		assert.Equal(t, "", instID)
 	})
 
-	t.Run("returns empty string when environmentId is not text", func(t *testing.T) {
+	t.Run("returns empty string when instanceId is not text", func(t *testing.T) {
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
-					Label: "environmentId",
+					Label: "instanceId",
 					Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 123}},
 				},
 			},
 		}
 
-		envID := ExtractEnvironmentID(record)
-		assert.Equal(t, "", envID)
+		instID := ExtractInstanceID(record)
+		assert.Equal(t, "", instID)
 	})
 }
 

@@ -16,7 +16,7 @@ import qualified Splice.Api.Token.HoldingV1
 template OnRamp
     with
         ccipOwner : Party
-        environmentId : Text
+        instanceId : Text
     where
         signatory ccipOwner
 
@@ -69,7 +69,7 @@ template OnRamp
         nonconsuming choice CCIPSendFromRouter : CCIPSendFromRouterResult
             with
                 routerPartyOwner : Party
-                routerEnvironmentId : Text
+                routerInstanceId : Text
 
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -87,9 +87,9 @@ template OnRamp
 
             controller ccipOwner
             do
-                -- validate router environment matches
-                assertMsg "onramp: router environmentid mismatch"
-                    (routerEnvironmentId == environmentId)
+                -- validate router instance matches
+                assertMsg "onramp: router instanceid mismatch"
+                    (routerInstanceId == instanceId)
 
                 -- fetch and validate global config
                 globalConfig <- fetch globalConfigCid

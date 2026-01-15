@@ -23,7 +23,7 @@ import qualified Splice.Api.Token.HoldingV1
 template PerPartyRouterFactory
     with
         ccipOwner : Party
-        environmentId : Text
+        instanceId : Text
         registeredParties : Set.Set Party
     where
         signatory ccipOwner
@@ -39,7 +39,7 @@ template PerPartyRouterFactory
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
                     partyOwner = partyOwner
-                    environmentId = environmentId
+                    instanceId = instanceId
                     outboundSequenceNumbers = Map.empty
                     executionStates = Map.empty
                     receiverRequiredCCVs = []
@@ -72,7 +72,7 @@ template PerPartyRouter
     with
         ccipOwner : Party
         partyOwner : Party
-        environmentId : Text
+        instanceId : Text
         -- only per-party state, no stored cids
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
@@ -102,8 +102,8 @@ template PerPartyRouter
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
                     (onRamp.ccipOwner == ccipOwner)
-                assertMsg "router: onramp environmentid mismatch"
-                    (onRamp.environmentId == environmentId)
+                assertMsg "router: onramp instanceid mismatch"
+                    (onRamp.instanceId == instanceId)
 
                 let currentSeqNum = fromOptional 0.0
                         (Map.lookup destChainSelector outboundSequenceNumbers)
@@ -111,7 +111,7 @@ template PerPartyRouter
                 -- delegate to onramp (no router CCVs passed - sender doesn't know receiver's requirements)
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
                     routerPartyOwner = partyOwner
-                    routerEnvironmentId = environmentId
+                    routerInstanceId = instanceId
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
                     destChainSelector = destChainSelector
@@ -162,8 +162,8 @@ template PerPartyRouter
                 offRamp <- fetch offRampCid
                 assertMsg "router: offramp ccipowner mismatch"
                     (offRamp.ccipOwner == ccipOwner)
-                assertMsg "router: offramp environmentid mismatch"
-                    (offRamp.environmentId == environmentId)
+                assertMsg "router: offramp instanceid mismatch"
+                    (offRamp.instanceId == instanceId)
 
                 -- check execution state (replay prevention)
                 let messageHash = keccak256 encodedMessage
@@ -180,7 +180,7 @@ template PerPartyRouter
                 -- pass receiver's required CCVs - receiver gets to specify their verification requirements
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
-                    routerEnvironmentId = environmentId
+                    routerInstanceId = instanceId
                     receiverRequiredCCVs = receiverRequiredCCVs
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid

@@ -23,7 +23,7 @@ testCCIPSend = script do
     ccipOwner <- allocateParty "ccip-owner"
     user <- allocateParty "user"
 
-    let environmentId = "test-environment"
+    let instanceId = "test-instance"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -31,7 +31,7 @@ testCCIPSend = script do
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = instanceId
             chainSelector = sourceChainSelector
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
@@ -52,13 +52,13 @@ testCCIPSend = script do
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = instanceId
 
     -- deploy perpartyrouter factory (no stored cids)
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = instanceId
             registeredParties = Set.empty
 
     -- disclose factory to user
@@ -128,7 +128,7 @@ testCCIPExecute = script do
     ccipOwner <- allocateParty "ccip-owner"
     receiver <- allocateParty "receiver"
 
-    let environmentId = "test-environment"
+    let instanceId = "test-instance"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -136,7 +136,7 @@ testCCIPExecute = script do
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = instanceId
             chainSelector = destChainSelector
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.empty
@@ -156,13 +156,13 @@ testCCIPExecute = script do
     offRamp <- submit ccipOwner do
         createCmd CCIP.OffRamp.OffRamp with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = instanceId
 
     -- deploy perpartyrouter factory (no stored cids)
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = instanceId
             registeredParties = Set.empty
 
     -- disclose factory to receiver

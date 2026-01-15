@@ -32,7 +32,7 @@ func (m *MockContractQuerier) GetAllContractsForParty(ctx context.Context, party
 	return m.Contracts, nil
 }
 
-func createMockContract(moduleName, entityName, environmentID, contractID string) *ledger.ActiveContract {
+func createMockContract(moduleName, entityName, instanceID, contractID string) *ledger.ActiveContract {
 	return &ledger.ActiveContract{
 		CreatedEvent: &apiv2.CreatedEvent{
 			ContractId: contractID,
@@ -44,8 +44,8 @@ func createMockContract(moduleName, entityName, environmentID, contractID string
 			CreateArguments: &apiv2.Record{
 				Fields: []*apiv2.RecordField{
 					{
-						Label: "environmentId",
-						Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: environmentID}},
+						Label: "instanceId",
+						Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}},
 					},
 				},
 			},
@@ -104,7 +104,7 @@ func TestHandlers_GetCCIPSendDisclosures(t *testing.T) {
 
 	t.Run("returns disclosures for valid environment", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/v1/ccip/mainnet-v1/disclosures/send", nil)
-		req = mux.SetURLVars(req, map[string]string{"environmentId": "mainnet-v1"})
+		req = mux.SetURLVars(req, map[string]string{"instanceId": "mainnet-v1"})
 		w := httptest.NewRecorder()
 
 		handlers.GetCCIPSendDisclosures(w, req)
@@ -115,7 +115,7 @@ func TestHandlers_GetCCIPSendDisclosures(t *testing.T) {
 		err := json.NewDecoder(w.Body).Decode(&response)
 		require.NoError(t, err)
 
-		assert.Equal(t, "mainnet-v1", response.EnvironmentID)
+		assert.Equal(t, "mainnet-v1", response.InstanceID)
 		assert.NotNil(t, response.Contracts.Router)
 		assert.NotNil(t, response.Contracts.OnRamp)
 		assert.NotNil(t, response.Contracts.FeeQuoter)
@@ -124,7 +124,7 @@ func TestHandlers_GetCCIPSendDisclosures(t *testing.T) {
 
 	t.Run("returns 404 for unknown environment", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/v1/ccip/unknown/disclosures/send", nil)
-		req = mux.SetURLVars(req, map[string]string{"environmentId": "unknown"})
+		req = mux.SetURLVars(req, map[string]string{"instanceId": "unknown"})
 		w := httptest.NewRecorder()
 
 		handlers.GetCCIPSendDisclosures(w, req)
@@ -143,7 +143,7 @@ func TestHandlers_GetCCIPExecuteDisclosures(t *testing.T) {
 
 	t.Run("returns disclosures for valid environment", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/api/v1/ccip/mainnet-v1/disclosures/execute", nil)
-		req = mux.SetURLVars(req, map[string]string{"environmentId": "mainnet-v1"})
+		req = mux.SetURLVars(req, map[string]string{"instanceId": "mainnet-v1"})
 		w := httptest.NewRecorder()
 
 		handlers.GetCCIPExecuteDisclosures(w, req)
@@ -154,7 +154,7 @@ func TestHandlers_GetCCIPExecuteDisclosures(t *testing.T) {
 		err := json.NewDecoder(w.Body).Decode(&response)
 		require.NoError(t, err)
 
-		assert.Equal(t, "mainnet-v1", response.EnvironmentID)
+		assert.Equal(t, "mainnet-v1", response.InstanceID)
 		assert.NotNil(t, response.Contracts.OffRamp)
 		assert.NotNil(t, response.Contracts.CCV)
 		assert.NotNil(t, response.Contracts.TokenAdminRegistry)

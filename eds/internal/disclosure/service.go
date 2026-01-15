@@ -56,10 +56,10 @@ func NewService(querier ContractQuerier, envConfig *config.EnvironmentsConfig) *
 	}
 }
 
-func (s *Service) GetCCIPSendDisclosures(ctx context.Context, environmentID string) (*types.CCIPSendDisclosures, error) {
-	env, ok := s.envConfig.GetEnvironment(environmentID)
+func (s *Service) GetCCIPSendDisclosures(ctx context.Context, instanceID string) (*types.CCIPSendDisclosures, error) {
+	env, ok := s.envConfig.GetEnvironment(instanceID)
 	if !ok {
-		return nil, fmt.Errorf("unknown environment: %s", environmentID)
+		return nil, fmt.Errorf("unknown instance: %s", instanceID)
 	}
 
 	contracts, err := s.querier.GetAllContractsForParty(ctx, env.Party)
@@ -83,7 +83,7 @@ func (s *Service) GetCCIPSendDisclosures(ctx context.Context, environmentID stri
 	}
 
 	return &types.CCIPSendDisclosures{
-		EnvironmentID: environmentID,
+		InstanceID: instanceID,
 		Contracts: types.CCIPSendContracts{
 			Router:    router,
 			OnRamp:    onRamp,
@@ -92,10 +92,10 @@ func (s *Service) GetCCIPSendDisclosures(ctx context.Context, environmentID stri
 	}, nil
 }
 
-func (s *Service) GetCCIPExecuteDisclosures(ctx context.Context, environmentID string) (*types.CCIPExecuteDisclosures, error) {
-	env, ok := s.envConfig.GetEnvironment(environmentID)
+func (s *Service) GetCCIPExecuteDisclosures(ctx context.Context, instanceID string) (*types.CCIPExecuteDisclosures, error) {
+	env, ok := s.envConfig.GetEnvironment(instanceID)
 	if !ok {
-		return nil, fmt.Errorf("unknown environment: %s", environmentID)
+		return nil, fmt.Errorf("unknown instance: %s", instanceID)
 	}
 
 	contracts, err := s.querier.GetAllContractsForParty(ctx, env.Party)
@@ -119,7 +119,7 @@ func (s *Service) GetCCIPExecuteDisclosures(ctx context.Context, environmentID s
 	}
 
 	return &types.CCIPExecuteDisclosures{
-		EnvironmentID: environmentID,
+		InstanceID: instanceID,
 		Contracts: types.CCIPExecuteContracts{
 			OffRamp:            offRamp,
 			CCV:                ccv,
@@ -128,11 +128,11 @@ func (s *Service) GetCCIPExecuteDisclosures(ctx context.Context, environmentID s
 	}, nil
 }
 
-// find contract by type and environmentId, matching module:entity (ignores packageId for upgrade resilience)
+// find contract by type and instanceId, matching module:entity (ignores packageId for upgrade resilience)
 func (s *Service) findContract(
 	contracts []*ledger.ActiveContract,
 	contractType ContractType,
-	expectedEnvID string,
+	expectedInstanceID string,
 ) (*types.DisclosedContract, error) {
 	moduleInfo, ok := ContractTypeToModule[contractType]
 	if !ok {
@@ -148,8 +148,8 @@ func (s *Service) findContract(
 			continue
 		}
 
-		envID := ExtractEnvironmentID(event.GetCreateArguments())
-		if envID != expectedEnvID {
+		instID := ExtractInstanceID(event.GetCreateArguments())
+		if instID != expectedInstanceID {
 			continue
 		}
 
@@ -165,15 +165,15 @@ func (s *Service) findContract(
 		}, nil
 	}
 
-	return nil, fmt.Errorf("no contract found with type %s and environmentId %s", contractType, expectedEnvID)
+	return nil, fmt.Errorf("no contract found with type %s and instanceId %s", contractType, expectedInstanceID)
 }
 
-func ExtractEnvironmentID(args *apiv2.Record) string {
+func ExtractInstanceID(args *apiv2.Record) string {
 	if args == nil {
 		return ""
 	}
 	for _, field := range args.GetFields() {
-		if field.GetLabel() == "environmentId" {
+		if field.GetLabel() == "instanceId" {
 			if textVal, ok := field.GetValue().GetSum().(*apiv2.Value_Text); ok {
 				return textVal.Text
 			}

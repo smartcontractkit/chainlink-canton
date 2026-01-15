@@ -17,8 +17,8 @@ type TemplateID struct {
 
 // contracts needed for CCIPSend
 type CCIPSendDisclosures struct {
-	EnvironmentID string            `json:"environmentId"`
-	Contracts     CCIPSendContracts `json:"contracts"`
+	InstanceID string            `json:"instanceId"`
+	Contracts  CCIPSendContracts `json:"contracts"`
 }
 
 type CCIPSendContracts struct {
@@ -29,8 +29,8 @@ type CCIPSendContracts struct {
 
 // contracts needed for CCIPExecute
 type CCIPExecuteDisclosures struct {
-	EnvironmentID string               `json:"environmentId"`
-	Contracts     CCIPExecuteContracts `json:"contracts"`
+	InstanceID string               `json:"instanceId"`
+	Contracts  CCIPExecuteContracts `json:"contracts"`
 }
 
 type CCIPExecuteContracts struct {

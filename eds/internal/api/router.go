@@ -16,8 +16,8 @@ func NewRouter(disclosureSvc *disclosure.Service, envConfig *config.Environments
 	api := r.PathPrefix("/api/v1").Subrouter()
 	api.HandleFunc("/health", handlers.Health).Methods("GET")
 	api.HandleFunc("/ccip/environments", handlers.ListEnvironments).Methods("GET")
-	api.HandleFunc("/ccip/{environmentId}/disclosures/send", handlers.GetCCIPSendDisclosures).Methods("GET")
-	api.HandleFunc("/ccip/{environmentId}/disclosures/execute", handlers.GetCCIPExecuteDisclosures).Methods("GET")
+	api.HandleFunc("/ccip/{instanceId}/disclosures/send", handlers.GetCCIPSendDisclosures).Methods("GET")
+	api.HandleFunc("/ccip/{instanceId}/disclosures/execute", handlers.GetCCIPExecuteDisclosures).Methods("GET")
 
 	r.Use(LoggingMiddleware)
 	r.Use(CORSMiddleware)

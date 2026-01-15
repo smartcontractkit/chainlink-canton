@@ -25,9 +25,9 @@ func NewHandlers(disclosureSvc *disclosure.Service, envConfig *config.Environmen
 
 func (h *Handlers) GetCCIPSendDisclosures(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	environmentID := vars["environmentId"]
+	instanceID := vars["instanceId"]
 
-	disclosures, err := h.disclosureSvc.GetCCIPSendDisclosures(r.Context(), environmentID)
+	disclosures, err := h.disclosureSvc.GetCCIPSendDisclosures(r.Context(), instanceID)
 	if err != nil {
 		WriteError(w, http.StatusNotFound, "DISCLOSURES_NOT_FOUND", err.Error())
 		return
@@ -38,9 +38,9 @@ func (h *Handlers) GetCCIPSendDisclosures(w http.ResponseWriter, r *http.Request
 
 func (h *Handlers) GetCCIPExecuteDisclosures(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	environmentID := vars["environmentId"]
+	instanceID := vars["instanceId"]
 
-	disclosures, err := h.disclosureSvc.GetCCIPExecuteDisclosures(r.Context(), environmentID)
+	disclosures, err := h.disclosureSvc.GetCCIPExecuteDisclosures(r.Context(), instanceID)
 	if err != nil {
 		WriteError(w, http.StatusNotFound, "DISCLOSURES_NOT_FOUND", err.Error())
 		return
