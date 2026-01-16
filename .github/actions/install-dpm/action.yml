@@ -1,0 +1,29 @@
+name: 'Install Digital Asset Package Manager (DPM)'
+description: 'Installs the DPM CLI tool'
+
+inputs:
+  DPM_VERSION:
+    description: 'The version of DPM to install'
+    required: false
+  SHELL:
+    description: 'The shell to use'
+    required: false
+    default: 'bash'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Fetch installation script
+      shell: ${{ inputs.SHELL }}
+      run: curl -fSL "https://get.digitalasset.com/install/install.sh" -o ${{ runner.temp }}/install_dpm.sh
+    - name: Install CLI
+      shell: ${{ inputs.SHELL }}
+      run: |
+        if [ -n "${{ inputs.DPM_VERSION }}" ]; then
+          ${{ inputs.SHELL }} ${{ runner.temp }}/install_dpm.sh "${{ inputs.DPM_VERSION }}"
+        else
+          ${{ inputs.SHELL }} ${{ runner.temp }}/install_dpm.sh
+        fi
+    - name: Verify installation
+      shell: ${{ inputs.SHELL }}
+      run: dpm --version

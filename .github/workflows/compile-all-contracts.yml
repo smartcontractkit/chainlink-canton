@@ -1,0 +1,21 @@
+name: Compile All Contracts
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+
+jobs:
+  test:
+    name: Build All Contracts
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+    - name: Install DPM
+      uses: ./.github/actions/install-dpm
+    - name: Install Go
+      uses: actions/setup-go@v5
+    - name: Run Test
+      run: go test ./bindings/compile/... -v -count 1 -run TestCompileAllPackages
