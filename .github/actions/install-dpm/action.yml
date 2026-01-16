@@ -23,7 +23,7 @@ runs:
       if: ${{ inputs.cache == 'true' }}
       with:
         key: ${{ runner.os }}-dpm-${{ inputs.DPM_VERSION }}
-        path: '${HOME}/.dpm'
+        path: '${{ HOME }}/.dpm'
     - name: Check cache hit
       if: ${{ inputs.cache == 'true' && steps.cache.outputs.cache-hit == 'true' }}
       shell: ${{ inputs.SHELL }}
@@ -48,3 +48,6 @@ runs:
     - name: Verify installation
       shell: ${{ inputs.SHELL }}
       run: dpm --version
+    - name: List installed versions
+      shell: ${{ inputs.SHELL }}
+      run: dpm versions
