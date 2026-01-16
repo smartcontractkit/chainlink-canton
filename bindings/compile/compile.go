@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 
@@ -19,6 +20,8 @@ type CompiledPackage struct {
 	PackageName string
 	Dar         []byte
 }
+
+var installPackageMutex = &sync.Mutex{}
 
 func Package(packageName contracts.Package) (CompiledPackage, error) {
 	packageDir, ok := contracts.Contracts[packageName]
@@ -71,6 +74,8 @@ func Package(packageName contracts.Package) (CompiledPackage, error) {
 	}
 
 	// Install Daml SDK version
+	// Only a single installation should be running at a time
+	installPackageMutex.Lock()
 	cmd := exec.Command("dpm", "install", "package")
 	cmd.Dir = filepath.Join(dstRoot, packageDir)
 	stdOut := &bytes.Buffer{}
@@ -82,8 +87,10 @@ func Package(packageName contracts.Package) (CompiledPackage, error) {
 		fmt.Println("daml install command failed:")
 		fmt.Println(stdErr.String())
 		fmt.Println(stdOut.String())
+		installPackageMutex.Unlock()
 		return CompiledPackage{}, fmt.Errorf("failed to run daml install command: %w", err)
 	}
+	installPackageMutex.Unlock()
 
 	// Compile the package using daml CLI
 	cmd = exec.Command("dpm", "build")
