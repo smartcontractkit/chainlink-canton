@@ -23,7 +23,7 @@ runs:
       if: ${{ inputs.cache == 'true' }}
       with:
         key: ${{ runner.os }}-dpm-${{ inputs.DPM_VERSION }}
-        path: '${{ HOME }}/.dpm'
+        path: ~/.dpm
     - name: Check cache hit
       if: ${{ inputs.cache == 'true' && steps.cache.outputs.cache-hit == 'true' }}
       shell: ${{ inputs.SHELL }}
