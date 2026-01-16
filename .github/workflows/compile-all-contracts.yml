@@ -17,5 +17,7 @@ jobs:
       uses: ./.github/actions/install-dpm
     - name: Install Go
       uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
     - name: Run Test
       run: go test ./bindings/compile/... -v -count 1 -run TestCompileAllPackages
