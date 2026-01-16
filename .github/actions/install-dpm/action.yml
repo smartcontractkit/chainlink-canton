@@ -17,8 +17,8 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - uses: actions/cache/restore@v4
-      id: restore-cache
+    - uses: actions/cache@v4
+      id: cache
       name: Cache DPM
       if: ${{ inputs.cache == 'true' }}
       with:
