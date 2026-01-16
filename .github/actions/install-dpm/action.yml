@@ -9,14 +9,32 @@ inputs:
     description: 'The shell to use'
     required: false
     default: 'bash'
+  cache:
+    description: 'Enable caching of the DPM installation'
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
   steps:
+    - uses: actions/cache@v4
+      id: cache
+      name: Cache DPM
+      if: ${{ inputs.cache == 'true' }}
+      with:
+        key: ${{ runner.os }}-dpm-${{ inputs.DPM_VERSION }}
+        path: '${HOME}/.dpm'
+    - name: Check cache hit
+      if: ${{ inputs.cache == 'true' && steps.cache.outputs.cache-hit == 'true' }}
+      shell: ${{ inputs.SHELL }}
+      run: |
+        echo "DPM cache hit, skipping installation."
     - name: Fetch installation script
+      if: ${{ inputs.cache != 'true' || steps.cache.outputs.cache-hit != 'true' }}
       shell: ${{ inputs.SHELL }}
       run: curl -fSL "https://get.digitalasset.com/install/install.sh" -o ${{ runner.temp }}/install_dpm.sh
     - name: Install CLI
+      if: ${{ inputs.cache != 'true' || steps.cache.outputs.cache-hit != 'true' }}
       shell: ${{ inputs.SHELL }}
       run: |
         if [ -n "${{ inputs.DPM_VERSION }}" ]; then
