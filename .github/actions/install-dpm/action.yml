@@ -24,6 +24,9 @@ runs:
         else
           ${{ inputs.SHELL }} ${{ runner.temp }}/install_dpm.sh
         fi
+    - name: Add DPM to PATH
+      shell: ${{ inputs.SHELL }}
+      run: echo "${HOME}/.dpm/bin" >> "$GITHUB_PATH"
     - name: Verify installation
       shell: ${{ inputs.SHELL }}
       run: dpm --version
