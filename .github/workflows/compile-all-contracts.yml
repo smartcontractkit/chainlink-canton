@@ -16,6 +16,6 @@ jobs:
     - name: Install DPM
       uses: ./.github/actions/install-dpm
     - name: Install Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
     - name: Run Test
       run: go test ./bindings/compile/... -v -count 1 -run TestCompileAllPackages
