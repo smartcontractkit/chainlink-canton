@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"slices"
 	"strings"
@@ -15,12 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/smartcontractkit/chainlink-canton-internal/generated/coin"
 	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
@@ -378,27 +381,40 @@ func QueryDisclosedContract(ctx context.Context, contractId string, participant 
 	return nil, fmt.Errorf("failed to find active contract with id %s", contractId)
 }
 
+func normalizeTemplateID(tid string) string {
+	return strings.TrimPrefix(tid, "#")
+}
+
 func QueryDisclosedContractWithBindingClient(
 	ctx context.Context,
 	cl *client.DamlBindingClient,
 	party string,
 	contractID string,
-	templateID string, // optional: can be "" for wildcard
+	templateID string, // now REQUIRED if you want CreatedEventBlob
 ) (*model.DisclosedContract, error) {
 
-	// 1) Snapshot the ACS at the *current* ledger end
+	templateID = normalizeTemplateID(templateID)
+	if templateID == "" {
+		return nil, fmt.Errorf("templateID must be non-empty to request CreatedEventBlob")
+	}
+
 	le, err := cl.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("GetLedgerEnd failed: %w", err)
 	}
 
 	req := &model.GetActiveContractsRequest{
-		ActiveAtOffset: le.Offset, // <-- this is the key fix
+		ActiveAtOffset: le.Offset,
 		EventFormat: &model.EventFormat{
 			FiltersByParty: map[string]*model.Filters{
 				party: {
 					Inclusive: &model.InclusiveFilters{
-						TemplateFilters: []*model.TemplateFilter{}, // wildcard
+						TemplateFilters: []*model.TemplateFilter{
+							{
+								TemplateID:              templateID,
+								IncludeCreatedEventBlob: true,
+							},
+						},
 					},
 				},
 			},
@@ -406,19 +422,12 @@ func QueryDisclosedContractWithBindingClient(
 		},
 	}
 
-	// Optional template restriction (faster)
-	if templateID != "" {
-		req.EventFormat.FiltersByParty[party].Inclusive.TemplateFilters = []*model.TemplateFilter{
-			{TemplateID: templateID},
-		}
-	}
-
 	respCh, errCh := cl.StateService.GetActiveContracts(ctx, req)
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("ACS query cancelled/timeout while searching for %s: %w", contractID, ctx.Err())
+			return nil, fmt.Errorf("ACS timeout while searching for %s: %w", contractID, ctx.Err())
 
 		case err, ok := <-errCh:
 			if ok && err != nil {
@@ -433,25 +442,25 @@ func QueryDisclosedContractWithBindingClient(
 				continue
 			}
 
-			switch entry := resp.ContractEntry.(type) {
-			case *model.ActiveContractEntry:
-				if entry.ActiveContract == nil || entry.ActiveContract.CreatedEvent == nil {
-					continue
-				}
-				created := entry.ActiveContract.CreatedEvent
-				if created.ContractID != contractID {
-					continue
-				}
-				return &model.DisclosedContract{
-					TemplateID:     created.TemplateID,
-					ContractID:     created.ContractID,
-					SynchronizerID: entry.ActiveContract.SynchronizerID,
-				}, nil
-
-			default:
-				// ignore incomplete assigned/unassigned, etc.
+			entry, ok := resp.ContractEntry.(*model.ActiveContractEntry)
+			if !ok || entry.ActiveContract == nil || entry.ActiveContract.CreatedEvent == nil {
 				continue
 			}
+
+			created := entry.ActiveContract.CreatedEvent
+			if created.ContractID != contractID {
+				continue
+			}
+			if len(created.CreatedEventBlob) == 0 {
+				return nil, fmt.Errorf("createdEventBlob missing for %s (IncludeCreatedEventBlob didn't take effect)", contractID)
+			}
+
+			return &model.DisclosedContract{
+				TemplateID:       created.TemplateID,
+				ContractID:       created.ContractID,
+				CreatedEventBlob: created.CreatedEventBlob,
+				SynchronizerID:   entry.ActiveContract.SynchronizerID,
+			}, nil
 		}
 	}
 }
@@ -478,6 +487,36 @@ func newBindingClient(t *testing.T, token, ledgerAddr, adminAddr string) *client
 
 	t.Cleanup(func() { bc.Close() })
 	return bc
+}
+
+func normalizeTemplateKey(tid string) string {
+	tid = strings.TrimPrefix(tid, "#")
+	parts := strings.Split(tid, ":")
+	if len(parts) < 3 {
+		return tid
+	}
+	return parts[len(parts)-2] + ":" + parts[len(parts)-1]
+}
+
+func ensureCanReadAs(ctx context.Context, cl *client.DamlBindingClient, userID, p string) error {
+	rights, err := cl.UserMng.ListUserRights(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, r := range rights {
+		if v, ok := r.Type.(model.CanReadAs); ok && v.Party == p {
+			return nil // already has it
+		}
+	}
+
+	_, err = cl.UserMng.GrantUserRights(ctx, userID, "", []*model.Right{
+		{Type: model.CanReadAs{Party: p}},
+	})
+	return err
+}
+
+func normTmplID(s string) string {
+	return strings.TrimPrefix(s, "#")
 }
 
 func TestCoin(t *testing.T) {
@@ -662,11 +701,15 @@ func TestCoin(t *testing.T) {
 	}
 	require.NotEmpty(t, registryContractID, "no CoinRegistry create found in update (check logs above)")
 	// Query the contract for explicit disclosure
-	disclosedRegistry, err := QueryDisclosedContractWithBindingClient(ctx, p1, party, registryContractID, "")
+	registryTemplateID := upd.Transaction.Events[0].Created.TemplateID // or from the matching create you found
+
+	disclosedRegistry, err := QueryDisclosedContractWithBindingClient(
+		ctx, p1, party, registryContractID, registryTemplateID,
+	)
 	require.NoError(t, err)
 	fmt.Println("Queried registry for disclosure: ", disclosedRegistry)
 
-	// Bob creates MintPreapproval
+	// TEST1 Bob creates MintPreapproval
 	bobRights, err := p2.UserMng.ListUserRights(ctx, UserName) // <- Bob's user id
 	require.NoError(t, err)
 
@@ -686,6 +729,8 @@ func TestCoin(t *testing.T) {
 
 	fmt.Println("BOB READ AS PARTY:", bobReadAs)
 	partyBob := bobActAs
+	require.NotEmpty(t, partyBob)
+	require.NoError(t, ensureCanReadAs(ctx, p2, UserName, partyBob))
 
 	mintPreapproval := coin.MintPreapproval{
 		Receiver: types.PARTY(partyBob),
@@ -708,101 +753,293 @@ func TestCoin(t *testing.T) {
 
 	submitResp, err = p2.CommandService.SubmitAndWait(ctx, cmds)
 	require.NoError(t, err)
-	fmt.Printf("Bob created MintPreapproval, CID: %v\n", submitResp)
 
-	// // Alice mints to Bob
-	// res, err = participant1.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-	// 	Commands: &apiv2.Commands{
-	// 		CommandId: uuid.Must(uuid.NewUUID()).String(),
-	// 		Commands: []*apiv2.Command{
-	// 			{
-	// 				Command: &apiv2.Command_Exercise{
-	// 					Exercise: &apiv2.ExerciseCommand{
-	// 						TemplateId: &apiv2.Identifier{
-	// 							PackageId:  "#splice",
-	// 							ModuleName: "Splice.Api.Token.BurnMintV1",
-	// 							EntityName: "BurnMintFactory",
-	// 						},
-	// 						ContractId: registryCid,
-	// 						Choice:     "BurnMintFactory_BurnMint",
-	// 						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 							{
-	// 								Label: "expectedAdmin",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyAlice}},
-	// 							}, {
-	// 								Label: "sender",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyAlice}},
-	// 							}, {
-	// 								Label: "instrumentId",
-	// 								Value: instrumentId,
-	// 							}, {
-	// 								Label: "inputHoldingCids",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}},
-	// 							}, {
-	// 								Label: "outputs",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-	// 									{
-	// 										Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 											{
-	// 												Label: "owner",
-	// 												Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyBob}},
-	// 											}, {
-	// 												Label: "amount",
-	// 												Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "42.13"}},
-	// 											}, {
-	// 												Label: "context",
-	// 												Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 													{
-	// 														Label: "values",
-	// 														Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
-	// 															{
-	// 																Key: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "mint-preapproval"}},
-	// 																Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-	// 																	Constructor: "AV_ContractId",
-	// 																	Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: bobMintPreapprovalCid}},
-	// 																}}},
-	// 															},
-	// 														}}}},
-	// 													},
-	// 												}}}},
-	// 											},
-	// 										}}},
-	// 									},
-	// 								}}}},
-	// 							}, {
-	// 								Label: "extraActors",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}},
-	// 							}, {
-	// 								Label: "extraArgs",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 									{
-	// 										Label: "context",
-	// 										Value: emptyChoiceContext,
-	// 									}, {
-	// 										Label: "meta",
-	// 										Value: emptyMetadata,
-	// 									},
-	// 								}}}},
-	// 							},
-	// 						}}}},
-	// 					},
+	upd, err = p2.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
+		UpdateID: submitResp.UpdateID,
+		UpdateFormat: &model.EventFormat{
+			// IMPORTANT: include both parties so you can see the create
+			FiltersByParty: map[string]*model.Filters{
+				partyBob: {},
+			},
+			Verbose: true,
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, upd.Transaction)
+
+	t.Logf("tx events: %d", len(upd.Transaction.Events))
+	for i, ev := range upd.Transaction.Events {
+		if ev.Created != nil {
+			t.Logf("created[%d] templateID=%q cid=%q",
+				i, ev.Created.TemplateID, ev.Created.ContractID)
+		}
+	}
+
+	wantKey := "Coin.Registry:MintPreapproval"
+
+	var bobMintPreapprovalCid string
+	for _, ev := range upd.Transaction.Events {
+		if ev.Created == nil {
+			continue
+		}
+		if normalizeTemplateKey(ev.Created.TemplateID) == wantKey {
+			bobMintPreapprovalCid = ev.Created.ContractID
+			break
+		}
+	}
+
+	require.NotEmpty(t, bobMintPreapprovalCid, "no MintPreapproval create found in transaction")
+	t.Logf("Bob created MintPreapproval, CID: %s", bobMintPreapprovalCid)
+
+	// TEST2 Alice mints to Bob (USING GENERATED BINDINGS + SubmitAndWait)
+
+	alice := party // this is party Alice
+	bob := partyBob
+
+	// registryContractID should be the *contract id* of the CoinRegistry you created earlier
+	// (not updateID). You already extracted it from the update in the working test.
+	require.NotEmpty(t, registryContractID)
+
+	// Build the BurnMint args using bindings.
+	// Names below assume your generated bindings contain these record types.
+	// If a specific type name differs (common: BurnMintFactoryBurnMint vs BurnMintFactory_BurnMint),
+	// use whatever godaml generated for that choice arg.
+	mintArgs := coin.BurnMintFactoryBurnMint{
+		ExpectedAdmin: types.PARTY(alice),
+		InstrumentId: coin.InstrumentId{
+			Admin: types.PARTY(alice),
+			Id:    "LINK",
+		},
+
+		// MUST be []types.CONTRACT_ID (not []string)
+		InputHoldingCids: []types.CONTRACT_ID{},
+
+		Outputs: []coin.BurnMintOutput{
+			{
+				Owner: types.PARTY(bob),
+
+				// set below (avoid placeholder)
+				Amount: nil,
+
+				Context: coin.ChoiceContext{
+					Values: types.TEXTMAP{
+						"mint-preapproval": coin.AnyValue{
+							AVContractId: func() *types.CONTRACT_ID {
+								cid := types.CONTRACT_ID(bobMintPreapprovalCid)
+								return &cid
+							}(),
+						},
+					},
+				},
+			},
+		},
+
+		ExtraActors: []types.PARTY{},
+		ExtraArgs: coin.ExtraArgs{
+			Context: coin.ChoiceContext{Values: types.TEXTMAP{}},
+			Meta:    coin.Metadata{Values: types.TEXTMAP{}},
+		},
+	}
+
+	// set NUMERIC precisely (don’t use float)
+	mintArgs.Outputs[0].Amount = types.NUMERIC(big.NewInt(0))
+	{
+		// 42.13 in DAML numeric string form.
+		// Depending on your NUMERIC representation, easiest is to set it via codec-friendly big.Int scaling.
+		// If your runtime uses convertBigIntToNumeric(v, 10).FloatString(10),
+		// then store 4213 with scale=2, or just use big.Rat elsewhere.
+		// If you already have a helper to parse "42.13" -> *big.Int, use it here.
+		amt, ok := new(big.Int).SetString("4213", 10) // representing 42.13 with scale 2 (example)
+		require.True(t, ok)
+		mintArgs.Outputs[0].Amount = types.NUMERIC(amt)
+	}
+
+	// Exercise the choice via binding (on the registry contract id)
+	exerciseCmd := coin.CoinRegistry{}.BurnMintFactoryBurnMint(registryContractID, mintArgs)
+
+	pkgs, err := p1.PackageMng.ListKnownPackages(ctx)
+	require.NoError(t, err)
+
+	var burnMintPkgID string
+	for _, p := range pkgs {
+		// adjust match as needed (print p.Name once to see exact string)
+		if strings.Contains(strings.ToLower(p.Name), "splice-api-token-burn-mint") {
+			burnMintPkgID = p.PackageID
+			break
+		}
+	}
+	require.NotEmpty(t, burnMintPkgID, "burn/mint package not found on ledger (did the DAR include it?)")
+
+	t.Logf("burnMintPkg   id=%s", burnMintPkgID)
+
+	leBefore, err := p1.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
+	require.NoError(t, err)
+
+	// Submit
+	mintReq := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID: "coin-test-mint",
+			UserID:     UserName,
+			CommandID:  uuid.Must(uuid.NewUUID()).String(),
+			ActAs:      []string{alice},
+			Commands:   []*model.Command{{Command: exerciseCmd}},
+		},
+	}
+
+	mintResp, err := p1.CommandService.SubmitAndWait(ctx, mintReq)
+	require.NoError(t, err)
+
+	fmt.Println("MintResp: ", mintResp)
+
+	tx, err := WaitForTransactionByCommandID(ctx, p1, alice, mintReq.Commands.CommandID, leBefore.Offset)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
+
+	for _, ev := range tx.Events {
+		if ev == nil || ev.Created == nil {
+			continue
+		}
+		fmt.Println("MINT CREATED:", strings.TrimPrefix(ev.Created.TemplateID, "#"))
+	}
+
+	holdingTmpl := normTmplID(coin.CoinHolding{}.GetTemplateID())
+
+	var bobHoldingCid string
+	for _, ev := range tx.Events {
+		if ev == nil || ev.Created == nil {
+			continue
+		}
+
+		evTmpl := normTmplID(ev.Created.TemplateID)
+		fmt.Println("EV:", evTmpl)
+
+		if evTmpl == holdingTmpl {
+			bobHoldingCid = ev.Created.ContractID
+			break
+		}
+	}
+
+	require.NotEmpty(t, bobHoldingCid, "no CoinHolding create found in mint transaction")
+	t.Logf("Alice minted to Bob, CoinHolding CID: %s", bobHoldingCid)
+
+	holdingTmpl = normTmplID(coin.CoinHolding{}.GetTemplateID())
+
+	spliceHoldingCid, err := findSpliceHoldingFromACS(ctx, p2, bob, bob, alice, "LINK")
+	require.NoError(t, err)
+	require.NotEmpty(t, spliceHoldingCid)
+	t.Logf("Splice Holding CID: %s", spliceHoldingCid)
+
+	require.NotEmpty(t, bobHoldingCid, "no CoinHolding create found in mint tx")
+	require.NotEmpty(t, spliceHoldingCid, "no embedded Splice Holding CID found in CoinHolding.view")
+
+	t.Logf("Alice minted to Bob, CoinHolding CID: %s", bobHoldingCid)
+	t.Logf("Embedded Splice Holding CID: %s", spliceHoldingCid)
+
+	// TEST3: Bob transfers part of their holdings to Charlie (no Charlie rights needed)
+	// u, err = p3.UserMng.GetUser(ctx, UserName)
+	// require.NoError(t, err)
+	// partyCharlie := u.PrimaryParty
+
+	// now := time.Now()
+	// requestedAt := types.TIMESTAMP(now)
+	// executeBefore := types.TIMESTAMP(now.Add(24 * time.Hour))
+
+	// inputHolding := types.CONTRACT_ID(spliceHoldingCid) // NOT bobCoinHoldingCid
+
+	// // Build args (adjust nested type name if your codegen differs)
+	// transferArgs := coin.TransferFactoryTransfer{
+	// 	ExpectedAdmin: types.PARTY(alice),
+	// 	Transfer: coin.Transfer222{
+	// 		Sender:        types.PARTY(bob),
+	// 		Receiver:      types.PARTY(partyCharlie),
+	// 		Amount:        types.NUMERIC(big.NewInt(0)),
+	// 		InstrumentId:  coin.InstrumentId{Admin: types.PARTY(alice), Id: "LINK"},
+	// 		RequestedAt:   requestedAt,
+	// 		ExecuteBefore: executeBefore,
+	// 		InputHoldingCids: []types.CONTRACT_ID{
+	// 			inputHolding,
+	// 		},
+	// 		Meta: coin.Metadata{Values: types.TEXTMAP{}},
+	// 	},
+	// 	ExtraArgs: coin.ExtraArgs{
+	// 		Context: coin.ChoiceContext{Values: types.TEXTMAP{}},
+	// 		Meta:    coin.Metadata{Values: types.TEXTMAP{}},
+	// 	},
+	// }
+
+	// // Exercise command via your generated binding (interface choice)
+	// exerciseCmd = coin.CoinRegistry{}.TransferFactoryTransfer(registryContractID, transferArgs)
+
+	// // ---- Interactive submission for disclosure ----
+	// cmdID := uuid.Must(uuid.NewUUID()).String()
+
+	// prepReq := &model.PrepareSubmissionRequest{
+	// 	UserID:    UserName,
+	// 	CommandID: cmdID,
+	// 	Commands:  []*model.Command{{Command: exerciseCmd}},
+	// 	ActAs:     []string{bob},
+	// 	ReadAs:    []string{bob},
+	// 	DisclosedContracts: []*model.DisclosedContract{
+	// 		disclosedRegistry, // ✅ must include CreatedEventBlob + SynchronizerID
+	// 	},
+	// }
+
+	// prepResp, err := p2.InteractiveSubmissionService.PrepareSubmission(ctx, prepReq)
+	// require.NoError(t, err)
+
+	// // Find the right signer helper in your repo. It should produce *model.SinglePartySignatures for bob.
+
+	// _, err = p2.InteractiveSubmissionService.ExecuteSubmission(ctx, &model.ExecuteSubmissionRequest{
+	// 	PreparedTransaction:  prepResp.PreparedTransaction,
+	// 	HashingSchemeVersion: prepResp.HashingSchemeVersion,
+	// 	UserID:               UserName,
+	// 	SubmissionID:         uuid.Must(uuid.NewUUID()).String(),
+	// 	PartySignatures: []*model.SinglePartySignatures{
+	// 		{
+	// 			Party: bob,
+	// 			Signatures: []*model.Signature{
+	// 				{
+	// 					Format:    model.SignatureFormatRaw,
+	// 					Signature: []byte("TODO-signature"), // <-- you must produce these bytes
+	// 					SignedBy:  bob,                      // or key-id depending on your signer setup
+	// 					// SigningAlgorithmSpec: model.SigningAlgorithmSpecED25519, etc
 	// 				},
 	// 			},
 	// 		},
-	// 		ActAs: []string{partyAlice},
 	// 	},
-	// 	TransactionFormat: nil,
 	// })
 	// require.NoError(t, err)
-	// bobCoinHoldingCid := ""
-	// for _, event := range res.GetTransaction().GetEvents() {
-	// 	if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-	// 		bobCoinHoldingCid = e.Created.ContractId
+
+	// ---- Fetch update: easiest is to use the command id you just submitted ----
+	// If your SDK exposes GetTransactionByID or query-by-command-id, use it.
+	// With your current model, you can usually call GetUpdateById only if you have the UpdateID.
+	// If ExecuteSubmission doesn't return UpdateID, you can instead stream updates and match CommandID.
+
+	// Example pattern (pseudo-ish): stream updates until you see Transaction.CommandID == cmdID
+	// update, err := WaitForTransactionByCommandID(ctx, p2, bob, cmdID)
+	// require.NoError(t, err)
+	// require.NotNil(t, upd.Transaction)
+
+	// // Find the TransferInstruction that Charlie receives.
+	// // Your old code matched EntityName == "CoinTransferInstruction".
+	// // Here: match template id suffix.
+	// wantModule, wantEntity = "Coin.TransferInstruction", "CoinTransferInstruction" // adjust to your actual module/entity
+	// var transferInstructionCid string
+
+	// for _, ev := range upd.Transaction.Events {
+	// 	if ev.Created == nil {
+	// 		continue
+	// 	}
+	// 	gotModule, gotEntity := templateSuffix(ev.Created.TemplateID)
+	// 	if gotModule == wantModule && gotEntity == wantEntity {
+	// 		transferInstructionCid = ev.Created.ContractID
+	// 		break
 	// 	}
 	// }
-	// fmt.Printf("Alice minted to Bob, CID: %v\n", bobCoinHoldingCid)
 
-	// // Bob transfers part of their holdings to charlie
+	// require.NotEmpty(t, transferInstructionCid, "no CoinTransferInstruction create found in transfer transaction")
+	// t.Logf("Bob transferred to Charlie, CoinTransferInstruction CID: %s", transferInstructionCid)
+
 	// res, err = participant2.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 	// 	Commands: &apiv2.Commands{
 	// 		CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -1164,3 +1401,262 @@ var emptyChoiceContext = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Re
 		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
 	},
 }}}}
+
+func WaitForTransactionByCommandID(
+	ctx context.Context,
+	cl *client.DamlBindingClient,
+	party string,
+	cmdID string,
+	beginExclusive int64,
+) (*model.Transaction, error) {
+
+	coinHoldingTmpl := strings.TrimPrefix(coin.CoinHolding{}.GetTemplateID(), "#")
+
+	updCh, errCh := cl.UpdateService.GetUpdates(ctx, &model.GetUpdatesRequest{
+		BeginExclusive: beginExclusive,
+		Filter: &model.TransactionFilter{
+			FiltersByParty: map[string]*model.Filters{
+				party: {}, // wildcard
+			},
+		},
+		UpdateFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {
+					Inclusive: &model.InclusiveFilters{
+						TemplateFilters: []*model.TemplateFilter{
+							{
+								TemplateID:              coinHoldingTmpl,
+								IncludeCreatedEventBlob: true, // ✅ gives you CreatedEventBlob
+							},
+						},
+					},
+				},
+			},
+			Verbose: true,
+		},
+		Verbose: true,
+	})
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case err := <-errCh:
+			if err != nil {
+				return nil, err
+			}
+		case resp, ok := <-updCh:
+			if !ok {
+				return nil, fmt.Errorf("update stream closed before finding cmdID=%s", cmdID)
+			}
+			if resp == nil || resp.Update == nil || resp.Update.Transaction == nil {
+				continue
+			}
+			tx := resp.Update.Transaction
+			if tx.CommandID == cmdID {
+				return tx, nil
+			}
+		}
+	}
+}
+
+func findCreatedCIDBySuffix(tx *model.Transaction, suffix string) string {
+	if tx == nil {
+		return ""
+	}
+	for _, ev := range tx.Events {
+		if ev == nil || ev.Created == nil {
+			continue
+		}
+		if strings.HasSuffix(normTmplID(ev.Created.TemplateID), suffix) {
+			return ev.Created.ContractID
+		}
+	}
+	return ""
+}
+
+func findSpliceHoldingFromACS(
+	ctx context.Context,
+	cl *client.DamlBindingClient,
+	witnessParty string,
+	ownerParty string,
+	adminParty string,
+	instrument string,
+) (string, error) {
+
+	le, err := cl.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
+	if err != nil {
+		return "", err
+	}
+
+	req := &model.GetActiveContractsRequest{
+		ActiveAtOffset: le.Offset,
+		EventFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				witnessParty: {
+					Inclusive: &model.InclusiveFilters{
+						// ✅ wildcard: no TemplateFilters (this is important)
+						TemplateFilters: []*model.TemplateFilter{},
+					},
+				},
+			},
+			Verbose: true,
+		},
+	}
+
+	respCh, errCh := cl.StateService.GetActiveContracts(ctx, req)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+
+		case err, ok := <-errCh:
+			if ok && err != nil {
+				return "", err
+			}
+
+		case resp, ok := <-respCh:
+			if !ok {
+				return "", fmt.Errorf("no matching Splice Holding found in ACS")
+			}
+			entry, ok := resp.ContractEntry.(*model.ActiveContractEntry)
+			if !ok || entry.ActiveContract == nil || entry.ActiveContract.CreatedEvent == nil {
+				continue
+			}
+
+			ce := entry.ActiveContract.CreatedEvent
+			tid := strings.TrimPrefix(ce.TemplateID, "#")
+
+			// ✅ ignore package id, match only module/entity suffix
+			if !strings.HasSuffix(tid, ":Splice.Api.Token.HoldingV1:Holding") {
+				continue
+			}
+
+			// Now inspect args (Verbose must be true to decode CreateArguments)
+			args, ok := ce.CreateArguments.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			owner, _ := args["owner"].(string)
+			inst, _ := args["instrumentId"].(map[string]any)
+			instAdmin, _ := inst["admin"].(string)
+			instId, _ := inst["id"].(string)
+
+			if owner == ownerParty && instAdmin == adminParty && instId == instrument {
+				return ce.ContractID, nil
+			}
+		}
+	}
+}
+
+func findFirstContractIDString(v any) (string, bool) {
+	switch x := v.(type) {
+	case string:
+		// Coin/Splice contract ids are long hex-ish strings starting with 00...
+		// We keep this conservative: only accept ones that look like your CIDs.
+		if strings.HasPrefix(x, "00") && len(x) > 20 {
+			return x, true
+		}
+		return "", false
+
+	case map[string]any:
+		for _, vv := range x {
+			if cid, ok := findFirstContractIDString(vv); ok {
+				return cid, true
+			}
+		}
+		return "", false
+
+	case []any:
+		for _, vv := range x {
+			if cid, ok := findFirstContractIDString(vv); ok {
+				return cid, true
+			}
+		}
+		return "", false
+
+	default:
+		return "", false
+	}
+}
+
+// findFirstContractIDInRecord searches a Daml-LF Record/Value tree and returns the first ContractId string.
+func findFirstContractIDInRecord(rec *v2.Record) (string, bool) {
+	if rec == nil {
+		return "", false
+	}
+	for _, f := range rec.Fields {
+		if f == nil || f.Value == nil {
+			continue
+		}
+		if cid, ok := findFirstContractIDInValue(f.Value); ok {
+			return cid, true
+		}
+	}
+	return "", false
+}
+
+func findFirstContractIDInValue(v *v2.Value) (string, bool) {
+	if v == nil {
+		return "", false
+	}
+
+	switch sum := v.Sum.(type) {
+
+	case *v2.Value_ContractId:
+		if sum.ContractId != "" {
+			return sum.ContractId, true
+		}
+
+	case *v2.Value_Record:
+		return findFirstContractIDInRecord(sum.Record)
+
+	case *v2.Value_Variant:
+		// variant has a constructor + inner value
+		return findFirstContractIDInValue(sum.Variant.Value)
+
+	case *v2.Value_Optional:
+		// optional has a value or nil
+		return findFirstContractIDInValue(sum.Optional.Value)
+
+	case *v2.Value_List:
+		for _, e := range sum.List.Elements {
+			if cid, ok := findFirstContractIDInValue(e); ok {
+				return cid, true
+			}
+		}
+
+	case *v2.Value_TextMap:
+		for _, e := range sum.TextMap.Entries {
+			if e == nil || e.Value == nil {
+				continue
+			}
+			if cid, ok := findFirstContractIDInValue(e.Value); ok {
+				return cid, true
+			}
+		}
+
+	case *v2.Value_GenMap:
+		for _, e := range sum.GenMap.Entries {
+			if e == nil {
+				continue
+			}
+			if cid, ok := findFirstContractIDInValue(e.Key); ok {
+				return cid, true
+			}
+			if cid, ok := findFirstContractIDInValue(e.Value); ok {
+				return cid, true
+			}
+		}
+	}
+
+	return "", false
+}
+
+func dumpRecord(t *testing.T, rec *v2.Record) {
+	b, err := protojson.MarshalOptions{Multiline: true, Indent: "  "}.Marshal(rec)
+	require.NoError(t, err)
+	t.Logf("CreateArguments record:\n%s", string(b))
+}

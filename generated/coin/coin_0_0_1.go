@@ -63,7 +63,13 @@ func (t CoinHolding) GetTemplateID() string {
 func (t CoinHolding) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["view"] = t.View
+	args["view"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.View).(mapper); ok {
+			return m.toMap()
+		}
+		return t.View
+	}()
 
 	args["issuer"] = t.Issuer.ToMap()
 
@@ -129,9 +135,21 @@ func (t CoinRegistry) CreateCommand() *model.CreateCommand {
 
 	args["issuer"] = t.Issuer.ToMap()
 
-	args["instrumentId"] = t.InstrumentId
+	args["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
-	args["meta"] = t.Meta
+	args["meta"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -166,7 +184,7 @@ func (t CoinRegistry) Archive(contractID string) *model.ExerciseCommand {
 // TransferFactoryTransfer exercises the TransferFactory_Transfer choice on this CoinRegistry contract via the ITransferFactory interface
 func (t CoinRegistry) TransferFactoryTransfer(contractID string, args TransferFactoryTransfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "TransferFactory"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281", "Splice.Api.Token.TransferInstructionV1", "TransferFactory"),
 		ContractID: contractID,
 		Choice:     "TransferFactory_Transfer",
 		Arguments:  argsToMap(args),
@@ -196,7 +214,7 @@ func (t CoinRegistry) BurnMintFactoryPublicFetch(contractID string, args BurnMin
 // BurnMintFactoryBurnMint exercises the BurnMintFactory_BurnMint choice on this CoinRegistry contract via the IBurnMintFactory interface
 func (t CoinRegistry) BurnMintFactoryBurnMint(contractID string, args BurnMintFactoryBurnMint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "BurnMintFactory"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", "9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e", "Splice.Api.Token.BurnMintV1", "BurnMintFactory"),
 		ContractID: contractID,
 		Choice:     "BurnMintFactory_BurnMint",
 		Arguments:  argsToMap(args),
@@ -226,7 +244,13 @@ func (t CoinTransferInstruction) GetTemplateID() string {
 func (t CoinTransferInstruction) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["holding"] = t.Holding
+	args["holding"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Holding).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Holding
+	}()
 
 	args["newOwner"] = t.NewOwner.ToMap()
 
@@ -378,7 +402,13 @@ func (t MintPreapprovalMint) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
 		"issuer": t.Issuer.ToMap(),
-		"view":   t.View,
+		"view": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.View).(mapper); ok {
+				return m.toMap()
+			}
+			return t.View
+		}(),
 	}
 }
 
@@ -466,8 +496,14 @@ type MintRoleMint struct {
 func (t MintRoleMint) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"instrumentId": t.InstrumentId,
-		"outputs":      t.Outputs,
+		"instrumentId": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.InstrumentId).(mapper); ok {
+				return m.toMap()
+			}
+			return t.InstrumentId
+		}(),
+		"outputs": t.Outputs,
 	}
 }
 

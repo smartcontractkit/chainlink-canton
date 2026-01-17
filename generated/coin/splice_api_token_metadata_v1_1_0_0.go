@@ -184,7 +184,13 @@ type ChoiceContext struct {
 func (t ChoiceContext) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"values": t.Values,
+		"values": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Values).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Values
+		}(),
 	}
 }
 
@@ -209,7 +215,13 @@ type ChoiceExecutionMetadata struct {
 func (t ChoiceExecutionMetadata) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"meta": t.Meta,
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -235,8 +247,20 @@ type ExtraArgs struct {
 func (t ExtraArgs) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"context": t.Context,
-		"meta":    t.Meta,
+		"context": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Context).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Context
+		}(),
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -261,7 +285,13 @@ type Metadata struct {
 func (t Metadata) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"values": t.Values,
+		"values": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Values).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Values
+		}(),
 	}
 }
 

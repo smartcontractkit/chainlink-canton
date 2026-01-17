@@ -65,14 +65,32 @@ type Transfer2 struct {
 func (t Transfer2) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"sender":           t.Sender.ToMap(),
-		"receiver":         t.Receiver.ToMap(),
-		"amount":           (*big.Int)(t.Amount),
-		"instrumentId":     t.InstrumentId,
-		"requestedAt":      t.RequestedAt,
-		"executeBefore":    t.ExecuteBefore,
-		"inputHoldingCids": t.InputHoldingCids,
-		"meta":             t.Meta,
+		"sender":   t.Sender.ToMap(),
+		"receiver": t.Receiver.ToMap(),
+		"amount":   (*big.Int)(t.Amount),
+		"instrumentId": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.InstrumentId).(mapper); ok {
+				return m.toMap()
+			}
+			return t.InstrumentId
+		}(),
+		"requestedAt":   t.RequestedAt,
+		"executeBefore": t.ExecuteBefore,
+		"inputHoldingCids": func() []interface{} {
+			res := make([]interface{}, 0, len(t.InputHoldingCids))
+			for _, e := range t.InputHoldingCids {
+				res = append(res, e)
+			}
+			return res
+		}(),
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -99,7 +117,13 @@ func (t TransferFactoryView) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
 		"admin": t.Admin.ToMap(),
-		"meta":  t.Meta,
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -154,8 +178,20 @@ func (t TransferFactoryTransfer) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
 		"expectedAdmin": t.ExpectedAdmin.ToMap(),
-		"transfer":      t.Transfer,
-		"extraArgs":     t.ExtraArgs,
+		"transfer": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Transfer).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Transfer
+		}(),
+		"extraArgs": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExtraArgs).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExtraArgs
+		}(),
 	}
 }
 
@@ -182,9 +218,27 @@ type TransferInstructionResult struct {
 func (t TransferInstructionResult) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"output":           t.Output,
-		"senderChangeCids": t.SenderChangeCids,
-		"meta":             t.Meta,
+		"output": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Output).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Output
+		}(),
+		"senderChangeCids": func() []interface{} {
+			res := make([]interface{}, 0, len(t.SenderChangeCids))
+			for _, e := range t.SenderChangeCids {
+				res = append(res, e)
+			}
+			return res
+		}(),
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -209,7 +263,13 @@ type TransferInstructionResultCompleted struct {
 func (t TransferInstructionResultCompleted) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"receiverHoldingCids": t.ReceiverHoldingCids,
+		"receiverHoldingCids": func() []interface{} {
+			res := make([]interface{}, 0, len(t.ReceiverHoldingCids))
+			for _, e := range t.ReceiverHoldingCids {
+				res = append(res, e)
+			}
+			return res
+		}(),
 	}
 }
 
@@ -292,7 +352,13 @@ type TransferInstructionResultPending struct {
 func (t TransferInstructionResultPending) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"transferInstructionCid": t.TransferInstructionCid,
+		"transferInstructionCid": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.TransferInstructionCid).(mapper); ok {
+				return m.toMap()
+			}
+			return t.TransferInstructionCid
+		}(),
 	}
 }
 
@@ -370,9 +436,27 @@ func (t TransferInstructionView) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
 		"originalInstructionCid": *t.OriginalInstructionCid,
-		"transfer":               t.Transfer,
-		"status":                 t.Status,
-		"meta":                   t.Meta,
+		"transfer": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Transfer).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Transfer
+		}(),
+		"status": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Status).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Status
+		}(),
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -397,7 +481,13 @@ type TransferInstructionAccept struct {
 func (t TransferInstructionAccept) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"extraArgs": t.ExtraArgs,
+		"extraArgs": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExtraArgs).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExtraArgs
+		}(),
 	}
 }
 
@@ -422,7 +512,13 @@ type TransferInstructionReject struct {
 func (t TransferInstructionReject) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"extraArgs": t.ExtraArgs,
+		"extraArgs": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExtraArgs).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExtraArgs
+		}(),
 	}
 }
 
@@ -448,8 +544,20 @@ type TransferInstructionUpdate struct {
 func (t TransferInstructionUpdate) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"extraActors": t.ExtraActors,
-		"extraArgs":   t.ExtraArgs,
+		"extraActors": func() []interface{} {
+			res := make([]interface{}, 0, len(t.ExtraActors))
+			for _, e := range t.ExtraActors {
+				res = append(res, e.ToMap())
+			}
+			return res
+		}(),
+		"extraArgs": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExtraArgs).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExtraArgs
+		}(),
 	}
 }
 
@@ -474,7 +582,13 @@ type TransferInstructionWithdraw struct {
 func (t TransferInstructionWithdraw) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"extraArgs": t.ExtraArgs,
+		"extraArgs": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExtraArgs).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExtraArgs
+		}(),
 	}
 }
 

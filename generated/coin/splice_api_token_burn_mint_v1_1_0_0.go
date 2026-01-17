@@ -41,7 +41,13 @@ func (t BurnMintFactoryView) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
 		"admin": t.Admin.ToMap(),
-		"meta":  t.Meta,
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -71,12 +77,47 @@ type BurnMintFactoryBurnMint struct {
 func (t BurnMintFactoryBurnMint) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"expectedAdmin":    t.ExpectedAdmin.ToMap(),
-		"instrumentId":     t.InstrumentId,
-		"inputHoldingCids": t.InputHoldingCids,
-		"outputs":          t.Outputs,
-		"extraActors":      t.ExtraActors,
-		"extraArgs":        t.ExtraArgs,
+		"expectedAdmin": t.ExpectedAdmin.ToMap(),
+		"instrumentId": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.InstrumentId).(mapper); ok {
+				return m.toMap()
+			}
+			return t.InstrumentId
+		}(),
+		"inputHoldingCids": func() []interface{} {
+			res := make([]interface{}, 0, len(t.InputHoldingCids))
+			for _, e := range t.InputHoldingCids {
+				res = append(res, e)
+			}
+			return res
+		}(),
+		"outputs": func() []interface{} {
+			res := make([]interface{}, 0, len(t.Outputs))
+			for _, e := range t.Outputs {
+				type mapper interface{ toMap() map[string]interface{} }
+				if m, ok := any(e).(mapper); ok {
+					res = append(res, m.toMap())
+				} else {
+					res = append(res, e)
+				}
+			}
+			return res
+		}(),
+		"extraActors": func() []interface{} {
+			res := make([]interface{}, 0, len(t.ExtraActors))
+			for _, e := range t.ExtraActors {
+				res = append(res, e.ToMap())
+			}
+			return res
+		}(),
+		"extraArgs": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExtraArgs).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExtraArgs
+		}(),
 	}
 }
 
@@ -101,7 +142,13 @@ type BurnMintFactoryBurnMintResult struct {
 func (t BurnMintFactoryBurnMintResult) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"outputCids": t.OutputCids,
+		"outputCids": func() []interface{} {
+			res := make([]interface{}, 0, len(t.OutputCids))
+			for _, e := range t.OutputCids {
+				res = append(res, e)
+			}
+			return res
+		}(),
 	}
 }
 
@@ -155,9 +202,15 @@ type BurnMintOutput struct {
 func (t BurnMintOutput) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"owner":   t.Owner.ToMap(),
-		"amount":  (*big.Int)(t.Amount),
-		"context": t.Context,
+		"owner":  t.Owner.ToMap(),
+		"amount": (*big.Int)(t.Amount),
+		"context": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Context).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Context
+		}(),
 	}
 }
 

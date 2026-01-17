@@ -37,11 +37,23 @@ type HoldingView struct {
 func (t HoldingView) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"owner":        t.Owner.ToMap(),
-		"instrumentId": t.InstrumentId,
-		"amount":       (*big.Int)(t.Amount),
-		"lock":         *t.Lock,
-		"meta":         t.Meta,
+		"owner": t.Owner.ToMap(),
+		"instrumentId": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.InstrumentId).(mapper); ok {
+				return m.toMap()
+			}
+			return t.InstrumentId
+		}(),
+		"amount": (*big.Int)(t.Amount),
+		"lock":   *t.Lock,
+		"meta": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.Meta).(mapper); ok {
+				return m.toMap()
+			}
+			return t.Meta
+		}(),
 	}
 }
 
@@ -96,10 +108,22 @@ type Lock struct {
 func (t Lock) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
-		"holders":      t.Holders,
-		"expiresAt":    *t.ExpiresAt,
-		"expiresAfter": t.ExpiresAfter,
-		"context":      string(*t.Context),
+		"holders": func() []interface{} {
+			res := make([]interface{}, 0, len(t.Holders))
+			for _, e := range t.Holders {
+				res = append(res, e.ToMap())
+			}
+			return res
+		}(),
+		"expiresAt": *t.ExpiresAt,
+		"expiresAfter": func() interface{} {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(t.ExpiresAfter).(mapper); ok {
+				return m.toMap()
+			}
+			return t.ExpiresAfter
+		}(),
+		"context": string(*t.Context),
 	}
 }
 
