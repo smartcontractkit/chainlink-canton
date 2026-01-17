@@ -554,43 +554,6 @@ func TestCoin(t *testing.T) {
 	upload(p4)
 	upload(p5)
 
-	// Get primary party for this user
-	u, err := p1.UserMng.GetUser(ctx, UserName)
-	require.NoError(t, err)
-	party := u.PrimaryParty
-	require.NotEmpty(t, party)
-
-	// (optional) ensure rights (add both ActAs + ReadAs)
-	rights, err := p1.UserMng.ListUserRights(ctx, UserName)
-	require.NoError(t, err)
-
-	hasAct, hasRead := false, false
-	for _, r := range rights {
-		if canAct, ok := r.Type.(model.RightType).(model.CanActAs); ok && canAct.Party == party {
-			hasAct = true
-		}
-		if canRead, ok := r.Type.(model.RightType).(model.CanReadAs); ok && canRead.Party == party {
-			hasRead = true
-		}
-	}
-	var newRights []*model.Right
-	if !hasAct {
-		newRights = append(newRights, &model.Right{Type: model.CanActAs{Party: party}})
-	}
-	if !hasRead {
-		newRights = append(newRights, &model.Right{Type: model.CanReadAs{Party: party}})
-	}
-	if len(newRights) > 0 {
-		_, err := p1.UserMng.GrantUserRights(ctx, UserName, "", newRights)
-		require.NoError(t, err)
-	}
-
-	// parties, err := p1.PartyMng.ListKnownParties(ctx, "", 100, "")
-	// require.NoError(t, err)
-	// for i, pd := range parties.PartyDetails {
-	// 	fmt.Printf("%d: party=%q display=%q\n", i, pd.Party, pd.IdentityProviderID)
-	// }
-
 	// Allocate parties (Admin service: PartyMng)
 	// alloc := func(p *client.DamlBindingClient, hint string) string {
 	// 	resp, err := p.PartyMng.AllocateParty(ctx, hint, map[string]string{
@@ -600,8 +563,45 @@ func TestCoin(t *testing.T) {
 	// 	return resp.Party
 	// }
 
+	// Get primary party for this user
+	u, err := p1.UserMng.GetUser(ctx, UserName)
+	require.NoError(t, err)
+	partyAlice := u.PrimaryParty
+	require.NotEmpty(t, partyAlice)
+
+	// (optional) ensure rights (add both ActAs + ReadAs)
+	rights, err := p1.UserMng.ListUserRights(ctx, UserName)
+	require.NoError(t, err)
+
+	hasAct, hasRead := false, false
+	for _, r := range rights {
+		if canAct, ok := r.Type.(model.RightType).(model.CanActAs); ok && canAct.Party == partyAlice {
+			hasAct = true
+		}
+		if canRead, ok := r.Type.(model.RightType).(model.CanReadAs); ok && canRead.Party == partyAlice {
+			hasRead = true
+		}
+	}
+	var newRights []*model.Right
+	if !hasAct {
+		newRights = append(newRights, &model.Right{Type: model.CanActAs{Party: partyAlice}})
+	}
+	if !hasRead {
+		newRights = append(newRights, &model.Right{Type: model.CanReadAs{Party: partyAlice}})
+	}
+	if len(newRights) > 0 {
+		_, err := p1.UserMng.GrantUserRights(ctx, UserName, "", newRights)
+		require.NoError(t, err)
+	}
+
+	parties, err := p1.PartyMng.ListKnownParties(ctx, "", 100, "")
+	require.NoError(t, err)
+	for i, pd := range parties.PartyDetails {
+		fmt.Printf("%d: party=%q display=%q\n", i, pd.Party, pd.IdentityProviderID)
+	}
+
 	// partyAlice := "Alice::1220e3bc36130743ea9420f73fef0081f36380a836630805fe6043b5b8ec8c1b70e0"
-	// partyAlice := alloc(p1, "Alice")
+	// partyAlice = alloc(p1, "Alice")
 	// partyBob := alloc(p2, "Bob")
 	// partyCharlie := alloc(p3, "Charlie")
 	// partyDave := alloc(p4, "Dave")
@@ -627,13 +627,13 @@ func TestCoin(t *testing.T) {
 	require.NotEmpty(t, actAsParty, "no CanActAs right found")
 
 	fmt.Println("READ AS PARTY: ", readAsParty)
-	party = actAsParty
+	partyAlice = actAsParty
 
 	// Create registry contract (USING YOUR GENERATED BINDINGS)
 	reg := coin.CoinRegistry{
-		Issuer: types.PARTY(party),
+		Issuer: types.PARTY(partyAlice),
 		InstrumentId: coin.InstrumentId{
-			Admin: types.PARTY(party),
+			Admin: types.PARTY(partyAlice),
 			Id:    "LINK",
 		},
 		Meta: coin.Metadata{
@@ -647,7 +647,7 @@ func TestCoin(t *testing.T) {
 			WorkflowID: "coin-test",
 			UserID:     UserName,
 			CommandID:  uuid.Must(uuid.NewUUID()).String(),
-			ActAs:      []string{party},
+			ActAs:      []string{partyAlice},
 			Commands:   []*model.Command{{Command: reg.CreateCommand()}},
 		},
 	}
@@ -659,7 +659,7 @@ func TestCoin(t *testing.T) {
 		UpdateID: submitResp.UpdateID,
 		UpdateFormat: &model.EventFormat{
 			FiltersByParty: map[string]*model.Filters{
-				party: {
+				partyAlice: {
 					Inclusive: &model.InclusiveFilters{
 						TemplateFilters: []*model.TemplateFilter{},
 					},
@@ -704,7 +704,7 @@ func TestCoin(t *testing.T) {
 	registryTemplateID := upd.Transaction.Events[0].Created.TemplateID // or from the matching create you found
 
 	disclosedRegistry, err := QueryDisclosedContractWithBindingClient(
-		ctx, p1, party, registryContractID, registryTemplateID,
+		ctx, p1, partyAlice, registryContractID, registryTemplateID,
 	)
 	require.NoError(t, err)
 	fmt.Println("Queried registry for disclosure: ", disclosedRegistry)
@@ -734,7 +734,7 @@ func TestCoin(t *testing.T) {
 
 	mintPreapproval := coin.MintPreapproval{
 		Receiver: types.PARTY(partyBob),
-		Sender:   types.PARTY(party),
+		Sender:   types.PARTY(partyAlice),
 	}
 
 	t.Logf("BOB ACT AS PARTY: %s", bobActAs)
@@ -792,8 +792,7 @@ func TestCoin(t *testing.T) {
 	t.Logf("Bob created MintPreapproval, CID: %s", bobMintPreapprovalCid)
 
 	// TEST2 Alice mints to Bob (USING GENERATED BINDINGS + SubmitAndWait)
-
-	alice := party // this is party Alice
+	alice := partyAlice // this is party Alice
 	bob := partyBob
 
 	// registryContractID should be the *contract id* of the CoinRegistry you created earlier
@@ -819,7 +818,7 @@ func TestCoin(t *testing.T) {
 				Owner: types.PARTY(bob),
 
 				// set below (avoid placeholder)
-				Amount: nil,
+				Amount: types.NUMERIC(big.NewInt(4213)),
 
 				Context: coin.ChoiceContext{
 					Values: types.TEXTMAP{
@@ -839,19 +838,6 @@ func TestCoin(t *testing.T) {
 			Context: coin.ChoiceContext{Values: types.TEXTMAP{}},
 			Meta:    coin.Metadata{Values: types.TEXTMAP{}},
 		},
-	}
-
-	// set NUMERIC precisely (don’t use float)
-	mintArgs.Outputs[0].Amount = types.NUMERIC(big.NewInt(0))
-	{
-		// 42.13 in DAML numeric string form.
-		// Depending on your NUMERIC representation, easiest is to set it via codec-friendly big.Int scaling.
-		// If your runtime uses convertBigIntToNumeric(v, 10).FloatString(10),
-		// then store 4213 with scale=2, or just use big.Rat elsewhere.
-		// If you already have a helper to parse "42.13" -> *big.Int, use it here.
-		amt, ok := new(big.Int).SetString("4213", 10) // representing 42.13 with scale 2 (example)
-		require.True(t, ok)
-		mintArgs.Outputs[0].Amount = types.NUMERIC(amt)
 	}
 
 	// Exercise the choice via binding (on the registry contract id)
@@ -891,21 +877,24 @@ func TestCoin(t *testing.T) {
 
 	fmt.Println("MintResp: ", mintResp)
 
-	tx, err := WaitForTransactionByCommandID(ctx, p1, alice, mintReq.Commands.CommandID, leBefore.Offset)
+	txAice, err := WaitForTransactionByCommandID(ctx, p1, alice, mintReq.Commands.CommandID, leBefore.Offset)
 	require.NoError(t, err)
-	require.NotNil(t, tx)
+	require.NotNil(t, txAice)
 
-	for _, ev := range tx.Events {
-		if ev == nil || ev.Created == nil {
-			continue
+	t.Logf("tx events: %d", len(upd.Transaction.Events))
+	for _, ev := range txAice.Events {
+		if ev.Created != nil {
+			fmt.Println("CREATED:", strings.TrimPrefix(ev.Created.TemplateID, "#"), ev.Created.ContractID)
 		}
-		fmt.Println("MINT CREATED:", strings.TrimPrefix(ev.Created.TemplateID, "#"))
+		if ev.Archived != nil {
+			fmt.Println("ARCHIVED:", strings.TrimPrefix(ev.Archived.TemplateID, "#"), ev.Archived.ContractID)
+		}
 	}
 
 	holdingTmpl := normTmplID(coin.CoinHolding{}.GetTemplateID())
 
 	var bobHoldingCid string
-	for _, ev := range tx.Events {
+	for _, ev := range txAice.Events {
 		if ev == nil || ev.Created == nil {
 			continue
 		}
