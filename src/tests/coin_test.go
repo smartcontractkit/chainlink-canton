@@ -1189,39 +1189,71 @@ func TestCoin(t *testing.T) {
 	leBeforeErinMint, err := p5.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
 	require.NoError(t, err)
 
-	updCh, errCh := p2.UpdateService.GetUpdates(ctx, &model.GetUpdatesRequest{
+	holdingTmpl = normTmplID(coin.CoinHolding{}.GetTemplateID())
+	// 1) Start updates stream on Erin's participant (p5), filtered to Erin + CoinHolding template
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+
+	updCh, errCh := p5.UpdateService.GetUpdates(streamCtx, &model.GetUpdatesRequest{
 		BeginExclusive: leBeforeErinMint.Offset,
 		Filter: &model.TransactionFilter{
 			FiltersByParty: map[string]*model.Filters{
-				partyErin: {},
+				partyErin: {
+					Inclusive: &model.InclusiveFilters{
+						TemplateFilters: []*model.TemplateFilter{
+							{
+								TemplateID:              coin.CoinHolding{}.GetTemplateID(),
+								IncludeCreatedEventBlob: true,
+							},
+						},
+					},
+				},
 			},
 		},
 		UpdateFormat: &model.EventFormat{
-			FiltersByParty: map[string]*model.Filters{partyErin: {}},
-			Verbose:        true,
+			FiltersByParty: map[string]*model.Filters{
+				partyErin: {
+					Inclusive: &model.InclusiveFilters{
+						TemplateFilters: []*model.TemplateFilter{
+							{
+								TemplateID:              coin.CoinHolding{}.GetTemplateID(),
+								IncludeCreatedEventBlob: true,
+							},
+						},
+					},
+				},
+			},
+			Verbose: true,
 		},
 		Verbose: true,
 	})
 	require.NoError(t, err)
 
-	// 1. Create a channel to pipe the specific CID back to the main thread
-	require.NoError(t, err)
-
+	// 2) Channel to return Erin's holding CID
 	erinCidChan := make(chan string, 1)
 
 	go func() {
+		defer close(erinCidChan)
+
 		for resp := range updCh {
-			tx := resp.Update.Transaction
-			if tx == nil {
+			upd := resp.Update
+			if upd == nil || upd.Transaction == nil {
 				continue
 			}
+			tx := upd.Transaction
 
-			for _, event := range tx.Events {
-				// Check specifically for the CoinHolding template to avoid noise
-				if event.Created != nil {
-					erinCidChan <- event.Created.ContractID
-					return
+			for _, ev := range tx.Events {
+				if ev == nil || ev.Created == nil {
+					continue
 				}
+				if normTmplID(ev.Created.TemplateID) != holdingTmpl {
+					continue
+				}
+
+				// Found Erin’s CoinHolding create
+				erinCidChan <- ev.Created.ContractID
+				cancelStream()
+				return
 			}
 		}
 	}()
@@ -1269,98 +1301,18 @@ func TestCoin(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Println("dave mint to erin resp: ", resp)
 
-	// res, err = participant4.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-	// 	Commands: &apiv2.Commands{
-	// 		CommandId: uuid.Must(uuid.NewUUID()).String(),
-	// 		Commands: []*apiv2.Command{
-	// 			{
-	// 				Command: &apiv2.Command_Exercise{
-	// 					Exercise: &apiv2.ExerciseCommand{
-	// 						TemplateId: &apiv2.Identifier{
-	// 							PackageId:  "#coin",
-	// 							ModuleName: "Coin.Registry",
-	// 							EntityName: "MintRole",
-	// 						},
-	// 						ContractId: daveMintRoleCid,
-	// 						Choice:     "MintRole_Mint",
-	// 						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 							{
-	// 								Label: "instrumentId",
-	// 								Value: instrumentId,
-	// 							}, {
-	// 								Label: "outputs",
-	// 								Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-	// 									{
-	// 										Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 											{
-	// 												Label: "owner",
-	// 												Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyErin}},
-	// 											}, {
-	// 												Label: "amount",
-	// 												Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "77.77"}},
-	// 											}, {
-	// 												Label: "context",
-	// 												Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	// 													{
-	// 														Label: "values",
-	// 														Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
-	// 															{
-	// 																Key: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "mint-preapproval"}},
-	// 																Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-	// 																	Constructor: "AV_ContractId",
-	// 																	Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: erinPreApprovalCid}},
-	// 																}}},
-	// 															},
-	// 														}}}},
-	// 													},
-	// 												}}}},
-	// 											},
-	// 										}}},
-	// 									},
-	// 								}}}},
-	// 							},
-	// 						}}}},
-	// 					},
-	// 				},
-	// 			},
-	// 		},
-	// 		ActAs: []string{partyDave},
-	// 		DisclosedContracts: []*apiv2.DisclosedContract{
-	// 			disclosedRegistry,
-	// 			disclosedErinPreApproval,
-	// 		},
-	// 	},
-	// })
-	// require.NoError(t, err)
-	// // Since the submitting party's (dave) node (participant4) isn't a stakeholder on the created contract (CoinHolding),
-	// // it doesn't actually receive the CreatedEvent as part of the transaction output.
-	// // This check here therefore won't result in a contract ID, despite us being a witness on the created contract.
-	// erinCoinHoldingCid := ""
-	// for i, event := range res.GetTransaction().GetEvents() {
-	// 	fmt.Printf("\tEvent %v: %v\n", i, event.GetEvent())
-	// 	if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-	// 		erinCoinHoldingCid = e.Created.ContractId
-	// 	}
-	// }
-	// fmt.Printf("Dave minted to Erin, CID: %v\n", erinCoinHoldingCid) // Will be empty
-	// fmt.Printf("Transaction: %+v\n", res.GetTransaction())
-
-	// // Wait for a couple of seconds, to receive the update on participant 5
-	// time.Sleep(time.Second * 3)
-	// fmt.Printf("Received CoinHolding creation update on Participant 5, CID: %v\n", erinHoldingCid)
-	// require.NotEmpty(t, erinHoldingCid)
-
-	// 3. Final Step: Wait for the result
-	var erinHoldingCid string
+	// 4) Wait for Erin’s holding CID from the async stream
 	select {
-	case erinHoldingCid = <-erinCidChan:
-		fmt.Printf("Captured: %s\n", erinHoldingCid)
-	case err := <-errCh:
-		t.Fatalf("Stream error: %v", err)
-	case <-time.After(10 * time.Second):
-		t.Fatal("Timeout waiting for erinHoldingCid")
-	}
+	case erinHoldingCid := <-erinCidChan:
+		require.NotEmpty(t, erinHoldingCid, "stream ended without observing CoinHolding")
+		t.Logf("Erin observed CoinHolding CID: %s", erinHoldingCid)
 
+	case err := <-errCh:
+		t.Fatalf("updates stream error: %v", err)
+
+	case <-time.After(30 * time.Second):
+		t.Fatal("Timeout waiting for Erin CoinHolding create via updates stream")
+	}
 }
 
 var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
