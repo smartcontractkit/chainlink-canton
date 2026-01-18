@@ -291,7 +291,7 @@ func (t CoinTransferInstruction) Archive(contractID string) *model.ExerciseComma
 // TransferInstructionAccept exercises the TransferInstruction_Accept choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 func (t CoinTransferInstruction) TransferInstructionAccept(contractID string, args TransferInstructionAccept) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "TransferInstruction"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281", "Splice.Api.Token.TransferInstructionV1", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "TransferInstruction_Accept",
 		Arguments:  argsToMap(args),
@@ -426,9 +426,9 @@ func (t *MintPreapprovalMint) UnmarshalJSON(data []byte) error {
 
 // MintRole is a Template type
 type MintRole struct {
-	Issuer   PARTY  `json:"issuer"`
-	Minter   PARTY  `json:"minter"`
-	Registry string `json:"registry"`
+	Issuer   PARTY       `json:"issuer"`
+	Minter   PARTY       `json:"minter"`
+	Registry CONTRACT_ID `json:"registry"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -444,7 +444,7 @@ func (t MintRole) CreateCommand() *model.CreateCommand {
 
 	args["minter"] = t.Minter.ToMap()
 
-	args["registry"] = string(t.Registry)
+	args["registry"] = t.Registry
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -488,8 +488,8 @@ func (t MintRole) MintRoleMint(contractID string, args MintRoleMint) *model.Exer
 
 // MintRoleMint is a Record type
 type MintRoleMint struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-	Outputs      LIST         `json:"outputs"`
+	InstrumentId InstrumentId     `json:"instrumentId"`
+	Outputs      []BurnMintOutput `json:"outputs"`
 }
 
 // toMap converts MintRoleMint to a map for DAML arguments
