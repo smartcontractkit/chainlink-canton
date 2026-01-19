@@ -26,7 +26,7 @@ data SourceChainConfig = SourceChainConfig
 template GlobalConfig
     with
         ccipOwner : Party
-        environmentId : Text
+        instanceId : Text
 
         chainSelector : Numeric 0
         onRampAddress : BytesHex

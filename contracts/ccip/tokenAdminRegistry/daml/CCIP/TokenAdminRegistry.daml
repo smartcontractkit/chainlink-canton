@@ -12,6 +12,7 @@ import qualified CCIP.Tickets
 template TokenAdminRegistry
     with
         owner : Party
+        instanceId : Text
 
         tokenConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenConfig
     where
