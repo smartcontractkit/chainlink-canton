@@ -4,8 +4,10 @@ import Daml.Script
 
 import DA.Crypto.Text (keccak256)
 import DA.Foldable (forA_)
+import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
+import CCIP.CCVRegistry qualified as CCVRegistry
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
 
@@ -20,12 +22,17 @@ setup = script do
     let hashedMsg = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> encodedMsg)
     debug ("Hashed message: " <> hashedMsg)
 
+    ccvRegistry <- submit owner do
+        createCmd CCVRegistry.CCVRegistry with
+            ccipOwner = owner
+            instanceId = "test-ccvregistry"
+
     -- Validate signatures individually
     forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
         let verified = CommitteeVerifier.validateSignature hashedMsg pubKey r s
         assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
 
-    
+
 
     debug ("===== Test1 =====")
     -- single signer, threshold 1
@@ -35,6 +42,8 @@ setup = script do
     ccv1 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv1"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -42,9 +51,11 @@ setup = script do
             signers = pubKeys1
     submit owner do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
             ccvData = ccvData
+            receiver = owner
             caller = owner
     debug ("===== Passed Test1 =====")
 
@@ -56,6 +67,8 @@ setup = script do
     ccv2 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv2"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -63,9 +76,11 @@ setup = script do
             signers = pubKeys2
     submit owner do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
             ccvData = ccvData2
+            receiver = owner
             caller = owner
     debug ("===== Passed Test2 =====")
 
@@ -77,6 +92,8 @@ setup = script do
     ccv3 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv3"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -91,6 +108,8 @@ setup = script do
     ccv4 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv4"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -98,9 +117,11 @@ setup = script do
             signers = pubKeys4
     submitMustFail owner do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
             ccvData = ccvData4
+            receiver = owner
             caller = owner
     debug ("===== Passed Test4 =====")
 
@@ -111,6 +132,8 @@ setup = script do
     ccv5 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv5"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -118,9 +141,11 @@ setup = script do
             signers = pubKeys5
     submitMustFail owner do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
             ccvData = ccvData5
+            receiver = owner
             caller = owner
     debug ("===== Passed Test5 =====")
 
@@ -131,6 +156,8 @@ setup = script do
     ccv6 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv6"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -138,9 +165,11 @@ setup = script do
             signers = pubKeys6
     submitMustFail owner do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
             ccvData = ccvData6
+            receiver = owner
             caller = owner
     debug ("===== Passed Test6 =====")
 
@@ -149,6 +178,8 @@ setup = script do
     ccv7 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv7"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -161,6 +192,8 @@ setup = script do
     ccv8 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv8"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = ""
@@ -174,6 +207,8 @@ setup = script do
     ccv9 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
+            instanceId = "test-ccv9"
+            versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
@@ -181,32 +216,38 @@ setup = script do
             signers = pubKeys9
     submitMustFail owner do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = --generate random invalid ccvData
+            ccvData =
                 "01234567" <> -- invalid version tag
                 "0004" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
+            receiver = owner
             caller = owner
     submitMustFail owner do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = --generate random invalid ccvData
+            ccvData =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "ffff" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
+            receiver = owner
             caller = owner
     submitMustFail owner do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = --generate random invalid ccvData
+            ccvData =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
+            receiver = owner
             caller = owner
-    
+
     debug ("===== Passed Test9 =====")
 
     debug ("===== All Tests Passed =====")

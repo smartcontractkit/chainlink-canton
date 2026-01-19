@@ -3,6 +3,7 @@ module CCIP.OnRamp where
 
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable qualified as Foldable
+import DA.Optional (isSome)
 
 import qualified CCIP.CCVId
 import qualified CCIP.GlobalConfig
@@ -16,7 +17,7 @@ import qualified Splice.Api.Token.HoldingV1
 template OnRamp
     with
         ccipOwner : Party
-        environmentId : Text
+        instanceId : Text
     where
         signatory ccipOwner
 
@@ -69,7 +70,6 @@ template OnRamp
         nonconsuming choice CCIPSendFromRouter : CCIPSendFromRouterResult
             with
                 routerPartyOwner : Party
-                routerEnvironmentId : Text
 
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -87,9 +87,6 @@ template OnRamp
 
             controller ccipOwner
             do
-                -- validate router environment matches
-                assertMsg "onramp: router environmentid mismatch"
-                    (routerEnvironmentId == environmentId)
 
                 -- fetch and validate global config
                 globalConfig <- fetch globalConfigCid

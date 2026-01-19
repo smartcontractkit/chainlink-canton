@@ -2,7 +2,6 @@
 module CCIP.PerPartyRouter where
 
 import DA.Map qualified as Map
-import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Optional (fromOptional)
 
@@ -19,33 +18,40 @@ import qualified Splice.Api.Token.HoldingV1
 
 
 -- | factory for creating perpartyrouters.
--- note: no stored cids - users pass all cids via explicit disclosure
+-- tracks (party, instanceId) combinations to prevent duplicate instanceIds.
 template PerPartyRouterFactory
     with
         ccipOwner : Party
-        environmentId : Text
-        registeredParties : Set.Set Party
+        instanceId : Text
+        registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
 
         choice CreateRouter : CreateRouterResult
             with
                 partyOwner : Party
+                instanceId : Text  -- user specifies their desired instanceId
             controller partyOwner
             do
+                -- check party doesn't already have a router
+                -- TODO: relax or remove this check as needed
                 assertMsg "router already exists for this party"
-                    (not (Set.member partyOwner registeredParties))
+                    (not (Map.member partyOwner registeredRouters))
+
+                -- check instanceId is not already taken
+                assertMsg "instanceId already in use"
+                    (instanceId `notElem` Map.values registeredRouters)
 
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
                     partyOwner = partyOwner
-                    environmentId = environmentId
+                    instanceId = instanceId
                     outboundSequenceNumbers = Map.empty
                     executionStates = Map.empty
                     receiverRequiredCCVs = []
 
                 newFactoryCid <- create this with
-                    registeredParties = Set.insert partyOwner registeredParties
+                    registeredRouters = Map.insert partyOwner instanceId registeredRouters
 
                 pure CreateRouterResult with
                     router = routerCid
@@ -56,7 +62,7 @@ template PerPartyRouterFactory
                 partyOwner : Party
                 caller : Party
             controller caller
-            do pure (Set.member partyOwner registeredParties)
+            do pure (Map.member partyOwner registeredRouters)
 
 
 data CreateRouterResult = CreateRouterResult
@@ -72,10 +78,11 @@ template PerPartyRouter
     with
         ccipOwner : Party
         partyOwner : Party
-        environmentId : Text
+        instanceId : Text
         -- only per-party state, no stored cids
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
+        receiverRequiredCCVs : [CCIP.CCVId.CCVId]
     where
         signatory ccipOwner
         observer partyOwner
@@ -98,12 +105,10 @@ template PerPartyRouter
                 ccvTickets : [ContractId CCIP.Tickets.CCVTicket]
             controller partyOwner
             do
-                -- validate onramp
+                -- validate onramp belongs to same deployment
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
                     (onRamp.ccipOwner == ccipOwner)
-                assertMsg "router: onramp environmentid mismatch"
-                    (onRamp.environmentId == environmentId)
 
                 let currentSeqNum = fromOptional 0.0
                         (Map.lookup destChainSelector outboundSequenceNumbers)
@@ -111,7 +116,6 @@ template PerPartyRouter
                 -- delegate to onramp (no router CCVs passed - sender doesn't know receiver's requirements)
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
                     routerPartyOwner = partyOwner
-                    routerEnvironmentId = environmentId
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
                     destChainSelector = destChainSelector
@@ -155,15 +159,12 @@ template PerPartyRouter
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 encodedMessage : BytesHex
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-                receiverRequiredCCVs : [CCIP.CCVId.CCVId]
             controller partyOwner
             do
-                -- validate offramp
+                -- validate offramp belongs to same deployment
                 offRamp <- fetch offRampCid
                 assertMsg "router: offramp ccipowner mismatch"
                     (offRamp.ccipOwner == ccipOwner)
-                assertMsg "router: offramp environmentid mismatch"
-                    (offRamp.environmentId == environmentId)
 
                 -- check execution state (replay prevention)
                 let messageHash = keccak256 encodedMessage
@@ -180,7 +181,6 @@ template PerPartyRouter
                 -- pass receiver's required CCVs - receiver gets to specify their verification requirements
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
-                    routerEnvironmentId = environmentId
                     receiverRequiredCCVs = receiverRequiredCCVs
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid

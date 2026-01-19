@@ -20,6 +20,7 @@ signature_component_length : Int = 32
 template CommitteeVerifier
     with
         owner : Party
+        instanceId : Text
 
         ccipOwner : Party
         versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")

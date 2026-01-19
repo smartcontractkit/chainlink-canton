@@ -18,7 +18,7 @@ import qualified Splice.Api.Token.HoldingV1
 template OffRamp
     with
         ccipOwner : Party
-        environmentId : Text
+        instanceId : Text
     where
         signatory ccipOwner
 
@@ -74,21 +74,16 @@ template OffRamp
         nonconsuming choice ExecuteFromRouter : ExecuteFromRouterResult
             with
                 routerPartyOwner : Party
-                routerEnvironmentId : Text
-                receiverRequiredCCVs : [CCIP.CCVId.CCVId]  -- Passed from PerPartyRouter
+                receiverRequiredCCVs : [CCIP.CCVId.CCVId]
 
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
 
                 encodedMessage : BytesHex
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-                tokenCCVVerifiedTicket: Optional Contractid CCIP.Tickets.TokenCCVVerifyTicket
 
             controller ccipOwner
             do
-                -- validate router environment matches
-                assertMsg "offramp: router environmentid mismatch"
-                    (routerEnvironmentId == environmentId)
 
                 -- decode message
                 let message = fromSomeNote "offramp: failed to decode message"

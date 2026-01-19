@@ -5,7 +5,6 @@ import Daml.Script
 
 import DA.Assert
 import DA.Map qualified as Map
-import DA.Set qualified as Set
 import DA.Optional
 
 import qualified CCIP.GlobalConfig
@@ -23,7 +22,10 @@ testCCIPSend = script do
     ccipOwner <- allocateParty "ccip-owner"
     user <- allocateParty "user"
 
-    let environmentId = "test-environment"
+    let globalConfigInstanceId = "test-globalconfig"
+    let onRampInstanceId = "test-onramp"
+    let factoryInstanceId = "test-factory"
+    let tokenAdminRegistryInstanceId = "test-tar"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -31,7 +33,7 @@ testCCIPSend = script do
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = globalConfigInstanceId
             chainSelector = sourceChainSelector
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
@@ -46,28 +48,30 @@ testCCIPSend = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             owner = ccipOwner
+            instanceId = tokenAdminRegistryInstanceId
             tokenConfigs = Map.empty
 
     -- deploy onramp
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = onRampInstanceId
 
-    -- deploy perpartyrouter factory (no stored cids)
+    -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
             ccipOwner = ccipOwner
-            environmentId = environmentId
-            registeredParties = Set.empty
+            instanceId = factoryInstanceId
+            registeredRouters = Map.empty
 
     -- disclose factory to user
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
 
-    -- user creates their router
+    -- user creates their router with their chosen instanceId
     createResult <- submit (actAs user <> disclose disclosedFactory) do
         exerciseCmd factory CCIP.PerPartyRouter.CreateRouter with
             partyOwner = user
+            instanceId = "test-router-user"
     let router = createResult.router
     let factory = createResult.factory
 
@@ -128,7 +132,10 @@ testCCIPExecute = script do
     ccipOwner <- allocateParty "ccip-owner"
     receiver <- allocateParty "receiver"
 
-    let environmentId = "test-environment"
+    let globalConfigInstanceId = "test-globalconfig"
+    let offRampInstanceId = "test-offramp"
+    let factoryInstanceId = "test-factory"
+    let tokenAdminRegistryInstanceId = "test-tar"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -136,7 +143,7 @@ testCCIPExecute = script do
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = globalConfigInstanceId
             chainSelector = destChainSelector
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.empty
@@ -150,28 +157,30 @@ testCCIPExecute = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             owner = ccipOwner
+            instanceId = tokenAdminRegistryInstanceId
             tokenConfigs = Map.empty
 
     -- deploy offramp
     offRamp <- submit ccipOwner do
         createCmd CCIP.OffRamp.OffRamp with
             ccipOwner = ccipOwner
-            environmentId = environmentId
+            instanceId = offRampInstanceId
 
-    -- deploy perpartyrouter factory (no stored cids)
+    -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
             ccipOwner = ccipOwner
-            environmentId = environmentId
-            registeredParties = Set.empty
+            instanceId = factoryInstanceId
+            registeredRouters = Map.empty
 
     -- disclose factory to receiver
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
 
-    -- receiver creates their router
+    -- receiver creates their router with their chosen instanceId
     createResult <- submit (actAs receiver <> disclose disclosedFactory) do
         exerciseCmd factory CCIP.PerPartyRouter.CreateRouter with
             partyOwner = receiver
+            instanceId = "test-router-receiver"
     let router = createResult.router
 
     -- build a test message

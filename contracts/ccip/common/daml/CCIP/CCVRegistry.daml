@@ -11,11 +11,10 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
 
 
--- | Registry for Cross-Chain Verifiers.
--- Stateless - the ccipOwner signatory is the security guarantee.
 template CCVRegistry
     with
         ccipOwner : Party
+        instanceId : Text
     where
         signatory ccipOwner
 
