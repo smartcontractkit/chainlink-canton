@@ -1,0 +1,76 @@
+name: Contracts build + Bindings generation
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+jobs:
+  build-and-generate:
+    name: Build DARs + Generate Bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+
+      - name: Export DARs (compile once)
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/dars
+          mkdir -p artifacts/dars
+          go run ./bindings/compile/cmd/export-dars -out artifacts/dars
+          ls -la artifacts/dars
+          test -f artifacts/dars/coin.dar
+          test -f artifacts/dars/mcms.dar
+
+      - name: Add Go bin to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install godaml
+        run: |
+          set -euo pipefail
+          GOBIN="$(go env GOPATH)/bin"
+          mkdir -p "$GOBIN"
+
+          echo "Building godaml from source..."
+          git clone --depth 1 https://github.com/stackman27/go-daml.git /tmp/go-daml
+          cd /tmp/go-daml
+          git checkout 3e0ae841d3ac6842e46c15a6ca55d36b01ca24f5
+
+          MAIN_DIRS="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | sed '/^$/d' || true)"
+          MAIN_DIR="$(echo "$MAIN_DIRS" | grep -E '/cmd/|/cli/' | head -n 1 || true)"
+          if [ -z "${MAIN_DIR:-}" ]; then MAIN_DIR="$(echo "$MAIN_DIRS" | head -n 1 || true)"; fi
+          if [ -z "${MAIN_DIR:-}" ]; then echo "Error: No Go 'main' package found"; exit 1; fi
+
+          go build -o "$GOBIN/godaml" "$MAIN_DIR"
+          command -v godaml >/dev/null
+          godaml -h >/dev/null
+
+      - name: Generate bindings
+        run: |
+          set -euo pipefail
+          chmod +x scripts/generate-bindings.sh
+          ./scripts/generate-bindings.sh
+
+      - name: Verify generated files exist
+        run: |
+          set -euo pipefail
+          test -n "$(find generated/coin -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find generated/ccip -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find generated/mcms -name '*.go' -type f 2>/dev/null | head -1)"
+          echo "Generated files found"
+
+      - name: Cleanup exported DARs
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/dars || true
+          echo "Cleaned artifacts/dars"
