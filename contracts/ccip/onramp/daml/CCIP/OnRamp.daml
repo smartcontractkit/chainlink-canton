@@ -3,6 +3,7 @@ module CCIP.OnRamp where
 
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable qualified as Foldable
+import DA.Optional (isSome)
 
 import qualified CCIP.CCVId
 import qualified CCIP.GlobalConfig
