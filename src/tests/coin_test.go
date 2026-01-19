@@ -552,6 +552,24 @@ func partyForUserOrAllocate(
 	return resp.Party
 }
 
+// TestCoin
+
+// What we're testing?
+// - Deploy/ensure code is available on all participiants (upload DAR)
+// - Alice (P1) creates coinRegistry contract for an instrument LINK
+// - Bob (P2) creates a MintPreapproval (permission for minting)
+// - (P1) Alice exercises a mintChoice (BurnMintFactory_BurnMint) on the registry to mint to Bob
+//   - This mint produces;
+//   - a Coin holding wrapper contract (i.e. our Coin app contract)
+//   - also an Splice.Api.Token.HoldingV1:Holding on the "real token holding" contract
+//
+// - (P2) Bob transfers part of his holdings to charlie using splice TransferFactory interface choice on registry
+//   - this transfer requires inputHoldingsCids of type ContractID Splice.Api.Token.HoldingV1:Holding
+//
+// - (P3) charlie accepts the transfer from bob
+// - (P1) Alice grants mint rights to Dave
+// - (P5) Erin grants MintPreapproval from Alice
+// - (P5) Dave uses MintRole to mint to Erin
 func TestCoin(t *testing.T) {
 	ctx := context.Background()
 
