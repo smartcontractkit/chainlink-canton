@@ -1,0 +1,53 @@
+name: 'Install Digital Asset Package Manager (DPM)'
+description: 'Installs the DPM CLI tool'
+
+inputs:
+  DPM_VERSION:
+    description: 'The version of DPM to install'
+    required: false
+  SHELL:
+    description: 'The shell to use'
+    required: false
+    default: 'bash'
+  cache:
+    description: 'Enable caching of the DPM installation'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/cache@v4
+      id: cache
+      name: Cache DPM
+      if: ${{ inputs.cache == 'true' }}
+      with:
+        key: ${{ runner.os }}-dpm-${{ inputs.DPM_VERSION || 'default' }}
+        path: ~/.dpm
+    - name: Check cache hit
+      if: ${{ inputs.cache == 'true' && steps.cache.outputs.cache-hit == 'true' }}
+      shell: ${{ inputs.SHELL }}
+      run: |
+        echo "DPM cache hit, skipping installation."
+    - name: Fetch installation script
+      if: ${{ inputs.cache != 'true' || steps.cache.outputs.cache-hit != 'true' }}
+      shell: ${{ inputs.SHELL }}
+      run: curl -fSL "https://get.digitalasset.com/install/install.sh" -o ${{ runner.temp }}/install_dpm.sh
+    - name: Install CLI
+      if: ${{ inputs.cache != 'true' || steps.cache.outputs.cache-hit != 'true' }}
+      shell: ${{ inputs.SHELL }}
+      run: |
+        if [ -n "${{ inputs.DPM_VERSION }}" ]; then
+          ${{ inputs.SHELL }} ${{ runner.temp }}/install_dpm.sh "${{ inputs.DPM_VERSION }}"
+        else
+          ${{ inputs.SHELL }} ${{ runner.temp }}/install_dpm.sh
+        fi
+    - name: Add DPM to PATH
+      shell: ${{ inputs.SHELL }}
+      run: echo "${HOME}/.dpm/bin" >> "$GITHUB_PATH"
+    - name: Verify installation
+      shell: ${{ inputs.SHELL }}
+      run: dpm --version
+    - name: List installed versions
+      shell: ${{ inputs.SHELL }}
+      run: dpm versions

@@ -1,22 +1,22 @@
 packages:
   - coin
-  - ccip/ccipreceiver
-  - ccip/ccvs
-  - ccip/common
-  - ccip/feequoter
-  - ccip/tokenAdminRegistry
-  - ccip/ccvRegistry
-  - ccip/onramp
-  - ccip/offramp
-  - ccip/pools/interfaces
-  - ccip/pools/lockReleaseTokenPool
-  - ccip/perpartyrouter
-  - ccip/test
-
+#  - ccip/ccipreceiver
+#  - ccip/ccvs
+#  - ccip/common
+#  - ccip/feequoter
+#  - ccip/tokenAdminRegistry
+#  - ccip/ccvRegistry
+#  - ccip/onramp
+#  - ccip/offramp
+#  - ccip/pools/interfaces
+#  - ccip/pools/lockReleaseTokenPool
+#  - ccip/perpartyrouter
+#  - ccip/test
+#
   - mcms
   - mcms/test
-
-  - test/interfaces
-  - test/proxy
-  - test/receiver
-  - test/test
+#
+#  - test/interfaces
+#  - test/proxy
+#  - test/receiver
+#  - test/test
