@@ -1,27 +1,38 @@
 -- | lock/release token pool for ccip token transfers.
--- note: this module needs to be redesigned to work with perpartyrouter and ticket pattern.
 module CCIP.LockReleaseTokenPool where
 
-import DA.List (unique)
+import DA.Crypto.Text (BytesHex)
+import DA.Foldable (forA_)
+import DA.List (dedupSort)
+import qualified DA.Map as Map
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.CCVId
 import qualified CCIP.Interfaces.TokenPool
-import qualified CCIP.MessageCodecV1
+import qualified CCIP.Tickets
+import qualified CCIP.TokenAdminRegistry
 
 
--- | lock/release token pool - currently stubbed out pending redesign for perpartyrouter.
+-- | Per-chain CCV requirements for the pool.
+data ChainCCVConfig = ChainCCVConfig
+    with
+        inboundCCVs : [CCIP.CCVId.CCVId]   -- Required CCVs for incoming transfers
+        outboundCCVs : [CCIP.CCVId.CCVId]  -- Required CCVs for outgoing transfers
+    deriving (Eq, Show)
+
+
+-- | lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
     with
         ccipOwner : Party
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
-        requiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+        -- CCV requirements per remote chain selector
+        chainCCVRequirements : Map.Map (Numeric 0) ChainCCVConfig
     where
         signatory poolOwner
-        ensure unique requiredCCVs
 
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with
@@ -32,20 +43,118 @@ template LockReleaseTokenPool
             tokenPool_getRequiredCCVsImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_GetRequiredCCVs
                     with
-                        message = arg.message
+                        remoteChainSelector = arg.remoteChainSelector
+                        amount = arg.amount
+                        finality = arg.finality
+                        extraData = arg.extraData
+                        direction = arg.direction
                         caller = arg.caller
 
-            tokenPool_releaseOrMintImpl self arg = do
-                -- stubbed: needs redesign for perpartyrouter ticket pattern
-                abort "TODO"
+            tokenPool_verifyCCVsImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyCCVs
+                    with
+                        ccvVerifyTickets = arg.ccvVerifyTickets
+                        messageHash = arg.messageHash
+                        sourceChainSelector = arg.sourceChainSelector
+                        amount = arg.amount
+                        receiver = arg.receiver
+                        caller = arg.caller
+
+            tokenPool_releaseFromTicketImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_ReleaseFromTicket
+                    with
+                        tokenReceiveTicketCid = arg.tokenReceiveTicketCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenInput = arg.tokenInput
+                        caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
-                -- stubbed: needs redesign for perpartyrouter ticket pattern
-                abort "TODO"
+                -- stubbed: needs full implementation
+                abort "LockReleaseTokenPool_LockOrBurn: not yet implemented"
 
-        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+        -- Get required CCVs based on chain and direction.
+        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [CCIP.CCVId.CCVId]
             with
-                message : CCIP.MessageCodecV1.MessageV1
+                remoteChainSelector : Numeric 0
+                amount : Numeric 0
+                finality : Int
+                extraData : BytesHex
+                direction : CCIP.Interfaces.TokenPool.TransferDirection
                 caller : Party
             controller caller
-            do return requiredCCVs
+            do
+                case Map.lookup remoteChainSelector chainCCVRequirements of
+                    None -> pure []
+                    Some config -> case direction of
+                        CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
+                        CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
+
+        -- Verify CCVs and issue TokenPoolCCVVerifiedTicket.
+        nonconsuming choice LockReleaseTokenPool_VerifyCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
+            with
+                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
+                messageHash : BytesHex
+                sourceChainSelector : Numeric 0
+                amount : Numeric 0
+                receiver : Party
+                caller : Party
+            controller caller
+            do
+                -- Get required CCVs for inbound
+                let requiredCCVIds = case Map.lookup sourceChainSelector chainCCVRequirements of
+                        None -> []
+                        Some config -> config.inboundCCVs
+
+                -- Fetch all provided tickets and extract their CCVIds
+                providedCCVIds <- forA ccvVerifyTickets \ticketCid -> do
+                    ticket <- fetch ticketCid
+                    -- Validate ticket is for this message
+                    assertMsg "CCVVerifyTicket messageHash mismatch" (ticket.messageHash == messageHash)
+                    assertMsg "CCVVerifyTicket sourceChainSelector mismatch" (ticket.sourceChainSelector == sourceChainSelector)
+                    pure ticket.ccvId
+
+                -- Validate all required CCVs are present
+                forA_ requiredCCVIds \requiredId ->
+                    assertMsg ("missing required pool CCV: " <> show requiredId)
+                        (requiredId `elem` providedCCVIds)
+
+                -- Issue TokenPoolCCVVerifiedTicket
+                create CCIP.Tickets.TokenPoolCCVVerifiedTicket with
+                    poolOwner = poolOwner
+                    ccipOwner = ccipOwner
+                    receiver = receiver
+                    messageHash = messageHash
+                    sourceChainSelector = sourceChainSelector
+                    verifiedCCVIds = dedupSort providedCCVIds
+
+        -- Release tokens by consuming a TokenReceiveTicket.
+        choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
+            with
+                tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+                caller : Party
+            controller poolOwner
+            do
+                -- Fetch and validate the ticket
+                ticket <- fetch tokenReceiveTicketCid
+                assertMsg "TokenReceiveTicket instrumentId mismatch" (ticket.instrumentId == instrumentId)
+                assertMsg "TokenReceiveTicket poolOwner mismatch" (ticket.poolOwner == poolOwner)
+
+                -- Consume the ticket
+                exercise tokenReceiveTicketCid CCIP.Tickets.TokenReceiveTicket_Consume
+
+                -- TODO: Implement actual token release via Splice TransferInstruction
+                -- For now, return empty result
+                pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                    output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
+                        receiverHoldingCids = []
+                    poolChangeCids = tokenInput.tokenPoolHoldings
+
+        -- Update chain CCV requirements.
+        choice LockReleaseTokenPool_UpdateChainCCVRequirements : ContractId LockReleaseTokenPool
+            with
+                newChainCCVRequirements : Map.Map (Numeric 0) ChainCCVConfig
+            controller poolOwner
+            do
+                create this with chainCCVRequirements = newChainCCVRequirements

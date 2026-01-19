@@ -6,7 +6,6 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.CCVId
 import qualified CCIP.Tickets
 
 template TokenAdminRegistry
@@ -28,10 +27,6 @@ template TokenAdminRegistry
                     None -> return None
                     Some config ->
                         return (Some config)
-
-  -- ================================================================
-  -- │                  Administrator functions                     │
-  -- ================================================================
 
         choice TokenAdminRegistry_SetPool : ContractId TokenAdminRegistry
             with
@@ -102,10 +97,6 @@ template TokenAdminRegistry
                                         updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
-  -- ================================================================
-  -- │                    Administrator config                      │
-  -- ================================================================
-
         nonconsuming choice TokenAdminRegistry_IsAdministrator : Bool
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -117,10 +108,10 @@ template TokenAdminRegistry
                     None -> return False
                     Some config ->
                         return (config.admin == Some administrator)
-        
-        -- Propose a new administrator for a token
-        -- Can only be called if no admin is currently set
-        -- Can be called by the admin of the instrument, or the CCIP owner/owner of this registry
+
+        -- Propose a new administrator for a token.
+        -- Can only be called if no admin is currently set.
+        -- Can be called by the admin of the instrument, or the CCIP owner/owner of this registry.
         choice TokenAdminRegistry_ProposeAdministrator : ContractId TokenAdminRegistry
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -141,7 +132,6 @@ template TokenAdminRegistry
                                     admin = None
                                     pendingAdmin = Some newAdmin
                                     tokenPoolOwner = None
-                                    requiredCCVs = []
                                 updatedMap = Map.insert instrumentId newConfig tokenConfigs
                             create this with tokenConfigs = updatedMap
                         Some config ->
@@ -153,36 +143,9 @@ template TokenAdminRegistry
                                     updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
                                 create this with tokenConfigs = updatedMap
 
-        -- | Update required CCVs for a token (admin only).
-        choice TokenAdminRegistry_SetRequiredCCVs : ContractId TokenAdminRegistry
-            with
-                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                newRequiredCCVs : [CCIP.CCVId.CCVId]
-                caller : Party
-            controller caller
-            do
-                case Map.lookup instrumentId tokenConfigs of
-                    None ->
-                        abort "TokenAdminRegistry_SetRequiredCCVs: No config for instrument"
-                    Some config ->
-                        case config.admin of
-                            None ->
-                                abort "TokenAdminRegistry_SetRequiredCCVs: No admin set for instrument"
-                            Some admin ->
-                                if admin /= caller then
-                                    abort "TokenAdminRegistry_SetRequiredCCVs: Caller is not the admin"
-                                else do
-                                    let updatedConfig = config with requiredCCVs = newRequiredCCVs
-                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
-                                    create this with tokenConfigs = updatedMap
-
-  -- ================================================================
-  -- │                 Ticket Authority Functions                    │
-  -- ================================================================
-
-        -- | issue a token send ticket for outbound token transfer.
-        -- called by tokenpool after locking tokens.
-        -- validates that caller is the registered pool for the instrument.
+        -- | Issue a token send ticket for outbound token transfer.
+        -- Called by tokenpool after locking tokens.
+        -- Validates that caller is the registered pool for the instrument.
         nonconsuming choice TokenAdminRegistry_IssueSendTicket : ContractId CCIP.Tickets.TokenSendTicket
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -192,10 +155,11 @@ template TokenAdminRegistry
                 destTokenAddress : BytesHex
                 tokenReceiver : BytesHex
                 extraData : BytesHex
+                receipt : CCIP.Tickets.Receipt
                 poolOwner : Party  -- controller - must be registered pool
             controller poolOwner
             do
-                -- validate poolOwner is the registered pool for this instrument
+                -- Validate poolOwner is the registered pool for this instrument
                 case Map.lookup instrumentId tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_IssueSendTicket: No config for instrument"
@@ -217,40 +181,39 @@ template TokenAdminRegistry
                                         destTokenAddress = destTokenAddress
                                         tokenReceiver = tokenReceiver
                                         extraData = extraData
+                                        receipt = receipt
 
-        -- | issue a token receive ticket for inbound token transfer.
-        -- called by offramp after successful message verification.
-        -- caller must be ccipOwner (same as registry owner).
+        -- | Issue a token receive ticket for inbound token transfer.
+        -- Called by OffRamp after successful message verification.
+        -- Caller must be ccipOwner (same as registry owner).
         nonconsuming choice TokenAdminRegistry_IssueReceiveTicket : ContractId CCIP.Tickets.TokenReceiveTicket
             with
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                poolOwner : Party
+                receiver : Party
+                tokenReceiver : Party
+                amount : Numeric 0
                 messageHash : BytesHex
                 sourceChainSelector : Numeric 0
-                sequenceNumber : Numeric 0
-                hasTokenTransfer : Bool
-                tokenAmount : Optional (Numeric 0)
-                destTokenAddress : Optional BytesHex
-                tokenReceiver : Optional Party
-                receiver : Party
                 caller : Party  -- should be ccipOwner (offramp)
             controller caller
             do
-                -- validate caller is the ccipOwner
+                -- Validate caller is the ccipOwner
                 assertMsg "TokenAdminRegistry_IssueReceiveTicket: Caller must be ccipOwner"
                     (caller == owner)
                 create CCIP.Tickets.TokenReceiveTicket with
                     ccipOwner = owner
+                    poolOwner = poolOwner
                     receiver = receiver
+                    tokenReceiver = tokenReceiver
+                    instrumentId = instrumentId
+                    amount = amount
                     messageHash = messageHash
                     sourceChainSelector = sourceChainSelector
-                    sequenceNumber = sequenceNumber
-                    hasTokenTransfer = hasTokenTransfer
-                    tokenAmount = tokenAmount
-                    destTokenAddress = destTokenAddress
-                    tokenReceiver = tokenReceiver
 
-        -- | consume a token receive ticket to authorize token release.
-        -- called by tokenpool when releasing tokens to receiver.
-        -- validates that caller is the registered pool for the destination token.
+        -- | Consume a token receive ticket to authorize token release.
+        -- Called by tokenpool when releasing tokens to receiver.
+        -- Validates that caller is the registered pool for the destination token.
         choice TokenAdminRegistry_ConsumeReceiveTicket : ConsumeReceiveTicketResult
             with
                 ticketCid : ContractId CCIP.Tickets.TokenReceiveTicket
@@ -258,7 +221,7 @@ template TokenAdminRegistry
                 poolOwner : Party  -- controller - must be registered pool
             controller poolOwner
             do
-                -- validate poolOwner is the registered pool for this instrument
+                -- Validate poolOwner is the registered pool for this instrument
                 case Map.lookup instrumentId tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_ConsumeReceiveTicket: No config for instrument"
@@ -270,18 +233,16 @@ template TokenAdminRegistry
                                 if registeredPool /= poolOwner then
                                     abort "TokenAdminRegistry_ConsumeReceiveTicket: Caller is not the registered pool"
                                 else do
-                                    -- fetch and archive the ticket
+                                    -- Fetch and archive the ticket
                                     ticket <- fetch ticketCid
                                     exercise ticketCid CCIP.Tickets.TokenReceiveTicket_Consume
                                     pure ConsumeReceiveTicketResult with
+                                        instrumentId = ticket.instrumentId
+                                        amount = ticket.amount
+                                        receiver = ticket.receiver
+                                        tokenReceiver = ticket.tokenReceiver
                                         messageHash = ticket.messageHash
                                         sourceChainSelector = ticket.sourceChainSelector
-                                        sequenceNumber = ticket.sequenceNumber
-                                        hasTokenTransfer = ticket.hasTokenTransfer
-                                        tokenAmount = ticket.tokenAmount
-                                        destTokenAddress = ticket.destTokenAddress
-                                        tokenReceiver = ticket.tokenReceiver
-
 
 
 data TokenConfig = TokenConfig
@@ -289,17 +250,15 @@ data TokenConfig = TokenConfig
         admin : Optional Party
         pendingAdmin : Optional Party
         tokenPoolOwner : Optional Party
-        requiredCCVs : [CCIP.CCVId.CCVId]    -- Pool's required CCVs for token transfers
     deriving (Eq, Show)
 
 
 data ConsumeReceiveTicketResult = ConsumeReceiveTicketResult
     with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        receiver : Party
+        tokenReceiver : Party
         messageHash : BytesHex
         sourceChainSelector : Numeric 0
-        sequenceNumber : Numeric 0
-        hasTokenTransfer : Bool
-        tokenAmount : Optional (Numeric 0)
-        destTokenAddress : Optional BytesHex
-        tokenReceiver : Optional Party
     deriving (Eq, Show)

@@ -20,7 +20,7 @@ interface ICrossChainVerifier where
             ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
             message : MessageCodecV1.MessageV1
             messageId : BytesHex
-            ccvData : BytesHex
+            verifierResults : BytesHex
             receiver : Party
             caller : Party
         controller caller

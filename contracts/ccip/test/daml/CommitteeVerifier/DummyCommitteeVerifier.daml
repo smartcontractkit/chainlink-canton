@@ -2,6 +2,7 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex, keccak256)
 
+import qualified CCIP.CCVId
 import qualified CCIP.CCVRegistry
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
@@ -26,19 +27,19 @@ template DummyCommitteeVerifier
 
             crossChainVerifier_verifyMessageImpl self arg = do
                 debug ("DummyCommitteeVerifier: verifyMessage called with messageId: " <> show arg.messageId)
-                -- ccvData should start with version tag (first 4 bytes)
+                -- verifierResults should start with version tag (first 4 bytes)
                 -- For testing, we use "01" as a failure trigger
-                case arg.ccvData of
+                case arg.verifierResults of
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
                         debug ("DummyCommitteeVerifier: Simulated successful verification")
                         -- Calculate message hash
                         let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 arg.message)
                         -- Issue verify ticket via CCVRegistry
-                        -- CCVRegistry extracts version tag from first 4 bytes of ccvData
+                        -- CCVRegistry extracts version tag from first 4 bytes of verifierResults
                         exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
                             ccvOwner = owner
-                            ccvData = arg.ccvData  -- Must start with version tag
+                            verifierResults = arg.verifierResults  -- Must start with version tag
                             messageHash = messageHash
                             sourceChainSelector = arg.message.sourceChainSelector
                             sequenceNumber = arg.message.sequenceNumber
@@ -49,6 +50,16 @@ template DummyCommitteeVerifier
                 -- Build verifierBlob with version tag as first 4 bytes
                 -- For dummy verifier, the blob is just the version tag itself
                 let verifierBlob = versionTag
+
+                -- Build stub Receipt
+                let ccvId = CCIP.CCVId.makeCCVId versionTag owner
+                let receipt = CCIP.Tickets.Receipt with
+                        issuer = ccvId
+                        destGasLimit = 0
+                        destBytesOverhead = 0
+                        feeTokenAmount = 0.0
+                        extraArgs = ""
+
                 -- Issue CCV ticket via CCVRegistry
                 -- CCVRegistry extracts version tag from first 4 bytes of verifierBlob
                 exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
@@ -56,3 +67,4 @@ template DummyCommitteeVerifier
                     verifierBlob = verifierBlob  -- Must start with version tag
                     messageSentObservers = [owner]
                     sender = arg.caller
+                    receipt = receipt
