@@ -49,8 +49,8 @@ type ITransferInstruction interface {
 	TransferInstructionUpdate(contractID string, args TransferInstructionUpdate) *model.ExerciseCommand
 }
 
-// Transfer2 is a Record type
-type Transfer2 struct {
+// Transfer22 is a Record type
+type Transfer22 struct {
 	Sender           PARTY         `json:"sender"`
 	Receiver         PARTY         `json:"receiver"`
 	Amount           NUMERIC       `json:"amount"`
@@ -61,8 +61,8 @@ type Transfer2 struct {
 	Meta             Metadata      `json:"meta"`
 }
 
-// toMap converts Transfer2 to a map for DAML arguments
-func (t Transfer2) toMap() map[string]interface{} {
+// toMap converts Transfer22 to a map for DAML arguments
+func (t Transfer22) toMap() map[string]interface{} {
 	return map[string]interface{}{
 
 		"sender":   t.Sender.ToMap(),
@@ -94,14 +94,14 @@ func (t Transfer2) toMap() map[string]interface{} {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for Transfer2 using JsonCodec
-func (t Transfer2) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for Transfer22 using JsonCodec
+func (t Transfer22) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Transfer2 using JsonCodec
-func (t *Transfer2) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for Transfer22 using JsonCodec
+func (t *Transfer22) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -168,9 +168,9 @@ func (t *TransferFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 
 // TransferFactoryTransfer is a Record type
 type TransferFactoryTransfer struct {
-	ExpectedAdmin PARTY     `json:"expectedAdmin"`
-	Transfer      Transfer2 `json:"transfer"`
-	ExtraArgs     ExtraArgs `json:"extraArgs"`
+	ExpectedAdmin PARTY      `json:"expectedAdmin"`
+	Transfer      Transfer22 `json:"transfer"`
+	ExtraArgs     ExtraArgs  `json:"extraArgs"`
 }
 
 // toMap converts TransferFactoryTransfer to a map for DAML arguments
@@ -426,7 +426,7 @@ var _ VARIANT = (*TransferInstructionStatus)(nil)
 // TransferInstructionView is a Record type
 type TransferInstructionView struct {
 	OriginalInstructionCid *CONTRACT_ID              `json:"originalInstructionCid"`
-	Transfer               Transfer2                 `json:"transfer"`
+	Transfer               Transfer22                `json:"transfer"`
 	Status                 TransferInstructionStatus `json:"status"`
 	Meta                   Metadata                  `json:"meta"`
 }

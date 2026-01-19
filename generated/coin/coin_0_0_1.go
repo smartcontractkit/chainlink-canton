@@ -184,7 +184,7 @@ func (t CoinRegistry) Archive(contractID string) *model.ExerciseCommand {
 // TransferFactoryTransfer exercises the TransferFactory_Transfer choice on this CoinRegistry contract via the ITransferFactory interface
 func (t CoinRegistry) TransferFactoryTransfer(contractID string, args TransferFactoryTransfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281", "Splice.Api.Token.TransferInstructionV1", "TransferFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "TransferFactory"),
 		ContractID: contractID,
 		Choice:     "TransferFactory_Transfer",
 		Arguments:  argsToMap(args),
@@ -214,7 +214,7 @@ func (t CoinRegistry) BurnMintFactoryPublicFetch(contractID string, args BurnMin
 // BurnMintFactoryBurnMint exercises the BurnMintFactory_BurnMint choice on this CoinRegistry contract via the IBurnMintFactory interface
 func (t CoinRegistry) BurnMintFactoryBurnMint(contractID string, args BurnMintFactoryBurnMint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", "9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e", "Splice.Api.Token.BurnMintV1", "BurnMintFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Registry", "BurnMintFactory"),
 		ContractID: contractID,
 		Choice:     "BurnMintFactory_BurnMint",
 		Arguments:  argsToMap(args),
@@ -291,7 +291,7 @@ func (t CoinTransferInstruction) Archive(contractID string) *model.ExerciseComma
 // TransferInstructionAccept exercises the TransferInstruction_Accept choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 func (t CoinTransferInstruction) TransferInstructionAccept(contractID string, args TransferInstructionAccept) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", "55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281", "Splice.Api.Token.TransferInstructionV1", "TransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "TransferInstruction_Accept",
 		Arguments:  argsToMap(args),
@@ -444,7 +444,13 @@ func (t MintRole) CreateCommand() *model.CreateCommand {
 
 	args["minter"] = t.Minter.ToMap()
 
-	args["registry"] = t.Registry
+	args["registry"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Registry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Registry
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -503,7 +509,18 @@ func (t MintRoleMint) toMap() map[string]interface{} {
 			}
 			return t.InstrumentId
 		}(),
-		"outputs": t.Outputs,
+		"outputs": func() []interface{} {
+			res := make([]interface{}, 0, len(t.Outputs))
+			for _, e := range t.Outputs {
+				type mapper interface{ toMap() map[string]interface{} }
+				if m, ok := any(e).(mapper); ok {
+					res = append(res, m.toMap())
+				} else {
+					res = append(res, e)
+				}
+			}
+			return res
+		}(),
 	}
 }
 

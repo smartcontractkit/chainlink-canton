@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
@@ -652,11 +651,11 @@ func TestCoin(t *testing.T) {
 		},
 	}
 
-	submitResp, err := p1.CommandService.SubmitAndWait(ctx, cmds)
+	submitRespNew, err := p1.CommandService.SubmitAndWaitForTransaction(ctx, cmds)
 	require.NoError(t, err)
 
 	upd, err := p1.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
-		UpdateID: submitResp.UpdateID,
+		UpdateID: submitRespNew.UpdateID,
 		UpdateFormat: &model.EventFormat{
 			FiltersByParty: map[string]*model.Filters{
 				partyAlice: {
@@ -751,7 +750,7 @@ func TestCoin(t *testing.T) {
 		},
 	}
 
-	submitResp, err = p2.CommandService.SubmitAndWait(ctx, cmds)
+	submitResp, err := p2.CommandService.SubmitAndWait(ctx, cmds)
 	require.NoError(t, err)
 
 	upd, err = p2.UpdateService.GetUpdateById(ctx, &model.GetUpdateByIDRequest{
@@ -848,7 +847,6 @@ func TestCoin(t *testing.T) {
 
 	var burnMintPkgID string
 	for _, p := range pkgs {
-		// adjust match as needed (print p.Name once to see exact string)
 		if strings.Contains(strings.ToLower(p.Name), "splice-api-token-burn-mint") {
 			burnMintPkgID = p.PackageID
 			break
@@ -868,7 +866,12 @@ func TestCoin(t *testing.T) {
 			UserID:     UserName,
 			CommandID:  uuid.Must(uuid.NewUUID()).String(),
 			ActAs:      []string{alice},
-			Commands:   []*model.Command{{Command: exerciseCmd}},
+			Commands: []*model.Command{{Command: &model.ExerciseCommand{
+				TemplateID: fmt.Sprintf("%s:%s:%s", burnMintPkgID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory"),
+				ContractID: exerciseCmd.ContractID,
+				Choice:     exerciseCmd.Choice,
+				Arguments:  exerciseCmd.Arguments,
+			}}},
 		},
 	}
 
@@ -925,7 +928,7 @@ func TestCoin(t *testing.T) {
 	// Build args (adjust nested type name if your codegen differs)
 	transferArgs := coin.TransferFactoryTransfer{
 		ExpectedAdmin: types.PARTY(alice),
-		Transfer: coin.Transfer2{
+		Transfer: coin.Transfer22{
 			Sender:        types.PARTY(bob),
 			Receiver:      types.PARTY(partyCharlie),
 			Amount:        types.NUMERIC(big.NewInt(10)),
@@ -946,6 +949,20 @@ func TestCoin(t *testing.T) {
 	// Exercise command via your generated binding (interface choice)
 	exerciseCmd = coin.CoinRegistry{}.TransferFactoryTransfer(registryContractID, transferArgs)
 
+	pkgsP2, err := p2.PackageMng.ListKnownPackages(ctx)
+	require.NoError(t, err)
+
+	var transferInstructionPkgID string
+	for _, p := range pkgsP2 {
+		if strings.Contains(strings.ToLower(p.Name), "splice-api-token-transfer-instruction") {
+			transferInstructionPkgID = p.PackageID
+			break
+		}
+	}
+	require.NotEmpty(t, transferInstructionPkgID, "transfer instruction package not found on ledger (did the DAR include it?)")
+
+	t.Logf("transferInstructionPkgID   id=%s", transferInstructionPkgID)
+
 	// ---- Interactive submission for disclosure ----
 	cmdID := uuid.Must(uuid.NewUUID()).String()
 
@@ -953,9 +970,14 @@ func TestCoin(t *testing.T) {
 		Commands: &model.Commands{
 			UserID:    UserName,
 			CommandID: cmdID,
-			Commands:  []*model.Command{{Command: exerciseCmd}},
-			ActAs:     []string{bob},
-			ReadAs:    []string{bob},
+			Commands: []*model.Command{{Command: &model.ExerciseCommand{
+				TemplateID: fmt.Sprintf("%s:%s:%s", transferInstructionPkgID, "Splice.Api.Token.TransferInstructionV1", "TransferFactory"),
+				ContractID: exerciseCmd.ContractID,
+				Choice:     exerciseCmd.Choice,
+				Arguments:  exerciseCmd.Arguments,
+			}}},
+			ActAs:  []string{bob},
+			ReadAs: []string{bob},
 			DisclosedContracts: []*model.DisclosedContract{
 				disclosedRegistry,
 			},
@@ -1040,7 +1062,12 @@ func TestCoin(t *testing.T) {
 			UserID:     UserName,
 			CommandID:  uuid.Must(uuid.NewUUID()).String(),
 			ActAs:      []string{partyCharlie},
-			Commands:   []*model.Command{{Command: acceptCmd}},
+			Commands: []*model.Command{{Command: &model.ExerciseCommand{
+				TemplateID: fmt.Sprintf("%s:%s:%s", transferInstructionPkgID, "Splice.Api.Token.TransferInstructionV1", "TransferInstruction"),
+				ContractID: transferInstructionCid,
+				Choice:     acceptCmd.Choice,
+				Arguments:  acceptCmd.Arguments,
+			}}},
 			// If your Commands type supports it, keep disclosure here too (needed if the choice references registry)
 			DisclosedContracts: []*model.DisclosedContract{
 				disclosedRegistry, // make sure this is a *v2.DisclosedContract if your Commands expects v2
@@ -1322,13 +1349,6 @@ var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 	},
 }}}}
 
-var emptyChoiceContext = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-	{
-		Label: "values",
-		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
-	},
-}}}}
-
 func WaitForTransactionByCommandID(
 	ctx context.Context,
 	cl *client.DamlBindingClient,
@@ -1454,19 +1474,4 @@ func findFirstContractIDInValue(v *v2.Value) (string, bool) {
 	}
 
 	return "", false
-}
-
-func dumpRecord(t *testing.T, rec *v2.Record) {
-	b, err := protojson.MarshalOptions{Multiline: true, Indent: "  "}.Marshal(rec)
-	require.NoError(t, err)
-	t.Logf("CreateArguments record:\n%s", string(b))
-}
-
-func packageIDFromTemplateID(tid string) string {
-	tid = strings.TrimPrefix(tid, "#")
-	parts := strings.Split(tid, ":")
-	if len(parts) >= 3 {
-		return parts[0]
-	}
-	return ""
 }
