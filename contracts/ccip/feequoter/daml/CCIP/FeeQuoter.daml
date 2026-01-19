@@ -14,6 +14,7 @@ import qualified CCIP.Client
 template FeeQuoter
     with
         owner : Party
+        instanceId : Text
 
         -- | Set of fee tokens that can be used to pay for fees. The values of the map are the fee multipliers which
         -- | can be used to set a premium or discount for a specific fee token.
