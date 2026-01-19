@@ -33,8 +33,9 @@ template PerPartyRouterFactory
                 instanceId : Text  -- user specifies their desired instanceId
             controller partyOwner
             do
-                -- check party doesn't already have a router
-                -- TODO: relax or remove this check as needed
+                -- Check party doesn't already have a route
+                -- NOTE: this is necessary to make sure that the same messageId isn't replayed, since
+                -- the `executionStates` map is in PerPartyRouter.
                 assertMsg "router already exists for this party"
                     (not (Map.member partyOwner registeredRouters))
 
