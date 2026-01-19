@@ -38,7 +38,7 @@ func createContract(moduleName, entityName, environmentID, contractID string) *l
 			CreateArguments: &apiv2.Record{
 				Fields: []*apiv2.RecordField{
 					{
-						Label: "environmentId",
+						Label: "instanceId",
 						Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: environmentID}},
 					},
 				},
@@ -56,12 +56,12 @@ func setupTestRouter() http.Handler {
 				Party:       "ccip-owner::123",
 				Description: "Production mainnet",
 				Contracts: config.ContractIdentifiers{
-					Router:             "mainnet-v1",
-					OnRamp:             "mainnet-v1",
-					FeeQuoter:          "mainnet-v1",
-					OffRamp:            "mainnet-v1",
-					CCV:                "mainnet-v1",
-					TokenAdminRegistry: "mainnet-v1",
+					Router:             "mainnet-v1-router",
+					OnRamp:             "mainnet-v1-onramp",
+					FeeQuoter:          "mainnet-v1-feequoter",
+					OffRamp:            "mainnet-v1-offramp",
+					CCV:                "mainnet-v1-ccv",
+					TokenAdminRegistry: "mainnet-v1-tar",
 				},
 			},
 		},
@@ -69,12 +69,12 @@ func setupTestRouter() http.Handler {
 
 	mockQ := &mockQuerier{
 		contracts: []*ledger.ActiveContract{
-			createContract("CCIP.Router", "Router", "mainnet-v1", "router-123"),
-			createContract("CCIP.OnRamp", "OnRamp", "mainnet-v1", "onramp-456"),
-			createContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1", "feequoter-789"),
-			createContract("CCIP.OffRamp", "OffRamp", "mainnet-v1", "offramp-111"),
-			createContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1", "ccv-222"),
-			createContract("CCIP.TokenAdminRegistry", "TokenAdminRegistry", "mainnet-v1", "tar-333"),
+			createContract("CCIP.Router", "Router", "mainnet-v1-router", "router-123"),
+			createContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-456"),
+			createContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1-feequoter", "feequoter-789"),
+			createContract("CCIP.OffRamp", "OffRamp", "mainnet-v1-offramp", "offramp-111"),
+			createContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1-ccv", "ccv-222"),
+			createContract("CCIP.TokenAdminRegistry", "TokenAdminRegistry", "mainnet-v1-tar", "tar-333"),
 		},
 	}
 

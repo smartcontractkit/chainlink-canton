@@ -38,7 +38,7 @@ func createMockContract(moduleName, entityName, environmentID, contractID string
 			CreateArguments: &apiv2.Record{
 				Fields: []*apiv2.RecordField{
 					{
-						Label: "environmentId",
+						Label: "instanceId",
 						Value: &apiv2.Value{
 							Sum: &apiv2.Value_Text{Text: environmentID},
 						},
@@ -58,9 +58,9 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 				Party:       "ccip-owner::123",
 				Description: "Production",
 				Contracts: config.ContractIdentifiers{
-					Router:    "mainnet-v1",
-					OnRamp:    "mainnet-v1",
-					FeeQuoter: "mainnet-v1",
+					Router:    "mainnet-v1-router",
+					OnRamp:    "mainnet-v1-onramp",
+					FeeQuoter: "mainnet-v1-feequoter",
 				},
 			},
 		},
@@ -69,9 +69,9 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 	t.Run("returns disclosures when all contracts found", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.Router", "Router", "mainnet-v1", "router-id-123", []byte("router-blob")),
-				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1", "onramp-id-456", []byte("onramp-blob")),
-				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1", "feequoter-id-789", []byte("feequoter-blob")),
+				createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-id-123", []byte("router-blob")),
+				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-id-456", []byte("onramp-blob")),
+				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1-feequoter", "feequoter-id-789", []byte("feequoter-blob")),
 			},
 		}
 
@@ -101,8 +101,8 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 	t.Run("returns error when router not found", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1", "onramp-id", []byte("onramp-blob")),
-				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1", "feequoter-id", []byte("feequoter-blob")),
+				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-id", []byte("onramp-blob")),
+				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1-feequoter", "feequoter-id", []byte("feequoter-blob")),
 			},
 		}
 
@@ -112,13 +112,13 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 		assert.Contains(t, err.Error(), "router not found")
 	})
 
-	t.Run("filters by environmentId correctly", func(t *testing.T) {
+	t.Run("filters by instanceId correctly", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.Router", "Router", "testnet", "router-testnet", []byte("blob")),    // Wrong env
-				createMockContract("CCIP.Router", "Router", "mainnet-v1", "router-mainnet", []byte("blob")), // Correct env
-				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1", "onramp-mainnet", []byte("blob")),
-				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1", "feequoter-mainnet", []byte("blob")),
+				createMockContract("CCIP.Router", "Router", "testnet-router", "router-testnet", []byte("blob")),         // Wrong env
+				createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-mainnet", []byte("blob")),      // Correct env
+				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-mainnet", []byte("blob")),
+				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1-feequoter", "feequoter-mainnet", []byte("blob")),
 			},
 		}
 
@@ -130,14 +130,14 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 	})
 
 	t.Run("ignores package ID for upgrade resilience", func(t *testing.T) {
-		contract := createMockContract("CCIP.Router", "Router", "mainnet-v1", "router-id", []byte("blob"))
+		contract := createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-id", []byte("blob"))
 		contract.CreatedEvent.TemplateId.PackageId = "different-package-id-after-upgrade"
 
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
 				contract,
-				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1", "onramp-id", []byte("blob")),
-				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1", "feequoter-id", []byte("blob")),
+				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-id", []byte("blob")),
+				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1-feequoter", "feequoter-id", []byte("blob")),
 			},
 		}
 
@@ -157,9 +157,9 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 				Party:       "ccip-owner::123",
 				Description: "Production",
 				Contracts: config.ContractIdentifiers{
-					OffRamp:            "mainnet-v1",
-					CCV:                "mainnet-v1",
-					TokenAdminRegistry: "mainnet-v1",
+					OffRamp:            "mainnet-v1-offramp",
+					CCV:                "mainnet-v1-ccv",
+					TokenAdminRegistry: "mainnet-v1-tar",
 				},
 			},
 		},
@@ -168,9 +168,9 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 	t.Run("returns disclosures when all contracts found", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.OffRamp", "OffRamp", "mainnet-v1", "offramp-id", []byte("offramp-blob")),
-				createMockContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1", "ccv-id", []byte("ccv-blob")),
-				createMockContract("CCIP.TokenAdminRegistry", "TokenAdminRegistry", "mainnet-v1", "tar-id", []byte("tar-blob")),
+				createMockContract("CCIP.OffRamp", "OffRamp", "mainnet-v1-offramp", "offramp-id", []byte("offramp-blob")),
+				createMockContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1-ccv", "ccv-id", []byte("ccv-blob")),
+				createMockContract("CCIP.TokenAdminRegistry", "TokenAdminRegistry", "mainnet-v1-tar", "tar-id", []byte("tar-blob")),
 			},
 		}
 
@@ -191,8 +191,8 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 	t.Run("returns error when offRamp not found", func(t *testing.T) {
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1", "ccv-id", []byte("ccv-blob")),
-				createMockContract("CCIP.TokenAdminRegistry", "TokenAdminRegistry", "mainnet-v1", "tar-id", []byte("tar-blob")),
+				createMockContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1-ccv", "ccv-id", []byte("ccv-blob")),
+				createMockContract("CCIP.TokenAdminRegistry", "TokenAdminRegistry", "mainnet-v1-tar", "tar-id", []byte("tar-blob")),
 			},
 		}
 
@@ -203,8 +203,8 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 	})
 }
 
-func TestExtractEnvironmentID(t *testing.T) {
-	t.Run("extracts environmentId from record", func(t *testing.T) {
+func TestExtractInstanceID(t *testing.T) {
+	t.Run("extracts instanceId from record", func(t *testing.T) {
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -212,17 +212,17 @@ func TestExtractEnvironmentID(t *testing.T) {
 					Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: "alice"}},
 				},
 				{
-					Label: "environmentId",
+					Label: "instanceId",
 					Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "mainnet-v1"}},
 				},
 			},
 		}
 
-		envID := ExtractEnvironmentID(record)
+		envID := ExtractInstanceID(record)
 		assert.Equal(t, "mainnet-v1", envID)
 	})
 
-	t.Run("returns empty string when environmentId not found", func(t *testing.T) {
+	t.Run("returns empty string when instanceId not found", func(t *testing.T) {
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -232,26 +232,26 @@ func TestExtractEnvironmentID(t *testing.T) {
 			},
 		}
 
-		envID := ExtractEnvironmentID(record)
+		envID := ExtractInstanceID(record)
 		assert.Equal(t, "", envID)
 	})
 
 	t.Run("returns empty string for nil record", func(t *testing.T) {
-		envID := ExtractEnvironmentID(nil)
+		envID := ExtractInstanceID(nil)
 		assert.Equal(t, "", envID)
 	})
 
-	t.Run("returns empty string when environmentId is not text", func(t *testing.T) {
+	t.Run("returns empty string when instanceId is not text", func(t *testing.T) {
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
-					Label: "environmentId",
+					Label: "instanceId",
 					Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 123}},
 				},
 			},
 		}
 
-		envID := ExtractEnvironmentID(record)
+		envID := ExtractInstanceID(record)
 		assert.Equal(t, "", envID)
 	})
 }
