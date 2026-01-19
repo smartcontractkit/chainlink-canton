@@ -27,6 +27,7 @@ setup = script do
     fq <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
+            instanceId = "test-feequoter"
             feeTokens = Map.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty

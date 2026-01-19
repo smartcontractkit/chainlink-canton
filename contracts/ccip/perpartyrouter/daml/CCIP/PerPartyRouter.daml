@@ -40,7 +40,7 @@ template PerPartyRouterFactory
 
                 -- check instanceId is not already taken
                 assertMsg "instanceId already in use"
-                    (instanceId `notElem` Map.elems registeredRouters)
+                    (instanceId `notElem` Map.values registeredRouters)
 
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner

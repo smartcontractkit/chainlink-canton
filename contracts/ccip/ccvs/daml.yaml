@@ -13,6 +13,5 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - ../common/.daml/dist/ccip-common-1.0.0.dar
-  - ../ccvRegistry/.daml/dist/ccip-ccvregistry-1.0.0.dar
   #- ../feequoter/.daml/dist/ccip-feequoter-1.0.0.dar
   #- ../onramp/.daml/dist/ccip-onramp-1.0.0.dar
