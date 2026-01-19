@@ -2,11 +2,9 @@ module github.com/smartcontractkit/chainlink-canton-internal
 
 go 1.25.5
 
-replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
-
 require (
 	github.com/digital-asset/dazl-client/v8 v8.7.1
-	github.com/ethereum/go-ethereum v1.16.7
+	github.com/ethereum/go-ethereum v1.16.8
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.5.1
@@ -25,7 +23,7 @@ require (
 	github.com/rs/zerolog v1.34.0 // indirect
 )
 
-replace github.com/noders-team/go-daml => ../go-daml
+replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260119044034-bce1fdd9b5ea
 
 replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
