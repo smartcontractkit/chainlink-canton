@@ -3,6 +3,7 @@ package types
 // contract disclosure for off-ledger distribution
 type DisclosedContract struct {
 	ContractID       string     `json:"contractId"`
+	InstanceID       string     `json:"instanceId"`
 	TemplateID       TemplateID `json:"templateId"`
 	CreatedEventBlob string     `json:"createdEventBlob"` // base64-encoded
 	SynchronizerID   string     `json:"synchronizerId,omitempty"`

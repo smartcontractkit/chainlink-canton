@@ -17,13 +17,16 @@ type EnvironmentConfig struct {
 	Contracts   ContractIdentifiers `yaml:"contracts"`
 }
 
+// ContractIdentifiers maps contract types to their unique instanceId values
 type ContractIdentifiers struct {
 	Router             string `yaml:"router"`
 	OnRamp             string `yaml:"onRamp"`
-	FeeQuoter          string `yaml:"feeQuoter"`
 	OffRamp            string `yaml:"offRamp"`
+	GlobalConfig       string `yaml:"globalConfig"`
+	FeeQuoter          string `yaml:"feeQuoter"`
 	CCV                string `yaml:"ccv"`
 	TokenAdminRegistry string `yaml:"tokenAdminRegistry"`
+	CCVRegistry        string `yaml:"ccvRegistry"`
 	TokenPool          string `yaml:"tokenPool"`
 }
 

@@ -128,7 +128,7 @@ func (s *Service) GetCCIPExecuteDisclosures(ctx context.Context, environmentID s
 	}, nil
 }
 
-// find contract by type and environmentId, matching module:entity (ignores packageId for upgrade resilience)
+// find contract by type and instanceId, matching module:entity (ignores packageId for upgrade resilience)
 func (s *Service) findContract(
 	contracts []*ledger.ActiveContract,
 	contractType ContractType,
@@ -148,13 +148,14 @@ func (s *Service) findContract(
 			continue
 		}
 
-		envID := ExtractEnvironmentID(event.GetCreateArguments())
+		envID := ExtractInstanceID(event.GetCreateArguments())
 		if envID != expectedEnvID {
 			continue
 		}
 
 		return &types.DisclosedContract{
 			ContractID: event.GetContractId(),
+			InstanceID: envID,
 			TemplateID: types.TemplateID{
 				PackageID:  templateID.GetPackageId(),
 				ModuleName: templateID.GetModuleName(),
@@ -165,15 +166,15 @@ func (s *Service) findContract(
 		}, nil
 	}
 
-	return nil, fmt.Errorf("no contract found with type %s and environmentId %s", contractType, expectedEnvID)
+	return nil, fmt.Errorf("no contract found with type %s and instanceId %s", contractType, expectedEnvID)
 }
 
-func ExtractEnvironmentID(args *apiv2.Record) string {
+func ExtractInstanceID(args *apiv2.Record) string {
 	if args == nil {
 		return ""
 	}
 	for _, field := range args.GetFields() {
-		if field.GetLabel() == "environmentId" {
+		if field.GetLabel() == "instanceId" {
 			if textVal, ok := field.GetValue().GetSum().(*apiv2.Value_Text); ok {
 				return textVal.Text
 			}
