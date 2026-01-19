@@ -1,0 +1,106 @@
+name: Build Contracts and Generate Bindings
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'contracts/**'
+      - 'scripts/generate-bindings.sh'
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - 'contracts/**'
+      - 'scripts/generate-bindings.sh'
+  workflow_dispatch:
+
+jobs:
+  build-and-generate:
+    name: Build Contracts and Generate Bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Add Go bin to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install godaml
+        run: |
+          # Build godaml from source due to replace directive in go.mod
+          # The replace directive points to github.com/stackman27/go-daml at commit bce1fdd9b5ea
+          GOBIN="$(go env GOPATH)/bin"
+          mkdir -p "$GOBIN"
+          
+          echo "Building godaml from source..."
+          git clone --depth 1 https://github.com/stackman27/go-daml.git /tmp/go-daml
+          cd /tmp/go-daml
+          git checkout bce1fdd9b5ea6336cc21db463590673927b6ca01
+          go build -o "$GOBIN/godaml" ./cmd/godaml
+          
+          # Verify installation
+          godaml --version || (echo "Error: godaml not found after installation" && exit 1)
+          echo "✓ godaml installed successfully"
+
+      - name: Build coin contract
+        working-directory: contracts/coin
+        run: |
+          dpm install package
+          dpm build
+
+      - name: Build CCIP contracts
+        working-directory: contracts
+        run: |
+          # Build common first (no CCIP dependencies)
+          cd ccip/common && dpm install package && dpm build && cd ../..
+          
+          # Build packages that only depend on common
+          cd ccip/feequoter && dpm install package && dpm build && cd ../..
+          cd ccip/tokenAdminRegistry && dpm install package && dpm build && cd ../..
+          cd ccip/ccipreceiver && dpm install package && dpm build && cd ../..
+          cd ccip/ccvs && dpm install package && dpm build && cd ../..
+          
+          # Build packages that depend on common + feequoter/tokenAdminRegistry
+          cd ccip/onramp && dpm install package && dpm build && cd ../..
+          cd ccip/offramp && dpm install package && dpm build && cd ../..
+          
+          # Build perpartyrouter (depends on everything)
+          cd ccip/perpartyrouter && dpm install package && dpm build && cd ../..
+          
+          # Build pools packages
+          cd ccip/pools/interfaces && dpm install package && dpm build && cd ../../..
+          cd ccip/pools/lockReleaseTokenPool && dpm install package && dpm build && cd ../../..
+
+      - name: Generate bindings
+        run: |
+          chmod +x scripts/generate-bindings.sh
+          ./scripts/generate-bindings.sh
+
+      - name: Check for generated files
+        run: |
+          if [ ! -d "generated/coin" ] || [ -z "$(ls -A generated/coin/*.go 2>/dev/null)" ]; then
+            echo "Error: No coin bindings generated"
+            exit 1
+          fi
+          if [ ! -d "generated/ccip" ] || [ -z "$(find generated/ccip -name '*.go' -type f)" ]; then
+            echo "Error: No CCIP bindings generated"
+            exit 1
+          fi
+          echo "✓ Generated files found:"
+          find generated -name "*.go" -type f | head -20
+
+      - name: Verify Go code compiles
+        run: |
+          go build ./generated/coin/...
+          go build ./generated/ccip/...

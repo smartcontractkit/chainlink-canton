@@ -18,9 +18,13 @@ require (
 )
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0 // indirect
+	github.com/avast/retry-go/v4 v4.6.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 )
 
 replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260119044034-bce1fdd9b5ea
@@ -47,6 +51,7 @@ require (
 	github.com/onsi/gomega v1.36.2 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/smartcontractkit/chainlink-deployments-framework v0.75.1
 	github.com/speakeasy-api/jsonpath v0.6.0 // indirect
 	github.com/speakeasy-api/openapi-overlay v0.10.2 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
