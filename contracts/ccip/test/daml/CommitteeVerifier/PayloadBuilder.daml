@@ -111,8 +111,8 @@ sValues = [
 getPubkeysForIndices : [Int] -> [BytesHex]
 getPubkeysForIndices indices = map (\i -> pubkeys !! i) indices
 
-getCCVDataForIndices : [Int] -> BytesHex
-getCCVDataForIndices indices = 
+getVerifierResultsForIndices : [Int] -> BytesHex
+getVerifierResultsForIndices indices =
     let signatures = map (\i -> rValues !! i <> sValues !! i) indices
         concatenatedSignatures = foldl (<>) "" signatures
         signatureLength = byteCount concatenatedSignatures

@@ -209,6 +209,7 @@ testCCIPExecute = script do
 
     -- receiver executes the message (ccipOwner acts via PerPartyRouter signatory)
     -- receiver passes all cids via explicit disclosure
+    -- no token transfer, so tokenPoolCCVTicket is None and no TokenReceiveTicket will be created
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
         exerciseCmd router CCIP.PerPartyRouter.Execute with
             offRampCid = offRamp
@@ -216,14 +217,15 @@ testCCIPExecute = script do
             tokenAdminRegistryCid = tokenAdminRegistry
             encodedMessage = encodedMessage
             ccvVerifyTickets = []
+            tokenPoolCCVTicket = None
+            receiverRequiredCCVIds = []
 
     -- verify execution succeeded
     executeResult.state === CCIP.Internal.SUCCESS
 
     debug ("message executed: " <> show executeResult.messageId)
 
-    -- verify token receive ticket was created
-    Some tokenReceiveTicket <- receiver `queryContractId` executeResult.tokenReceiveTicket
-    tokenReceiveTicket.hasTokenTransfer === False
+    -- verify no token receive ticket was created (no token transfer)
+    executeResult.tokenReceiveTicket === None
 
     pure ()

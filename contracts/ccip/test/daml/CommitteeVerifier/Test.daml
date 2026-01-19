@@ -38,7 +38,7 @@ setup = script do
     -- single signer, threshold 1
     let indices1 = [0]
     let pubKeys1 = PayloadBuilder.getPubkeysForIndices indices1
-    let ccvData = PayloadBuilder.getCCVDataForIndices indices1
+    let verifierResults1 = PayloadBuilder.getVerifierResultsForIndices indices1
     ccv1 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
@@ -54,7 +54,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = ccvData
+            verifierResults = verifierResults1
             receiver = owner
             caller = owner
     debug ("===== Passed Test1 =====")
@@ -63,7 +63,7 @@ setup = script do
     -- multiple signers, threshold 3
     let indices2 = [0, 1, 2, 3, 4]
     let pubKeys2 = PayloadBuilder.getPubkeysForIndices indices2
-    let ccvData2 = PayloadBuilder.getCCVDataForIndices indices2
+    let verifierResults2 = PayloadBuilder.getVerifierResultsForIndices indices2
     ccv2 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
@@ -79,7 +79,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = ccvData2
+            verifierResults = verifierResults2
             receiver = owner
             caller = owner
     debug ("===== Passed Test2 =====")
@@ -88,7 +88,7 @@ setup = script do
     -- insufficient signers, threshold 20 - ccv creation should fail
     let indices3 = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     let pubKeys3 = PayloadBuilder.getPubkeysForIndices indices3
-    let ccvData3 = PayloadBuilder.getCCVDataForIndices indices3
+    let verifierResults3 = PayloadBuilder.getVerifierResultsForIndices indices3
     ccv3 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
@@ -104,7 +104,7 @@ setup = script do
     debug ("===== Test4 =====")
     -- submit with invalid signatures, threshold of 3 met, should fail
     let pubKeys4 = PayloadBuilder.getPubkeysForIndices [0, 2, 4, 6, 8, 10]
-    let ccvData4 = PayloadBuilder.getCCVDataForIndices [0, 1, 2, 3, 4, 5]
+    let verifierResults4 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
     ccv4 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
@@ -120,7 +120,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = ccvData4
+            verifierResults = verifierResults4
             receiver = owner
             caller = owner
     debug ("===== Passed Test4 =====")
@@ -128,7 +128,7 @@ setup = script do
     debug ("===== Test5 =====")
     -- submit with invalid signatures, threshold not met
     let pubKeys5 = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]
-    let ccvData5 = PayloadBuilder.getCCVDataForIndices [5, 6, 7, 8, 9]
+    let verifierResults5 = PayloadBuilder.getVerifierResultsForIndices [5, 6, 7, 8, 9]
     ccv5 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
@@ -144,7 +144,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = ccvData5
+            verifierResults = verifierResults5
             receiver = owner
             caller = owner
     debug ("===== Passed Test5 =====")
@@ -152,7 +152,7 @@ setup = script do
     debug ("===== Test6 =====")
     -- submit duplicate signatures, should fail
     let pubKeys6 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
-    let ccvData6 = PayloadBuilder.getCCVDataForIndices [0, 1, 2, 0]
+    let verifierResults6 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 0]
     ccv6 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
             owner = owner
@@ -168,7 +168,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData = ccvData6
+            verifierResults = verifierResults6
             receiver = owner
             caller = owner
     debug ("===== Passed Test6 =====")
@@ -202,7 +202,7 @@ setup = script do
     debug ("===== Passed Test8 =====")
 
     debug ("===== Test9 =====")
-    -- pass invalid ccvData
+    -- pass invalid verifierResults
     let pubKeys9 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
     ccv9 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -219,7 +219,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData =
+            verifierResults =
                 "01234567" <> -- invalid version tag
                 "0004" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
@@ -230,7 +230,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData =
+            verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "ffff" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
@@ -241,7 +241,7 @@ setup = script do
             ccvRegistryCid = ccvRegistry
             message = msg
             messageId = hashedMsg
-            ccvData =
+            verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data

@@ -6,47 +6,73 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
+import qualified CCIP.CCVId
 import qualified CCIP.Client
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OffRamp
 import qualified CCIP.OnRamp
+import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
+
+
+-- | Direction of token transfer for CCV requirement lookup.
+data TransferDirection = Outbound | Inbound
+    deriving (Eq, Show)
+
 
 interface ITokenPool where
     viewtype TokenPoolView
 
-    tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
-    tokenPool_releaseOrMintImpl : ContractId ITokenPool -> TokenPool_ReleaseOrMint -> Update ReleaseOrMintResult
+    tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [CCIP.CCVId.CCVId]
+    tokenPool_verifyCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyCCVs -> Update (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
+    tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
 
-    nonconsuming choice TokenPool_GetRequiredCCVs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
+    -- Get required CCVs for a transfer based on direction, amount, finality, etc.
+    nonconsuming choice TokenPool_GetRequiredCCVs : [CCIP.CCVId.CCVId]
         with
-            message : CCIP.MessageCodecV1.MessageV1
+            remoteChainSelector : Numeric 0
+            amount : Numeric 0
+            finality : Int
+            extraData : BytesHex
+            direction : TransferDirection
             caller : Party
         controller caller
         do tokenPool_getRequiredCCVsImpl this self arg
 
-    nonconsuming choice TokenPool_ReleaseOrMint : ReleaseOrMintResult
+    -- Verify CCVs and issue TokenPoolCCVVerifiedTicket for inbound transfers.
+    -- Called by receiver BEFORE calling PerPartyRouter.Execute.
+    nonconsuming choice TokenPool_VerifyCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
         with
-            encodedMessage : BytesHex
-            ccvs : [ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier]
-            ccvData : [BytesHex]
-            tokenInput : TokenInput
-            offRampCid : ContractId CCIP.OffRamp.OffRamp
-            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
+            messageHash : BytesHex
+            sourceChainSelector : Numeric 0
+            amount : Numeric 0
+            receiver : Party
             caller : Party
         controller caller
-        do tokenPool_releaseOrMintImpl this self arg
+        do tokenPool_verifyCCVsImpl this self arg
 
+    -- Release tokens by consuming a TokenReceiveTicket issued by OffRamp.
+    choice TokenPool_ReleaseFromTicket : ReleaseOrMintResult
+        with
+            tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            tokenInput : TokenInput
+            caller : Party
+        controller caller
+        do tokenPool_releaseFromTicketImpl this self arg
+
+    -- Lock/burn tokens for outbound transfer.
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
             destChainSelector : Numeric 0
             message : CCIP.Client.Canton2AnyMessage
             tokenInput : TokenInput
             feeInput : FeeInput
-            senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding] -- TODO: Probably should handle sending and paying fee from same holdings?
+            senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
             onRampCid : ContractId CCIP.OnRamp.OnRamp
             feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
