@@ -206,7 +206,7 @@ template LockReleaseTokenPool
                 let amountDecimal : Decimal = intToDecimal (truncate ticket.amount)
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = poolOwner
-                        receiver = ticket.receiver
+                        receiver = ticket.tokenReceiver
                         amount = amountDecimal
                         instrumentId = instrumentId
                         requestedAt = now
