@@ -13,7 +13,7 @@ import DA.List (dedupSort, head)
 import qualified DA.Map as Map
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
-import DA.Time (time)
+import DA.Time (time, addRelTime, hours)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -166,20 +166,22 @@ template LockReleaseTokenPool
 
         -- Release tokens by consuming a TokenReceiveTicket.
         -- Transfers tokens from pool to receiver via TransferFactory.
-        choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
+        -- Can be called by anyone with a valid ticket.
+        nonconsuming choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
-            controller poolOwner
+            controller caller
             do
                 -- Fetch and validate the ticket
                 ticket <- fetch tokenReceiveTicketCid
                 assertMsg "TokenReceiveTicket instrumentId mismatch" (ticket.instrumentId == instrumentId)
                 assertMsg "TokenReceiveTicket poolOwner mismatch" (ticket.poolOwner == poolOwner)
 
-                -- Consume the ticket
+                -- Validate caller is authorized
+                assertMsg "ReleaseFromTicket: caller must be tokenReceiver" (caller == ticket.tokenReceiver)
                 exercise tokenReceiveTicketCid CCIP.Tickets.TokenReceiveTicket_Consume
 
                 -- Transfer tokens from pool to receiver via TransferFactory.
