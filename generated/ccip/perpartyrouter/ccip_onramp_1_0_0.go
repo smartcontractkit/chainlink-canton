@@ -153,8 +153,8 @@ func (t *CCIPSendFromRouterResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// GetRequiredCCVsForSend2 is a Record type
-type GetRequiredCCVsForSend2 struct {
+// GetRequiredCCVsForSend is a Record type
+type GetRequiredCCVsForSend struct {
 	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
 	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
 	DestChainSelector     NUMERIC       `json:"destChainSelector"`
@@ -162,8 +162,8 @@ type GetRequiredCCVsForSend2 struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// ToMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
-func (t GetRequiredCCVsForSend2) ToMap() map[string]interface{} {
+// ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
+func (t GetRequiredCCVsForSend) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["globalConfigCid"] = func() interface{} {
@@ -200,14 +200,14 @@ func (t GetRequiredCCVsForSend2) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend2 using JsonCodec
-func (t GetRequiredCCVsForSend2) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend using JsonCodec
+func (t GetRequiredCCVsForSend) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForSend2 using JsonCodec
-func (t *GetRequiredCCVsForSend2) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForSend using JsonCodec
+func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -252,7 +252,7 @@ func (t *OnRamp) UnmarshalJSON(data []byte) error {
 // Choice methods for OnRamp
 
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this OnRamp contract
-func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
+func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,

@@ -139,8 +139,8 @@ func (t *ApplyFeeTokenUpdates) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// DestChainConfig is a Record type
-type DestChainConfig struct {
+// DestChainConfig2 is a Record type
+type DestChainConfig2 struct {
 	IsEnabled                   BOOL    `json:"isEnabled"`
 	MaxDataBytes                INT64   `json:"maxDataBytes"`
 	MaxPerMsgGasLimit           INT64   `json:"maxPerMsgGasLimit"`
@@ -153,8 +153,8 @@ type DestChainConfig struct {
 	DefaultTokenDestGasOverhead INT64   `json:"defaultTokenDestGasOverhead"`
 }
 
-// ToMap converts DestChainConfig to a map for DAML arguments
-func (t DestChainConfig) ToMap() map[string]interface{} {
+// ToMap converts DestChainConfig2 to a map for DAML arguments
+func (t DestChainConfig2) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["isEnabled"] = bool(t.IsEnabled)
@@ -180,22 +180,22 @@ func (t DestChainConfig) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for DestChainConfig using JsonCodec
-func (t DestChainConfig) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for DestChainConfig2 using JsonCodec
+func (t DestChainConfig2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for DestChainConfig using JsonCodec
-func (t *DestChainConfig) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for DestChainConfig2 using JsonCodec
+func (t *DestChainConfig2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
 
 // DestChainConfigArgs is a Record type
 type DestChainConfigArgs struct {
-	DestChainSelector NUMERIC         `json:"destChainSelector"`
-	DestChainConfig   DestChainConfig `json:"destChainConfig"`
+	DestChainSelector NUMERIC          `json:"destChainSelector"`
+	DestChainConfig   DestChainConfig2 `json:"destChainConfig"`
 }
 
 // ToMap converts DestChainConfigArgs to a map for DAML arguments
@@ -393,7 +393,7 @@ func (t FeeQuoter) ApplyFeeTokenUpdates(contractID string, args ApplyFeeTokenUpd
 }
 
 // GetDestChainConfig exercises the GetDestChainConfig choice on this FeeQuoter contract
-func (t FeeQuoter) GetDestChainConfig(contractID string, args GetDestChainConfig) *model.ExerciseCommand {
+func (t FeeQuoter) GetDestChainConfig(contractID string, args GetDestChainConfig2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
@@ -568,14 +568,14 @@ func (t *GasPriceUpdate) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// GetDestChainConfig is a Record type
-type GetDestChainConfig struct {
+// GetDestChainConfig2 is a Record type
+type GetDestChainConfig2 struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
 	Caller            PARTY   `json:"caller"`
 }
 
-// ToMap converts GetDestChainConfig to a map for DAML arguments
-func (t GetDestChainConfig) ToMap() map[string]interface{} {
+// ToMap converts GetDestChainConfig2 to a map for DAML arguments
+func (t GetDestChainConfig2) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
@@ -585,14 +585,14 @@ func (t GetDestChainConfig) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetDestChainConfig using JsonCodec
-func (t GetDestChainConfig) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for GetDestChainConfig2 using JsonCodec
+func (t GetDestChainConfig2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetDestChainConfig using JsonCodec
-func (t *GetDestChainConfig) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for GetDestChainConfig2 using JsonCodec
+func (t *GetDestChainConfig2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }

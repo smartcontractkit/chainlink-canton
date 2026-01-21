@@ -120,8 +120,8 @@ github.com/speakeasy-api/jsonpath v0.6.0/go.mod h1:ymb2iSkyOycmzKwbEAYPJV/yi2rSm
 github.com/speakeasy-api/openapi-overlay v0.10.2 h1:VOdQ03eGKeiHnpb1boZCGm7x8Haj6gST0P3SGTX95GU=
 github.com/speakeasy-api/openapi-overlay v0.10.2/go.mod h1:n0iOU7AqKpNFfEt6tq7qYITC4f0yzVVdFw0S7hukemg=
 github.com/spkg/bom v0.0.0-20160624110644-59b7046e48ad/go.mod h1:qLr4V1qq6nMqFKkMo8ZTx3f+BZEkzsRUY10Xsm2mwU0=
-github.com/stackman27/go-daml v0.0.0-20260120000038-3e0ae841d3ac h1:OX8ipgBVfpX785l2mrb7Qzr+qWkF6VuOZ7kdryHbqAc=
-github.com/stackman27/go-daml v0.0.0-20260120000038-3e0ae841d3ac/go.mod h1:yi458NGE4dlDOhlyCZvQ2XgsIOdHHvepwoHRgEusbo8=
+github.com/stackman27/go-daml v0.0.0-20260121212323-845710f79173 h1:+Tq81FRHDqMlwpUoQLvuEgt7TCCq9/Nb9HHrGm3UnyU=
+github.com/stackman27/go-daml v0.0.0-20260121212323-845710f79173/go.mod h1:yi458NGE4dlDOhlyCZvQ2XgsIOdHHvepwoHRgEusbo8=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=

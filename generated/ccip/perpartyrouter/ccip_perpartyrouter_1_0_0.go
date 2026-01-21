@@ -639,8 +639,8 @@ func (t *GetReceiverRequiredCCVs) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// GetRequiredCCVsForExecute is a Record type
-type GetRequiredCCVsForExecute struct {
+// GetRequiredCCVsForExecute2 is a Record type
+type GetRequiredCCVsForExecute2 struct {
 	OffRampCid            CONTRACT_ID   `json:"offRampCid"`
 	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
 	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
@@ -649,8 +649,8 @@ type GetRequiredCCVsForExecute struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
-func (t GetRequiredCCVsForExecute) ToMap() map[string]interface{} {
+// ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
+func (t GetRequiredCCVsForExecute2) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["offRampCid"] = func() interface{} {
@@ -695,20 +695,20 @@ func (t GetRequiredCCVsForExecute) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForExecute using JsonCodec
-func (t GetRequiredCCVsForExecute) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForExecute2 using JsonCodec
+func (t GetRequiredCCVsForExecute2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForExecute using JsonCodec
-func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForExecute2 using JsonCodec
+func (t *GetRequiredCCVsForExecute2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// GetRequiredCCVsForSend is a Record type
-type GetRequiredCCVsForSend struct {
+// GetRequiredCCVsForSend2 is a Record type
+type GetRequiredCCVsForSend2 struct {
 	OnRampCid             CONTRACT_ID   `json:"onRampCid"`
 	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
 	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
@@ -717,8 +717,8 @@ type GetRequiredCCVsForSend struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
-func (t GetRequiredCCVsForSend) ToMap() map[string]interface{} {
+// ToMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
+func (t GetRequiredCCVsForSend2) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["onRampCid"] = func() interface{} {
@@ -763,14 +763,14 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend using JsonCodec
-func (t GetRequiredCCVsForSend) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend2 using JsonCodec
+func (t GetRequiredCCVsForSend2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForSend using JsonCodec
-func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForSend2 using JsonCodec
+func (t *GetRequiredCCVsForSend2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -964,7 +964,7 @@ func (t PerPartyRouter) UpdateReceiverRequiredCCVs(contractID string, args Updat
 }
 
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this PerPartyRouter contract
-func (t PerPartyRouter) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
+func (t PerPartyRouter) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -974,7 +974,7 @@ func (t PerPartyRouter) GetRequiredCCVsForSend(contractID string, args GetRequir
 }
 
 // GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this PerPartyRouter contract
-func (t PerPartyRouter) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,

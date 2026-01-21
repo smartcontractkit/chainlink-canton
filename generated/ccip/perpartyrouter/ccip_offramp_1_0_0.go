@@ -132,8 +132,8 @@ func (t *ExecuteFromRouterResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// GetRequiredCCVsForExecute2 is a Record type
-type GetRequiredCCVsForExecute2 struct {
+// GetRequiredCCVsForExecute is a Record type
+type GetRequiredCCVsForExecute struct {
 	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
 	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
 	ReceiverRequiredCCVs  []TEXT        `json:"receiverRequiredCCVs"`
@@ -142,8 +142,8 @@ type GetRequiredCCVsForExecute2 struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
-func (t GetRequiredCCVsForExecute2) ToMap() map[string]interface{} {
+// ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
+func (t GetRequiredCCVsForExecute) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["globalConfigCid"] = func() interface{} {
@@ -188,14 +188,14 @@ func (t GetRequiredCCVsForExecute2) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForExecute2 using JsonCodec
-func (t GetRequiredCCVsForExecute2) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForExecute using JsonCodec
+func (t GetRequiredCCVsForExecute) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForExecute2 using JsonCodec
-func (t *GetRequiredCCVsForExecute2) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForExecute using JsonCodec
+func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -240,7 +240,7 @@ func (t *OffRamp) UnmarshalJSON(data []byte) error {
 // Choice methods for OffRamp
 
 // GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this OffRamp contract
-func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute2) *model.ExerciseCommand {
+func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,

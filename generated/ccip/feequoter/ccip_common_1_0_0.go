@@ -732,8 +732,8 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// DestChainConfig22 is a Record type
-type DestChainConfig22 struct {
+// DestChainConfig is a Record type
+type DestChainConfig struct {
 	IsEnabled        BOOL   `json:"isEnabled"`
 	DefaultExecutor  TEXT   `json:"defaultExecutor"`
 	OffRampAddress   TEXT   `json:"offRampAddress"`
@@ -741,8 +741,8 @@ type DestChainConfig22 struct {
 	DefaultCCVs      []TEXT `json:"defaultCCVs"`
 }
 
-// ToMap converts DestChainConfig22 to a map for DAML arguments
-func (t DestChainConfig22) ToMap() map[string]interface{} {
+// ToMap converts DestChainConfig to a map for DAML arguments
+func (t DestChainConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["isEnabled"] = bool(t.IsEnabled)
@@ -770,26 +770,26 @@ func (t DestChainConfig22) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for DestChainConfig22 using JsonCodec
-func (t DestChainConfig22) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for DestChainConfig using JsonCodec
+func (t DestChainConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for DestChainConfig22 using JsonCodec
-func (t *DestChainConfig22) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for DestChainConfig using JsonCodec
+func (t *DestChainConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// GetDestChainConfig2 is a Record type
-type GetDestChainConfig2 struct {
+// GetDestChainConfig is a Record type
+type GetDestChainConfig struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
 	Caller            PARTY   `json:"caller"`
 }
 
-// ToMap converts GetDestChainConfig2 to a map for DAML arguments
-func (t GetDestChainConfig2) ToMap() map[string]interface{} {
+// ToMap converts GetDestChainConfig to a map for DAML arguments
+func (t GetDestChainConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
@@ -799,14 +799,14 @@ func (t GetDestChainConfig2) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetDestChainConfig2 using JsonCodec
-func (t GetDestChainConfig2) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for GetDestChainConfig using JsonCodec
+func (t GetDestChainConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetDestChainConfig2 using JsonCodec
-func (t *GetDestChainConfig2) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for GetDestChainConfig using JsonCodec
+func (t *GetDestChainConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -898,7 +898,7 @@ func (t *GlobalConfig) UnmarshalJSON(data []byte) error {
 // Choice methods for GlobalConfig
 
 // GetDestChainConfig exercises the GetDestChainConfig choice on this GlobalConfig contract
-func (t GlobalConfig) GetDestChainConfig(contractID string, args GetDestChainConfig2) *model.ExerciseCommand {
+func (t GlobalConfig) GetDestChainConfig(contractID string, args GetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
@@ -1426,8 +1426,8 @@ func (t *TokenTransferV1) UnmarshalJSON(data []byte) error {
 
 // UpdateDestChainConfig is a Record type
 type UpdateDestChainConfig struct {
-	DestChainSelector NUMERIC           `json:"destChainSelector"`
-	Config            DestChainConfig22 `json:"config"`
+	DestChainSelector NUMERIC         `json:"destChainSelector"`
+	Config            DestChainConfig `json:"config"`
 }
 
 // ToMap converts UpdateDestChainConfig to a map for DAML arguments
