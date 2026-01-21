@@ -55,7 +55,7 @@ func (c *Client) generateJWT() (string, error) {
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Subject:   "ledger-api-user",
 		Audience:  []string{c.jwtAudience},
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 1)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	})
 	return t.SignedString([]byte(c.jwtSecret))
