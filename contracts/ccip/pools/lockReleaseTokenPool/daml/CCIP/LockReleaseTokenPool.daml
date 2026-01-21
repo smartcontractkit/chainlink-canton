@@ -33,6 +33,14 @@ import qualified CCIP.TokenAdminRegistry
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
 
+-- | Transfer timeout configuration for pending TransferInstructions.
+-- Some tokens (e.g., Amulet) have expiry constraints and reject transfers with
+-- executeBefore times beyond the token's expiry. Use RelativeHours for such tokens.
+-- Tokens without expiry (e.g., TestToken) can use Indefinite.
+data TransferTimeout
+    = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
+    | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
+    deriving (Eq, Show)
 
 -- | Per-chain CCV requirements for the pool.
 -- This partially matches the EVM pattern in AdvancedPoolHooks.sol which is primarily based on chain selector:
@@ -59,6 +67,8 @@ template LockReleaseTokenPool
         -- the pool's preapproval CID under the key the TransferFactory expects
         -- (e.g., "transfer-preapproval"). Enables direct transfers without pending state.
         poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        -- Timeout for pending TransferInstructions created by this pool.
+        transferTimeout : TransferTimeout
     where
         signatory poolOwner
 
@@ -182,13 +192,17 @@ template LockReleaseTokenPool
 
                 -- Validate caller is authorized
                 assertMsg "ReleaseFromTicket: caller must be tokenReceiver" (caller == ticket.tokenReceiver)
+
+                -- Consume the ticket (poolOwner authorization propagates from this choice's controller)
                 exercise tokenReceiveTicketCid CCIP.Tickets.TokenReceiveTicket_Consume
 
                 -- Transfer tokens from pool to receiver via TransferFactory.
                 -- If receiver has preapproval, completes immediately. Otherwise creates pending
-                -- TransferInstruction that receiver must accept. Uses maxTime so pending
-                -- transfers don't time out.
+                -- TransferInstruction that receiver must accept.
                 now <- getTime
+                let executeBefore = case transferTimeout of
+                        Indefinite -> maxTime
+                        RelativeHours h -> addRelTime now (hours h)
                 let amountDecimal : Decimal = intToDecimal (truncate ticket.amount)
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = poolOwner
@@ -196,7 +210,7 @@ template LockReleaseTokenPool
                         amount = amountDecimal
                         instrumentId = instrumentId
                         requestedAt = now
-                        executeBefore = maxTime
+                        executeBefore
                         inputHoldingCids = tokenInput.tokenPoolHoldings
                         meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
@@ -258,6 +272,9 @@ template LockReleaseTokenPool
 
                 -- Transfer tokens from caller to pool via TransferFactory.
                 now <- getTime
+                let executeBefore = case transferTimeout of
+                        Indefinite -> maxTime
+                        RelativeHours h -> addRelTime now (hours h)
                 let amountDecimal : Decimal = intToDecimal (truncate tokenAmount.amount)
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
@@ -265,7 +282,7 @@ template LockReleaseTokenPool
                         amount = amountDecimal
                         instrumentId = instrumentId
                         requestedAt = now
-                        executeBefore = maxTime
+                        executeBefore
                         inputHoldingCids = senderInputCids
                         meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
