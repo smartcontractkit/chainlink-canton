@@ -1,0 +1,57 @@
+module MCMS.MCMSRegistry where
+
+import DA.Map qualified as Map
+import MCMS.MCMSReceiver (MCMSReceiver)
+
+-- | Registry for MCMS target contracts.
+-- Only mcmsOwner can register/update/unregister targets (true allowlist).
+template MCMSRegistry
+  with
+    mcmsOwner : Party                                      -- MCMS owner (ccip_owner)
+    registrations : Map.Map Text (ContractId MCMSReceiver) -- instanceId → targetCid
+  where
+    signatory mcmsOwner
+
+    -- | Register a target contract (only mcmsOwner can call)
+    choice Register : ContractId MCMSRegistry
+      with
+        instanceId : Text
+        targetCid : ContractId MCMSReceiver
+      controller mcmsOwner
+      do
+        case Map.lookup instanceId registrations of
+          Some _ -> abort "E_ALREADY_REGISTERED: instanceId already registered"
+          None -> pure ()
+        create this with registrations = Map.insert instanceId targetCid registrations
+
+    -- | Update an existing registration (e.g., after contract upgrade)
+    choice UpdateRegistration : ContractId MCMSRegistry
+      with
+        instanceId : Text
+        newTargetCid : ContractId MCMSReceiver
+      controller mcmsOwner
+      do
+        case Map.lookup instanceId registrations of
+          None -> abort "E_NOT_REGISTERED: instanceId not found"
+          Some _ -> pure ()
+        create this with registrations = Map.insert instanceId newTargetCid registrations
+
+    -- | Unregister a target contract
+    choice Unregister : ContractId MCMSRegistry
+      with
+        instanceId : Text
+      controller mcmsOwner
+      do
+        case Map.lookup instanceId registrations of
+          None -> abort "E_NOT_REGISTERED: instanceId not found"
+          Some _ -> pure ()
+        create this with registrations = Map.delete instanceId registrations
+
+    -- | Look up a target by instanceId (anyone can query)
+    nonconsuming choice Lookup : Optional (ContractId MCMSReceiver)
+      with
+        caller : Party
+        instanceId : Text
+      controller caller
+      do
+        pure (Map.lookup instanceId registrations)

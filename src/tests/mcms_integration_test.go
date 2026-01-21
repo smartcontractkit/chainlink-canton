@@ -18,13 +18,14 @@ import (
 )
 
 // TestMCMS_ExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
-// 1. Deploy MCMS and Counter contracts
-// 2. Configure signers (2-of-3)
-// 3. Create proposal with "increment" operation
-// 4. Sign with 2 signers
-// 5. SetRoot with real signatures
-// 6. ExecuteOp - direct call to Counter via MCMSReceiver interface
-// 7. Verify counter value incremented
+// 1. Deploy MCMS, Registry, and Counter contracts
+// 2. Register Counter in the registry
+// 3. Configure signers (2-of-3)
+// 4. Create proposal with "increment" operation
+// 5. Sign with 2 signers
+// 6. SetRoot with real signatures
+// 7. ExecuteOp - looks up target in registry, then calls Counter
+// 8. Verify counter value incremented
 func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	// Setup context with JWT auth
 	jwToken, err := getJWT()
@@ -226,6 +227,85 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	counterCid := counterCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
 	t.Logf("Created Counter contract: %s", counterCid)
 
+	// ====================================
+	// |   2.5. Create Target Registry    |
+	// ====================================
+
+	t.Log("Creating MCMSRegistry contract...")
+
+	// Create empty registrations map
+	emptyRegistrations := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
+
+	registryCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Create{
+						Create: &apiv2.CreateCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.MCMSRegistry",
+								EntityName: "MCMSRegistry",
+							},
+							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "mcmsOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+								{Label: "registrations", Value: emptyRegistrations},
+							}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwner},
+		},
+	})
+	require.NoError(t, err)
+	registryCid := registryCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
+	t.Logf("Created MCMSRegistry contract: %s", registryCid)
+
+	// ====================================
+	// |   2.6. Register Counter Target   |
+	// ====================================
+
+	t.Log("Registering Counter in the target registry...")
+
+	registerRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Exercise{
+						Exercise: &apiv2.ExerciseCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.MCMSRegistry",
+								EntityName: "MCMSRegistry",
+							},
+							ContractId: registryCid,
+							Choice:     "Register",
+							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+								Fields: []*apiv2.RecordField{
+									{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceId}}},
+									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
+								},
+							}}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwner},
+		},
+	})
+	require.NoError(t, err)
+	// Get new registry CID from the result
+	for _, event := range registerRes.GetTransaction().GetEvents() {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSRegistry" {
+			registryCid = created.GetContractId()
+			break
+		}
+	}
+	t.Logf("Registered Counter, new registry CID: %s", registryCid)
+
 	// ========================
 	// |   3. Build Proposal  |
 	// ========================
@@ -387,11 +467,11 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
 									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
-									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
+									{Label: "registryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: registryCid}}},
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
 									{Label: "contractIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-										{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}, // Pass Counter CID to verify contractIds flow
+										{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}, // Pass Counter CID for target to use
 									}}}}},
 								},
 							}}},
