@@ -54,12 +54,13 @@ type Participant struct {
 	VersionServiceClient apiv2.VersionServiceClient
 }
 
-func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
-	adminApiClient, err := grpc.NewClient(adminApiURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// NewParticipantWithOpts creates a new Participant with gRPC connections using the provided dial options.
+func NewParticipantWithOpts(adminApiURL string, adminOpts []grpc.DialOption, ledgerApiURL string, ledgerOpts []grpc.DialOption) (*Participant, error) {
+	adminApiClient, err := grpc.NewClient(adminApiURL, adminOpts...)
 	if err != nil {
 		return nil, err
 	}
-	ledgerApiClient, err := grpc.NewClient(ledgerApiURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ledgerApiClient, err := grpc.NewClient(ledgerApiURL, ledgerOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +75,12 @@ func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
 		UpdateServiceClient:          apiv2.NewUpdateServiceClient(ledgerApiClient),
 		VersionServiceClient:         apiv2.NewVersionServiceClient(ledgerApiClient),
 	}, nil
+}
+
+// NewParticipant creates a new Participant with insecure gRPC connections (no TLS).
+func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	return NewParticipantWithOpts(adminApiURL, opts, ledgerApiURL, opts)
 }
 
 func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, participants ...*Participant) ([]string, error) {
