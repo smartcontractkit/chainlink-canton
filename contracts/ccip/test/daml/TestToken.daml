@@ -1,0 +1,258 @@
+-- | Simplified test token implementation following Canton Coin (Splice) patterns.
+-- Provides Holding, TransferPreapproval, TransferInstruction, and TransferFactory
+-- for CCIP token pool testing without fees or expiry.
+module TestToken where
+
+import DA.Action (foldlA)
+import DA.Optional (fromOptional)
+import DA.Time (addRelTime, hours)
+
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
+
+
+-- | Token holding template (like Amulet but simplified).
+-- No expiry, no fees - just a simple UTXO holding.
+template TestHolding
+  with
+    owner : Party
+    admin : Party  -- Registry admin (like DSO in Canton Coin)
+    instrumentId : HoldingV1.InstrumentId
+    amount : Decimal
+  where
+    signatory owner, admin
+
+    interface instance HoldingV1.Holding for TestHolding where
+      view = HoldingV1.HoldingView with
+        owner
+        instrumentId
+        amount
+        lock = None
+        meta = MetadataV1.emptyMetadata
+
+
+-- | Transfer Preapproval (like Canton Coin's TransferPreapproval).
+-- Receiver + admin create this to allow ANY sender to send tokens directly.
+template TestTransferPreapproval
+  with
+    admin : Party
+    receiver : Party
+  where
+    signatory receiver, admin
+
+    -- Direct send to receiver (like TransferPreapproval_Send).
+    -- Controller is SENDER - any party can send if receiver has preapproved.
+    nonconsuming choice TestTransferPreapproval_Send : TransferV1.TransferInstructionResult
+      with
+        sender : Party
+        amount : Decimal
+        instrumentId : HoldingV1.InstrumentId
+        inputHoldingCids : [ContractId HoldingV1.Holding]
+      controller sender
+      do
+        -- Sum and validate inputs
+        inputTotal <- sumAndArchiveInputs admin sender instrumentId inputHoldingCids
+
+        assertMsg ("insufficient input: have " <> show inputTotal <> ", need " <> show amount)
+          (inputTotal >= amount)
+
+        -- Create receiver holding
+        receiverCid <- create TestHolding with owner = receiver, admin, instrumentId, amount
+
+        -- Create change for sender
+        let change = inputTotal - amount
+        senderChangeCids <- createChangeIfNeeded admin sender instrumentId change
+
+        pure TransferV1.TransferInstructionResult with
+          senderChangeCids
+          output = TransferV1.TransferInstructionResult_Completed with
+            receiverHoldingCids = [toInterfaceContractId receiverCid]
+          meta = MetadataV1.emptyMetadata
+
+
+-- | Pending Transfer Instruction (like AmuletTransferInstruction).
+-- Created when receiver doesn't have preapproval.
+template TestTransferInstruction
+  with
+    admin : Party
+    transfer : TransferV1.Transfer
+    lockedHoldingCid : ContractId TestHolding  -- Sender's funds locked pending acceptance
+  where
+    signatory admin, transfer.sender
+    observer transfer.receiver
+
+    interface instance TransferV1.TransferInstruction for TestTransferInstruction where
+      view = TransferV1.TransferInstructionView with
+        originalInstructionCid = None
+        transfer
+        status = TransferV1.TransferPendingReceiverAcceptance
+        meta = MetadataV1.emptyMetadata
+
+      -- Receiver accepts: unlock and transfer
+      transferInstruction_acceptImpl _self _arg = do
+        lockedHolding <- fetch lockedHoldingCid
+        archive lockedHoldingCid
+
+        -- Create holding for receiver
+        receiverCid <- create TestHolding with
+          owner = transfer.receiver
+          admin
+          instrumentId = transfer.instrumentId
+          amount = transfer.amount
+
+        pure TransferV1.TransferInstructionResult with
+          senderChangeCids = []  -- Change was already returned when instruction created
+          output = TransferV1.TransferInstructionResult_Completed with
+            receiverHoldingCids = [toInterfaceContractId receiverCid]
+          meta = MetadataV1.emptyMetadata
+
+      -- Receiver rejects: return funds to sender
+      transferInstruction_rejectImpl _self _arg = do
+        lockedHolding <- fetch lockedHoldingCid
+        archive lockedHoldingCid
+
+        -- Return funds to sender
+        senderCid <- create TestHolding with
+          owner = transfer.sender
+          admin
+          instrumentId = transfer.instrumentId
+          amount = lockedHolding.amount
+
+        pure TransferV1.TransferInstructionResult with
+          senderChangeCids = [toInterfaceContractId senderCid]
+          output = TransferV1.TransferInstructionResult_Failed
+          meta = MetadataV1.emptyMetadata
+
+      -- Sender withdraws: return funds
+      transferInstruction_withdrawImpl _self _arg = do
+        lockedHolding <- fetch lockedHoldingCid
+        archive lockedHoldingCid
+
+        senderCid <- create TestHolding with
+          owner = transfer.sender
+          admin
+          instrumentId = transfer.instrumentId
+          amount = lockedHolding.amount
+
+        pure TransferV1.TransferInstructionResult with
+          senderChangeCids = [toInterfaceContractId senderCid]
+          output = TransferV1.TransferInstructionResult_Failed
+          meta = MetadataV1.emptyMetadata
+
+      transferInstruction_updateImpl _self _arg =
+        abort "TestTransferInstruction: update not supported"
+
+
+-- | TransferFactory (like ExternalPartyAmuletRules).
+-- Checks for preapproval; if exists -> direct, else -> pending.
+template TestTransferFactory
+  with
+    admin : Party
+    preapprovalCid : Optional (ContractId TestTransferPreapproval)
+  where
+    signatory admin
+
+    interface instance TransferV1.TransferFactory for TestTransferFactory where
+      view = TransferV1.TransferFactoryView with admin, meta = MetadataV1.emptyMetadata
+
+      transferFactory_transferImpl _self arg = do
+        let transfer = arg.transfer
+        assertMsg "expectedAdmin mismatch" (arg.expectedAdmin == admin)
+
+        -- Check if this is a self-transfer or has preapproval
+        let isSelfTransfer = transfer.sender == transfer.receiver
+
+        case (isSelfTransfer, preapprovalCid) of
+          -- Self-transfer: direct (like Canton Coin)
+          (True, _) -> executeDirect admin transfer
+
+          -- Has preapproval: use it for direct transfer
+          (False, Some paCid) -> do
+            exercise paCid TestTransferPreapproval_Send with
+              sender = transfer.sender
+              amount = transfer.amount
+              instrumentId = transfer.instrumentId
+              inputHoldingCids = transfer.inputHoldingCids
+
+          -- No preapproval: create pending TransferInstruction
+          (False, None) -> createPendingTransfer admin transfer
+
+      transferFactory_publicFetchImpl _self _arg =
+        pure (view (toInterface @TransferV1.TransferFactory this))
+
+    -- Update preapproval reference
+    choice TestTransferFactory_SetPreapproval : ContractId TestTransferFactory
+      with
+        newPreapprovalCid : Optional (ContractId TestTransferPreapproval)
+      controller admin
+      do create this with preapprovalCid = newPreapprovalCid
+
+
+-- Helper: Sum inputs, validate ownership/instrument, and archive them.
+sumAndArchiveInputs : Party -> Party -> HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> Update Decimal
+sumAndArchiveInputs admin sender instrumentId cids =
+  foldlA
+    (\acc cid -> do
+      h <- fetch cid
+      let hv = view h
+      assertMsg "input instrumentId mismatch" (hv.instrumentId == instrumentId)
+      assertMsg "input owner mismatch" (hv.owner == sender)
+      archive (coerceContractId cid : ContractId TestHolding)
+      pure (acc + hv.amount))
+    0.0
+    cids
+
+
+-- Helper: Create change holding if amount > 0.
+createChangeIfNeeded : Party -> Party -> HoldingV1.InstrumentId -> Decimal -> Update [ContractId HoldingV1.Holding]
+createChangeIfNeeded admin owner instrumentId change =
+  if change > 0.0
+    then do
+      changeCid <- create TestHolding with owner, admin, instrumentId, amount = change
+      pure [toInterfaceContractId changeCid]
+    else pure []
+
+
+-- Helper: Execute direct self-transfer.
+executeDirect : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
+executeDirect admin transfer = do
+  inputTotal <- sumAndArchiveInputs admin transfer.sender transfer.instrumentId transfer.inputHoldingCids
+  assertMsg "insufficient input" (inputTotal >= transfer.amount)
+
+  receiverCid <- create TestHolding with
+    owner = transfer.receiver, admin, instrumentId = transfer.instrumentId, amount = transfer.amount
+
+  senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
+
+  pure TransferV1.TransferInstructionResult with
+    senderChangeCids
+    output = TransferV1.TransferInstructionResult_Completed with
+      receiverHoldingCids = [toInterfaceContractId receiverCid]
+    meta = MetadataV1.emptyMetadata
+
+
+-- Helper: Create pending transfer instruction when no preapproval.
+createPendingTransfer : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
+createPendingTransfer admin transfer = do
+  inputTotal <- sumAndArchiveInputs admin transfer.sender transfer.instrumentId transfer.inputHoldingCids
+  assertMsg "insufficient input" (inputTotal >= transfer.amount)
+
+  -- Create locked holding for the transfer amount (admin holds it)
+  lockedCid <- create TestHolding with
+    owner = admin  -- Admin holds locked funds (like LockedAmulet pattern)
+    admin
+    instrumentId = transfer.instrumentId
+    amount = transfer.amount
+
+  -- Create change for sender
+  senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
+
+  -- Create pending instruction
+  instrCid <- create TestTransferInstruction with admin, transfer, lockedHoldingCid = lockedCid
+
+  pure TransferV1.TransferInstructionResult with
+    senderChangeCids
+    output = TransferV1.TransferInstructionResult_Pending with
+      transferInstructionCid = toInterfaceContractId instrCid
+    meta = MetadataV1.emptyMetadata
