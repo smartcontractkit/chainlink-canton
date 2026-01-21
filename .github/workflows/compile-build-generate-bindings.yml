@@ -68,6 +68,17 @@ jobs:
           test -n "$(find generated/mcms -name '*.go' -type f 2>/dev/null | head -1)"
           echo "Generated files found"
 
+      - name: Check if any files have been changed
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet HEAD; then
+            echo "The following bindings don't match the latest generated version, run \`./scripts/generate-bindings.sh\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+            git diff --name-only | while read -r n ; do
+              echo "- $n" >> $GITHUB_STEP_SUMMARY
+            done
+            exit 1
+          fi
+          
       - name: Cleanup exported DARs
         if: always()
         run: |

@@ -34,13 +34,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -53,23 +53,24 @@ type ApplyDestChainConfigUpdates struct {
 	DestChainConfigArgs []DestChainConfigArgs `json:"destChainConfigArgs"`
 }
 
-// toMap converts ApplyDestChainConfigUpdates to a map for DAML arguments
-func (t ApplyDestChainConfigUpdates) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ApplyDestChainConfigUpdates to a map for DAML arguments
+func (t ApplyDestChainConfigUpdates) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainConfigArgs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.DestChainConfigArgs))
-			for _, e := range t.DestChainConfigArgs {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["destChainConfigArgs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.DestChainConfigArgs))
+		for _, e := range t.DestChainConfigArgs {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ApplyDestChainConfigUpdates using JsonCodec
@@ -91,36 +92,39 @@ type ApplyFeeTokenUpdates struct {
 	Caller            PARTY          `json:"caller"`
 }
 
-// toMap converts ApplyFeeTokenUpdates to a map for DAML arguments
-func (t ApplyFeeTokenUpdates) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ApplyFeeTokenUpdates to a map for DAML arguments
+func (t ApplyFeeTokenUpdates) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"feeTokensToRemove": func() []interface{} {
-			res := make([]interface{}, 0, len(t.FeeTokensToRemove))
-			for _, e := range t.FeeTokensToRemove {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["feeTokensToRemove"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.FeeTokensToRemove))
+		for _, e := range t.FeeTokensToRemove {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"feeTokensToAdd": func() []interface{} {
-			res := make([]interface{}, 0, len(t.FeeTokensToAdd))
-			for _, e := range t.FeeTokensToAdd {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+		}
+		return res
+	}()
+
+	m["feeTokensToAdd"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.FeeTokensToAdd))
+		for _, e := range t.FeeTokensToAdd {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ApplyFeeTokenUpdates using JsonCodec
@@ -149,21 +153,31 @@ type DestChainConfig struct {
 	DefaultTokenDestGasOverhead INT64   `json:"defaultTokenDestGasOverhead"`
 }
 
-// toMap converts DestChainConfig to a map for DAML arguments
-func (t DestChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts DestChainConfig to a map for DAML arguments
+func (t DestChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"isEnabled":                   bool(t.IsEnabled),
-		"maxDataBytes":                int64(t.MaxDataBytes),
-		"maxPerMsgGasLimit":           int64(t.MaxPerMsgGasLimit),
-		"destGasOverhead":             int64(t.DestGasOverhead),
-		"destGasPerPayloadByteBase":   int64(t.DestGasPerPayloadByteBase),
-		"chainFamilySelector":         string(t.ChainFamilySelector),
-		"defaultTxGasLimit":           int64(t.DefaultTxGasLimit),
-		"networkFeeUSD":               (*big.Int)(t.NetworkFeeUSD),
-		"defaultTokenFeeUSD":          (*big.Int)(t.DefaultTokenFeeUSD),
-		"defaultTokenDestGasOverhead": int64(t.DefaultTokenDestGasOverhead),
-	}
+	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["maxDataBytes"] = int64(t.MaxDataBytes)
+
+	m["maxPerMsgGasLimit"] = int64(t.MaxPerMsgGasLimit)
+
+	m["destGasOverhead"] = int64(t.DestGasOverhead)
+
+	m["destGasPerPayloadByteBase"] = int64(t.DestGasPerPayloadByteBase)
+
+	m["chainFamilySelector"] = string(t.ChainFamilySelector)
+
+	m["defaultTxGasLimit"] = int64(t.DefaultTxGasLimit)
+
+	m["networkFeeUSD"] = (*big.Int)(t.NetworkFeeUSD)
+
+	m["defaultTokenFeeUSD"] = (*big.Int)(t.DefaultTokenFeeUSD)
+
+	m["defaultTokenDestGasOverhead"] = int64(t.DefaultTokenDestGasOverhead)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for DestChainConfig using JsonCodec
@@ -184,19 +198,21 @@ type DestChainConfigArgs struct {
 	DestChainConfig   DestChainConfig `json:"destChainConfig"`
 }
 
-// toMap converts DestChainConfigArgs to a map for DAML arguments
-func (t DestChainConfigArgs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts DestChainConfigArgs to a map for DAML arguments
+func (t DestChainConfigArgs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"destChainConfig": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.DestChainConfig).(mapper); ok {
-				return m.toMap()
-			}
-			return t.DestChainConfig
-		}(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["destChainConfig"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.DestChainConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DestChainConfig
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for DestChainConfigArgs using JsonCodec
@@ -413,20 +429,23 @@ type FeeQuoterGetTokenTransferFee struct {
 	Caller            PARTY        `json:"caller"`
 }
 
-// toMap converts FeeQuoterGetTokenTransferFee to a map for DAML arguments
-func (t FeeQuoterGetTokenTransferFee) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts FeeQuoterGetTokenTransferFee to a map for DAML arguments
+func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"token": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Token).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Token
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["token"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Token).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Token
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for FeeQuoterGetTokenTransferFee using JsonCodec
@@ -450,22 +469,27 @@ type FeeQuoterQuoteGasForExec struct {
 	Caller            PARTY        `json:"caller"`
 }
 
-// toMap converts FeeQuoterQuoteGasForExec to a map for DAML arguments
-func (t FeeQuoterQuoteGasForExec) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts FeeQuoterQuoteGasForExec to a map for DAML arguments
+func (t FeeQuoterQuoteGasForExec) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"nonCalldataGas":    int64(t.NonCalldataGas),
-		"calldataSize":      int64(t.CalldataSize),
-		"feeToken": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.FeeToken).(mapper); ok {
-				return m.toMap()
-			}
-			return t.FeeToken
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["nonCalldataGas"] = int64(t.NonCalldataGas)
+
+	m["calldataSize"] = int64(t.CalldataSize)
+
+	m["feeToken"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for FeeQuoterQuoteGasForExec using JsonCodec
@@ -486,19 +510,21 @@ type FeeTokenArgs struct {
 	PremiumMultiplier NUMERIC      `json:"premiumMultiplier"`
 }
 
-// toMap converts FeeTokenArgs to a map for DAML arguments
-func (t FeeTokenArgs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts FeeTokenArgs to a map for DAML arguments
+func (t FeeTokenArgs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"premiumMultiplier": (*big.Int)(t.PremiumMultiplier),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["premiumMultiplier"] = (*big.Int)(t.PremiumMultiplier)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for FeeTokenArgs using JsonCodec
@@ -519,13 +545,15 @@ type GasPriceUpdate struct {
 	UsdPerUnitGas     NUMERIC `json:"usdPerUnitGas"`
 }
 
-// toMap converts GasPriceUpdate to a map for DAML arguments
-func (t GasPriceUpdate) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GasPriceUpdate to a map for DAML arguments
+func (t GasPriceUpdate) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"usdPerUnitGas":     (*big.Int)(t.UsdPerUnitGas),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["usdPerUnitGas"] = (*big.Int)(t.UsdPerUnitGas)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GasPriceUpdate using JsonCodec
@@ -546,13 +574,15 @@ type GetDestChainConfig struct {
 	Caller            PARTY   `json:"caller"`
 }
 
-// toMap converts GetDestChainConfig to a map for DAML arguments
-func (t GetDestChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetDestChainConfig to a map for DAML arguments
+func (t GetDestChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"caller":            t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetDestChainConfig using JsonCodec
@@ -573,13 +603,15 @@ type GetDestinationChainGasPrice struct {
 	Caller            PARTY   `json:"caller"`
 }
 
-// toMap converts GetDestinationChainGasPrice to a map for DAML arguments
-func (t GetDestinationChainGasPrice) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetDestinationChainGasPrice to a map for DAML arguments
+func (t GetDestinationChainGasPrice) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"caller":            t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetDestinationChainGasPrice using JsonCodec
@@ -599,12 +631,13 @@ type GetFeeTokens struct {
 	Caller PARTY `json:"caller"`
 }
 
-// toMap converts GetFeeTokens to a map for DAML arguments
-func (t GetFeeTokens) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetFeeTokens to a map for DAML arguments
+func (t GetFeeTokens) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"caller": t.Caller.ToMap(),
-	}
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetFeeTokens using JsonCodec
@@ -625,19 +658,21 @@ type GetPremiumMultiplierWeiPerEth struct {
 	Caller PARTY        `json:"caller"`
 }
 
-// toMap converts GetPremiumMultiplierWeiPerEth to a map for DAML arguments
-func (t GetPremiumMultiplierWeiPerEth) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetPremiumMultiplierWeiPerEth to a map for DAML arguments
+func (t GetPremiumMultiplierWeiPerEth) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"token": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Token).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Token
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["token"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Token).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Token
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetPremiumMultiplierWeiPerEth using JsonCodec
@@ -658,19 +693,21 @@ type GetTokenPrice struct {
 	Caller       PARTY        `json:"caller"`
 }
 
-// toMap converts GetTokenPrice to a map for DAML arguments
-func (t GetTokenPrice) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetTokenPrice to a map for DAML arguments
+func (t GetTokenPrice) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetTokenPrice using JsonCodec
@@ -692,20 +729,23 @@ type GetValidatedFee struct {
 	Caller            PARTY             `json:"caller"`
 }
 
-// toMap converts GetValidatedFee to a map for DAML arguments
-func (t GetValidatedFee) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetValidatedFee to a map for DAML arguments
+func (t GetValidatedFee) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetValidatedFee using JsonCodec
@@ -726,35 +766,37 @@ type PriceUpdates struct {
 	GasPriceUpdates   []GasPriceUpdate   `json:"gasPriceUpdates"`
 }
 
-// toMap converts PriceUpdates to a map for DAML arguments
-func (t PriceUpdates) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts PriceUpdates to a map for DAML arguments
+func (t PriceUpdates) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"tokenPriceUpdates": func() []interface{} {
-			res := make([]interface{}, 0, len(t.TokenPriceUpdates))
-			for _, e := range t.TokenPriceUpdates {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["tokenPriceUpdates"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TokenPriceUpdates))
+		for _, e := range t.TokenPriceUpdates {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"gasPriceUpdates": func() []interface{} {
-			res := make([]interface{}, 0, len(t.GasPriceUpdates))
-			for _, e := range t.GasPriceUpdates {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+		}
+		return res
+	}()
+
+	m["gasPriceUpdates"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.GasPriceUpdates))
+		for _, e := range t.GasPriceUpdates {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for PriceUpdates using JsonCodec
@@ -775,13 +817,15 @@ type TimestampedPrice struct {
 	Timestamp TIMESTAMP `json:"timestamp"`
 }
 
-// toMap converts TimestampedPrice to a map for DAML arguments
-func (t TimestampedPrice) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TimestampedPrice to a map for DAML arguments
+func (t TimestampedPrice) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"price":     (*big.Int)(t.Price),
-		"timestamp": t.Timestamp,
-	}
+	m["price"] = (*big.Int)(t.Price)
+
+	m["timestamp"] = t.Timestamp
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TimestampedPrice using JsonCodec
@@ -802,19 +846,21 @@ type TokenPriceUpdate struct {
 	UsdPerToken  NUMERIC      `json:"usdPerToken"`
 }
 
-// toMap converts TokenPriceUpdate to a map for DAML arguments
-func (t TokenPriceUpdate) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenPriceUpdate to a map for DAML arguments
+func (t TokenPriceUpdate) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"usdPerToken": (*big.Int)(t.UsdPerToken),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["usdPerToken"] = (*big.Int)(t.UsdPerToken)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenPriceUpdate using JsonCodec
@@ -836,14 +882,17 @@ type TokenTransferFeeConfig struct {
 	DestBytesOverhead INT64   `json:"destBytesOverhead"`
 }
 
-// toMap converts TokenTransferFeeConfig to a map for DAML arguments
-func (t TokenTransferFeeConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenTransferFeeConfig to a map for DAML arguments
+func (t TokenTransferFeeConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"feeUSD":            (*big.Int)(t.FeeUSD),
-		"destGasOverhead":   int64(t.DestGasOverhead),
-		"destBytesOverhead": int64(t.DestBytesOverhead),
-	}
+	m["feeUSD"] = (*big.Int)(t.FeeUSD)
+
+	m["destGasOverhead"] = int64(t.DestGasOverhead)
+
+	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenTransferFeeConfig using JsonCodec
@@ -864,19 +913,21 @@ type UpdatePrices struct {
 	Caller       PARTY        `json:"caller"`
 }
 
-// toMap converts UpdatePrices to a map for DAML arguments
-func (t UpdatePrices) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts UpdatePrices to a map for DAML arguments
+func (t UpdatePrices) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"priceUpdates": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.PriceUpdates).(mapper); ok {
-				return m.toMap()
-			}
-			return t.PriceUpdates
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["priceUpdates"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.PriceUpdates).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PriceUpdates
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for UpdatePrices using JsonCodec

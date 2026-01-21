@@ -28,18 +28,52 @@ type ConsumeReceiveTicketResult struct {
 	TokenReceiver       *PARTY   `json:"tokenReceiver"`
 }
 
-// toMap converts ConsumeReceiveTicketResult to a map for DAML arguments
-func (t ConsumeReceiveTicketResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ConsumeReceiveTicketResult to a map for DAML arguments
+func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"messageHash":         string(t.MessageHash),
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"sequenceNumber":      (*big.Int)(t.SequenceNumber),
-		"hasTokenTransfer":    bool(t.HasTokenTransfer),
-		"tokenAmount":         (*big.Int)(*t.TokenAmount),
-		"destTokenAddress":    string(*t.DestTokenAddress),
-		"tokenReceiver":       (*t.TokenReceiver).ToMap(),
+	m["messageHash"] = string(t.MessageHash)
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+
+	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
+
+	if t.TokenAmount != nil {
+		m["tokenAmount"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*big.Int)(*t.TokenAmount),
+		}
+	} else {
+		m["tokenAmount"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	if t.DestTokenAddress != nil {
+		m["destTokenAddress"] = map[string]interface{}{
+			"_type": "optional",
+			"value": string(*t.DestTokenAddress),
+		}
+	} else {
+		m["destTokenAddress"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenReceiver != nil {
+		m["tokenReceiver"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.TokenReceiver).ToMap(),
+		}
+	} else {
+		m["tokenReceiver"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ConsumeReceiveTicketResult using JsonCodec
@@ -214,19 +248,21 @@ type TokenAdminRegistryAcceptAdminRole struct {
 	Caller       PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistryAcceptAdminRole to a map for DAML arguments
-func (t TokenAdminRegistryAcceptAdminRole) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryAcceptAdminRole to a map for DAML arguments
+func (t TokenAdminRegistryAcceptAdminRole) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryAcceptAdminRole using JsonCodec
@@ -248,26 +284,29 @@ type TokenAdminRegistryConsumeReceiveTicket struct {
 	PoolOwner    PARTY        `json:"poolOwner"`
 }
 
-// toMap converts TokenAdminRegistryConsumeReceiveTicket to a map for DAML arguments
-func (t TokenAdminRegistryConsumeReceiveTicket) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryConsumeReceiveTicket to a map for DAML arguments
+func (t TokenAdminRegistryConsumeReceiveTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ticketCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TicketCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TicketCid
-		}(),
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"poolOwner": t.PoolOwner.ToMap(),
-	}
+	m["ticketCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TicketCid
+	}()
+
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryConsumeReceiveTicket using JsonCodec
@@ -288,19 +327,21 @@ type TokenAdminRegistryGetTokenConfig struct {
 	Caller       PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistryGetTokenConfig to a map for DAML arguments
-func (t TokenAdminRegistryGetTokenConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryGetTokenConfig to a map for DAML arguments
+func (t TokenAdminRegistryGetTokenConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryGetTokenConfig using JsonCodec
@@ -322,20 +363,23 @@ type TokenAdminRegistryIsAdministrator struct {
 	Caller        PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistryIsAdministrator to a map for DAML arguments
-func (t TokenAdminRegistryIsAdministrator) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryIsAdministrator to a map for DAML arguments
+func (t TokenAdminRegistryIsAdministrator) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"administrator": t.Administrator.ToMap(),
-		"caller":        t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["administrator"] = t.Administrator.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryIsAdministrator using JsonCodec
@@ -363,20 +407,56 @@ type TokenAdminRegistryIssueReceiveTicket struct {
 	Caller              PARTY    `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
-func (t TokenAdminRegistryIssueReceiveTicket) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
+func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"messageHash":         string(t.MessageHash),
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"sequenceNumber":      (*big.Int)(t.SequenceNumber),
-		"hasTokenTransfer":    bool(t.HasTokenTransfer),
-		"tokenAmount":         (*big.Int)(*t.TokenAmount),
-		"destTokenAddress":    string(*t.DestTokenAddress),
-		"tokenReceiver":       (*t.TokenReceiver).ToMap(),
-		"receiver":            t.Receiver.ToMap(),
-		"caller":              t.Caller.ToMap(),
+	m["messageHash"] = string(t.MessageHash)
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+
+	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
+
+	if t.TokenAmount != nil {
+		m["tokenAmount"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*big.Int)(*t.TokenAmount),
+		}
+	} else {
+		m["tokenAmount"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	if t.DestTokenAddress != nil {
+		m["destTokenAddress"] = map[string]interface{}{
+			"_type": "optional",
+			"value": string(*t.DestTokenAddress),
+		}
+	} else {
+		m["destTokenAddress"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenReceiver != nil {
+		m["tokenReceiver"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.TokenReceiver).ToMap(),
+		}
+	} else {
+		m["tokenReceiver"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryIssueReceiveTicket using JsonCodec
@@ -403,25 +483,33 @@ type TokenAdminRegistryIssueSendTicket struct {
 	PoolOwner          PARTY        `json:"poolOwner"`
 }
 
-// toMap converts TokenAdminRegistryIssueSendTicket to a map for DAML arguments
-func (t TokenAdminRegistryIssueSendTicket) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryIssueSendTicket to a map for DAML arguments
+func (t TokenAdminRegistryIssueSendTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"sender":             t.Sender.ToMap(),
-		"amount":             (*big.Int)(t.Amount),
-		"sourceTokenAddress": string(t.SourceTokenAddress),
-		"destTokenAddress":   string(t.DestTokenAddress),
-		"tokenReceiver":      string(t.TokenReceiver),
-		"extraData":          string(t.ExtraData),
-		"poolOwner":          t.PoolOwner.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["sender"] = t.Sender.ToMap()
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["sourceTokenAddress"] = string(t.SourceTokenAddress)
+
+	m["destTokenAddress"] = string(t.DestTokenAddress)
+
+	m["tokenReceiver"] = string(t.TokenReceiver)
+
+	m["extraData"] = string(t.ExtraData)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryIssueSendTicket using JsonCodec
@@ -443,20 +531,23 @@ type TokenAdminRegistryProposeAdministrator struct {
 	Caller       PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistryProposeAdministrator to a map for DAML arguments
-func (t TokenAdminRegistryProposeAdministrator) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryProposeAdministrator to a map for DAML arguments
+func (t TokenAdminRegistryProposeAdministrator) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"newAdmin": t.NewAdmin.ToMap(),
-		"caller":   t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryProposeAdministrator using JsonCodec
@@ -478,20 +569,32 @@ type TokenAdminRegistrySetPool struct {
 	Caller            PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistrySetPool to a map for DAML arguments
-func (t TokenAdminRegistrySetPool) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistrySetPool to a map for DAML arguments
+func (t TokenAdminRegistrySetPool) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"optTokenPoolOwner": (*t.OptTokenPoolOwner).ToMap(),
-		"caller":            t.Caller.ToMap(),
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	if t.OptTokenPoolOwner != nil {
+		m["optTokenPoolOwner"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.OptTokenPoolOwner).ToMap(),
+		}
+	} else {
+		m["optTokenPoolOwner"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistrySetPool using JsonCodec
@@ -513,26 +616,29 @@ type TokenAdminRegistrySetRequiredCCVs struct {
 	Caller          PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistrySetRequiredCCVs to a map for DAML arguments
-func (t TokenAdminRegistrySetRequiredCCVs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistrySetRequiredCCVs to a map for DAML arguments
+func (t TokenAdminRegistrySetRequiredCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"newRequiredCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.NewRequiredCCVs))
-			for _, e := range t.NewRequiredCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["newRequiredCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.NewRequiredCCVs))
+		for _, e := range t.NewRequiredCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistrySetRequiredCCVs using JsonCodec
@@ -554,20 +660,23 @@ type TokenAdminRegistryTransferAdminRole struct {
 	Caller       PARTY        `json:"caller"`
 }
 
-// toMap converts TokenAdminRegistryTransferAdminRole to a map for DAML arguments
-func (t TokenAdminRegistryTransferAdminRole) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAdminRegistryTransferAdminRole to a map for DAML arguments
+func (t TokenAdminRegistryTransferAdminRole) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"newAdmin": t.NewAdmin.ToMap(),
-		"caller":   t.Caller.ToMap(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAdminRegistryTransferAdminRole using JsonCodec
@@ -590,21 +699,52 @@ type TokenConfig struct {
 	RequiredCCVs   []TEXT `json:"requiredCCVs"`
 }
 
-// toMap converts TokenConfig to a map for DAML arguments
-func (t TokenConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenConfig to a map for DAML arguments
+func (t TokenConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"admin":          (*t.Admin).ToMap(),
-		"pendingAdmin":   (*t.PendingAdmin).ToMap(),
-		"tokenPoolOwner": (*t.TokenPoolOwner).ToMap(),
-		"requiredCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.RequiredCCVs))
-			for _, e := range t.RequiredCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
+	if t.Admin != nil {
+		m["admin"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.Admin).ToMap(),
+		}
+	} else {
+		m["admin"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	if t.PendingAdmin != nil {
+		m["pendingAdmin"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.PendingAdmin).ToMap(),
+		}
+	} else {
+		m["pendingAdmin"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenPoolOwner != nil {
+		m["tokenPoolOwner"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.TokenPoolOwner).ToMap(),
+		}
+	} else {
+		m["tokenPoolOwner"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	m["requiredCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenConfig using JsonCodec

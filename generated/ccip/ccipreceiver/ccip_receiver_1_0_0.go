@@ -34,13 +34,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{

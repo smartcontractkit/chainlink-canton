@@ -41,39 +41,43 @@ type FeeInput struct {
 	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
 }
 
-// toMap converts FeeInput to a map for DAML arguments
-func (t FeeInput) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts FeeInput to a map for DAML arguments
+func (t FeeInput) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"transferFactory": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TransferFactory).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TransferFactory
-		}(),
-		"extraArgs": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.ExtraArgs).(mapper); ok {
-				return m.toMap()
-			}
-			return t.ExtraArgs
-		}(),
-		"inputHoldingCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.InputHoldingCids))
-			for _, e := range t.InputHoldingCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["transferFactory"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TransferFactory).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferFactory
+	}()
+
+	m["extraArgs"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
+
+	m["inputHoldingCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.InputHoldingCids))
+		for _, e := range t.InputHoldingCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for FeeInput using JsonCodec
@@ -94,25 +98,27 @@ type LockOrBurnResult struct {
 	SenderChangeCids []CONTRACT_ID `json:"senderChangeCids"`
 }
 
-// toMap converts LockOrBurnResult to a map for DAML arguments
-func (t LockOrBurnResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts LockOrBurnResult to a map for DAML arguments
+func (t LockOrBurnResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"poolChangeCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.PoolChangeCids))
-			for _, e := range t.PoolChangeCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-		"senderChangeCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.SenderChangeCids))
-			for _, e := range t.SenderChangeCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["poolChangeCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.PoolChangeCids))
+		for _, e := range t.PoolChangeCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["senderChangeCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.SenderChangeCids))
+		for _, e := range t.SenderChangeCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for LockOrBurnResult using JsonCodec
@@ -133,25 +139,27 @@ type ReleaseOrMintResult struct {
 	PoolChangeCids []CONTRACT_ID             `json:"poolChangeCids"`
 }
 
-// toMap converts ReleaseOrMintResult to a map for DAML arguments
-func (t ReleaseOrMintResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ReleaseOrMintResult to a map for DAML arguments
+func (t ReleaseOrMintResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"output": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Output).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Output
-		}(),
-		"poolChangeCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.PoolChangeCids))
-			for _, e := range t.PoolChangeCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["output"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Output).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Output
+	}()
+
+	m["poolChangeCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.PoolChangeCids))
+		for _, e := range t.PoolChangeCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ReleaseOrMintResult using JsonCodec
@@ -171,18 +179,19 @@ type ReleaseOrMintResultCompleted struct {
 	ReceiverHoldingCids []CONTRACT_ID `json:"receiverHoldingCids"`
 }
 
-// toMap converts ReleaseOrMintResultCompleted to a map for DAML arguments
-func (t ReleaseOrMintResultCompleted) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ReleaseOrMintResultCompleted to a map for DAML arguments
+func (t ReleaseOrMintResultCompleted) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"receiverHoldingCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ReceiverHoldingCids))
-			for _, e := range t.ReceiverHoldingCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["receiverHoldingCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ReceiverHoldingCids))
+		for _, e := range t.ReceiverHoldingCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ReleaseOrMintResultCompleted using JsonCodec
@@ -251,18 +260,19 @@ type ReleaseOrMintResultPending struct {
 	TransferInstructionCid CONTRACT_ID `json:"transferInstructionCid"`
 }
 
-// toMap converts ReleaseOrMintResultPending to a map for DAML arguments
-func (t ReleaseOrMintResultPending) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ReleaseOrMintResultPending to a map for DAML arguments
+func (t ReleaseOrMintResultPending) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"transferInstructionCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TransferInstructionCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TransferInstructionCid
-		}(),
-	}
+	m["transferInstructionCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferInstructionCid
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ReleaseOrMintResultPending using JsonCodec
@@ -284,32 +294,35 @@ type TokenInput struct {
 	TokenPoolHoldings []CONTRACT_ID `json:"tokenPoolHoldings"`
 }
 
-// toMap converts TokenInput to a map for DAML arguments
-func (t TokenInput) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenInput to a map for DAML arguments
+func (t TokenInput) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"transferFactory": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TransferFactory).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TransferFactory
-		}(),
-		"extraArgs": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.ExtraArgs).(mapper); ok {
-				return m.toMap()
-			}
-			return t.ExtraArgs
-		}(),
-		"tokenPoolHoldings": func() []interface{} {
-			res := make([]interface{}, 0, len(t.TokenPoolHoldings))
-			for _, e := range t.TokenPoolHoldings {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["transferFactory"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TransferFactory).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferFactory
+	}()
+
+	m["extraArgs"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
+
+	m["tokenPoolHoldings"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TokenPoolHoldings))
+		for _, e := range t.TokenPoolHoldings {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenInput using JsonCodec
@@ -331,20 +344,23 @@ type TokenPoolView struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
 }
 
-// toMap converts TokenPoolView to a map for DAML arguments
-func (t TokenPoolView) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenPoolView to a map for DAML arguments
+func (t TokenPoolView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"owner":     t.Owner.ToMap(),
-		"ccipOwner": t.CcipOwner.ToMap(),
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-	}
+	m["owner"] = t.Owner.ToMap()
+
+	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenPoolView using JsonCodec
@@ -365,19 +381,21 @@ type TokenPoolGetRequiredCCVs struct {
 	Caller  PARTY     `json:"caller"`
 }
 
-// toMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
-func (t TokenPoolGetRequiredCCVs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
+func (t TokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenPoolGetRequiredCCVs using JsonCodec
@@ -405,62 +423,71 @@ type TokenPoolLockOrBurn struct {
 	Caller                PARTY             `json:"caller"`
 }
 
-// toMap converts TokenPoolLockOrBurn to a map for DAML arguments
-func (t TokenPoolLockOrBurn) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
+func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"tokenInput": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenInput).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenInput
-		}(),
-		"feeInput": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.FeeInput).(mapper); ok {
-				return m.toMap()
-			}
-			return t.FeeInput
-		}(),
-		"senderInputCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.SenderInputCids))
-			for _, e := range t.SenderInputCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-		"onRampCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.OnRampCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.OnRampCid
-		}(),
-		"feeQuoterCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.FeeQuoterCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["tokenInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
+	m["feeInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeInput
+	}()
+
+	m["senderInputCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.SenderInputCids))
+		for _, e := range t.SenderInputCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["onRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OnRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRampCid
+	}()
+
+	m["feeQuoterCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenPoolLockOrBurn using JsonCodec
@@ -486,48 +513,55 @@ type TokenPoolReleaseOrMint struct {
 	Caller                PARTY         `json:"caller"`
 }
 
-// toMap converts TokenPoolReleaseOrMint to a map for DAML arguments
-func (t TokenPoolReleaseOrMint) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenPoolReleaseOrMint to a map for DAML arguments
+func (t TokenPoolReleaseOrMint) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"encodedMessage": string(t.EncodedMessage),
-		"ccvs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Ccvs))
-			for _, e := range t.Ccvs {
-				res = append(res, e)
-			}
-			return res
-		}(),
-		"ccvData": func() []interface{} {
-			res := make([]interface{}, 0, len(t.CcvData))
-			for _, e := range t.CcvData {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"tokenInput": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenInput).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenInput
-		}(),
-		"offRampCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.OffRampCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.OffRampCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["ccvs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Ccvs))
+		for _, e := range t.Ccvs {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["ccvData"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.CcvData))
+		for _, e := range t.CcvData {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["tokenInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
+	m["offRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OffRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRampCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenPoolReleaseOrMint using JsonCodec

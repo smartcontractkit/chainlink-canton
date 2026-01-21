@@ -34,13 +34,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -178,36 +178,43 @@ type CommitteeVerifierForwardToVerifier struct {
 	Caller         PARTY        `json:"caller"`
 }
 
-// toMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
-func (t CommitteeVerifierForwardToVerifier) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
+func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccvRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.CcvRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.CcvRegistryCid
-		}(),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"messageId": string(t.MessageId),
-		"feeToken": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.FeeToken).(mapper); ok {
-				return m.toMap()
-			}
-			return t.FeeToken
-		}(),
-		"feeTokenAmount": (*big.Int)(t.FeeTokenAmount),
-		"verifierArgs":   string(t.VerifierArgs),
-		"caller":         t.Caller.ToMap(),
-	}
+	m["ccvRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.CcvRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRegistryCid
+	}()
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["messageId"] = string(t.MessageId)
+
+	m["feeToken"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["feeTokenAmount"] = (*big.Int)(t.FeeTokenAmount)
+
+	m["verifierArgs"] = string(t.VerifierArgs)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CommitteeVerifierForwardToVerifier using JsonCodec
@@ -232,29 +239,35 @@ type CommitteeVerifierVerifyMessage struct {
 	Caller         PARTY       `json:"caller"`
 }
 
-// toMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
-func (t CommitteeVerifierVerifyMessage) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
+func (t CommitteeVerifierVerifyMessage) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccvRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.CcvRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.CcvRegistryCid
-		}(),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"messageId": string(t.MessageId),
-		"ccvData":   string(t.CcvData),
-		"receiver":  t.Receiver.ToMap(),
-		"caller":    t.Caller.ToMap(),
-	}
+	m["ccvRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.CcvRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRegistryCid
+	}()
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["messageId"] = string(t.MessageId)
+
+	m["ccvData"] = string(t.CcvData)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CommitteeVerifierVerifyMessage using JsonCodec

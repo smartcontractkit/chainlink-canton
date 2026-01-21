@@ -47,13 +47,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -69,38 +69,42 @@ type APSetConfig struct {
 	ApClearRoot    BOOL         `json:"apClearRoot"`
 }
 
-// toMap converts APSetConfig to a map for DAML arguments
-func (t APSetConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts APSetConfig to a map for DAML arguments
+func (t APSetConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"apSigners": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ApSigners))
-			for _, e := range t.ApSigners {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["apSigners"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ApSigners))
+		for _, e := range t.ApSigners {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"apGroupQuorums": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ApGroupQuorums))
-			for _, e := range t.ApGroupQuorums {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"apGroupParents": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ApGroupParents))
-			for _, e := range t.ApGroupParents {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"apClearRoot": bool(t.ApClearRoot),
-	}
+		}
+		return res
+	}()
+
+	m["apGroupQuorums"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ApGroupQuorums))
+		for _, e := range t.ApGroupQuorums {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["apGroupParents"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ApGroupParents))
+		for _, e := range t.ApGroupParents {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["apClearRoot"] = bool(t.ApClearRoot)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for APSetConfig using JsonCodec
@@ -168,9 +172,11 @@ var _ VARIANT = (*AdminParams)(nil)
 type ArchiveMCMSEntrypointEvent struct {
 }
 
-// toMap converts ArchiveMCMSEntrypointEvent to a map for DAML arguments
-func (t ArchiveMCMSEntrypointEvent) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts ArchiveMCMSEntrypointEvent to a map for DAML arguments
+func (t ArchiveMCMSEntrypointEvent) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ArchiveMCMSEntrypointEvent using JsonCodec
@@ -267,19 +273,21 @@ type CanExecuteOp struct {
 	Op        Op    `json:"op"`
 }
 
-// toMap converts CanExecuteOp to a map for DAML arguments
-func (t CanExecuteOp) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CanExecuteOp to a map for DAML arguments
+func (t CanExecuteOp) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"submitter": t.Submitter.ToMap(),
-		"op": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Op).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Op
-		}(),
-	}
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["op"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Op).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Op
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CanExecuteOp using JsonCodec
@@ -397,26 +405,29 @@ type ExecuteMcmsOp struct {
 	OpProof   []TEXT `json:"opProof"`
 }
 
-// toMap converts ExecuteMcmsOp to a map for DAML arguments
-func (t ExecuteMcmsOp) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ExecuteMcmsOp to a map for DAML arguments
+func (t ExecuteMcmsOp) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"submitter": t.Submitter.ToMap(),
-		"op": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Op).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Op
-		}(),
-		"opProof": func() []interface{} {
-			res := make([]interface{}, 0, len(t.OpProof))
-			for _, e := range t.OpProof {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-	}
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["op"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Op).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Op
+	}()
+
+	m["opProof"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.OpProof))
+		for _, e := range t.OpProof {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ExecuteMcmsOp using JsonCodec
@@ -440,40 +451,45 @@ type ExecuteOp struct {
 	ContractIds []CONTRACT_ID `json:"contractIds"`
 }
 
-// toMap converts ExecuteOp to a map for DAML arguments
-func (t ExecuteOp) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ExecuteOp to a map for DAML arguments
+func (t ExecuteOp) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"submitter": t.Submitter.ToMap(),
-		"targetCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TargetCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TargetCid
-		}(),
-		"op": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Op).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Op
-		}(),
-		"opProof": func() []interface{} {
-			res := make([]interface{}, 0, len(t.OpProof))
-			for _, e := range t.OpProof {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"contractIds": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ContractIds))
-			for _, e := range t.ContractIds {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["targetCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetCid
+	}()
+
+	m["op"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Op).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Op
+	}()
+
+	m["opProof"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.OpProof))
+		for _, e := range t.OpProof {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["contractIds"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ContractIds))
+		for _, e := range t.ContractIds {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ExecuteOp using JsonCodec
@@ -495,14 +511,17 @@ type ExpiringRoot struct {
 	OpCount    INT64     `json:"opCount"`
 }
 
-// toMap converts ExpiringRoot to a map for DAML arguments
-func (t ExpiringRoot) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ExpiringRoot to a map for DAML arguments
+func (t ExpiringRoot) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"root":       string(t.Root),
-		"validUntil": t.ValidUntil,
-		"opCount":    int64(t.OpCount),
-	}
+	m["root"] = string(t.Root)
+
+	m["validUntil"] = t.ValidUntil
+
+	m["opCount"] = int64(t.OpCount)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ExpiringRoot using JsonCodec
@@ -522,12 +541,13 @@ type GetInstanceIdChoice struct {
 	Viewer PARTY `json:"viewer"`
 }
 
-// toMap converts GetInstanceIdChoice to a map for DAML arguments
-func (t GetInstanceIdChoice) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetInstanceIdChoice to a map for DAML arguments
+func (t GetInstanceIdChoice) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"viewer": t.Viewer.ToMap(),
-	}
+	m["viewer"] = t.Viewer.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetInstanceIdChoice using JsonCodec
@@ -547,12 +567,13 @@ type GetState struct {
 	Submitter PARTY `json:"submitter"`
 }
 
-// toMap converts GetState to a map for DAML arguments
-func (t GetState) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetState to a map for DAML arguments
+func (t GetState) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"submitter": t.Submitter.ToMap(),
-	}
+	m["submitter"] = t.Submitter.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetState using JsonCodec
@@ -572,12 +593,13 @@ type GetValue struct {
 	Viewer PARTY `json:"viewer"`
 }
 
-// toMap converts GetValue to a map for DAML arguments
-func (t GetValue) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetValue to a map for DAML arguments
+func (t GetValue) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"viewer": t.Viewer.ToMap(),
-	}
+	m["viewer"] = t.Viewer.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetValue using JsonCodec
@@ -829,13 +851,15 @@ type MCMSReceiverView struct {
 	InstanceId TEXT  `json:"instanceId"`
 }
 
-// toMap converts MCMSReceiverView to a map for DAML arguments
-func (t MCMSReceiverView) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MCMSReceiverView to a map for DAML arguments
+func (t MCMSReceiverView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"owner":      t.Owner.ToMap(),
-		"instanceId": string(t.InstanceId),
-	}
+	m["owner"] = t.Owner.ToMap()
+
+	m["instanceId"] = string(t.InstanceId)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MCMSReceiverView using JsonCodec
@@ -858,21 +882,25 @@ type MCMSReceiverEntrypoint struct {
 	ContractIds   []CONTRACT_ID `json:"contractIds"`
 }
 
-// toMap converts MCMSReceiverEntrypoint to a map for DAML arguments
-func (t MCMSReceiverEntrypoint) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
+func (t MCMSReceiverEntrypoint) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"caller":        t.Caller.ToMap(),
-		"functionName":  string(t.FunctionName),
-		"operationData": string(t.OperationData),
-		"contractIds": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ContractIds))
-			for _, e := range t.ContractIds {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["caller"] = t.Caller.ToMap()
+
+	m["functionName"] = string(t.FunctionName)
+
+	m["operationData"] = string(t.OperationData)
+
+	m["contractIds"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ContractIds))
+		for _, e := range t.ContractIds {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MCMSReceiverEntrypoint using JsonCodec
@@ -892,12 +920,13 @@ type MCMSReceiverGetInstanceId struct {
 	C PARTY `json:"c"`
 }
 
-// toMap converts MCMSReceiverGetInstanceId to a map for DAML arguments
-func (t MCMSReceiverGetInstanceId) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MCMSReceiverGetInstanceId to a map for DAML arguments
+func (t MCMSReceiverGetInstanceId) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"c": t.C.ToMap(),
-	}
+	m["c"] = t.C.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MCMSReceiverGetInstanceId using JsonCodec
@@ -922,23 +951,29 @@ type MCMSState struct {
 	NumSigners    INT64     `json:"numSigners"`
 }
 
-// toMap converts MCMSState to a map for DAML arguments
-func (t MCMSState) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MCMSState to a map for DAML arguments
+func (t MCMSState) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"role": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Role).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Role
-		}(),
-		"opCount":       int64(t.OpCount),
-		"postOpCount":   int64(t.PostOpCount),
-		"validUntil":    t.ValidUntil,
-		"hasActiveRoot": bool(t.HasActiveRoot),
-		"numSigners":    int64(t.NumSigners),
-	}
+	m["role"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Role).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Role
+	}()
+
+	m["opCount"] = int64(t.OpCount)
+
+	m["postOpCount"] = int64(t.PostOpCount)
+
+	m["validUntil"] = t.ValidUntil
+
+	m["hasActiveRoot"] = bool(t.HasActiveRoot)
+
+	m["numSigners"] = int64(t.NumSigners)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MCMSState using JsonCodec
@@ -960,37 +995,40 @@ type MultisigConfig struct {
 	GroupParents []INT64      `json:"groupParents"`
 }
 
-// toMap converts MultisigConfig to a map for DAML arguments
-func (t MultisigConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MultisigConfig to a map for DAML arguments
+func (t MultisigConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"signers": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Signers))
-			for _, e := range t.Signers {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["signers"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Signers))
+		for _, e := range t.Signers {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"groupQuorums": func() []interface{} {
-			res := make([]interface{}, 0, len(t.GroupQuorums))
-			for _, e := range t.GroupQuorums {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"groupParents": func() []interface{} {
-			res := make([]interface{}, 0, len(t.GroupParents))
-			for _, e := range t.GroupParents {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	m["groupQuorums"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.GroupQuorums))
+		for _, e := range t.GroupQuorums {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["groupParents"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.GroupParents))
+		for _, e := range t.GroupParents {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MultisigConfig using JsonCodec
@@ -1015,17 +1053,23 @@ type Op struct {
 	OperationData    TEXT  `json:"operationData"`
 }
 
-// toMap converts Op to a map for DAML arguments
-func (t Op) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Op to a map for DAML arguments
+func (t Op) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"chainId":          int64(t.ChainId),
-		"multisigId":       string(t.MultisigId),
-		"nonce":            int64(t.Nonce),
-		"targetInstanceId": string(t.TargetInstanceId),
-		"functionName":     string(t.FunctionName),
-		"operationData":    string(t.OperationData),
-	}
+	m["chainId"] = int64(t.ChainId)
+
+	m["multisigId"] = string(t.MultisigId)
+
+	m["nonce"] = int64(t.Nonce)
+
+	m["targetInstanceId"] = string(t.TargetInstanceId)
+
+	m["functionName"] = string(t.FunctionName)
+
+	m["operationData"] = string(t.OperationData)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Op using JsonCodec
@@ -1047,14 +1091,17 @@ type RawSignature struct {
 	S         TEXT `json:"s"`
 }
 
-// toMap converts RawSignature to a map for DAML arguments
-func (t RawSignature) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts RawSignature to a map for DAML arguments
+func (t RawSignature) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"publicKey": string(t.PublicKey),
-		"r":         string(t.R),
-		"s":         string(t.S),
-	}
+	m["publicKey"] = string(t.PublicKey)
+
+	m["r"] = string(t.R)
+
+	m["s"] = string(t.S)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for RawSignature using JsonCodec
@@ -1110,16 +1157,21 @@ type RootMetadata struct {
 	OverridePreviousRoot BOOL  `json:"overridePreviousRoot"`
 }
 
-// toMap converts RootMetadata to a map for DAML arguments
-func (t RootMetadata) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts RootMetadata to a map for DAML arguments
+func (t RootMetadata) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"chainId":              int64(t.ChainId),
-		"multisigId":           string(t.MultisigId),
-		"preOpCount":           int64(t.PreOpCount),
-		"postOpCount":          int64(t.PostOpCount),
-		"overridePreviousRoot": bool(t.OverridePreviousRoot),
-	}
+	m["chainId"] = int64(t.ChainId)
+
+	m["multisigId"] = string(t.MultisigId)
+
+	m["preOpCount"] = int64(t.PreOpCount)
+
+	m["postOpCount"] = int64(t.PostOpCount)
+
+	m["overridePreviousRoot"] = bool(t.OverridePreviousRoot)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for RootMetadata using JsonCodec
@@ -1142,38 +1194,42 @@ type SetConfig struct {
 	ClearRoot       BOOL         `json:"clearRoot"`
 }
 
-// toMap converts SetConfig to a map for DAML arguments
-func (t SetConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts SetConfig to a map for DAML arguments
+func (t SetConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"newSigners": func() []interface{} {
-			res := make([]interface{}, 0, len(t.NewSigners))
-			for _, e := range t.NewSigners {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["newSigners"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.NewSigners))
+		for _, e := range t.NewSigners {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"newGroupQuorums": func() []interface{} {
-			res := make([]interface{}, 0, len(t.NewGroupQuorums))
-			for _, e := range t.NewGroupQuorums {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"newGroupParents": func() []interface{} {
-			res := make([]interface{}, 0, len(t.NewGroupParents))
-			for _, e := range t.NewGroupParents {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"clearRoot": bool(t.ClearRoot),
-	}
+		}
+		return res
+	}()
+
+	m["newGroupQuorums"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.NewGroupQuorums))
+		for _, e := range t.NewGroupQuorums {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["newGroupParents"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.NewGroupParents))
+		for _, e := range t.NewGroupParents {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["clearRoot"] = bool(t.ClearRoot)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for SetConfig using JsonCodec
@@ -1196,38 +1252,42 @@ type SetConfigParams struct {
 	ClearRoot    BOOL         `json:"clearRoot"`
 }
 
-// toMap converts SetConfigParams to a map for DAML arguments
-func (t SetConfigParams) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts SetConfigParams to a map for DAML arguments
+func (t SetConfigParams) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"signers": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Signers))
-			for _, e := range t.Signers {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["signers"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Signers))
+		for _, e := range t.Signers {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-		"groupQuorums": func() []interface{} {
-			res := make([]interface{}, 0, len(t.GroupQuorums))
-			for _, e := range t.GroupQuorums {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"groupParents": func() []interface{} {
-			res := make([]interface{}, 0, len(t.GroupParents))
-			for _, e := range t.GroupParents {
-				res = append(res, int64(e))
-			}
-			return res
-		}(),
-		"clearRoot": bool(t.ClearRoot),
-	}
+		}
+		return res
+	}()
+
+	m["groupQuorums"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.GroupQuorums))
+		for _, e := range t.GroupQuorums {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["groupParents"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.GroupParents))
+		for _, e := range t.GroupParents {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	m["clearRoot"] = bool(t.ClearRoot)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for SetConfigParams using JsonCodec
@@ -1252,40 +1312,46 @@ type SetRoot struct {
 	Signatures    []RawSignature `json:"signatures"`
 }
 
-// toMap converts SetRoot to a map for DAML arguments
-func (t SetRoot) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts SetRoot to a map for DAML arguments
+func (t SetRoot) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"submitter":  t.Submitter.ToMap(),
-		"newRoot":    string(t.NewRoot),
-		"validUntil": t.ValidUntil,
-		"metadata": func() interface{} {
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["newRoot"] = string(t.NewRoot)
+
+	m["validUntil"] = t.ValidUntil
+
+	m["metadata"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Metadata).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Metadata
+	}()
+
+	m["metadataProof"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.MetadataProof))
+		for _, e := range t.MetadataProof {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["signatures"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Signatures))
+		for _, e := range t.Signatures {
 			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Metadata).(mapper); ok {
-				return m.toMap()
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return t.Metadata
-		}(),
-		"metadataProof": func() []interface{} {
-			res := make([]interface{}, 0, len(t.MetadataProof))
-			for _, e := range t.MetadataProof {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"signatures": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Signatures))
-			for _, e := range t.Signatures {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
-			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for SetRoot using JsonCodec
@@ -1307,14 +1373,17 @@ type SignerInfo struct {
 	SignerGroup   INT64 `json:"signerGroup"`
 }
 
-// toMap converts SignerInfo to a map for DAML arguments
-func (t SignerInfo) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts SignerInfo to a map for DAML arguments
+func (t SignerInfo) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"signerAddress": string(t.SignerAddress),
-		"signerIndex":   int64(t.SignerIndex),
-		"signerGroup":   int64(t.SignerGroup),
-	}
+	m["signerAddress"] = string(t.SignerAddress)
+
+	m["signerIndex"] = int64(t.SignerIndex)
+
+	m["signerGroup"] = int64(t.SignerGroup)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for SignerInfo using JsonCodec

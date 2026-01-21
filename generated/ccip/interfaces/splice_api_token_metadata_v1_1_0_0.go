@@ -28,9 +28,11 @@ type IAnyContract interface {
 type AnyContractView struct {
 }
 
-// toMap converts AnyContractView to a map for DAML arguments
-func (t AnyContractView) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts AnyContractView to a map for DAML arguments
+func (t AnyContractView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for AnyContractView using JsonCodec
@@ -180,18 +182,19 @@ type ChoiceContext struct {
 	Values TEXTMAP `json:"values"`
 }
 
-// toMap converts ChoiceContext to a map for DAML arguments
-func (t ChoiceContext) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ChoiceContext to a map for DAML arguments
+func (t ChoiceContext) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"values": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Values).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Values
-		}(),
-	}
+	m["values"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Values).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Values
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ChoiceContext using JsonCodec
@@ -211,18 +214,19 @@ type ChoiceExecutionMetadata struct {
 	Meta Metadata `json:"meta"`
 }
 
-// toMap converts ChoiceExecutionMetadata to a map for DAML arguments
-func (t ChoiceExecutionMetadata) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ChoiceExecutionMetadata to a map for DAML arguments
+func (t ChoiceExecutionMetadata) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"meta": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Meta).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Meta
-		}(),
-	}
+	m["meta"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ChoiceExecutionMetadata using JsonCodec
@@ -243,25 +247,27 @@ type ExtraArgs struct {
 	Meta    Metadata      `json:"meta"`
 }
 
-// toMap converts ExtraArgs to a map for DAML arguments
-func (t ExtraArgs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ExtraArgs to a map for DAML arguments
+func (t ExtraArgs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"context": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Context).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Context
-		}(),
-		"meta": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Meta).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Meta
-		}(),
-	}
+	m["context"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["meta"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ExtraArgs using JsonCodec
@@ -281,18 +287,19 @@ type Metadata struct {
 	Values TEXTMAP `json:"values"`
 }
 
-// toMap converts Metadata to a map for DAML arguments
-func (t Metadata) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Metadata to a map for DAML arguments
+func (t Metadata) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"values": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Values).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Values
-		}(),
-	}
+	m["values"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Values).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Values
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Metadata using JsonCodec

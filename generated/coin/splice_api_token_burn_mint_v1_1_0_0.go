@@ -36,19 +36,21 @@ type BurnMintFactoryView struct {
 	Meta  Metadata `json:"meta"`
 }
 
-// toMap converts BurnMintFactoryView to a map for DAML arguments
-func (t BurnMintFactoryView) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts BurnMintFactoryView to a map for DAML arguments
+func (t BurnMintFactoryView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"admin": t.Admin.ToMap(),
-		"meta": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Meta).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Meta
-		}(),
-	}
+	m["admin"] = t.Admin.ToMap()
+
+	m["meta"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for BurnMintFactoryView using JsonCodec
@@ -73,52 +75,58 @@ type BurnMintFactoryBurnMint struct {
 	ExtraArgs        ExtraArgs        `json:"extraArgs"`
 }
 
-// toMap converts BurnMintFactoryBurnMint to a map for DAML arguments
-func (t BurnMintFactoryBurnMint) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts BurnMintFactoryBurnMint to a map for DAML arguments
+func (t BurnMintFactoryBurnMint) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"expectedAdmin": t.ExpectedAdmin.ToMap(),
-		"instrumentId": func() interface{} {
+	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
+
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["inputHoldingCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.InputHoldingCids))
+		for _, e := range t.InputHoldingCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["outputs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Outputs))
+		for _, e := range t.Outputs {
 			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"inputHoldingCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.InputHoldingCids))
-			for _, e := range t.InputHoldingCids {
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
 				res = append(res, e)
 			}
-			return res
-		}(),
-		"outputs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Outputs))
-			for _, e := range t.Outputs {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
-			}
-			return res
-		}(),
-		"extraActors": func() []interface{} {
-			res := make([]interface{}, 0, len(t.ExtraActors))
-			for _, e := range t.ExtraActors {
-				res = append(res, e.ToMap())
-			}
-			return res
-		}(),
-		"extraArgs": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.ExtraArgs).(mapper); ok {
-				return m.toMap()
-			}
-			return t.ExtraArgs
-		}(),
-	}
+		}
+		return res
+	}()
+
+	m["extraActors"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ExtraActors))
+		for _, e := range t.ExtraActors {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["extraArgs"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraArgs
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for BurnMintFactoryBurnMint using JsonCodec
@@ -138,18 +146,19 @@ type BurnMintFactoryBurnMintResult struct {
 	OutputCids []CONTRACT_ID `json:"outputCids"`
 }
 
-// toMap converts BurnMintFactoryBurnMintResult to a map for DAML arguments
-func (t BurnMintFactoryBurnMintResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts BurnMintFactoryBurnMintResult to a map for DAML arguments
+func (t BurnMintFactoryBurnMintResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"outputCids": func() []interface{} {
-			res := make([]interface{}, 0, len(t.OutputCids))
-			for _, e := range t.OutputCids {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["outputCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.OutputCids))
+		for _, e := range t.OutputCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for BurnMintFactoryBurnMintResult using JsonCodec
@@ -170,13 +179,15 @@ type BurnMintFactoryPublicFetch struct {
 	Actor         PARTY `json:"actor"`
 }
 
-// toMap converts BurnMintFactoryPublicFetch to a map for DAML arguments
-func (t BurnMintFactoryPublicFetch) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts BurnMintFactoryPublicFetch to a map for DAML arguments
+func (t BurnMintFactoryPublicFetch) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"expectedAdmin": t.ExpectedAdmin.ToMap(),
-		"actor":         t.Actor.ToMap(),
-	}
+	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
+
+	m["actor"] = t.Actor.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for BurnMintFactoryPublicFetch using JsonCodec
@@ -198,20 +209,23 @@ type BurnMintOutput struct {
 	Context ChoiceContext `json:"context"`
 }
 
-// toMap converts BurnMintOutput to a map for DAML arguments
-func (t BurnMintOutput) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts BurnMintOutput to a map for DAML arguments
+func (t BurnMintOutput) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"owner":  t.Owner.ToMap(),
-		"amount": (*big.Int)(t.Amount),
-		"context": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Context).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Context
-		}(),
-	}
+	m["owner"] = t.Owner.ToMap()
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["context"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for BurnMintOutput using JsonCodec

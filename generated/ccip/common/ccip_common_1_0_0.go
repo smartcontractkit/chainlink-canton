@@ -60,13 +60,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -83,27 +83,32 @@ type Any2CantonMessage struct {
 	TokenAmounts        []TokenAmount `json:"tokenAmounts"`
 }
 
-// toMap converts Any2CantonMessage to a map for DAML arguments
-func (t Any2CantonMessage) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Any2CantonMessage to a map for DAML arguments
+func (t Any2CantonMessage) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"messageId":           string(t.MessageId),
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"sender":              string(t.Sender),
-		"payload":             string(t.Payload),
-		"tokenAmounts": func() []interface{} {
-			res := make([]interface{}, 0, len(t.TokenAmounts))
-			for _, e := range t.TokenAmounts {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
+	m["messageId"] = string(t.MessageId)
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["sender"] = string(t.Sender)
+
+	m["payload"] = string(t.Payload)
+
+	m["tokenAmounts"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TokenAmounts))
+		for _, e := range t.TokenAmounts {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Any2CantonMessage using JsonCodec
@@ -123,12 +128,13 @@ type Any2CantonMessageReceiverView struct {
 	CcipOwner PARTY `json:"ccipOwner"`
 }
 
-// toMap converts Any2CantonMessageReceiverView to a map for DAML arguments
-func (t Any2CantonMessageReceiverView) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Any2CantonMessageReceiverView to a map for DAML arguments
+func (t Any2CantonMessageReceiverView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccipOwner": t.CcipOwner.ToMap(),
-	}
+	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Any2CantonMessageReceiverView using JsonCodec
@@ -148,18 +154,19 @@ type Any2CantonMessageReceiverCCIPReceive struct {
 	Message Any2CantonMessage `json:"message"`
 }
 
-// toMap converts Any2CantonMessageReceiverCCIPReceive to a map for DAML arguments
-func (t Any2CantonMessageReceiverCCIPReceive) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Any2CantonMessageReceiverCCIPReceive to a map for DAML arguments
+func (t Any2CantonMessageReceiverCCIPReceive) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-	}
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Any2CantonMessageReceiverCCIPReceive using JsonCodec
@@ -180,13 +187,15 @@ type Any2CantonMessageReceiverGetCCVs struct {
 	Caller              PARTY   `json:"caller"`
 }
 
-// toMap converts Any2CantonMessageReceiverGetCCVs to a map for DAML arguments
-func (t Any2CantonMessageReceiverGetCCVs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Any2CantonMessageReceiverGetCCVs to a map for DAML arguments
+func (t Any2CantonMessageReceiverGetCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"caller":              t.Caller.ToMap(),
-	}
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Any2CantonMessageReceiverGetCCVs using JsonCodec
@@ -278,21 +287,25 @@ type CCVRegistryIssueCCVTicket struct {
 	Sender               PARTY   `json:"sender"`
 }
 
-// toMap converts CCVRegistryIssueCCVTicket to a map for DAML arguments
-func (t CCVRegistryIssueCCVTicket) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCVRegistryIssueCCVTicket to a map for DAML arguments
+func (t CCVRegistryIssueCCVTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccvOwner":     t.CcvOwner.ToMap(),
-		"verifierBlob": string(t.VerifierBlob),
-		"messageSentObservers": func() []interface{} {
-			res := make([]interface{}, 0, len(t.MessageSentObservers))
-			for _, e := range t.MessageSentObservers {
-				res = append(res, e.ToMap())
-			}
-			return res
-		}(),
-		"sender": t.Sender.ToMap(),
-	}
+	m["ccvOwner"] = t.CcvOwner.ToMap()
+
+	m["verifierBlob"] = string(t.VerifierBlob)
+
+	m["messageSentObservers"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.MessageSentObservers))
+		for _, e := range t.MessageSentObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["sender"] = t.Sender.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCVRegistryIssueCCVTicket using JsonCodec
@@ -317,17 +330,23 @@ type CCVRegistryIssueVerifyTicket struct {
 	Receiver            PARTY   `json:"receiver"`
 }
 
-// toMap converts CCVRegistryIssueVerifyTicket to a map for DAML arguments
-func (t CCVRegistryIssueVerifyTicket) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCVRegistryIssueVerifyTicket to a map for DAML arguments
+func (t CCVRegistryIssueVerifyTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccvOwner":            t.CcvOwner.ToMap(),
-		"ccvData":             string(t.CcvData),
-		"messageHash":         string(t.MessageHash),
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"sequenceNumber":      (*big.Int)(t.SequenceNumber),
-		"receiver":            t.Receiver.ToMap(),
-	}
+	m["ccvOwner"] = t.CcvOwner.ToMap()
+
+	m["ccvData"] = string(t.CcvData)
+
+	m["messageHash"] = string(t.MessageHash)
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCVRegistryIssueVerifyTicket using JsonCodec
@@ -425,9 +444,11 @@ func (t CCVTicket) Archive(contractID string) *model.ExerciseCommand {
 type CCVTicketConsume struct {
 }
 
-// toMap converts CCVTicketConsume to a map for DAML arguments
-func (t CCVTicketConsume) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts CCVTicketConsume to a map for DAML arguments
+func (t CCVTicketConsume) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCVTicketConsume using JsonCodec
@@ -524,9 +545,11 @@ func (t CCVVerifyTicket) Archive(contractID string) *model.ExerciseCommand {
 type CCVVerifyTicketConsume struct {
 }
 
-// toMap converts CCVVerifyTicketConsume to a map for DAML arguments
-func (t CCVVerifyTicketConsume) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts CCVVerifyTicketConsume to a map for DAML arguments
+func (t CCVVerifyTicketConsume) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCVVerifyTicketConsume using JsonCodec
@@ -550,33 +573,38 @@ type Canton2AnyMessage struct {
 	TokenAmounts []TokenAmount `json:"tokenAmounts"`
 }
 
-// toMap converts Canton2AnyMessage to a map for DAML arguments
-func (t Canton2AnyMessage) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Canton2AnyMessage to a map for DAML arguments
+func (t Canton2AnyMessage) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"receiver": string(t.Receiver),
-		"payload":  string(t.Payload),
-		"feeToken": func() interface{} {
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	m["feeToken"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["extraArgs"] = string(t.ExtraArgs)
+
+	m["tokenAmounts"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TokenAmounts))
+		for _, e := range t.TokenAmounts {
 			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.FeeToken).(mapper); ok {
-				return m.toMap()
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return t.FeeToken
-		}(),
-		"extraArgs": string(t.ExtraArgs),
-		"tokenAmounts": func() []interface{} {
-			res := make([]interface{}, 0, len(t.TokenAmounts))
-			for _, e := range t.TokenAmounts {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
-			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Canton2AnyMessage using JsonCodec
@@ -597,13 +625,15 @@ type CrossChainVerifierView struct {
 	StorageLocation TEXT  `json:"storageLocation"`
 }
 
-// toMap converts CrossChainVerifierView to a map for DAML arguments
-func (t CrossChainVerifierView) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CrossChainVerifierView to a map for DAML arguments
+func (t CrossChainVerifierView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccipOwner":       t.CcipOwner.ToMap(),
-		"storageLocation": string(t.StorageLocation),
-	}
+	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["storageLocation"] = string(t.StorageLocation)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CrossChainVerifierView using JsonCodec
@@ -629,36 +659,43 @@ type CrossChainVerifierForwardToVerifier struct {
 	Caller         PARTY        `json:"caller"`
 }
 
-// toMap converts CrossChainVerifierForwardToVerifier to a map for DAML arguments
-func (t CrossChainVerifierForwardToVerifier) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CrossChainVerifierForwardToVerifier to a map for DAML arguments
+func (t CrossChainVerifierForwardToVerifier) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccvRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.CcvRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.CcvRegistryCid
-		}(),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"messageId": string(t.MessageId),
-		"feeToken": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.FeeToken).(mapper); ok {
-				return m.toMap()
-			}
-			return t.FeeToken
-		}(),
-		"feeTokenAmount": (*big.Int)(t.FeeTokenAmount),
-		"verifierArgs":   string(t.VerifierArgs),
-		"caller":         t.Caller.ToMap(),
-	}
+	m["ccvRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.CcvRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRegistryCid
+	}()
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["messageId"] = string(t.MessageId)
+
+	m["feeToken"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["feeTokenAmount"] = (*big.Int)(t.FeeTokenAmount)
+
+	m["verifierArgs"] = string(t.VerifierArgs)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CrossChainVerifierForwardToVerifier using JsonCodec
@@ -683,29 +720,35 @@ type CrossChainVerifierVerifyMessage struct {
 	Caller         PARTY       `json:"caller"`
 }
 
-// toMap converts CrossChainVerifierVerifyMessage to a map for DAML arguments
-func (t CrossChainVerifierVerifyMessage) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CrossChainVerifierVerifyMessage to a map for DAML arguments
+func (t CrossChainVerifierVerifyMessage) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"ccvRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.CcvRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.CcvRegistryCid
-		}(),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"messageId": string(t.MessageId),
-		"ccvData":   string(t.CcvData),
-		"receiver":  t.Receiver.ToMap(),
-		"caller":    t.Caller.ToMap(),
-	}
+	m["ccvRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.CcvRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRegistryCid
+	}()
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["messageId"] = string(t.MessageId)
+
+	m["ccvData"] = string(t.CcvData)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CrossChainVerifierVerifyMessage using JsonCodec
@@ -729,28 +772,33 @@ type DestChainConfig struct {
 	DefaultCCVs      []TEXT `json:"defaultCCVs"`
 }
 
-// toMap converts DestChainConfig to a map for DAML arguments
-func (t DestChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts DestChainConfig to a map for DAML arguments
+func (t DestChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"isEnabled":       bool(t.IsEnabled),
-		"defaultExecutor": string(t.DefaultExecutor),
-		"offRampAddress":  string(t.OffRampAddress),
-		"laneMandatedCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.LaneMandatedCCVs))
-			for _, e := range t.LaneMandatedCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"defaultCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.DefaultCCVs))
-			for _, e := range t.DefaultCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-	}
+	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["defaultExecutor"] = string(t.DefaultExecutor)
+
+	m["offRampAddress"] = string(t.OffRampAddress)
+
+	m["laneMandatedCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.LaneMandatedCCVs))
+		for _, e := range t.LaneMandatedCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["defaultCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.DefaultCCVs))
+		for _, e := range t.DefaultCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for DestChainConfig using JsonCodec
@@ -771,13 +819,15 @@ type GetDestChainConfig struct {
 	Caller            PARTY   `json:"caller"`
 }
 
-// toMap converts GetDestChainConfig to a map for DAML arguments
-func (t GetDestChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetDestChainConfig to a map for DAML arguments
+func (t GetDestChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"caller":            t.Caller.ToMap(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetDestChainConfig using JsonCodec
@@ -798,13 +848,15 @@ type GetSourceChainConfig struct {
 	Caller              PARTY   `json:"caller"`
 }
 
-// toMap converts GetSourceChainConfig to a map for DAML arguments
-func (t GetSourceChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetSourceChainConfig to a map for DAML arguments
+func (t GetSourceChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"caller":              t.Caller.ToMap(),
-	}
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetSourceChainConfig using JsonCodec
@@ -979,25 +1031,48 @@ type MessageV1 struct {
 	MessageData         TEXT             `json:"messageData"`
 }
 
-// toMap converts MessageV1 to a map for DAML arguments
-func (t MessageV1) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MessageV1 to a map for DAML arguments
+func (t MessageV1) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"destChainSelector":   (*big.Int)(t.DestChainSelector),
-		"sequenceNumber":      (*big.Int)(t.SequenceNumber),
-		"executionGasLimit":   int64(t.ExecutionGasLimit),
-		"ccipReceiveGasLimit": int64(t.CcipReceiveGasLimit),
-		"finality":            int64(t.Finality),
-		"ccvAndExecutorHash":  string(t.CcvAndExecutorHash),
-		"onRampAddress":       string(t.OnRampAddress),
-		"offRampAddress":      string(t.OffRampAddress),
-		"sender":              string(t.Sender),
-		"receiver":            string(t.Receiver),
-		"destBlob":            string(t.DestBlob),
-		"tokenTransfer":       *t.TokenTransfer,
-		"messageData":         string(t.MessageData),
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+
+	m["executionGasLimit"] = int64(t.ExecutionGasLimit)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["finality"] = int64(t.Finality)
+
+	m["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
+
+	m["onRampAddress"] = string(t.OnRampAddress)
+
+	m["offRampAddress"] = string(t.OffRampAddress)
+
+	m["sender"] = string(t.Sender)
+
+	m["receiver"] = string(t.Receiver)
+
+	m["destBlob"] = string(t.DestBlob)
+
+	if t.TokenTransfer != nil {
+		m["tokenTransfer"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.TokenTransfer,
+		}
+	} else {
+		m["tokenTransfer"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	m["messageData"] = string(t.MessageData)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MessageV1 using JsonCodec
@@ -1020,27 +1095,31 @@ type SourceChainConfig struct {
 	DefaultCCVs      []TEXT `json:"defaultCCVs"`
 }
 
-// toMap converts SourceChainConfig to a map for DAML arguments
-func (t SourceChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts SourceChainConfig to a map for DAML arguments
+func (t SourceChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"isEnabled":     bool(t.IsEnabled),
-		"onRampAddress": string(t.OnRampAddress),
-		"laneMandatedCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.LaneMandatedCCVs))
-			for _, e := range t.LaneMandatedCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"defaultCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.DefaultCCVs))
-			for _, e := range t.DefaultCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-	}
+	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["onRampAddress"] = string(t.OnRampAddress)
+
+	m["laneMandatedCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.LaneMandatedCCVs))
+		for _, e := range t.LaneMandatedCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["defaultCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.DefaultCCVs))
+		for _, e := range t.DefaultCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for SourceChainConfig using JsonCodec
@@ -1061,19 +1140,21 @@ type TokenAmount struct {
 	Amount       NUMERIC      `json:"amount"`
 }
 
-// toMap converts TokenAmount to a map for DAML arguments
-func (t TokenAmount) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenAmount to a map for DAML arguments
+func (t TokenAmount) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"amount": (*big.Int)(t.Amount),
-	}
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenAmount using JsonCodec
@@ -1203,9 +1284,11 @@ func (t TokenReceiveTicket) TokenReceiveTicketConsume(contractID string, args To
 type TokenReceiveTicketConsume struct {
 }
 
-// toMap converts TokenReceiveTicketConsume to a map for DAML arguments
-func (t TokenReceiveTicketConsume) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts TokenReceiveTicketConsume to a map for DAML arguments
+func (t TokenReceiveTicketConsume) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenReceiveTicketConsume using JsonCodec
@@ -1312,9 +1395,11 @@ func (t TokenSendTicket) Archive(contractID string) *model.ExerciseCommand {
 type TokenSendTicketConsume struct {
 }
 
-// toMap converts TokenSendTicketConsume to a map for DAML arguments
-func (t TokenSendTicketConsume) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts TokenSendTicketConsume to a map for DAML arguments
+func (t TokenSendTicketConsume) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenSendTicketConsume using JsonCodec
@@ -1339,17 +1424,23 @@ type TokenTransferV1 struct {
 	ExtraData          TEXT    `json:"extraData"`
 }
 
-// toMap converts TokenTransferV1 to a map for DAML arguments
-func (t TokenTransferV1) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts TokenTransferV1 to a map for DAML arguments
+func (t TokenTransferV1) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"amount":             (*big.Int)(t.Amount),
-		"sourcePoolAddress":  string(t.SourcePoolAddress),
-		"sourceTokenAddress": string(t.SourceTokenAddress),
-		"destTokenAddress":   string(t.DestTokenAddress),
-		"tokenReceiver":      string(t.TokenReceiver),
-		"extraData":          string(t.ExtraData),
-	}
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["sourcePoolAddress"] = string(t.SourcePoolAddress)
+
+	m["sourceTokenAddress"] = string(t.SourceTokenAddress)
+
+	m["destTokenAddress"] = string(t.DestTokenAddress)
+
+	m["tokenReceiver"] = string(t.TokenReceiver)
+
+	m["extraData"] = string(t.ExtraData)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for TokenTransferV1 using JsonCodec
@@ -1370,19 +1461,21 @@ type UpdateDestChainConfig struct {
 	Config            DestChainConfig `json:"config"`
 }
 
-// toMap converts UpdateDestChainConfig to a map for DAML arguments
-func (t UpdateDestChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts UpdateDestChainConfig to a map for DAML arguments
+func (t UpdateDestChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"config": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Config).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Config
-		}(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["config"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Config).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Config
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for UpdateDestChainConfig using JsonCodec
@@ -1403,19 +1496,21 @@ type UpdateSourceChainConfig struct {
 	Config              SourceChainConfig `json:"config"`
 }
 
-// toMap converts UpdateSourceChainConfig to a map for DAML arguments
-func (t UpdateSourceChainConfig) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts UpdateSourceChainConfig to a map for DAML arguments
+func (t UpdateSourceChainConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"config": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Config).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Config
-		}(),
-	}
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["config"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Config).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Config
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for UpdateSourceChainConfig using JsonCodec

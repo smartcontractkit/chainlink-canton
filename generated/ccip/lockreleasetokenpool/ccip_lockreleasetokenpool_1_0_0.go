@@ -34,13 +34,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -170,19 +170,21 @@ type LockReleaseTokenPoolGetRequiredCCVs struct {
 	Caller  PARTY     `json:"caller"`
 }
 
-// toMap converts LockReleaseTokenPoolGetRequiredCCVs to a map for DAML arguments
-func (t LockReleaseTokenPoolGetRequiredCCVs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts LockReleaseTokenPoolGetRequiredCCVs to a map for DAML arguments
+func (t LockReleaseTokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"caller": t.Caller.ToMap(),
-	}
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for LockReleaseTokenPoolGetRequiredCCVs using JsonCodec

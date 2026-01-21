@@ -34,13 +34,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -397,19 +397,21 @@ type MintPreapprovalMint struct {
 	View   HoldingView `json:"view"`
 }
 
-// toMap converts MintPreapprovalMint to a map for DAML arguments
-func (t MintPreapprovalMint) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MintPreapprovalMint to a map for DAML arguments
+func (t MintPreapprovalMint) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"issuer": t.Issuer.ToMap(),
-		"view": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.View).(mapper); ok {
-				return m.toMap()
-			}
-			return t.View
-		}(),
-	}
+	m["issuer"] = t.Issuer.ToMap()
+
+	m["view"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.View).(mapper); ok {
+			return m.toMap()
+		}
+		return t.View
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MintPreapprovalMint using JsonCodec
@@ -498,30 +500,32 @@ type MintRoleMint struct {
 	Outputs      []BurnMintOutput `json:"outputs"`
 }
 
-// toMap converts MintRoleMint to a map for DAML arguments
-func (t MintRoleMint) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MintRoleMint to a map for DAML arguments
+func (t MintRoleMint) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"instrumentId": func() interface{} {
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["outputs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Outputs))
+		for _, e := range t.Outputs {
 			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
 			}
-			return t.InstrumentId
-		}(),
-		"outputs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Outputs))
-			for _, e := range t.Outputs {
-				type mapper interface{ toMap() map[string]interface{} }
-				if m, ok := any(e).(mapper); ok {
-					res = append(res, m.toMap())
-				} else {
-					res = append(res, e)
-				}
-			}
-			return res
-		}(),
-	}
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MintRoleMint using JsonCodec
@@ -541,12 +545,13 @@ type Transfer struct {
 	To PARTY `json:"to"`
 }
 
-// toMap converts Transfer to a map for DAML arguments
-func (t Transfer) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Transfer to a map for DAML arguments
+func (t Transfer) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"to": t.To.ToMap(),
-	}
+	m["to"] = t.To.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Transfer using JsonCodec

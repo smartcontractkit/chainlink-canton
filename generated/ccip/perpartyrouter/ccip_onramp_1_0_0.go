@@ -32,40 +32,60 @@ type CCIPSendFromRouter struct {
 	CcvTickets            []CONTRACT_ID `json:"ccvTickets"`
 }
 
-// toMap converts CCIPSendFromRouter to a map for DAML arguments
-func (t CCIPSendFromRouter) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCIPSendFromRouter to a map for DAML arguments
+func (t CCIPSendFromRouter) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"routerPartyOwner": t.RouterPartyOwner.ToMap(),
-		"globalConfigCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.GlobalConfigCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"destChainSelector":     (*big.Int)(t.DestChainSelector),
-		"receiver":              string(t.Receiver),
-		"payload":               string(t.Payload),
-		"executionGasLimit":     int64(t.ExecutionGasLimit),
-		"ccipReceiveGasLimit":   int64(t.CcipReceiveGasLimit),
-		"currentSequenceNumber": (*big.Int)(t.CurrentSequenceNumber),
-		"tokenSendTicket":       *t.TokenSendTicket,
-		"ccvTickets": func() []interface{} {
-			res := make([]interface{}, 0, len(t.CcvTickets))
-			for _, e := range t.CcvTickets {
-				res = append(res, e)
-			}
-			return res
-		}(),
+	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
+
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	m["executionGasLimit"] = int64(t.ExecutionGasLimit)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["currentSequenceNumber"] = (*big.Int)(t.CurrentSequenceNumber)
+
+	if t.TokenSendTicket != nil {
+		m["tokenSendTicket"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.TokenSendTicket,
+		}
+	} else {
+		m["tokenSendTicket"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	m["ccvTickets"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.CcvTickets))
+		for _, e := range t.CcvTickets {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCIPSendFromRouter using JsonCodec
@@ -90,29 +110,35 @@ type CCIPSendFromRouterResult struct {
 	MessageSentObservers []PARTY `json:"messageSentObservers"`
 }
 
-// toMap converts CCIPSendFromRouterResult to a map for DAML arguments
-func (t CCIPSendFromRouterResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
+func (t CCIPSendFromRouterResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"messageId":         string(t.MessageId),
-		"encodedMessage":    string(t.EncodedMessage),
-		"newSequenceNumber": (*big.Int)(t.NewSequenceNumber),
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"verifierBlobs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.VerifierBlobs))
-			for _, e := range t.VerifierBlobs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-		"messageSentObservers": func() []interface{} {
-			res := make([]interface{}, 0, len(t.MessageSentObservers))
-			for _, e := range t.MessageSentObservers {
-				res = append(res, e.ToMap())
-			}
-			return res
-		}(),
-	}
+	m["messageId"] = string(t.MessageId)
+
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["newSequenceNumber"] = (*big.Int)(t.NewSequenceNumber)
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["verifierBlobs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.VerifierBlobs))
+		for _, e := range t.VerifierBlobs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["messageSentObservers"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.MessageSentObservers))
+		for _, e := range t.MessageSentObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCIPSendFromRouterResult using JsonCodec
@@ -136,28 +162,42 @@ type GetRequiredCCVsForSend2 struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// toMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
-func (t GetRequiredCCVsForSend2) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
+func (t GetRequiredCCVsForSend2) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"globalConfigCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.GlobalConfigCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"hasTokenTransfer":  bool(t.HasTokenTransfer),
-		"instrumentId":      *t.InstrumentId,
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
+
+	if t.InstrumentId != nil {
+		m["instrumentId"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.InstrumentId,
+		}
+	} else {
+		m["instrumentId"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend2 using JsonCodec

@@ -33,28 +33,42 @@ type HoldingView struct {
 	Meta         Metadata     `json:"meta"`
 }
 
-// toMap converts HoldingView to a map for DAML arguments
-func (t HoldingView) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts HoldingView to a map for DAML arguments
+func (t HoldingView) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"owner": t.Owner.ToMap(),
-		"instrumentId": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.InstrumentId).(mapper); ok {
-				return m.toMap()
-			}
-			return t.InstrumentId
-		}(),
-		"amount": (*big.Int)(t.Amount),
-		"lock":   *t.Lock,
-		"meta": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Meta).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Meta
-		}(),
+	m["owner"] = t.Owner.ToMap()
+
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	if t.Lock != nil {
+		m["lock"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.Lock,
+		}
+	} else {
+		m["lock"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	m["meta"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Meta).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Meta
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for HoldingView using JsonCodec
@@ -75,13 +89,15 @@ type InstrumentId struct {
 	Id    TEXT  `json:"id"`
 }
 
-// toMap converts InstrumentId to a map for DAML arguments
-func (t InstrumentId) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts InstrumentId to a map for DAML arguments
+func (t InstrumentId) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"admin": t.Admin.ToMap(),
-		"id":    string(t.Id),
-	}
+	m["admin"] = t.Admin.ToMap()
+
+	m["id"] = string(t.Id)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for InstrumentId using JsonCodec
@@ -104,27 +120,49 @@ type Lock struct {
 	Context      *TEXT      `json:"context"`
 }
 
-// toMap converts Lock to a map for DAML arguments
-func (t Lock) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Lock to a map for DAML arguments
+func (t Lock) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"holders": func() []interface{} {
-			res := make([]interface{}, 0, len(t.Holders))
-			for _, e := range t.Holders {
-				res = append(res, e.ToMap())
-			}
-			return res
-		}(),
-		"expiresAt": *t.ExpiresAt,
-		"expiresAfter": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.ExpiresAfter).(mapper); ok {
-				return m.toMap()
-			}
-			return t.ExpiresAfter
-		}(),
-		"context": string(*t.Context),
+	m["holders"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Holders))
+		for _, e := range t.Holders {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	if t.ExpiresAt != nil {
+		m["expiresAt"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.ExpiresAt,
+		}
+	} else {
+		m["expiresAt"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	m["expiresAfter"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExpiresAfter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExpiresAfter
+	}()
+
+	if t.Context != nil {
+		m["context"] = map[string]interface{}{
+			"_type": "optional",
+			"value": string(*t.Context),
+		}
+	} else {
+		m["context"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Lock using JsonCodec

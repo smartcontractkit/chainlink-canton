@@ -34,13 +34,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -126,22 +126,27 @@ type CCIPMessageSentEvent struct {
 	VerifierBlobs     []TEXT  `json:"verifierBlobs"`
 }
 
-// toMap converts CCIPMessageSentEvent to a map for DAML arguments
-func (t CCIPMessageSentEvent) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCIPMessageSentEvent to a map for DAML arguments
+func (t CCIPMessageSentEvent) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"sequenceNumber":    (*big.Int)(t.SequenceNumber),
-		"messageId":         string(t.MessageId),
-		"encodedMessage":    string(t.EncodedMessage),
-		"verifierBlobs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.VerifierBlobs))
-			for _, e := range t.VerifierBlobs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+
+	m["messageId"] = string(t.MessageId)
+
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["verifierBlobs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.VerifierBlobs))
+		for _, e := range t.VerifierBlobs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCIPMessageSentEvent using JsonCodec
@@ -170,45 +175,64 @@ type CCIPSend struct {
 	CcvTickets            []CONTRACT_ID `json:"ccvTickets"`
 }
 
-// toMap converts CCIPSend to a map for DAML arguments
-func (t CCIPSend) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCIPSend to a map for DAML arguments
+func (t CCIPSend) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"onRampCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.OnRampCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.OnRampCid
-		}(),
-		"globalConfigCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.GlobalConfigCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"destChainSelector":   (*big.Int)(t.DestChainSelector),
-		"receiver":            string(t.Receiver),
-		"payload":             string(t.Payload),
-		"executionGasLimit":   int64(t.ExecutionGasLimit),
-		"ccipReceiveGasLimit": int64(t.CcipReceiveGasLimit),
-		"tokenSendTicket":     *t.TokenSendTicket,
-		"ccvTickets": func() []interface{} {
-			res := make([]interface{}, 0, len(t.CcvTickets))
-			for _, e := range t.CcvTickets {
-				res = append(res, e)
-			}
-			return res
-		}(),
+	m["onRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OnRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRampCid
+	}()
+
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	m["executionGasLimit"] = int64(t.ExecutionGasLimit)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	if t.TokenSendTicket != nil {
+		m["tokenSendTicket"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.TokenSendTicket,
+		}
+	} else {
+		m["tokenSendTicket"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	m["ccvTickets"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.CcvTickets))
+		for _, e := range t.CcvTickets {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCIPSend using JsonCodec
@@ -230,26 +254,29 @@ type CCIPSendResult struct {
 	MessageId       TEXT        `json:"messageId"`
 }
 
-// toMap converts CCIPSendResult to a map for DAML arguments
-func (t CCIPSendResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CCIPSendResult to a map for DAML arguments
+func (t CCIPSendResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"router": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Router).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Router
-		}(),
-		"ccipMessageSent": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.CcipMessageSent).(mapper); ok {
-				return m.toMap()
-			}
-			return t.CcipMessageSent
-		}(),
-		"messageId": string(t.MessageId),
-	}
+	m["router"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Router).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Router
+	}()
+
+	m["ccipMessageSent"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.CcipMessageSent).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcipMessageSent
+	}()
+
+	m["messageId"] = string(t.MessageId)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CCIPSendResult using JsonCodec
@@ -270,13 +297,15 @@ type CreateRouter struct {
 	InstanceId TEXT  `json:"instanceId"`
 }
 
-// toMap converts CreateRouter to a map for DAML arguments
-func (t CreateRouter) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CreateRouter to a map for DAML arguments
+func (t CreateRouter) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"partyOwner": t.PartyOwner.ToMap(),
-		"instanceId": string(t.InstanceId),
-	}
+	m["partyOwner"] = t.PartyOwner.ToMap()
+
+	m["instanceId"] = string(t.InstanceId)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CreateRouter using JsonCodec
@@ -297,25 +326,27 @@ type CreateRouterResult struct {
 	Factory CONTRACT_ID `json:"factory"`
 }
 
-// toMap converts CreateRouterResult to a map for DAML arguments
-func (t CreateRouterResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts CreateRouterResult to a map for DAML arguments
+func (t CreateRouterResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"router": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Router).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Router
-		}(),
-		"factory": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Factory).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Factory
-		}(),
-	}
+	m["router"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Router).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Router
+	}()
+
+	m["factory"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Factory).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Factory
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for CreateRouterResult using JsonCodec
@@ -339,40 +370,45 @@ type Execute struct {
 	CcvVerifyTickets      []CONTRACT_ID `json:"ccvVerifyTickets"`
 }
 
-// toMap converts Execute to a map for DAML arguments
-func (t Execute) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Execute to a map for DAML arguments
+func (t Execute) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"offRampCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.OffRampCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.OffRampCid
-		}(),
-		"globalConfigCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.GlobalConfigCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"encodedMessage": string(t.EncodedMessage),
-		"ccvVerifyTickets": func() []interface{} {
-			res := make([]interface{}, 0, len(t.CcvVerifyTickets))
-			for _, e := range t.CcvVerifyTickets {
-				res = append(res, e)
-			}
-			return res
-		}(),
-	}
+	m["offRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OffRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRampCid
+	}()
+
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["ccvVerifyTickets"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.CcvVerifyTickets))
+		for _, e := range t.CcvVerifyTickets {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Execute using JsonCodec
@@ -396,40 +432,45 @@ type ExecuteResult struct {
 	State              MessageExecutionState `json:"state"`
 }
 
-// toMap converts ExecuteResult to a map for DAML arguments
-func (t ExecuteResult) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ExecuteResult to a map for DAML arguments
+func (t ExecuteResult) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"router": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Router).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Router
-		}(),
-		"tokenReceiveTicket": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenReceiveTicket).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenReceiveTicket
-		}(),
-		"messageId": string(t.MessageId),
-		"message": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Message).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Message
-		}(),
-		"state": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.State).(mapper); ok {
-				return m.toMap()
-			}
-			return t.State
-		}(),
-	}
+	m["router"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Router).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Router
+	}()
+
+	m["tokenReceiveTicket"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenReceiveTicket).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenReceiveTicket
+	}()
+
+	m["messageId"] = string(t.MessageId)
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["state"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.State).(mapper); ok {
+			return m.toMap()
+		}
+		return t.State
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ExecuteResult using JsonCodec
@@ -511,22 +552,27 @@ type ExecutionStateChangedEvent struct {
 	ReturnData          TEXT                  `json:"returnData"`
 }
 
-// toMap converts ExecutionStateChangedEvent to a map for DAML arguments
-func (t ExecutionStateChangedEvent) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts ExecutionStateChangedEvent to a map for DAML arguments
+func (t ExecutionStateChangedEvent) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"sequenceNumber":      (*big.Int)(t.SequenceNumber),
-		"messageId":           string(t.MessageId),
-		"state": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.State).(mapper); ok {
-				return m.toMap()
-			}
-			return t.State
-		}(),
-		"returnData": string(t.ReturnData),
-	}
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+
+	m["messageId"] = string(t.MessageId)
+
+	m["state"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.State).(mapper); ok {
+			return m.toMap()
+		}
+		return t.State
+	}()
+
+	m["returnData"] = string(t.ReturnData)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for ExecutionStateChangedEvent using JsonCodec
@@ -546,12 +592,13 @@ type GetExecutionState struct {
 	MessageHash TEXT `json:"messageHash"`
 }
 
-// toMap converts GetExecutionState to a map for DAML arguments
-func (t GetExecutionState) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetExecutionState to a map for DAML arguments
+func (t GetExecutionState) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"messageHash": string(t.MessageHash),
-	}
+	m["messageHash"] = string(t.MessageHash)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetExecutionState using JsonCodec
@@ -571,12 +618,13 @@ type GetReceiverRequiredCCVs struct {
 	Caller PARTY `json:"caller"`
 }
 
-// toMap converts GetReceiverRequiredCCVs to a map for DAML arguments
-func (t GetReceiverRequiredCCVs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetReceiverRequiredCCVs to a map for DAML arguments
+func (t GetReceiverRequiredCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"caller": t.Caller.ToMap(),
-	}
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetReceiverRequiredCCVs using JsonCodec
@@ -601,35 +649,50 @@ type GetRequiredCCVsForExecute struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// toMap converts GetRequiredCCVsForExecute to a map for DAML arguments
-func (t GetRequiredCCVsForExecute) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
+func (t GetRequiredCCVsForExecute) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"offRampCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.OffRampCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.OffRampCid
-		}(),
-		"globalConfigCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.GlobalConfigCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"sourceChainSelector": (*big.Int)(t.SourceChainSelector),
-		"hasTokenTransfer":    bool(t.HasTokenTransfer),
-		"instrumentId":        *t.InstrumentId,
+	m["offRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OffRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRampCid
+	}()
+
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
+
+	if t.InstrumentId != nil {
+		m["instrumentId"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.InstrumentId,
+		}
+	} else {
+		m["instrumentId"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForExecute using JsonCodec
@@ -654,35 +717,50 @@ type GetRequiredCCVsForSend struct {
 	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
-// toMap converts GetRequiredCCVsForSend to a map for DAML arguments
-func (t GetRequiredCCVsForSend) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
+func (t GetRequiredCCVsForSend) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"onRampCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.OnRampCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.OnRampCid
-		}(),
-		"globalConfigCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.GlobalConfigCid
-		}(),
-		"tokenAdminRegistryCid": func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-				return m.toMap()
-			}
-			return t.TokenAdminRegistryCid
-		}(),
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-		"hasTokenTransfer":  bool(t.HasTokenTransfer),
-		"instrumentId":      *t.InstrumentId,
+	m["onRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OnRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRampCid
+	}()
+
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
+
+	if t.InstrumentId != nil {
+		m["instrumentId"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.InstrumentId,
+		}
+	} else {
+		m["instrumentId"] = map[string]interface{}{
+			"_type": "optional",
+		}
 	}
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend using JsonCodec
@@ -702,12 +780,13 @@ type GetSequenceNumber struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
 }
 
-// toMap converts GetSequenceNumber to a map for DAML arguments
-func (t GetSequenceNumber) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts GetSequenceNumber to a map for DAML arguments
+func (t GetSequenceNumber) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"destChainSelector": (*big.Int)(t.DestChainSelector),
-	}
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for GetSequenceNumber using JsonCodec
@@ -728,13 +807,15 @@ type HasRouter struct {
 	Caller     PARTY `json:"caller"`
 }
 
-// toMap converts HasRouter to a map for DAML arguments
-func (t HasRouter) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts HasRouter to a map for DAML arguments
+func (t HasRouter) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"partyOwner": t.PartyOwner.ToMap(),
-		"caller":     t.Caller.ToMap(),
-	}
+	m["partyOwner"] = t.PartyOwner.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for HasRouter using JsonCodec
@@ -981,18 +1062,19 @@ type UpdateReceiverRequiredCCVs struct {
 	NewReceiverRequiredCCVs []TEXT `json:"newReceiverRequiredCCVs"`
 }
 
-// toMap converts UpdateReceiverRequiredCCVs to a map for DAML arguments
-func (t UpdateReceiverRequiredCCVs) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts UpdateReceiverRequiredCCVs to a map for DAML arguments
+func (t UpdateReceiverRequiredCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"newReceiverRequiredCCVs": func() []interface{} {
-			res := make([]interface{}, 0, len(t.NewReceiverRequiredCCVs))
-			for _, e := range t.NewReceiverRequiredCCVs {
-				res = append(res, string(e))
-			}
-			return res
-		}(),
-	}
+	m["newReceiverRequiredCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.NewReceiverRequiredCCVs))
+		for _, e := range t.NewReceiverRequiredCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for UpdateReceiverRequiredCCVs using JsonCodec
