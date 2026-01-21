@@ -1,36 +1,64 @@
--- | lock/release token pool for ccip token transfers.
+-- | Lock/release token pool for CCIP token transfers.
+--
+-- Supports Splice token standard patterns where TransferFactory implementations
+-- may look up preapproval from extraArgs.context (e.g., Amulet's ExternalPartyAmuletRules
+-- uses "transfer-preapproval" key). The pool stores a poolReceiveContext that gets
+-- merged into extraArgs for inbound transfers, enabling direct transfers without
+-- pending state when the pool has preapproval.
 module CCIP.LockReleaseTokenPool where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Foldable (forA_)
-import DA.List (dedupSort)
+import DA.List (dedupSort, head)
 import qualified DA.Map as Map
+import qualified DA.TextMap as TextMap
+import DA.Date (date, Month(Dec))
+import DA.Time (time)
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.CCVId
+import qualified CCIP.Client
+import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.MessageCodecV1
+import qualified CCIP.OnRamp
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
+-- | Far-future time used as "never expires" for pending transfers.
+-- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
+
 
 -- | Per-chain CCV requirements for the pool.
+-- This partially matches the EVM pattern in AdvancedPoolHooks.sol which is primarily based on chain selector:
+-- https://github.com/smartcontractkit/chainlink-ccip/blob/afc2e9e58c953fbdeee724ac5fae021155ca6325/chains/evm/contracts/pools/AdvancedPoolHooks.sol#L235
+-- Users that require more expressiveness can implement or modify LockReleaseTokenPool_GetRequiredCCVs below directly.
 data ChainCCVConfig = ChainCCVConfig
     with
         inboundCCVs : [CCIP.CCVId.CCVId]   -- Required CCVs for incoming transfers
         outboundCCVs : [CCIP.CCVId.CCVId]  -- Required CCVs for outgoing transfers
     deriving (Eq, Show)
 
-
--- | lock/release token pool with dynamic CCV requirements per chain.
+-- | Lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
     with
         ccipOwner : Party
         poolOwner : Party
+        instanceId : Text  -- Unique identifier for this pool instance
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
         -- CCV requirements per remote chain selector
         chainCCVRequirements : Map.Map (Numeric 0) ChainCCVConfig
+        -- Context merged into extraArgs for transfers TO the pool (LockOrBurn).
+        -- For tokens following Splice patterns (e.g., Amulet), this should contain
+        -- the pool's preapproval CID under the key the TransferFactory expects
+        -- (e.g., "transfer-preapproval"). Enables direct transfers without pending state.
+        poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
     where
         signatory poolOwner
 
@@ -69,8 +97,17 @@ template LockReleaseTokenPool
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
-                -- stubbed: needs full implementation
-                abort "LockReleaseTokenPool_LockOrBurn: not yet implemented"
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_LockOrBurn
+                    with
+                        destChainSelector = arg.destChainSelector
+                        message = arg.message
+                        tokenInput = arg.tokenInput
+                        feeInput = arg.feeInput
+                        senderInputCids = arg.senderInputCids
+                        onRampCid = arg.onRampCid
+                        feeQuoterCid = arg.feeQuoterCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        caller = arg.caller
 
         -- Get required CCVs based on chain and direction.
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [CCIP.CCVId.CCVId]
@@ -128,6 +165,7 @@ template LockReleaseTokenPool
                     verifiedCCVIds = dedupSort providedCCVIds
 
         -- Release tokens by consuming a TokenReceiveTicket.
+        -- Transfers tokens from pool to receiver via TransferFactory.
         choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
@@ -144,12 +182,41 @@ template LockReleaseTokenPool
                 -- Consume the ticket
                 exercise tokenReceiveTicketCid CCIP.Tickets.TokenReceiveTicket_Consume
 
-                -- TODO: Implement actual token release via Splice TransferInstruction
-                -- For now, return empty result
-                pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
-                    output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
-                        receiverHoldingCids = []
-                    poolChangeCids = tokenInput.tokenPoolHoldings
+                -- Transfer tokens from pool to receiver via TransferFactory.
+                -- If receiver has preapproval, completes immediately. Otherwise creates pending
+                -- TransferInstruction that receiver must accept. Uses maxTime so pending
+                -- transfers don't time out.
+                now <- getTime
+                let amountDecimal : Decimal = intToDecimal (truncate ticket.amount)
+                let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
+                        sender = poolOwner
+                        receiver = ticket.receiver
+                        amount = amountDecimal
+                        instrumentId = instrumentId
+                        requestedAt = now
+                        executeBefore = maxTime
+                        inputHoldingCids = tokenInput.tokenPoolHoldings
+                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+                transferResult <- exercise tokenInput.transferFactory
+                    Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                        expectedAdmin = instrumentId.admin
+                        transfer
+                        extraArgs = tokenInput.extraArgs
+
+                -- Return transfer result
+                case transferResult.output of
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids ->
+                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
+                                receiverHoldingCids = receiverCids
+                            poolChangeCids = transferResult.senderChangeCids
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid ->
+                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
+                                transferInstructionCid = instrCid
+                            poolChangeCids = transferResult.senderChangeCids
+                    _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
         -- Update chain CCV requirements.
         choice LockReleaseTokenPool_UpdateChainCCVRequirements : ContractId LockReleaseTokenPool
@@ -158,3 +225,82 @@ template LockReleaseTokenPool
             controller poolOwner
             do
                 create this with chainCCVRequirements = newChainCCVRequirements
+
+        -- Lock tokens for outbound transfer and issue TokenSendTicket.
+        -- Transfers tokens from caller to pool via TransferFactory.
+        nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
+            with
+                destChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+                tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+                feeInput : CCIP.Interfaces.TokenPool.FeeInput
+                senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+                onRampCid : ContractId CCIP.OnRamp.OnRamp
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                caller : Party
+            controller caller, poolOwner
+            do
+                -- Find token amount for this pool's instrument
+                let matchingAmounts = filter (\ta -> ta.instrumentId == instrumentId) message.tokenAmounts
+                assertMsg "LockOrBurn: no matching token amount for this pool's instrument"
+                    (not (null matchingAmounts))
+                let tokenAmount = head matchingAmounts
+
+                -- Merge pool's receive context into extraArgs. For Splice-pattern tokens,
+                -- this injects the pool's preapproval CID so TransferFactory can complete
+                -- the transfer directly without creating a pending TransferInstruction.
+                let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
+                        values = TextMap.union poolReceiveContext.values tokenInput.extraArgs.context.values
+                let mergedExtraArgs = tokenInput.extraArgs with context = mergedContext
+
+                -- Transfer tokens from caller to pool via TransferFactory.
+                now <- getTime
+                let amountDecimal : Decimal = intToDecimal (truncate tokenAmount.amount)
+                let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
+                        sender = caller
+                        receiver = poolOwner
+                        amount = amountDecimal
+                        instrumentId = instrumentId
+                        requestedAt = now
+                        executeBefore = maxTime
+                        inputHoldingCids = senderInputCids
+                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+                transferResult <- exercise tokenInput.transferFactory
+                    Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                        expectedAdmin = instrumentId.admin
+                        transfer
+                        extraArgs = mergedExtraArgs
+
+                -- Build receipt identifying this pool instance.
+                -- Format: "pool:{instanceId}:{poolOwner}:{instrumentId}"
+                let poolReceipt = CCIP.Tickets.Receipt with
+                        issuer = "pool:" <> instanceId
+                            <> ":" <> CCIP.MessageCodecV1.encodePartyId poolOwner
+                            <> ":" <> CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+                        destGasLimit = 0
+                        destBytesOverhead = 0
+                        feeTokenAmount = 0.0
+                        extraArgs = ""
+
+                -- Issue TokenSendTicket via TokenAdminRegistry
+                _tokenSendTicket <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueSendTicket
+                    with
+                        instrumentId = instrumentId
+                        sender = caller
+                        amount = tokenAmount.amount
+                        sourceTokenAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
+                        destTokenAddress = ""
+                        tokenReceiver = message.receiver
+                        extraData = ""
+                        receipt = poolReceipt
+                        poolOwner = poolOwner
+
+                -- Return actual transfer results
+                case transferResult.output of
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids ->
+                        pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
+                            poolChangeCids = receiverCids ++ tokenInput.tokenPoolHoldings
+                            senderChangeCids = transferResult.senderChangeCids
+                    _ -> abort "LockOrBurn: transfer did not complete directly"
