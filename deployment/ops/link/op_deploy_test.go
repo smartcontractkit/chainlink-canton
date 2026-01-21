@@ -42,7 +42,14 @@ func TestDeployAndMintLink(t *testing.T) {
 		reporter,
 	)
 
-	_, err = cld_ops.ExecuteOperation(bundle, DeployLINKOp, deps, cld_ops.EmptyInput{})
+	result, err := cld_ops.ExecuteOperation(bundle, DeployLINKOp, deps, cld_ops.EmptyInput{})
 	require.NoError(t, err, "failed to deploy LINK token")
+
+	_, err = cld_ops.ExecuteOperation(bundle, MintLINKPreApprovalOp, deps, MintLinkTokenInput{
+		RegistryContractID: result.Output.Output.RegistryContractID,
+		ReceiverParty:      setupResult.Party, // approve preapproval to mint for self
+		Amount:             "100000",
+	})
+	require.NoError(t, err, "failed to mint LINK token")
 
 }

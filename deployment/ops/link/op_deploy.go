@@ -115,8 +115,7 @@ var handler = func(b cld_ops.Bundle, deps CantonOpDeps, input cld_ops.EmptyInput
 		return CantonOpResult[DeployLinkTokenOutput]{}, fmt.Errorf("failed to find CoinRegistry contract in transaction events")
 	}
 
-	fmt.Println("Registry Contract ID: ", registryContractID)
-	fmt.Println("Registry Template ID: ", registryTemplateID)
+	fmt.Printf("Deployed LINK token registry contract   id=%s\n", registryContractID)
 
 	return CantonOpResult[DeployLinkTokenOutput]{
 		TransactionID: commandID,
@@ -184,6 +183,9 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 		return CantonOpResult[MintLinkTokenOutput]{}, fmt.Errorf("failed to find MintPreapproval contract")
 	}
 
+	fmt.Printf("MintPreapproval contract ID   id=%s\n", mintPreapprovalCID)
+	fmt.Printf("Minting tokens to receiver party   party=%s\n", input.ReceiverParty)
+
 	// Now mint tokens using BurnMintFactory_BurnMint choice
 	mintArgs := coin.BurnMintFactoryBurnMint{
 		ExpectedAdmin: types.PARTY(deps.Party),
@@ -218,13 +220,32 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 	// Exercise the choice on the registry contract
 	exerciseCmd := coin.CoinRegistry{}.BurnMintFactoryBurnMint(input.RegistryContractID, mintArgs)
 
+	ListKnownPackagesResp, err := deps.BindingClient.PackageMng.ListKnownPackages(ctx)
+	if err != nil {
+		return CantonOpResult[MintLinkTokenOutput]{}, fmt.Errorf("failed to list known packages: %w", err)
+	}
+
+	var burnMintPkgID string
+	for _, p := range ListKnownPackagesResp {
+		if strings.Contains(strings.ToLower(p.Name), "splice-api-token-burn-mint") {
+			burnMintPkgID = p.PackageID
+			break
+		}
+	}
+
 	cmds = &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID: "link-token-mint",
 			UserID:     deps.UserID,
 			CommandID:  uuid.Must(uuid.NewUUID()).String(),
 			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: exerciseCmd}},
+			Commands: []*model.Command{{Command: &model.ExerciseCommand{
+				// TODO find a better way rather than this this templateID override hack which exposes PackageID to the client
+				TemplateID: fmt.Sprintf("%s:%s:%s", burnMintPkgID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory"),
+				ContractID: exerciseCmd.ContractID,
+				Choice:     exerciseCmd.Choice,
+				Arguments:  exerciseCmd.Arguments,
+			}}},
 		},
 	}
 
@@ -253,6 +274,7 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 		return CantonOpResult[MintLinkTokenOutput]{}, fmt.Errorf("failed to find token holding contract in mint transaction")
 	}
 
+	fmt.Printf("Minted token to tokenHoldingCID   id=%s\n", tokenHoldingCID)
 	return CantonOpResult[MintLinkTokenOutput]{
 		TransactionID: mintCommandID,
 		Output: MintLinkTokenOutput{
@@ -268,7 +290,7 @@ var DeployLINKOp = cld_ops.NewOperation(
 	handler,
 )
 
-var MintLinkOp = cld_ops.NewOperation(
+var MintLINKPreApprovalOp = cld_ops.NewOperation(
 	"canton/link/mint",
 	semver.MustParse("0.1.0"),
 	"Mint LINK tokens on Canton",
