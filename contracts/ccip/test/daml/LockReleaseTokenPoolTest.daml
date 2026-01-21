@@ -108,6 +108,7 @@ testLockOrBurn = script do
             decimals = 6
             chainCCVRequirements = Map.empty
             poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
 
     -- Build message with token amount (5 tokens)
     let message = Client.Canton2AnyMessage with
@@ -223,6 +224,7 @@ testReleaseFromTicket = script do
             decimals = 6
             chainCCVRequirements = Map.empty
             poolReceiveContext = MetadataV1.emptyChoiceContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates)
     tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
