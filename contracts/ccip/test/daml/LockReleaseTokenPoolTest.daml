@@ -1,0 +1,280 @@
+-- | Tests for LockReleaseTokenPool lock and release flows.
+module LockReleaseTokenPoolTest where
+
+import Daml.Script
+
+import DA.Assert
+import DA.List (head)
+import DA.Map qualified as Map
+import DA.Optional
+
+import CCIP.Client qualified as Client
+import CCIP.FeeQuoter qualified as FeeQuoter
+import CCIP.Interfaces.TokenPool qualified as ITokenPool
+import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
+import CCIP.OnRamp qualified as OnRamp
+import CCIP.Tickets qualified as Tickets
+import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
+
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+
+import TestToken qualified
+
+
+-- | Test LockOrBurn transfers tokens from sender to pool.
+testLockOrBurn = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    poolOwner <- allocateParty "pool-owner"
+    sender <- allocateParty "sender"
+
+    let destChainSelector : Numeric 0 = 456.0
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    -- Deploy TokenAdminRegistry and register pool
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            instanceId = "test-tar"
+            tokenConfigs = Map.empty
+
+    tokenAdminRegistry <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+            instrumentId = testInstrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+
+    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+            instrumentId = testInstrumentId
+            caller = poolOwner
+
+    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+            instrumentId = testInstrumentId
+            optTokenPoolOwner = Some poolOwner
+            caller = poolOwner
+
+    -- Create sender's token holding (10 tokens)
+    senderHolding <- submit (actAs sender <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            owner = sender
+            admin = ccipOwner
+            instrumentId = testInstrumentId
+            amount = 10000000.0
+
+    -- Create preapproval for pool to receive tokens directly
+    poolPreapproval <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestTransferPreapproval with
+            admin = ccipOwner
+            receiver = poolOwner
+
+    -- Create TransferFactory with pool's preapproval
+    transferFactory <- submit ccipOwner do
+        createCmd TestToken.TestTransferFactory with
+            admin = ccipOwner
+            preapprovalCid = Some poolPreapproval
+
+    -- Deploy OnRamp and FeeQuoter stubs
+    onRamp <- submit ccipOwner do
+        createCmd OnRamp.OnRamp with
+            ccipOwner = ccipOwner
+            instanceId = "test-onramp"
+
+    feeQuoter <- submit ccipOwner do
+        createCmd FeeQuoter.FeeQuoter with
+            owner = ccipOwner
+            instanceId = "test-feequoter"
+            feeTokens = Map.empty
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.empty
+            priceUpdaters = []
+
+    -- Deploy LockReleaseTokenPool with empty receive context
+    -- (TestTransferFactory uses its own preapproval field, not extraArgs lookup)
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool"
+            instrumentId = testInstrumentId
+            decimals = 6
+            chainCCVRequirements = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+
+    -- Build message with token amount (5 tokens)
+    let message = Client.Canton2AnyMessage with
+            receiver = "0000000000000000000000000000000000000001"
+            payload = ""
+            feeToken = testInstrumentId
+            extraArgs = ""
+            tokenAmounts = [Client.TokenAmount with
+                instrumentId = testInstrumentId
+                amount = 5000000.0]
+
+    let tokenInput = ITokenPool.TokenInput with
+            transferFactory = toInterfaceContractId transferFactory
+            extraArgs = MetadataV1.ExtraArgs with
+                context = MetadataV1.emptyChoiceContext
+                meta = MetadataV1.emptyMetadata
+            tokenPoolHoldings = []
+
+    let feeInput = ITokenPool.FeeInput with
+            instrumentId = testInstrumentId
+            transferFactory = toInterfaceContractId transferFactory
+            extraArgs = MetadataV1.ExtraArgs with
+                context = MetadataV1.emptyChoiceContext
+                meta = MetadataV1.emptyMetadata
+            inputHoldingCids = []
+
+    -- Disclose contracts
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
+
+    -- Call LockOrBurn
+    result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
+                      <> disclose disclosedPool <> disclose disclosedTar
+                      <> disclose disclosedFactory <> disclose disclosedPreapproval) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+            destChainSelector = destChainSelector
+            message = message
+            tokenInput = tokenInput
+            feeInput = feeInput
+            senderInputCids = [toInterfaceContractId senderHolding]
+            onRampCid = onRamp
+            feeQuoterCid = feeQuoter
+            tokenAdminRegistryCid = tokenAdminRegistry
+            caller = sender
+
+    -- Verify pool received tokens (5 tokens)
+    assertMsg "Pool should have 1 holding" (length result.poolChangeCids == 1)
+    poolHolding <- queryContractId poolOwner (fromInterfaceContractId @TestToken.TestHolding (head result.poolChangeCids))
+    assertMsg "Pool holding should exist" (isSome poolHolding)
+    let poolH = fromSome poolHolding
+    poolH.amount === 5000000.0
+    poolH.owner === poolOwner
+
+    -- Verify sender got change (5 tokens)
+    assertMsg "Sender should have 1 change holding" (length result.senderChangeCids == 1)
+    senderChange <- queryContractId sender (fromInterfaceContractId @TestToken.TestHolding (head result.senderChangeCids))
+    assertMsg "Sender change should exist" (isSome senderChange)
+    let senderC = fromSome senderChange
+    senderC.amount === 5000000.0
+    senderC.owner === sender
+
+    debug "testLockOrBurn: PASSED"
+
+
+-- | Test ReleaseFromTicket transfers tokens from pool to receiver.
+testReleaseFromTicket = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    poolOwner <- allocateParty "pool-owner"
+    receiver <- allocateParty "receiver"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    -- Create pool's token holding (10 tokens)
+    poolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            owner = poolOwner
+            admin = ccipOwner
+            instrumentId = testInstrumentId
+            amount = 10000000.0
+
+    -- Create preapproval for receiver
+    receiverPreapproval <- submit (actAs receiver <> actAs ccipOwner) do
+        createCmd TestToken.TestTransferPreapproval with
+            admin = ccipOwner
+            receiver = receiver
+
+    -- Create TransferFactory with receiver's preapproval
+    transferFactory <- submit ccipOwner do
+        createCmd TestToken.TestTransferFactory with
+            admin = ccipOwner
+            preapprovalCid = Some receiverPreapproval
+
+    -- Deploy TokenAdminRegistry
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            instanceId = "test-tar"
+            tokenConfigs = Map.empty
+
+    -- Deploy LockReleaseTokenPool
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool"
+            instrumentId = testInstrumentId
+            decimals = 6
+            chainCCVRequirements = Map.empty
+            poolReceiveContext = MetadataV1.emptyChoiceContext
+
+    -- Create TokenReceiveTicket (simulating what OffRamp creates)
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
+        createCmd Tickets.TokenReceiveTicket with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = 3000000.0
+            messageHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            sourceChainSelector = sourceChainSelector
+
+    let tokenInput = ITokenPool.TokenInput with
+            transferFactory = toInterfaceContractId transferFactory
+            extraArgs = MetadataV1.ExtraArgs with
+                context = MetadataV1.emptyChoiceContext
+                meta = MetadataV1.emptyMetadata
+            tokenPoolHoldings = [toInterfaceContractId poolHolding]
+
+    -- Disclose contracts
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+
+    -- Call ReleaseFromTicket
+    result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
+                      <> disclose disclosedTar <> disclose disclosedFactory
+                      <> disclose disclosedPreapproval) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            tokenInput = tokenInput
+            caller = receiver
+
+    -- Verify result is completed
+    case result.output of
+        ITokenPool.ReleaseOrMintResult_Completed receiverCids -> do
+            assertMsg "Receiver should have 1 holding" (length receiverCids == 1)
+            receiverHolding <- queryContractId receiver (fromInterfaceContractId @TestToken.TestHolding (head receiverCids))
+            assertMsg "Receiver holding should exist" (isSome receiverHolding)
+            let receiverH = fromSome receiverHolding
+            receiverH.amount === 3000000.0
+            receiverH.owner === receiver
+        _ -> abort "Expected completed result"
+
+    -- Verify pool got change (7 tokens)
+    assertMsg "Pool should have 1 change holding" (length result.poolChangeCids == 1)
+    poolChange <- queryContractId poolOwner (fromInterfaceContractId @TestToken.TestHolding (head result.poolChangeCids))
+    assertMsg "Pool change should exist" (isSome poolChange)
+    let poolC = fromSome poolChange
+    poolC.amount === 7000000.0
+    poolC.owner === poolOwner
+
+    debug "testReleaseFromTicket: PASSED"
