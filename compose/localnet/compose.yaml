@@ -28,8 +28,6 @@ services:
       - postgres
       - -c
       - max_connections=1000
-      - -c
-      - log_statement=all
 
   canton:
     image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}"
@@ -55,10 +53,25 @@ services:
         condition: service_healthy
     restart: always
     ports:
-    - 1101:1101
-    - 1201:1201
-    - 1301:1301
-  
+      # Participant 0 (SV)
+      - 1200:1200  # Admin API
+      - 1300:1300  # Ledger API
+      # Participant 1
+      - 1201:1201  # Admin API
+      - 1301:1301  # Ledger API
+      # Participant 2
+      - 1202:1202  # Admin API
+      - 1302:1302  # Ledger API
+      # Participant 3
+      - 1203:1203  # Admin API
+      - 1303:1303  # Ledger API
+      # Participant 4
+      - 1204:1204  # Admin API
+      - 1304:1304  # Ledger API
+      # Participant 5
+      - 1205:1205  # Admin API
+      - 1305:1305  # Ledger API
+
   splice:
     image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-app:${SPLICE_VERSION}"
     container_name: splice
@@ -84,6 +97,15 @@ services:
       canton:
         condition: service_healthy
     restart: always
+    ports:
+      - 5012:5012  # Scan registry
+      # Validator Admin APIs
+      - 2200:2200  # SV
+      - 2201:2201  # Participant 1
+      - 2202:2202  # Participant 2
+      - 2203:2203  # Participant 3
+      - 2204:2204  # Participant 4
+      - 2205:2205  # Participant 5
 
   nginx:
     image: "nginx:1.27.0"
