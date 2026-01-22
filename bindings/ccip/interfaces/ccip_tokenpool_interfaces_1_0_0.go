@@ -235,8 +235,7 @@ func (t *ReleaseOrMintResultCompleted) UnmarshalJSON(data []byte) error {
 
 // ReleaseOrMintResultOutput is a variant/union type
 type ReleaseOrMintResultOutput struct {
-	ReleaseOrMintResultPending *ReleaseOrMintResultPending `json:"ReleaseOrMintResult_Pending,omitempty"`
-
+	ReleaseOrMintResultPending   *ReleaseOrMintResultPending   `json:"ReleaseOrMintResult_Pending,omitempty"`
 	ReleaseOrMintResultCompleted *ReleaseOrMintResultCompleted `json:"ReleaseOrMintResult_Completed,omitempty"`
 }
 

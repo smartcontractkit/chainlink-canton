@@ -54,7 +54,7 @@ jobs:
           echo "Building godaml from source..."
           git clone --depth 1 https://github.com/stackman27/go-daml.git /tmp/go-daml
           cd /tmp/go-daml
-          git checkout 88bca2d21f5f6f6bbee699dc5f7c6c0798f1d863
+          git checkout d578c8e7c5e5577dd289b5baafbc4d3bdd2cd80d
 
           MAIN_DIRS="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | sed '/^$/d' || true)"
           MAIN_DIR="$(echo "$MAIN_DIRS" | grep -E '/cmd/|/cli/' | head -n 1 || true)"

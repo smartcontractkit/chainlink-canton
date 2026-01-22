@@ -118,8 +118,7 @@ func (t *APSetConfig) UnmarshalJSON(data []byte) error {
 
 // AdminParams is a variant/union type
 type AdminParams struct {
-	APSetConfig *SET `json:"AP_SetConfig,omitempty"`
-
+	APSetConfig *SET  `json:"AP_SetConfig,omitempty"`
 	APClearRoot *UNIT `json:"AP_ClearRoot,omitempty"`
 }
 
@@ -188,15 +187,11 @@ func (t *ArchiveMCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 
 // ArgValue is a variant/union type
 type ArgValue struct {
-	AVText *TEXT `json:"AV_Text,omitempty"`
-
-	AVInt *INT64 `json:"AV_Int,omitempty"`
-
-	AVBool *BOOL `json:"AV_Bool,omitempty"`
-
-	AVParty *PARTY `json:"AV_Party,omitempty"`
-
-	AVTime *TIMESTAMP `json:"AV_Time,omitempty"`
+	AVText  *TEXT      `json:"AV_Text,omitempty"`
+	AVInt   *INT64     `json:"AV_Int,omitempty"`
+	AVBool  *BOOL      `json:"AV_Bool,omitempty"`
+	AVParty *PARTY     `json:"AV_Party,omitempty"`
+	AVTime  *TIMESTAMP `json:"AV_Time,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for ArgValue

@@ -75,6 +75,24 @@ func TestDeployCCIPContracts(t *testing.T) {
 	})
 
 	// --------------------------
+	// Test Committee Verifier Deployment
+	// --------------------------
+	t.Run("DeployCommitteeVerifier", func(t *testing.T) {
+		result, err := cld_ops.ExecuteOperation(bundle, DeployCommitteeVerifierOp, deps, DeployCommitteeVerifierInput{
+			InstanceID:          instanceID,
+			VersionTag:          "1.0.0",
+			StorageLocation:     "ipfs://test-ccv",
+			Threshold:           2,
+			Signers:             []string{"signer1", "signer2", "signer3"},
+			MessageSentObserver: "", // Will default to deployer party
+		})
+		require.NoError(t, err, "failed to deploy CommitteeVerifier")
+		require.NotEmpty(t, result.Output.Output.CommitteeVerifierContractID, "CommitteeVerifier contract ID should not be empty")
+		require.NotEmpty(t, result.Output.Output.CommitteeVerifierTemplateID, "CommitteeVerifier template ID should not be empty")
+		t.Logf("Deployed CommitteeVerifier contract ID: %s", result.Output.Output.CommitteeVerifierContractID)
+	})
+
+	// --------------------------
 	// Test Fee Quoter Deployment
 	// --------------------------
 	t.Run("DeployFeeQuoter", func(t *testing.T) {

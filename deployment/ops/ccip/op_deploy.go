@@ -13,6 +13,7 @@ import (
 	"github.com/noders-team/go-daml/pkg/types"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/offramp"
@@ -243,6 +244,118 @@ var deployTokenAdminRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, 
 		Output: DeployTokenAdminRegistryOutput{
 			TokenAdminRegistryContractID: tokenAdminRegistryContractID,
 			TokenAdminRegistryTemplateID: tokenAdminRegistryTemplateID,
+		},
+	}, nil
+}
+
+// ============================================================================
+// Committee Verifier Operations
+// ============================================================================
+
+// DeployCommitteeVerifierInput contains input for deploying CommitteeVerifier
+type DeployCommitteeVerifierInput struct {
+	InstanceID          string
+	VersionTag          string
+	StorageLocation     string
+	Threshold           int64
+	Signers             []string
+	MessageSentObserver string // Optional, defaults to deployer party
+}
+
+// DeployCommitteeVerifierOutput contains the deployed contract ID
+type DeployCommitteeVerifierOutput struct {
+	CommitteeVerifierContractID string
+	CommitteeVerifierTemplateID string
+}
+
+var deployCommitteeVerifierHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input DeployCommitteeVerifierInput) (output CantonOpResult[DeployCommitteeVerifierOutput], err error) {
+	ctx := b.GetContext()
+
+	// Get and upload CCIP CommitteeVerifier package
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
+	if err != nil {
+		return CantonOpResult[DeployCommitteeVerifierOutput]{}, fmt.Errorf("failed to get DAR for package %s: %w", contracts.CCIPCommitteeVerifier, err)
+	}
+
+	submissionID := "validate-" + time.Now().Format("20060102150405")
+	err = deps.BindingClient.PackageMng.ValidateDarFile(ctx, committeeVerifierDar, submissionID)
+	if err != nil {
+		return CantonOpResult[DeployCommitteeVerifierOutput]{}, fmt.Errorf("failed to validate DAR file: %w", err)
+	}
+	uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
+	err = deps.BindingClient.PackageMng.UploadDarFile(ctx, committeeVerifierDar, uploadSubmissionID)
+	if err != nil {
+		return CantonOpResult[DeployCommitteeVerifierOutput]{}, fmt.Errorf("failed to upload DAR file: %w", err)
+	}
+
+	// Determine message sent observer (default to deployer party if not provided)
+	messageSentObserver := input.MessageSentObserver
+	if messageSentObserver == "" {
+		messageSentObserver = deps.Party
+	}
+
+	// Convert signers to TEXT slice
+	signers := make([]types.TEXT, len(input.Signers))
+	for i, signer := range input.Signers {
+		signers[i] = types.TEXT(signer)
+	}
+
+	// Create CommitteeVerifier contract
+	committeeVerifier := ccvs.CommitteeVerifier{
+		Owner:               types.PARTY(deps.Party),
+		InstanceId:          types.TEXT(input.InstanceID),
+		CcipOwner:           types.PARTY(deps.Party),
+		VersionTag:          types.TEXT(input.VersionTag),
+		MessageSentObserver: types.PARTY(messageSentObserver),
+		StorageLocation:     types.TEXT(input.StorageLocation),
+		Threshold:           types.INT64(input.Threshold),
+		Signers:             signers,
+	}
+
+	// Submit via binding client's CommandService
+	commandID := uuid.Must(uuid.NewUUID()).String()
+	cmds := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID: "ccip-committeeverifier-deploy",
+			UserID:     deps.UserID,
+			CommandID:  commandID,
+			ActAs:      []string{deps.Party},
+			Commands:   []*model.Command{{Command: committeeVerifier.CreateCommand()}},
+		},
+	}
+
+	submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(ctx, cmds)
+	if err != nil {
+		return CantonOpResult[DeployCommitteeVerifierOutput]{}, fmt.Errorf("failed to submit CommitteeVerifier creation: %w", err)
+	}
+
+	// Retrieve the contract ID and template ID from the create event
+	committeeVerifierContractID := ""
+	committeeVerifierTemplateID := ""
+	for _, event := range submitResp.Transaction.Events {
+		if event.Created == nil {
+			continue
+		}
+
+		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
+		if normalizedTemplateID == "CCIP.CommitteeVerifier:CommitteeVerifier" {
+			committeeVerifierContractID = event.Created.ContractID
+			committeeVerifierTemplateID = event.Created.TemplateID
+			break
+		}
+	}
+
+	if committeeVerifierContractID == "" {
+		return CantonOpResult[DeployCommitteeVerifierOutput]{}, fmt.Errorf("failed to find CommitteeVerifier contract in transaction events")
+	}
+
+	fmt.Printf("Deployed CommitteeVerifier contract   id=%s\n", committeeVerifierContractID)
+
+	return CantonOpResult[DeployCommitteeVerifierOutput]{
+		TransactionID: commandID,
+		Output: DeployCommitteeVerifierOutput{
+			CommitteeVerifierContractID: committeeVerifierContractID,
+			CommitteeVerifierTemplateID: committeeVerifierTemplateID,
 		},
 	}, nil
 }
@@ -628,6 +741,13 @@ var DeployTokenAdminRegistryOp = cld_ops.NewOperation(
 	semver.MustParse("0.1.0"),
 	"Deploys the CCIP TokenAdminRegistry contract on Canton",
 	deployTokenAdminRegistryHandler,
+)
+
+var DeployCommitteeVerifierOp = cld_ops.NewOperation(
+	"canton/ccip/committeeverifier/deploy",
+	semver.MustParse("0.1.0"),
+	"Deploys the CCIP CommitteeVerifier contract on Canton",
+	deployCommitteeVerifierHandler,
 )
 
 var DeployFeeQuoterOp = cld_ops.NewOperation(

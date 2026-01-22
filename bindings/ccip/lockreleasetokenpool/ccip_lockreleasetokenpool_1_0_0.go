@@ -594,8 +594,7 @@ func (t *LockReleaseTokenPoolVerifyCCVs) UnmarshalJSON(data []byte) error {
 
 // TransferTimeout is a variant/union type
 type TransferTimeout struct {
-	Indefinite *UNIT `json:"Indefinite,omitempty"`
-
+	Indefinite    *UNIT  `json:"Indefinite,omitempty"`
 	RelativeHours *INT64 `json:"RelativeHours,omitempty"`
 }
 

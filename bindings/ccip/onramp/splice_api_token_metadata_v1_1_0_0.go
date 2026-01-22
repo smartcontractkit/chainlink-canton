@@ -47,27 +47,17 @@ func (t *AnyContractView) UnmarshalJSON(data []byte) error {
 
 // AnyValue is a variant/union type
 type AnyValue struct {
-	AVText *TEXT `json:"AV_Text,omitempty"`
-
-	AVInt *INT64 `json:"AV_Int,omitempty"`
-
-	AVDecimal *NUMERIC `json:"AV_Decimal,omitempty"`
-
-	AVBool *BOOL `json:"AV_Bool,omitempty"`
-
-	AVDate *DATE `json:"AV_Date,omitempty"`
-
-	AVTime *TIMESTAMP `json:"AV_Time,omitempty"`
-
-	AVRelTime *RELTIME `json:"AV_RelTime,omitempty"`
-
-	AVParty *PARTY `json:"AV_Party,omitempty"`
-
+	AVText       *TEXT        `json:"AV_Text,omitempty"`
+	AVInt        *INT64       `json:"AV_Int,omitempty"`
+	AVDecimal    *NUMERIC     `json:"AV_Decimal,omitempty"`
+	AVBool       *BOOL        `json:"AV_Bool,omitempty"`
+	AVDate       *DATE        `json:"AV_Date,omitempty"`
+	AVTime       *TIMESTAMP   `json:"AV_Time,omitempty"`
+	AVRelTime    *RELTIME     `json:"AV_RelTime,omitempty"`
+	AVParty      *PARTY       `json:"AV_Party,omitempty"`
 	AVContractId *CONTRACT_ID `json:"AV_ContractId,omitempty"`
-
-	AVList *[]AnyValue `json:"AV_List,omitempty"`
-
-	AVMap *TEXTMAP `json:"AV_Map,omitempty"`
+	AVList       *[]AnyValue  `json:"AV_List,omitempty"`
+	AVMap        *TEXTMAP     `json:"AV_Map,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for AnyValue

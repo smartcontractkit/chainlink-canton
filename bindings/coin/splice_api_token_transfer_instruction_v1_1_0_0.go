@@ -307,11 +307,9 @@ func (t *TransferInstructionResultCompleted) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionResultOutput is a variant/union type
 type TransferInstructionResultOutput struct {
-	TransferInstructionResultPending *TransferInstructionResultPending `json:"TransferInstructionResult_Pending,omitempty"`
-
+	TransferInstructionResultPending   *TransferInstructionResultPending   `json:"TransferInstructionResult_Pending,omitempty"`
 	TransferInstructionResultCompleted *TransferInstructionResultCompleted `json:"TransferInstructionResult_Completed,omitempty"`
-
-	TransferInstructionResultFailed *UNIT `json:"TransferInstructionResult_Failed,omitempty"`
+	TransferInstructionResultFailed    *UNIT                               `json:"TransferInstructionResult_Failed,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for TransferInstructionResultOutput
@@ -396,9 +394,8 @@ func (t *TransferInstructionResultPending) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionStatus is a variant/union type
 type TransferInstructionStatus struct {
-	TransferPendingReceiverAcceptance *UNIT `json:"TransferPendingReceiverAcceptance,omitempty"`
-
-	TransferPendingInternalWorkflow *TransferPendingInternalWorkflow `json:"TransferPendingInternalWorkflow,omitempty"`
+	TransferPendingReceiverAcceptance *UNIT                            `json:"TransferPendingReceiverAcceptance,omitempty"`
+	TransferPendingInternalWorkflow   *TransferPendingInternalWorkflow `json:"TransferPendingInternalWorkflow,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for TransferInstructionStatus
