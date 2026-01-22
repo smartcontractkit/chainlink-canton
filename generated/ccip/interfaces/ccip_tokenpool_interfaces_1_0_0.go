@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "4c09d18cf98fd6d5c174a951ffff4fc580fa1aa96f1897e755ba603d80e4cc98"
+const PackageID = "e3e5bc3d80f265d41e4e9bd293f695460d94ed8d2364bd80a625ecf3e1f725fa"
 const SDKVersion = "3.4.8"
 
 type Template interface {
@@ -34,8 +34,11 @@ type IITokenPool interface {
 	// TokenPoolGetRequiredCCVs executes the TokenPool_GetRequiredCCVs choice
 	TokenPoolGetRequiredCCVs(contractID string, args TokenPoolGetRequiredCCVs) *model.ExerciseCommand
 
-	// TokenPoolReleaseOrMint executes the TokenPool_ReleaseOrMint choice
-	TokenPoolReleaseOrMint(contractID string, args TokenPoolReleaseOrMint) *model.ExerciseCommand
+	// TokenPoolVerifyCCVs executes the TokenPool_VerifyCCVs choice
+	TokenPoolVerifyCCVs(contractID string, args TokenPoolVerifyCCVs) *model.ExerciseCommand
+
+	// TokenPoolReleaseFromTicket executes the TokenPool_ReleaseFromTicket choice
+	TokenPoolReleaseFromTicket(contractID string, args TokenPoolReleaseFromTicket) *model.ExerciseCommand
 
 	// TokenPoolLockOrBurn executes the TokenPool_LockOrBurn choice
 	TokenPoolLockOrBurn(contractID string, args TokenPoolLockOrBurn) *model.ExerciseCommand
@@ -408,20 +411,32 @@ func (t *TokenPoolView) UnmarshalJSON(data []byte) error {
 
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
-	Message MessageV1 `json:"message"`
-	Caller  PARTY     `json:"caller"`
+	RemoteChainSelector NUMERIC           `json:"remoteChainSelector"`
+	Amount              NUMERIC           `json:"amount"`
+	Finality            INT64             `json:"finality"`
+	ExtraData           TEXT              `json:"extraData"`
+	Direction           TransferDirection `json:"direction"`
+	Caller              PARTY             `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
 func (t TokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["message"] = func() interface{} {
+	m["remoteChainSelector"] = (*big.Int)(t.RemoteChainSelector)
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["finality"] = int64(t.Finality)
+
+	m["extraData"] = string(t.ExtraData)
+
+	m["direction"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Message).(mapper); ok {
+		if m, ok := any(t.Direction).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Message
+		return t.Direction
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -533,53 +548,24 @@ func (t *TokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// TokenPoolReleaseOrMint is a Record type
-type TokenPoolReleaseOrMint struct {
-	EncodedMessage        TEXT          `json:"encodedMessage"`
-	Ccvs                  []CONTRACT_ID `json:"ccvs"`
-	CcvData               []TEXT        `json:"ccvData"`
-	TokenInput            TokenInput    `json:"tokenInput"`
-	OffRampCid            CONTRACT_ID   `json:"offRampCid"`
-	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	Caller                PARTY         `json:"caller"`
+// TokenPoolReleaseFromTicket is a Record type
+type TokenPoolReleaseFromTicket struct {
+	TokenReceiveTicketCid CONTRACT_ID `json:"tokenReceiveTicketCid"`
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+	TokenInput            TokenInput  `json:"tokenInput"`
+	Caller                PARTY       `json:"caller"`
 }
 
-// ToMap converts TokenPoolReleaseOrMint to a map for DAML arguments
-func (t TokenPoolReleaseOrMint) ToMap() map[string]interface{} {
+// ToMap converts TokenPoolReleaseFromTicket to a map for DAML arguments
+func (t TokenPoolReleaseFromTicket) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["encodedMessage"] = string(t.EncodedMessage)
-
-	m["ccvs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Ccvs))
-		for _, e := range t.Ccvs {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["ccvData"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CcvData))
-		for _, e := range t.CcvData {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	m["tokenInput"] = func() interface{} {
+	m["tokenReceiveTicketCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TokenInput).(mapper); ok {
+		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.TokenInput
-	}()
-
-	m["offRampCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.OffRampCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.OffRampCid
+		return t.TokenReceiveTicketCid
 	}()
 
 	m["tokenAdminRegistryCid"] = func() interface{} {
@@ -590,22 +576,110 @@ func (t TokenPoolReleaseOrMint) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
+	m["tokenInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
 	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPoolReleaseOrMint using JsonCodec
-func (t TokenPoolReleaseOrMint) MarshalJSON() ([]byte, error) {
+// MarshalJSON implements custom JSON marshaling for TokenPoolReleaseFromTicket using JsonCodec
+func (t TokenPoolReleaseFromTicket) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolReleaseOrMint using JsonCodec
-func (t *TokenPoolReleaseOrMint) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolReleaseFromTicket using JsonCodec
+func (t *TokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
+
+// TokenPoolVerifyCCVs is a Record type
+type TokenPoolVerifyCCVs struct {
+	CcvVerifyTickets    []CONTRACT_ID `json:"ccvVerifyTickets"`
+	MessageHash         TEXT          `json:"messageHash"`
+	SourceChainSelector NUMERIC       `json:"sourceChainSelector"`
+	Amount              NUMERIC       `json:"amount"`
+	Receiver            PARTY         `json:"receiver"`
+	Caller              PARTY         `json:"caller"`
+}
+
+// ToMap converts TokenPoolVerifyCCVs to a map for DAML arguments
+func (t TokenPoolVerifyCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["ccvVerifyTickets"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.CcvVerifyTickets))
+		for _, e := range t.CcvVerifyTickets {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["messageHash"] = string(t.MessageHash)
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for TokenPoolVerifyCCVs using JsonCodec
+func (t TokenPoolVerifyCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolVerifyCCVs using JsonCodec
+func (t *TokenPoolVerifyCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// TransferDirection is an enum type
+type TransferDirection string
+
+const (
+	TransferDirectionOutbound TransferDirection = "Outbound"
+	TransferDirectionInbound  TransferDirection = "Inbound"
+)
+
+// GetEnumConstructor implements types.ENUM interface
+func (e TransferDirection) GetEnumConstructor() string {
+	return string(e)
+}
+
+// GetEnumTypeID implements types.ENUM interface
+func (e TransferDirection) GetEnumTypeID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.Interfaces.TokenPool", "TransferDirection")
+}
+
+// MarshalJSON implements custom JSON marshaling for TransferDirection using JsonCodec
+func (e TransferDirection) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(e)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for TransferDirection using JsonCodec
+func (e *TransferDirection) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, e)
+}
+
+// Verify interface implementation
+var _ ENUM = TransferDirection("")
 
 // IITokenPoolInterfaceID returns the interface ID for the IITokenPool interface
 func IITokenPoolInterfaceID(packageID *string) string {

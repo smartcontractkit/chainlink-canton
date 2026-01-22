@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "55733e4d68576e48d6c41df0ddaf8114075122b541f03f3c154ccbef995655e4"
+const PackageID = "ec822b93a813e44ee650697b2ebbd82ace82446127731cfe9a1962e0ce050988"
 const SDKVersion = "3.4.8"
 
 type Template interface {
@@ -48,13 +48,57 @@ func argsToMap(args interface{}) map[string]interface{} {
 	}
 }
 
+// ChainCCVConfig is a Record type
+type ChainCCVConfig struct {
+	InboundCCVs  []TEXT `json:"inboundCCVs"`
+	OutboundCCVs []TEXT `json:"outboundCCVs"`
+}
+
+// ToMap converts ChainCCVConfig to a map for DAML arguments
+func (t ChainCCVConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["inboundCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.InboundCCVs))
+		for _, e := range t.InboundCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["outboundCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.OutboundCCVs))
+		for _, e := range t.OutboundCCVs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for ChainCCVConfig using JsonCodec
+func (t ChainCCVConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for ChainCCVConfig using JsonCodec
+func (t *ChainCCVConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	CcipOwner    PARTY         `json:"ccipOwner"`
-	PoolOwner    PARTY         `json:"poolOwner"`
-	InstrumentId InstrumentId  `json:"instrumentId"`
-	Decimals     INT64         `json:"decimals"`
-	RequiredCCVs []CONTRACT_ID `json:"requiredCCVs"`
+	CcipOwner            PARTY           `json:"ccipOwner"`
+	PoolOwner            PARTY           `json:"poolOwner"`
+	InstanceId           TEXT            `json:"instanceId"`
+	InstrumentId         InstrumentId    `json:"instrumentId"`
+	Decimals             INT64           `json:"decimals"`
+	ChainCCVRequirements GENMAP          `json:"chainCCVRequirements"`
+	PoolReceiveContext   ChoiceContext   `json:"poolReceiveContext"`
+	TransferTimeout      TransferTimeout `json:"transferTimeout"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -70,6 +114,8 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 
 	args["poolOwner"] = t.PoolOwner.ToMap()
 
+	args["instanceId"] = string(t.InstanceId)
+
 	args["instrumentId"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
@@ -80,15 +126,25 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 
 	args["decimals"] = int64(t.Decimals)
 
-	if len(t.RequiredCCVs) > 0 {
-		args["requiredCCVs"] = func() []interface{} {
-			res := make([]interface{}, 0, len(t.RequiredCCVs))
-			for _, e := range t.RequiredCCVs {
-				res = append(res, e)
-			}
-			return res
-		}()
+	if t.ChainCCVRequirements != nil && len(t.ChainCCVRequirements) > 0 {
+		args["chainCCVRequirements"] = map[string]interface{}{"_type": "genmap", "value": t.ChainCCVRequirements}
 	}
+
+	args["poolReceiveContext"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.PoolReceiveContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PoolReceiveContext
+	}()
+
+	args["transferTimeout"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TransferTimeout).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TransferTimeout
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -110,6 +166,46 @@ func (t *LockReleaseTokenPool) UnmarshalJSON(data []byte) error {
 
 // Choice methods for LockReleaseTokenPool
 
+// LockReleaseTokenPoolLockOrBurn exercises the LockReleaseTokenPool_LockOrBurn choice on this LockReleaseTokenPool contract
+func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurn(contractID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_LockOrBurn",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolReleaseFromTicket exercises the LockReleaseTokenPool_ReleaseFromTicket choice on this LockReleaseTokenPool contract
+func (t LockReleaseTokenPool) LockReleaseTokenPoolReleaseFromTicket(contractID string, args LockReleaseTokenPoolReleaseFromTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_ReleaseFromTicket",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolGetRequiredCCVs exercises the LockReleaseTokenPool_GetRequiredCCVs choice on this LockReleaseTokenPool contract
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVs(contractID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolVerifyCCVs exercises the LockReleaseTokenPool_VerifyCCVs choice on this LockReleaseTokenPool contract
+func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyCCVs(contractID string, args LockReleaseTokenPoolVerifyCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_VerifyCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Archive exercises the Archive choice on this LockReleaseTokenPool contract
 func (t LockReleaseTokenPool) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -120,12 +216,12 @@ func (t LockReleaseTokenPool) Archive(contractID string) *model.ExerciseCommand 
 	}
 }
 
-// LockReleaseTokenPoolGetRequiredCCVs exercises the LockReleaseTokenPool_GetRequiredCCVs choice on this LockReleaseTokenPool contract
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVs(contractID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+// LockReleaseTokenPoolUpdateChainCCVRequirements exercises the LockReleaseTokenPool_UpdateChainCCVRequirements choice on this LockReleaseTokenPool contract
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainCCVRequirements(contractID string, args LockReleaseTokenPoolUpdateChainCCVRequirements) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Choice:     "LockReleaseTokenPool_UpdateChainCCVRequirements",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -140,12 +236,22 @@ func (t LockReleaseTokenPool) TokenPoolGetRequiredCCVs(contractID string, args T
 	}
 }
 
-// TokenPoolReleaseOrMint exercises the TokenPool_ReleaseOrMint choice on this LockReleaseTokenPool contract via the IITokenPool interface
-func (t LockReleaseTokenPool) TokenPoolReleaseOrMint(contractID string, args TokenPoolReleaseOrMint) *model.ExerciseCommand {
+// TokenPoolVerifyCCVs exercises the TokenPool_VerifyCCVs choice on this LockReleaseTokenPool contract via the IITokenPool interface
+func (t LockReleaseTokenPool) TokenPoolVerifyCCVs(contractID string, args TokenPoolVerifyCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
 		ContractID: contractID,
-		Choice:     "TokenPool_ReleaseOrMint",
+		Choice:     "TokenPool_VerifyCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenPoolReleaseFromTicket exercises the TokenPool_ReleaseFromTicket choice on this LockReleaseTokenPool contract via the IITokenPool interface
+func (t LockReleaseTokenPool) TokenPoolReleaseFromTicket(contractID string, args TokenPoolReleaseFromTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
+		ContractID: contractID,
+		Choice:     "TokenPool_ReleaseFromTicket",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -166,20 +272,32 @@ var _ IITokenPool = (*LockReleaseTokenPool)(nil)
 
 // LockReleaseTokenPoolGetRequiredCCVs is a Record type
 type LockReleaseTokenPoolGetRequiredCCVs struct {
-	Message MessageV1 `json:"message"`
-	Caller  PARTY     `json:"caller"`
+	RemoteChainSelector NUMERIC           `json:"remoteChainSelector"`
+	Amount              NUMERIC           `json:"amount"`
+	Finality            INT64             `json:"finality"`
+	ExtraData           TEXT              `json:"extraData"`
+	Direction           TransferDirection `json:"direction"`
+	Caller              PARTY             `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolGetRequiredCCVs to a map for DAML arguments
 func (t LockReleaseTokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["message"] = func() interface{} {
+	m["remoteChainSelector"] = (*big.Int)(t.RemoteChainSelector)
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["finality"] = int64(t.Finality)
+
+	m["extraData"] = string(t.ExtraData)
+
+	m["direction"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Message).(mapper); ok {
+		if m, ok := any(t.Direction).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Message
+		return t.Direction
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -198,3 +316,270 @@ func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
+
+// LockReleaseTokenPoolLockOrBurn is a Record type
+type LockReleaseTokenPoolLockOrBurn struct {
+	DestChainSelector     NUMERIC           `json:"destChainSelector"`
+	Message               Canton2AnyMessage `json:"message"`
+	TokenInput            TokenInput        `json:"tokenInput"`
+	FeeInput              FeeInput          `json:"feeInput"`
+	SenderInputCids       []CONTRACT_ID     `json:"senderInputCids"`
+	OnRampCid             CONTRACT_ID       `json:"onRampCid"`
+	FeeQuoterCid          CONTRACT_ID       `json:"feeQuoterCid"`
+	TokenAdminRegistryCid CONTRACT_ID       `json:"tokenAdminRegistryCid"`
+	Caller                PARTY             `json:"caller"`
+}
+
+// ToMap converts LockReleaseTokenPoolLockOrBurn to a map for DAML arguments
+func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+
+	m["message"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
+
+	m["tokenInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
+	m["feeInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeInput
+	}()
+
+	m["senderInputCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.SenderInputCids))
+		for _, e := range t.SenderInputCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["onRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OnRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRampCid
+	}()
+
+	m["feeQuoterCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for LockReleaseTokenPoolLockOrBurn using JsonCodec
+func (t LockReleaseTokenPoolLockOrBurn) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for LockReleaseTokenPoolLockOrBurn using JsonCodec
+func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// LockReleaseTokenPoolReleaseFromTicket is a Record type
+type LockReleaseTokenPoolReleaseFromTicket struct {
+	TokenReceiveTicketCid CONTRACT_ID `json:"tokenReceiveTicketCid"`
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+	TokenInput            TokenInput  `json:"tokenInput"`
+	Caller                PARTY       `json:"caller"`
+}
+
+// ToMap converts LockReleaseTokenPoolReleaseFromTicket to a map for DAML arguments
+func (t LockReleaseTokenPoolReleaseFromTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["tokenReceiveTicketCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenReceiveTicketCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["tokenInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInput
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for LockReleaseTokenPoolReleaseFromTicket using JsonCodec
+func (t LockReleaseTokenPoolReleaseFromTicket) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for LockReleaseTokenPoolReleaseFromTicket using JsonCodec
+func (t *LockReleaseTokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// LockReleaseTokenPoolUpdateChainCCVRequirements is a Record type
+type LockReleaseTokenPoolUpdateChainCCVRequirements struct {
+	NewChainCCVRequirements GENMAP `json:"newChainCCVRequirements"`
+}
+
+// ToMap converts LockReleaseTokenPoolUpdateChainCCVRequirements to a map for DAML arguments
+func (t LockReleaseTokenPoolUpdateChainCCVRequirements) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["newChainCCVRequirements"] = map[string]interface{}{"_type": "genmap", "value": t.NewChainCCVRequirements}
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for LockReleaseTokenPoolUpdateChainCCVRequirements using JsonCodec
+func (t LockReleaseTokenPoolUpdateChainCCVRequirements) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for LockReleaseTokenPoolUpdateChainCCVRequirements using JsonCodec
+func (t *LockReleaseTokenPoolUpdateChainCCVRequirements) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// LockReleaseTokenPoolVerifyCCVs is a Record type
+type LockReleaseTokenPoolVerifyCCVs struct {
+	CcvVerifyTickets    []CONTRACT_ID `json:"ccvVerifyTickets"`
+	MessageHash         TEXT          `json:"messageHash"`
+	SourceChainSelector NUMERIC       `json:"sourceChainSelector"`
+	Amount              NUMERIC       `json:"amount"`
+	Receiver            PARTY         `json:"receiver"`
+	Caller              PARTY         `json:"caller"`
+}
+
+// ToMap converts LockReleaseTokenPoolVerifyCCVs to a map for DAML arguments
+func (t LockReleaseTokenPoolVerifyCCVs) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["ccvVerifyTickets"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.CcvVerifyTickets))
+		for _, e := range t.CcvVerifyTickets {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["messageHash"] = string(t.MessageHash)
+
+	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for LockReleaseTokenPoolVerifyCCVs using JsonCodec
+func (t LockReleaseTokenPoolVerifyCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for LockReleaseTokenPoolVerifyCCVs using JsonCodec
+func (t *LockReleaseTokenPoolVerifyCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// TransferTimeout is a variant/union type
+type TransferTimeout struct {
+	Indefinite    *UNIT  `json:"Indefinite,omitempty"`
+	RelativeHours *INT64 `json:"RelativeHours,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for TransferTimeout
+func (v TransferTimeout) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for TransferTimeout
+func (v *TransferTimeout) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v TransferTimeout) GetVariantTag() string {
+
+	if v.Indefinite != nil {
+		return "Indefinite"
+	}
+
+	if v.RelativeHours != nil {
+		return "RelativeHours"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v TransferTimeout) GetVariantValue() interface{} {
+
+	if v.Indefinite != nil {
+		return v.Indefinite
+	}
+
+	if v.RelativeHours != nil {
+		return v.RelativeHours
+	}
+
+	return nil
+}
+
+// Verify interface implementation
+var _ VARIANT = (*TransferTimeout)(nil)

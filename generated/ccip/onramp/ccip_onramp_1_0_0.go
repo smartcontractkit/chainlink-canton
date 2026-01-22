@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "ed1eefadf552def2759f144fa5cfe12ef3fa193ce096a352dee0f00c5817c770"
+const PackageID = "761fb4ac7f48a6a6f20df94b022c019a76bf2299769f520a26c7b8bfaf94df16"
 const SDKVersion = "3.4.8"
 
 type Template interface {
@@ -133,12 +133,13 @@ func (t *CCIPSendFromRouter) UnmarshalJSON(data []byte) error {
 
 // CCIPSendFromRouterResult is a Record type
 type CCIPSendFromRouterResult struct {
-	MessageId            TEXT    `json:"messageId"`
-	EncodedMessage       TEXT    `json:"encodedMessage"`
-	NewSequenceNumber    NUMERIC `json:"newSequenceNumber"`
-	DestChainSelector    NUMERIC `json:"destChainSelector"`
-	VerifierBlobs        []TEXT  `json:"verifierBlobs"`
-	MessageSentObservers []PARTY `json:"messageSentObservers"`
+	MessageId            TEXT      `json:"messageId"`
+	EncodedMessage       TEXT      `json:"encodedMessage"`
+	NewSequenceNumber    NUMERIC   `json:"newSequenceNumber"`
+	DestChainSelector    NUMERIC   `json:"destChainSelector"`
+	VerifierBlobs        []TEXT    `json:"verifierBlobs"`
+	MessageSentObservers []PARTY   `json:"messageSentObservers"`
+	Receipts             []Receipt `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
@@ -165,6 +166,19 @@ func (t CCIPSendFromRouterResult) ToMap() map[string]interface{} {
 		res := make([]interface{}, 0, len(t.MessageSentObservers))
 		for _, e := range t.MessageSentObservers {
 			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["receipts"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Receipts))
+		for _, e := range t.Receipts {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()

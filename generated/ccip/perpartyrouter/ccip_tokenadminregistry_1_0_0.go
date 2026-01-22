@@ -19,59 +19,35 @@ var (
 
 // ConsumeReceiveTicketResult is a Record type
 type ConsumeReceiveTicketResult struct {
-	MessageHash         TEXT     `json:"messageHash"`
-	SourceChainSelector NUMERIC  `json:"sourceChainSelector"`
-	SequenceNumber      NUMERIC  `json:"sequenceNumber"`
-	HasTokenTransfer    BOOL     `json:"hasTokenTransfer"`
-	TokenAmount         *NUMERIC `json:"tokenAmount"`
-	DestTokenAddress    *TEXT    `json:"destTokenAddress"`
-	TokenReceiver       *PARTY   `json:"tokenReceiver"`
+	InstrumentId        InstrumentId `json:"instrumentId"`
+	Amount              NUMERIC      `json:"amount"`
+	Receiver            PARTY        `json:"receiver"`
+	TokenReceiver       PARTY        `json:"tokenReceiver"`
+	MessageHash         TEXT         `json:"messageHash"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
 }
 
 // ToMap converts ConsumeReceiveTicketResult to a map for DAML arguments
 func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["amount"] = (*big.Int)(t.Amount)
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["tokenReceiver"] = t.TokenReceiver.ToMap()
+
 	m["messageHash"] = string(t.MessageHash)
 
 	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
-
-	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
-
-	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
-
-	if t.TokenAmount != nil {
-		m["tokenAmount"] = map[string]interface{}{
-			"_type": "optional",
-			"value": (*big.Int)(*t.TokenAmount),
-		}
-	} else {
-		m["tokenAmount"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	if t.DestTokenAddress != nil {
-		m["destTokenAddress"] = map[string]interface{}{
-			"_type": "optional",
-			"value": string(*t.DestTokenAddress),
-		}
-	} else {
-		m["destTokenAddress"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	if t.TokenReceiver != nil {
-		m["tokenReceiver"] = map[string]interface{}{
-			"_type": "optional",
-			"value": (*t.TokenReceiver).ToMap(),
-		}
-	} else {
-		m["tokenReceiver"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
 
 	return m
 }
@@ -188,16 +164,6 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ProposeAdministrator",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistrySetRequiredCCVs exercises the TokenAdminRegistry_SetRequiredCCVs choice on this TokenAdminRegistry contract
-func (t TokenAdminRegistry) TokenAdminRegistrySetRequiredCCVs(contractID string, args SET) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetRequiredCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -396,63 +362,39 @@ func (t *TokenAdminRegistryIsAdministrator) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryIssueReceiveTicket is a Record type
 type TokenAdminRegistryIssueReceiveTicket struct {
-	MessageHash         TEXT     `json:"messageHash"`
-	SourceChainSelector NUMERIC  `json:"sourceChainSelector"`
-	SequenceNumber      NUMERIC  `json:"sequenceNumber"`
-	HasTokenTransfer    BOOL     `json:"hasTokenTransfer"`
-	TokenAmount         *NUMERIC `json:"tokenAmount"`
-	DestTokenAddress    *TEXT    `json:"destTokenAddress"`
-	TokenReceiver       *PARTY   `json:"tokenReceiver"`
-	Receiver            PARTY    `json:"receiver"`
-	Caller              PARTY    `json:"caller"`
+	InstrumentId        InstrumentId `json:"instrumentId"`
+	PoolOwner           PARTY        `json:"poolOwner"`
+	Receiver            PARTY        `json:"receiver"`
+	TokenReceiver       PARTY        `json:"tokenReceiver"`
+	Amount              NUMERIC      `json:"amount"`
+	MessageHash         TEXT         `json:"messageHash"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
+	Caller              PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
 func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
+	m["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
+
+	m["receiver"] = t.Receiver.ToMap()
+
+	m["tokenReceiver"] = t.TokenReceiver.ToMap()
+
+	m["amount"] = (*big.Int)(t.Amount)
+
 	m["messageHash"] = string(t.MessageHash)
 
 	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
-
-	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
-
-	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
-
-	if t.TokenAmount != nil {
-		m["tokenAmount"] = map[string]interface{}{
-			"_type": "optional",
-			"value": (*big.Int)(*t.TokenAmount),
-		}
-	} else {
-		m["tokenAmount"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	if t.DestTokenAddress != nil {
-		m["destTokenAddress"] = map[string]interface{}{
-			"_type": "optional",
-			"value": string(*t.DestTokenAddress),
-		}
-	} else {
-		m["destTokenAddress"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	if t.TokenReceiver != nil {
-		m["tokenReceiver"] = map[string]interface{}{
-			"_type": "optional",
-			"value": (*t.TokenReceiver).ToMap(),
-		}
-	} else {
-		m["tokenReceiver"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	m["receiver"] = t.Receiver.ToMap()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -480,6 +422,7 @@ type TokenAdminRegistryIssueSendTicket struct {
 	DestTokenAddress   TEXT         `json:"destTokenAddress"`
 	TokenReceiver      TEXT         `json:"tokenReceiver"`
 	ExtraData          TEXT         `json:"extraData"`
+	Receipt            Receipt      `json:"receipt"`
 	PoolOwner          PARTY        `json:"poolOwner"`
 }
 
@@ -506,6 +449,14 @@ func (t TokenAdminRegistryIssueSendTicket) ToMap() map[string]interface{} {
 	m["tokenReceiver"] = string(t.TokenReceiver)
 
 	m["extraData"] = string(t.ExtraData)
+
+	m["receipt"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Receipt).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Receipt
+	}()
 
 	m["poolOwner"] = t.PoolOwner.ToMap()
 
@@ -609,50 +560,6 @@ func (t *TokenAdminRegistrySetPool) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// TokenAdminRegistrySetRequiredCCVs is a Record type
-type TokenAdminRegistrySetRequiredCCVs struct {
-	InstrumentId    InstrumentId `json:"instrumentId"`
-	NewRequiredCCVs []TEXT       `json:"newRequiredCCVs"`
-	Caller          PARTY        `json:"caller"`
-}
-
-// ToMap converts TokenAdminRegistrySetRequiredCCVs to a map for DAML arguments
-func (t TokenAdminRegistrySetRequiredCCVs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
-
-	m["newRequiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.NewRequiredCCVs))
-		for _, e := range t.NewRequiredCCVs {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistrySetRequiredCCVs using JsonCodec
-func (t TokenAdminRegistrySetRequiredCCVs) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
-}
-
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistrySetRequiredCCVs using JsonCodec
-func (t *TokenAdminRegistrySetRequiredCCVs) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
-}
-
 // TokenAdminRegistryTransferAdminRole is a Record type
 type TokenAdminRegistryTransferAdminRole struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
@@ -696,7 +603,6 @@ type TokenConfig struct {
 	Admin          *PARTY `json:"admin"`
 	PendingAdmin   *PARTY `json:"pendingAdmin"`
 	TokenPoolOwner *PARTY `json:"tokenPoolOwner"`
-	RequiredCCVs   []TEXT `json:"requiredCCVs"`
 }
 
 // ToMap converts TokenConfig to a map for DAML arguments
@@ -735,14 +641,6 @@ func (t TokenConfig) ToMap() map[string]interface{} {
 			"_type": "optional",
 		}
 	}
-
-	m["requiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.RequiredCCVs))
-		for _, e := range t.RequiredCCVs {
-			res = append(res, string(e))
-		}
-		return res
-	}()
 
 	return m
 }
