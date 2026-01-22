@@ -16,13 +16,13 @@ die() { log_error "$1"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-GEN_DIR="$PROJECT_ROOT/generated"
+GEN_DIR="$PROJECT_ROOT/bindings"
 COIN_OUTPUT_DIR="$GEN_DIR/coin"
 CCIP_OUTPUT_DIR="$GEN_DIR/ccip"
 MCMS_OUTPUT_DIR="$GEN_DIR/mcms"
 
 # DARs are exported by: go run ./bindings/compile/cmd/export-dars -out artifacts/dars
-DAR_DIR="$PROJECT_ROOT/artifacts/dars"
+DAR_DIR="$PROJECT_ROOT/contracts/dars"
 
 # Find godaml
 if command -v godaml >/dev/null 2>&1; then
