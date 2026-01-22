@@ -21,6 +21,22 @@ data ArgValue
 -- MCMS RECEIVER INTERFACE
 -- ===========================================================================
 
+-- | Ticket proving a target's owner and instanceId.
+-- Issued by the target owner and consumed by MCMS.
+template TargetAuthTicket
+  with
+    owner : Party
+    instanceId : Text
+    targetCid : ContractId MCMSReceiver
+  where
+    signatory owner
+
+    -- | Consume and return ticket contents for validation.
+    choice Consume : (Party, Text, ContractId MCMSReceiver)
+      controller owner
+      do
+        pure (owner, instanceId, targetCid)
+
 -- | View for MCMSReceiver interface
 data MCMSReceiverView = MCMSReceiverView
   with
@@ -73,6 +89,19 @@ interface MCMSReceiver where
       -- Call the interface method implementation
       -- `mcmsEntrypoint` is the abstract method that implementations provide
       ((this `mcmsEntrypoint` functionName) operationData) contractIds
+
+  -- | Issue a target auth ticket for MCMS validation.
+  -- Only the owner can issue tickets.
+  nonconsuming choice MCMSReceiver_IssueAuthTicket : ContractId TargetAuthTicket
+    with
+      caller : Party
+    controller (view this).owner
+    do
+      let v = view this
+      create TargetAuthTicket with
+        owner = v.owner
+        instanceId = v.instanceId
+        targetCid = toInterfaceContractId @MCMSReceiver self
 
 -- ===========================================================================
 -- HELPER FUNCTIONS

@@ -2,12 +2,12 @@
 --
 -- ARCHITECTURE:
 --   MCMS verifies signatures and merkle proofs, then calls target contracts directly.
---   Target contracts are registered in MCMSRegistry with authenticated owner identity.
+--   Target contracts issue auth tickets to prove owner + instanceId.
 --
 -- Direct Invocation Pattern:
---   1. Anyone submits: proofs + signatures + registryCid
+--   1. Anyone submits: proofs + signatures + authTicketCid + targetCid
 --   2. MCMS validates proofs and signatures on-chain
---   3. MCMS looks up target in registry (authenticated, can't be forged)
+--   3. MCMS consumes auth ticket to authenticate owner + instanceId
 --   4. MCMS calls target.mcmsEntrypoint(functionName, operationData, contractIds)
 --   5. ccip_owner authority flows through the call chain
 module MCMS.Main where
@@ -19,8 +19,7 @@ import DA.Crypto.Text (BytesHex)
 import MCMS.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), numGroups, maxNumSigners, roleToText)
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..))
-import MCMS.MCMSRegistry (MCMSRegistry, Lookup(..))
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), TargetAuthTicket, Consume(..))
 import MCMS.Codec (decodeSetConfigParams, SetConfigParams(..))
 
 template MCMS
@@ -136,20 +135,20 @@ template MCMS
     -- | Execute an operation directly on a target contract
     -- This is the main execution flow:
     --   1. Validate merkle proof against the root set by SetRoot
-    --   2. Look up target in registry (caller provides registryCid)
-    --   3. Verify registration.targetOwner == MCMS owner (prevents fake registries)
-    --   4. Call target.mcmsEntrypoint(functionName, operationData, contractIds)
+    --   2. Consume target auth ticket to verify owner + instanceId
+    --   3. Call target.mcmsEntrypoint(functionName, operationData, contractIds)
     --
     -- ANYONE CAN EXECUTE - Security comes from:
     --   1. Merkle proof verification (cryptographically bound operation)
-    --   2. Registry must have targetOwner == this.owner (attacker can't register as ccip_owner)
+    --   2. Ticket owner/instanceId validation (issued by target owner)
     choice ExecuteOp : ContractId MCMS
       with
-        submitter : Party                               -- Anyone can submit
-        registryCid : ContractId MCMSRegistry           -- Target registry (any registry, validated by owner check)
-        op : Op                                         -- Operation details
-        opProof : [BytesHex]                            -- Merkle proof
-        contractIds : [ContractId ()]                   -- Untyped contract IDs for target to use
+        submitter : Party                                -- Anyone can submit
+        targetCid : ContractId MCMSReceiver              -- Target contract ID (current)
+        authTicketCid : ContractId TargetAuthTicket      -- Ticket issued by target owner
+        op : Op                                          -- Operation details
+        opProof : [BytesHex]                             -- Merkle proof
+        contractIds : [ContractId ()]                    -- Untyped contract IDs for target to use
       controller submitter
       do
         now <- getTime
@@ -175,15 +174,13 @@ template MCMS
         assertMsg "E_INVALID_OP_MERKLE_PROOF" $
           verifyMerkleProof expiringRoot.root opLeaf opProof
 
-        -- 6. Look up target in registry (only mcmsOwner can register, so this is trusted)
-        targetCid <- exercise registryCid Lookup with
-          caller = owner
-          instanceId = op.targetInstanceId
-        targetCid <- case targetCid of
-          None -> abort $ "E_TARGET_NOT_REGISTERED: " <> op.targetInstanceId
-          Some cid -> pure cid
+        -- 6. Consume auth ticket to validate owner + instanceId
+        (ticketOwner, ticketInstanceId, ticketTargetCid) <- exercise authTicketCid Consume
+        assertMsg "E_TICKET_OWNER_MISMATCH" $ ticketOwner == owner
+        assertMsg "E_TICKET_INSTANCE_MISMATCH" $ ticketInstanceId == op.targetInstanceId
+        assertMsg "E_TICKET_TARGET_MISMATCH" $ ticketTargetCid == targetCid
 
-        -- 7. Call target's mcmsEntrypoint using the REGISTERED ContractId
+        -- 7. Call target's mcmsEntrypoint using the provided ContractId
         _ <- exercise targetCid MCMSReceiver_Entrypoint with
           caller = owner
           functionName = op.functionName

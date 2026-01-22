@@ -18,13 +18,13 @@ import (
 )
 
 // TestMCMS_ExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
-// 1. Deploy MCMS, Registry, and Counter contracts
-// 2. Register Counter in the registry
+// 1. Deploy MCMS and Counter contracts
+// 2. Issue a target auth ticket
 // 3. Configure signers (2-of-3)
 // 4. Create proposal with "increment" operation
 // 5. Sign with 2 signers
 // 6. SetRoot with real signatures
-// 7. ExecuteOp - looks up target in registry, then calls Counter
+// 7. ExecuteOp - validates ticket, then calls Counter
 // 8. Verify counter value incremented
 func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	// Setup context with JWT auth
@@ -228,48 +228,12 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	t.Logf("Created Counter contract: %s", counterCid)
 
 	// ====================================
-	// |   2.5. Create Target Registry    |
+	// |   2.5. Issue Auth Ticket         |
 	// ====================================
 
-	t.Log("Creating MCMSRegistry contract...")
+	t.Log("Issuing MCMS target auth ticket...")
 
-	// Create empty registrations map
-	emptyRegistrations := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
-
-	registryCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Create{
-						Create: &apiv2.CreateCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.MCMSRegistry",
-								EntityName: "MCMSRegistry",
-							},
-							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "mcmsOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
-								{Label: "registrations", Value: emptyRegistrations},
-							}},
-						},
-					},
-				},
-			},
-			ActAs: []string{ccipOwner},
-		},
-	})
-	require.NoError(t, err)
-	registryCid := registryCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
-	t.Logf("Created MCMSRegistry contract: %s", registryCid)
-
-	// ====================================
-	// |   2.6. Register Counter Target   |
-	// ====================================
-
-	t.Log("Registering Counter in the target registry...")
-
-	registerRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	issueTicketRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -278,15 +242,14 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 						Exercise: &apiv2.ExerciseCommand{
 							TemplateId: &apiv2.Identifier{
 								PackageId:  "#mcms",
-								ModuleName: "MCMS.MCMSRegistry",
-								EntityName: "MCMSRegistry",
+								ModuleName: "MCMS.MCMSReceiver",
+								EntityName: "MCMSReceiver",
 							},
-							ContractId: registryCid,
-							Choice:     "Register",
+							ContractId: counterCid,
+							Choice:     "MCMSReceiver_IssueAuthTicket",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceId}}},
-									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
+									{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
 								},
 							}}},
 						},
@@ -297,14 +260,16 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	// Get new registry CID from the result
-	for _, event := range registerRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMSRegistry" {
-			registryCid = created.GetContractId()
+
+	var authTicketCid string
+	for _, event := range issueTicketRes.GetTransaction().GetEvents() {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "TargetAuthTicket" {
+			authTicketCid = created.GetContractId()
 			break
 		}
 	}
-	t.Logf("Registered Counter, new registry CID: %s", registryCid)
+	require.NotEmpty(t, authTicketCid, "Should have created a TargetAuthTicket")
+	t.Logf("Issued auth ticket: %s", authTicketCid)
 
 	// ========================
 	// |   3. Build Proposal  |
@@ -467,7 +432,8 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
 									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
-									{Label: "registryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: registryCid}}},
+									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
+									{Label: "authTicketCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: authTicketCid}}},
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
 									{Label: "contractIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
@@ -581,11 +547,12 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	t.Log("Summary:")
 	t.Log("  1. Created MCMS with 2-of-3 config")
 	t.Log("  2. Created Counter contract (implements MCMSReceiver)")
-	t.Log("  3. Built proposal with 'increment' operation targeting instanceId")
-	t.Log("  4. Signed with 2 signers (real ECDSA signatures)")
-	t.Log("  5. SetRoot with on-chain verification")
-	t.Log("  6. ExecuteOp - MCMS directly calls Counter.MCMSReceiver_Entrypoint")
-	t.Log("  7. Counter value = 1 ✓")
+	t.Log("  3. Issued target auth ticket")
+	t.Log("  4. Built proposal with 'increment' operation targeting instanceId")
+	t.Log("  5. Signed with 2 signers (real ECDSA signatures)")
+	t.Log("  6. SetRoot with on-chain verification")
+	t.Log("  7. ExecuteOp - validates ticket and calls Counter.MCMSReceiver_Entrypoint")
+	t.Log("  8. Counter value = 1 ✓")
 }
 
 // TestMCMS_SignatureVerificationFails tests that invalid signatures are rejected
