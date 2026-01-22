@@ -25,6 +25,7 @@ template OffRamp
         -- | Get required CCVs for inbound message execution.
         -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
         -- Includes receiver's required CCVs since they're executing the message.
+        -- Note: pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs.
         nonconsuming choice GetRequiredCCVsForExecute : [CCIP.CCVId.CCVId]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
@@ -35,7 +36,7 @@ template OffRamp
                 instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
             controller ccipOwner
             do
-                -- 1. Get lane-mandated CCVs from GlobalConfig
+                -- Get lane-mandated CCVs from GlobalConfig
                 sourceConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetSourceChainConfig with
                         sourceChainSelector = sourceChainSelector
@@ -44,33 +45,21 @@ template OffRamp
                         None -> []
                         Some config -> config.laneMandatedCCVs
 
-                -- 2. Receiver's required CCVs (passed from PerPartyRouter)
+                -- Receiver's required CCVs (passed from PerPartyRouter)
                 let receiverCCVs = receiverRequiredCCVs
 
-                -- 3. Get pool's required CCVs (if token transfer)
-                poolCCVs <- case (hasTokenTransfer, instrumentId) of
-                    (True, Some instId) -> do
-                        configOpt <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
-                                instrumentId = instId
-                                caller = ccipOwner
-                        pure (case configOpt of
-                            None -> []
-                            Some config -> config.requiredCCVs)
-                    _ -> pure []
-
-                -- 4. Get default CCVs (if no other CCVs specified)
+                -- Get default CCVs (if no other CCVs specified)
                 let defaultCCVs = case sourceConfigOpt of
                         None -> []
                         Some config ->
-                            if null laneMandatedCCVs && null receiverCCVs && null poolCCVs
+                            if null laneMandatedCCVs && null receiverCCVs
                             then config.defaultCCVs
                             else []
 
                 -- Combine and dedupe
-                pure (CCIP.CCVId.dedupCCVIds (laneMandatedCCVs ++ receiverCCVs ++ poolCCVs ++ defaultCCVs))
+                pure (CCIP.CCVId.dedupCCVIds (laneMandatedCCVs ++ receiverCCVs ++ defaultCCVs))
 
-        -- | process a ccip execute request from a perpartyrouter.
+        -- | Process a ccip execute request from a perpartyrouter.
         nonconsuming choice ExecuteFromRouter : ExecuteFromRouterResult
             with
                 routerPartyOwner : Party
@@ -81,6 +70,7 @@ template OffRamp
 
                 encodedMessage : BytesHex
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
+                tokenPoolCCVTicket : Optional (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
 
             controller ccipOwner
             do
@@ -111,7 +101,7 @@ template OffRamp
                         assertMsg "offramp: source chain disabled" c.isEnabled
                         pure c
 
-                -- extract token transfer info (need it for CCV validation)
+                -- extract token transfer info
                 let (hasTokenTransfer, tokenAmount, destTokenAddr, tokenReceiverParty, instrumentId) =
                         case message.tokenTransfer of
                             None -> (False, None, None, None, None)
@@ -120,14 +110,35 @@ template OffRamp
                                     instId = CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress
                                 in (True, Some tt.amount, Some tt.destTokenAddress, trParty, instId)
 
-                -- get required CCVs for this execute (includes receiver's CCVs)
-                requiredCCVIds <- exercise self GetRequiredCCVsForExecute with
-                    globalConfigCid = globalConfigCid
-                    tokenAdminRegistryCid = tokenAdminRegistryCid
-                    receiverRequiredCCVs = receiverRequiredCCVs
-                    sourceChainSelector = message.sourceChainSelector
-                    hasTokenTransfer = hasTokenTransfer
-                    instrumentId = instrumentId
+                -- Consume tokenPoolCCVTicket if provided to get pool's verified CCVs
+                poolVerifiedCCVIds <- case tokenPoolCCVTicket of
+                    None -> pure []
+                    Some ticketCid -> do
+                        ticket <- fetch ticketCid
+                        assertMsg "offramp: tokenPoolCCVTicket ccipOwner mismatch"
+                            (ticket.ccipOwner == ccipOwner)
+                        assertMsg "offramp: tokenPoolCCVTicket messageHash mismatch"
+                            (ticket.messageHash == messageHash)
+                        assertMsg "offramp: tokenPoolCCVTicket sourceChainSelector mismatch"
+                            (ticket.sourceChainSelector == message.sourceChainSelector)
+                        exercise ticketCid CCIP.Tickets.TokenPoolCCVVerifiedTicket_Consume
+
+                -- Get lane-mandated CCVs
+                let laneMandatedCCVs = sourceConfig.laneMandatedCCVs
+
+                -- Determine if defaults should apply
+                let hasSpecificRequirements =
+                        not (null laneMandatedCCVs) ||
+                        not (null receiverRequiredCCVs) ||
+                        not (null poolVerifiedCCVIds)
+
+                let defaultCCVs = if hasSpecificRequirements
+                        then []
+                        else sourceConfig.defaultCCVs
+
+                -- Combine all required CCVs
+                let requiredCCVIds = CCIP.CCVId.dedupCCVIds $
+                        laneMandatedCCVs ++ receiverRequiredCCVs ++ poolVerifiedCCVIds ++ defaultCCVs
 
                 -- consume ccv verification tickets and collect CCVIds
                 providedCCVIds <- forA ccvVerifyTickets $ \ticketCid -> do
@@ -136,7 +147,6 @@ template OffRamp
                         (ticket.ccipOwner == ccipOwner)
                     assertMsg "offramp: ccvverifyticket messagehash mismatch"
                         (ticket.messageHash == messageHash)
-                    -- CCVVerifyTicket_Consume now returns CCVId
                     exercise ticketCid CCIP.Tickets.CCVVerifyTicket_Consume
 
                 -- validate all required CCVs are covered
@@ -144,18 +154,32 @@ template OffRamp
                     assertMsg ("offramp: missing required CCV " <> requiredId)
                         (requiredId `elem` providedCCVIds)
 
-                -- issue token receive ticket via TokenAdminRegistry
-                tokenReceiveTicketCid <- exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
-                        messageHash = messageHash
-                        sourceChainSelector = message.sourceChainSelector
-                        sequenceNumber = message.sequenceNumber
-                        hasTokenTransfer = hasTokenTransfer
-                        tokenAmount = tokenAmount
-                        destTokenAddress = destTokenAddr
-                        tokenReceiver = tokenReceiverParty
-                        receiver = routerPartyOwner
-                        caller = ccipOwner
+                -- Issue token receive ticket only if there's a token transfer
+                tokenReceiveTicketCid <- case (hasTokenTransfer, instrumentId, tokenAmount, tokenReceiverParty) of
+                    (True, Some instId, Some amount, Some tokenReceiver) -> do
+                        -- Look up pool owner for the instrument
+                        configOpt <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
+                                instrumentId = instId
+                                caller = ccipOwner
+                        poolOwner <- case configOpt of
+                            None -> abort "offramp: no token config for instrument"
+                            Some config -> case config.tokenPoolOwner of
+                                None -> abort "offramp: no pool registered for instrument"
+                                Some po -> pure po
+
+                        ticketCid <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
+                                instrumentId = instId
+                                poolOwner = poolOwner
+                                receiver = routerPartyOwner
+                                tokenReceiver = tokenReceiver
+                                amount = amount
+                                messageHash = messageHash
+                                sourceChainSelector = message.sourceChainSelector
+                                caller = ccipOwner
+                        pure (Some ticketCid)
+                    _ -> pure None
 
                 pure ExecuteFromRouterResult with
                     messageHash = messageHash
@@ -171,5 +195,5 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
         message : CCIP.MessageCodecV1.MessageV1
         sourceChainSelector : Numeric 0
         sequenceNumber : Numeric 0
-        tokenReceiveTicket : ContractId CCIP.Tickets.TokenReceiveTicket
+        tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
     deriving (Eq, Show)

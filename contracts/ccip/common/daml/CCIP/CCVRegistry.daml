@@ -27,6 +27,7 @@ template CCVRegistry
                 verifierBlob : BytesHex  -- Contains version tag in first 4 bytes
                 messageSentObservers : [Party]
                 sender : Party
+                receipt : CCIP.Tickets.Receipt  -- Fee/gas contribution from this CCV
             controller ccvOwner
             do
                 -- Extract version tag from first 4 bytes of verifierBlob
@@ -41,23 +42,24 @@ template CCVRegistry
                     sender = sender
                     verifierBlob = verifierBlob
                     messageSentObservers = messageSentObservers
+                    receipt = receipt
 
         -- | Issue a CCV verify ticket for inbound message verification.
         -- Called by CCV after successful verification.
-        -- The version tag is extracted from the first 4 bytes of ccvData.
+        -- The version tag is extracted from the first 4 bytes of verifierResults.
         nonconsuming choice CCVRegistry_IssueVerifyTicket : ContractId CCIP.Tickets.CCVVerifyTicket
             with
                 ccvOwner : Party  -- Controller - becomes part of CCVId
-                ccvData : BytesHex  -- Contains version tag in first 4 bytes
+                verifierResults : BytesHex  -- Contains version tag in first 4 bytes
                 messageHash : BytesHex
                 sourceChainSelector : Numeric 0
                 sequenceNumber : Numeric 0
                 receiver : Party
             controller ccvOwner
             do
-                -- Extract version tag from first 4 bytes of ccvData
-                let versionTag = fromSomeNote "CCVRegistry: Failed to extract version tag from ccvData"
-                        (CCIP.MessageCodecV1.extractBytes ccvData 0 4)
+                -- Extract version tag from first 4 bytes of verifierResults
+                let versionTag = fromSomeNote "CCVRegistry: Failed to extract version tag from verifierResults"
+                        (CCIP.MessageCodecV1.extractBytes verifierResults 0 4)
                 let ccvId = CCIP.CCVId.makeCCVId versionTag ccvOwner
 
                 create CCIP.Tickets.CCVVerifyTicket with
