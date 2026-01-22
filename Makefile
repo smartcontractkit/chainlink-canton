@@ -11,7 +11,7 @@ DC ?= docker compose
 # Common compose invocation (project-directory makes relative paths resolve correctly)
 DC_CMD := $(DC) -f $(COMPOSE_FILE) --project-directory $(COMPOSE_DIR)
 
-.PHONY: help up down stop start restart ps logs pull build config console clean contracts-build contracts-clean
+.PHONY: help up down stop start restart ps logs pull build config console clean contracts-build contracts-clean compile-contracts generate-bindings contracts
 
 help:
 	@echo "Localnet docker compose targets:"
@@ -61,15 +61,20 @@ console:
 
 
 build:
-	make contracts-build
+	make contracts
 	$(DC_CMD) build
 
 clean:
 	$(DC_CMD) down -v --remove-orphans
 	make contracts-clean
 
-contracts-build:
-	cd $(CONTRACTS_DIR) && dpm build --all
+compile-contracts:
+	@echo "Compiling contracts..."
+	dpm clean --all --multi-package-path ./contracts/
+	go run ./contracts/cmd/compile -root ./contracts -artifacts ./contracts/dars
 
-contracts-clean:
-	cd $(CONTRACTS_DIR) && dpm clean --all
+generate-bindings:
+	@echo "Generating contract bindings..."
+	sh ./scripts/generate-bindings.sh
+  
+contracts: compile-contracts generate-bindings

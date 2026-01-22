@@ -3,7 +3,7 @@ module CCIP.OnRamp where
 
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable qualified as Foldable
-import DA.Optional (isSome)
+import DA.Optional (isSome, catOptionals)
 
 import qualified CCIP.CCVId
 import qualified CCIP.GlobalConfig
@@ -24,6 +24,7 @@ template OnRamp
         -- | Get required CCVs for outbound message.
         -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
         -- Does NOT include sender's router CCVs - we don't know what the receiver requires.
+        -- Note: pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs.
         nonconsuming choice GetRequiredCCVsForSend : [CCIP.CCVId.CCVId]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
@@ -42,28 +43,19 @@ template OnRamp
                         None -> []
                         Some config -> config.laneMandatedCCVs
 
-                -- 2. Get pool's required CCVs (if token transfer)
-                poolCCVs <- case (hasTokenTransfer, instrumentId) of
-                    (True, Some instId) -> do
-                        configOpt <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
-                                instrumentId = instId
-                                caller = ccipOwner
-                        pure (case configOpt of
-                            None -> []
-                            Some config -> config.requiredCCVs)
-                    _ -> pure []
+                -- 2. Pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs
+                -- (caller should query the pool directly if needed)
 
-                -- 3. Get default CCVs (if no other CCVs specified)
+                -- 3. Get default CCVs (if no lane-mandated CCVs specified)
                 let defaultCCVs = case destConfigOpt of
                         None -> []
                         Some config ->
-                            if null laneMandatedCCVs && null poolCCVs
+                            if null laneMandatedCCVs
                             then config.defaultCCVs
                             else []
 
                 -- Combine and dedupe
-                pure (CCIP.CCVId.dedupCCVIds (laneMandatedCCVs ++ poolCCVs ++ defaultCCVs))
+                pure (CCIP.CCVId.dedupCCVIds (laneMandatedCCVs ++ defaultCCVs))
 
         -- | process a ccip send request from a perpartyrouter.
         -- note: tokenSendTicket was already validated at issuance via TokenAdminRegistry_IssueSendTicket
@@ -105,16 +97,17 @@ template OnRamp
 
                 -- process optional token transfer ticket
                 -- ticket was already validated at issuance via TokenAdminRegistry_IssueSendTicket
-                (tokenTransfer, instrumentId) <- case tokenSendTicket of
-                    None -> pure (None, None)
+                (tokenTransfer, instrumentId, poolReceipt) <- case tokenSendTicket of
+                    None -> pure (None, None, None)
                     Some ticketCid -> do
                         ticket <- fetch ticketCid
                         assertMsg "onramp: tokensendticket ccipowner mismatch"
                             (ticket.ccipOwner == ccipOwner)
                         assertMsg "onramp: tokensendticket sender mismatch"
                             (ticket.sender == routerPartyOwner)
-                        tt <- exercise ticketCid CCIP.Tickets.TokenSendTicket_Consume
-                        pure (Some tt, Some ticket.instrumentId)
+                        -- TokenSendTicket_Consume now returns (TokenTransferV1, Receipt)
+                        (tt, receipt) <- exercise ticketCid CCIP.Tickets.TokenSendTicket_Consume
+                        pure (Some tt, Some ticket.instrumentId, Some receipt)
 
                 -- get required CCVs for this send (no router CCVs - sender doesn't know receiver's requirements)
                 let hasTokenTransfer = isSome tokenTransfer
@@ -126,6 +119,7 @@ template OnRamp
                     instrumentId = instrumentId
 
                 -- process ccv tickets and collect provided CCVIds
+                -- CCVTicket_Consume now returns (CCVId, BytesHex, [Party], Receipt)
                 ccvResults <- forA ccvTickets $ \ticketCid -> do
                     ticket <- fetch ticketCid
                     assertMsg "onramp: ccvticket ccipowner mismatch"
@@ -134,15 +128,18 @@ template OnRamp
                         (ticket.sender == routerPartyOwner)
                     exercise ticketCid CCIP.Tickets.CCVTicket_Consume
 
-                -- CCVTicket_Consume now returns (CCVId, BytesHex, [Party])
-                let providedCCVIds = map (\(ccvId, _, _) -> ccvId) ccvResults
-                let verifierBlobs = map (\(_, blob, _) -> blob) ccvResults
-                let allMessageSentObservers = concatMap (\(_, _, obs) -> obs) ccvResults
+                let providedCCVIds = map (\(ccvId, _, _, _) -> ccvId) ccvResults
+                let verifierBlobs = map (\(_, blob, _, _) -> blob) ccvResults
+                let allMessageSentObservers = concatMap (\(_, _, obs, _) -> obs) ccvResults
+                let ccvReceipts = map (\(_, _, _, receipt) -> receipt) ccvResults
 
                 -- validate all required CCVs are covered
                 Foldable.forA_ requiredCCVIds $ \requiredId ->
                     assertMsg ("onramp: missing required CCV " <> requiredId)
                         (requiredId `elem` providedCCVIds)
+
+                -- Collect all receipts (CCV receipts + pool receipt)
+                let allReceipts = ccvReceipts ++ catOptionals [poolReceipt]
 
                 let ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -175,6 +172,7 @@ template OnRamp
                     destChainSelector = destChainSelector
                     verifierBlobs = verifierBlobs
                     messageSentObservers = allMessageSentObservers
+                    receipts = allReceipts
 
 
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
@@ -185,4 +183,5 @@ data CCIPSendFromRouterResult = CCIPSendFromRouterResult
         destChainSelector : Numeric 0
         verifierBlobs : [BytesHex]
         messageSentObservers : [Party]
+        receipts : [CCIP.Tickets.Receipt]
     deriving (Eq, Show)
