@@ -105,30 +105,30 @@ run_godaml "$PROJECT_ROOT/contracts/dependencies/splice-api-token-burn-mint-v1-1
 # Coin (required)
 # -------------------------
 log_info "Generating coin bindings..."
-run_godaml "$DAR_DIR/coin.dar" "$COIN_OUTPUT_DIR" "coin" 1
+run_godaml "$DAR_DIR/coin-current.dar" "$COIN_OUTPUT_DIR" "coin" 1
 [ -n "$(find "$COIN_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for coin"
 
 # -------------------------
 # CCIP (required)
 # -------------------------
 log_info "Generating CCIP bindings..."
-run_godaml "$DAR_DIR/ccip-common.dar"               "$CCIP_OUTPUT_DIR/common"               "common"               1
-run_godaml "$DAR_DIR/ccip-feequoter.dar"            "$CCIP_OUTPUT_DIR/feequoter"            "feequoter"            1
-run_godaml "$DAR_DIR/ccip-tokenadminregistry.dar"   "$CCIP_OUTPUT_DIR/tokenadminregistry"   "tokenadminregistry"   1
-run_godaml "$DAR_DIR/ccip-receiver.dar"             "$CCIP_OUTPUT_DIR/ccipreceiver"         "ccipreceiver"         1
-run_godaml "$DAR_DIR/ccip-committeeverifier.dar"    "$CCIP_OUTPUT_DIR/ccvs"                 "ccvs"                 1
-run_godaml "$DAR_DIR/ccip-onramp.dar"               "$CCIP_OUTPUT_DIR/onramp"               "onramp"               1
-run_godaml "$DAR_DIR/ccip-offramp.dar"              "$CCIP_OUTPUT_DIR/offramp"              "offramp"              1
-run_godaml "$DAR_DIR/ccip-perpartyrouter.dar"       "$CCIP_OUTPUT_DIR/perpartyrouter"       "perpartyrouter"       1
-run_godaml "$DAR_DIR/ccip-tokenpool-interfaces.dar" "$CCIP_OUTPUT_DIR/interfaces"           "interfaces"           1
-run_godaml "$DAR_DIR/ccip-lockreleasetokenpool.dar" "$CCIP_OUTPUT_DIR/lockreleasetokenpool" "lockreleasetokenpool" 1
+run_godaml "$DAR_DIR/ccip-common-curren.dar"               "$CCIP_OUTPUT_DIR/common"               "common"               1
+run_godaml "$DAR_DIR/ccip-feequoter-curren.dar"            "$CCIP_OUTPUT_DIR/feequoter"            "feequoter"            1
+run_godaml "$DAR_DIR/ccip-tokenadminregistry-curren.dar"   "$CCIP_OUTPUT_DIR/tokenadminregistry"   "tokenadminregistry"   1
+run_godaml "$DAR_DIR/ccip-receiver-curren.dar"             "$CCIP_OUTPUT_DIR/ccipreceiver"         "ccipreceiver"         1
+run_godaml "$DAR_DIR/ccip-committeeverifier-curren.dar"    "$CCIP_OUTPUT_DIR/ccvs"                 "ccvs"                 1
+run_godaml "$DAR_DIR/ccip-onramp-curren.dar"               "$CCIP_OUTPUT_DIR/onramp"               "onramp"               1
+run_godaml "$DAR_DIR/ccip-offramp-curren.dar"              "$CCIP_OUTPUT_DIR/offramp"              "offramp"              1
+run_godaml "$DAR_DIR/ccip-perpartyrouter-curren.dar"       "$CCIP_OUTPUT_DIR/perpartyrouter"       "perpartyrouter"       1
+run_godaml "$DAR_DIR/ccip-tokenpool-interfaces-curren.dar" "$CCIP_OUTPUT_DIR/interfaces"           "interfaces"           1
+run_godaml "$DAR_DIR/ccip-lockreleasetokenpool-curren.dar" "$CCIP_OUTPUT_DIR/lockreleasetokenpool" "lockreleasetokenpool" 1
 [ -n "$(find "$CCIP_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for CCIP"
 
 # -------------------------
 # MCMS (required)
 # -------------------------
 log_info "Generating MCMS bindings..."
-run_godaml "$DAR_DIR/mcms.dar" "$MCMS_OUTPUT_DIR" "mcms" 1
+run_godaml "$DAR_DIR/mcms-curren.dar" "$MCMS_OUTPUT_DIR" "mcms" 1
 [ -n "$(find "$MCMS_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for MCMS"
 
 log_info "All code generation complete!"
