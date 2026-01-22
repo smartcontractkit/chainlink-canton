@@ -1,4 +1,4 @@
-name: Contract artifacts + Bindings generation
+name: Contract artifacts
 
 on:
   push:
