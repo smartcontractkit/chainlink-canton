@@ -3,6 +3,7 @@ SHELL := /bin/bash
 # Localnet docker compose settings
 COMPOSE_DIR  ?= compose/localnet
 COMPOSE_FILE ?= $(COMPOSE_DIR)/compose.yaml
+CONTRACTS_DIR ?= contracts
 
 # Docker Compose v2 (preferred). Override if needed, e.g. `make DC="docker-compose" up`
 DC ?= docker compose
@@ -10,7 +11,7 @@ DC ?= docker compose
 # Common compose invocation (project-directory makes relative paths resolve correctly)
 DC_CMD := $(DC) -f $(COMPOSE_FILE) --project-directory $(COMPOSE_DIR)
 
-.PHONY: help up down stop start restart ps logs pull build config console clean
+.PHONY: help up down stop start restart ps logs pull build config console clean contracts-build contracts-clean
 
 help:
 	@echo "Localnet docker compose targets:"
@@ -51,9 +52,6 @@ logs:
 pull:
 	$(DC_CMD) pull
 
-build:
-	$(DC_CMD) build
-
 config:
 	$(DC_CMD) config
 
@@ -61,6 +59,17 @@ config:
 console:
 	$(DC_CMD) --profile console run --rm console
 
-# Removes volumes too (Postgres data, etc.). Use with care.
+
+build:
+	make contracts-build
+	$(DC_CMD) build
+
 clean:
 	$(DC_CMD) down -v --remove-orphans
+	make contracts-clean
+
+contracts-build:
+	cd $(CONTRACTS_DIR) && dpm build --all
+
+contracts-clean:
+	cd $(CONTRACTS_DIR) && dpm clean --all
