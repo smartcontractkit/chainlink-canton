@@ -1,4 +1,4 @@
-sdk-version: 3.4.8
+sdk-version: 3.4.9
 name: ccip-offramp
 source: daml
 version: 1.0.0
