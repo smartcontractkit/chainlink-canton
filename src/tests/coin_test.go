@@ -331,6 +331,104 @@ func GetActiveContractsForPartyInterface(ctx context.Context, participant *Parti
 		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
 	})
 	return activeContracts, nil
+
+}
+
+func identifierToStringV2(id *apiv2.Identifier) string {
+	if id == nil {
+		return ""
+	}
+	pkg := strings.TrimPrefix(id.PackageId, "#")
+	if pkg != "" {
+		return pkg + ":" + id.ModuleName + ":" + id.EntityName
+	}
+	return id.ModuleName + ":" + id.EntityName
+}
+
+func GetActiveContractsForPartyWithFilters(
+	ctx context.Context,
+	cl *client.DamlBindingClient,
+	party string,
+	templateID string,
+	interfaceID string,
+	includeInterfaceView bool,
+) ([]*model.ActiveContract, error) {
+
+	le, err := cl.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("GetLedgerEnd failed: %w", err)
+	}
+
+	incl := &model.InclusiveFilters{}
+
+	if templateID != "" {
+		incl.TemplateFilters = []*model.TemplateFilter{{TemplateID: templateID}}
+	}
+	if interfaceID != "" {
+		incl.InterfaceFilters = []*model.InterfaceFilter{{
+			InterfaceID:          interfaceID,
+			IncludeInterfaceView: includeInterfaceView,
+		}}
+	}
+
+	req := &model.GetActiveContractsRequest{
+		ActiveAtOffset: le.Offset,
+		EventFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {Inclusive: incl},
+			},
+			Verbose: true,
+		},
+	}
+
+	respCh, errCh := cl.StateService.GetActiveContracts(ctx, req)
+
+	var activeContracts []*model.ActiveContract
+
+	for respCh != nil || errCh != nil {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("ACS canceled for party %s: %w", party, ctx.Err())
+
+		case err, ok := <-errCh:
+			if !ok {
+				errCh = nil
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("ACS stream error: %w", err)
+			}
+
+		case resp, ok := <-respCh:
+			if !ok {
+				respCh = nil
+				continue
+			}
+			if resp == nil || resp.ContractEntry == nil {
+				continue
+			}
+
+			entry, ok := resp.ContractEntry.(*model.ActiveContractEntry)
+			if !ok || entry.ActiveContract == nil || entry.ActiveContract.CreatedEvent == nil {
+				continue
+			}
+			activeContracts = append(activeContracts, entry.ActiveContract)
+		}
+	}
+
+	// newest-first, nil-safe
+	slices.SortFunc(activeContracts, func(a, b *model.ActiveContract) int {
+		var ta, tb time.Time
+		if a != nil && a.CreatedEvent != nil && a.CreatedEvent.CreatedAt != nil {
+			ta = *a.CreatedEvent.CreatedAt
+		}
+		if b != nil && b.CreatedEvent != nil && b.CreatedEvent.CreatedAt != nil {
+			tb = *b.CreatedEvent.CreatedAt
+		}
+		return tb.Compare(ta)
+	})
+
+	return activeContracts, nil
 }
 
 func QueryDisclosedContract(ctx context.Context, contractId string, participant *Participant) (*apiv2.DisclosedContract, error) {
@@ -794,7 +892,7 @@ func TestCoin(t *testing.T) {
 
 	transferArgs := coin.TransferFactoryTransfer{
 		ExpectedAdmin: types.PARTY(partyAlice),
-		Transfer: coin.Transfer22{
+		Transfer: coin.Transfer2{
 			Sender:        types.PARTY(partyBob),
 			Receiver:      types.PARTY(partyCharlie),
 			Amount:        types.NUMERIC(big.NewInt(10)),
@@ -1121,6 +1219,39 @@ func TestCoin(t *testing.T) {
 	resp, err = p4.CommandService.SubmitAndWaitForTransaction(ctx, daveMintRoleReq)
 	require.NoError(t, err)
 	fmt.Println("dave mint to erin resp: ", resp)
+
+	pkgsForBob, err := p2.PackageMng.ListKnownPackages(ctx)
+	require.NoError(t, err)
+
+	var holdingPkgID string
+	for _, p := range pkgsForBob {
+		// fmt.Printf("package: %+v\n", p)
+		if strings.Contains(strings.ToLower(p.Name), "splice-api-token-holding") {
+			holdingPkgID = p.PackageID
+			break
+		}
+	}
+	require.NotEmpty(t, holdingPkgID, "holding package not found on ledger (did the DAR include it?)")
+
+	// check how much bob owns via it's coinHoldingiD
+	holdingTemplateID := "38d5b6b6f815ced2f6bc8f81181719a3d1d7451808d1ce9795ce5ffd3de68ca2:Coin.Holding:CoinHolding"
+
+	coinHoldings, err := GetActiveContractsForPartyWithFilters(
+		ctx, p2, partyBob,
+		holdingTemplateID, "", false,
+	)
+	require.NoError(t, err)
+
+	fmt.Printf("Bob has %d CoinHolding contracts\n", len(coinHoldings))
+
+	for _, h := range coinHoldings {
+		ce := h.CreatedEvent
+		if ce == nil || ce.CreateArguments == nil {
+			continue
+		}
+
+		fmt.Printf("holdingID=%s createArgsRaw=%+v\n", ce.ContractID, ce.CreateArguments)
+	}
 
 	// 4) Wait for Erin’s holding CID from the async stream
 	select {
