@@ -17,6 +17,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+require github.com/shopspring/decimal v1.4.0 // indirect
+
+replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260121212323-845710f79173
+
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/avast/retry-go/v4 v4.6.1 // indirect
