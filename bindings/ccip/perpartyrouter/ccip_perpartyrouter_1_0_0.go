@@ -870,17 +870,24 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	args["ccipOwner"] = t.CcipOwner.ToMap()
-
 	args["partyOwner"] = t.PartyOwner.ToMap()
-
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.OutboundSequenceNumbers != nil && len(t.OutboundSequenceNumbers) > 0 {
-		args["outboundSequenceNumbers"] = map[string]interface{}{"_type": "genmap", "value": t.OutboundSequenceNumbers}
+	// Non-optional GENMAP fields must be present even if empty
+	if t.OutboundSequenceNumbers == nil {
+		t.OutboundSequenceNumbers = GENMAP{}
+	}
+	args["outboundSequenceNumbers"] = map[string]interface{}{
+		"_type": "genmap",
+		"value": t.OutboundSequenceNumbers,
 	}
 
-	if t.ExecutionStates != nil && len(t.ExecutionStates) > 0 {
-		args["executionStates"] = map[string]interface{}{"_type": "genmap", "value": t.ExecutionStates}
+	if t.ExecutionStates == nil {
+		t.ExecutionStates = GENMAP{}
+	}
+	args["executionStates"] = map[string]interface{}{
+		"_type": "genmap",
+		"value": t.ExecutionStates,
 	}
 
 	return &model.CreateCommand{
@@ -990,11 +997,15 @@ func (t PerPartyRouterFactory) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	args["ccipOwner"] = t.CcipOwner.ToMap()
-
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.RegisteredRouters != nil && len(t.RegisteredRouters) > 0 {
-		args["registeredRouters"] = map[string]interface{}{"_type": "genmap", "value": t.RegisteredRouters}
+	// Non-optional GENMAP must always be present even if empty
+	if t.RegisteredRouters == nil {
+		t.RegisteredRouters = GENMAP{} // or types.GENMAP{} depending on package
+	}
+	args["registeredRouters"] = map[string]interface{}{
+		"_type": "genmap",
+		"value": t.RegisteredRouters,
 	}
 
 	return &model.CreateCommand{

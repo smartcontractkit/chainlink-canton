@@ -909,7 +909,6 @@ func (t GlobalConfig) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	args["ccipOwner"] = t.CcipOwner.ToMap()
-
 	args["instanceId"] = string(t.InstanceId)
 
 	if t.ChainSelector != nil {
@@ -918,12 +917,21 @@ func (t GlobalConfig) CreateCommand() *model.CreateCommand {
 
 	args["onRampAddress"] = string(t.OnRampAddress)
 
-	if t.DestChainConfigs != nil && len(t.DestChainConfigs) > 0 {
-		args["destChainConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
+	// IMPORTANT: non-optional fields must be present even if empty
+	if t.DestChainConfigs == nil {
+		t.DestChainConfigs = GENMAP{}
+	}
+	args["destChainConfigs"] = map[string]interface{}{
+		"_type": "genmap",
+		"value": t.DestChainConfigs,
 	}
 
-	if t.SourceChainConfigs != nil && len(t.SourceChainConfigs) > 0 {
-		args["sourceChainConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.SourceChainConfigs}
+	if t.SourceChainConfigs == nil {
+		t.SourceChainConfigs = GENMAP{}
+	}
+	args["sourceChainConfigs"] = map[string]interface{}{
+		"_type": "genmap",
+		"value": t.SourceChainConfigs,
 	}
 
 	return &model.CreateCommand{

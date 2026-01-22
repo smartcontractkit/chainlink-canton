@@ -245,33 +245,41 @@ func (t FeeQuoter) GetTemplateID() string {
 }
 
 // CreateCommand returns a CreateCommand for this template
+// CreateCommand returns a CreateCommand for this template
 func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	args["owner"] = t.Owner.ToMap()
-
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.FeeTokens != nil && len(t.FeeTokens) > 0 {
-		args["feeTokens"] = map[string]interface{}{"_type": "genmap", "value": t.FeeTokens}
+	// Non-optional GENMAP fields must always be present (even if empty)
+	if t.FeeTokens == nil {
+		t.FeeTokens = GENMAP{}
 	}
+	args["feeTokens"] = map[string]interface{}{"_type": "genmap", "value": t.FeeTokens}
 
-	if t.DestChainConfigs != nil && len(t.DestChainConfigs) > 0 {
-		args["destChainConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
+	if t.DestChainConfigs == nil {
+		t.DestChainConfigs = GENMAP{}
 	}
+	args["destChainConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
 
-	if t.TokenTransferFeeConfigs != nil && len(t.TokenTransferFeeConfigs) > 0 {
-		args["tokenTransferFeeConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
+	if t.TokenTransferFeeConfigs == nil {
+		t.TokenTransferFeeConfigs = GENMAP{}
 	}
+	args["tokenTransferFeeConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
 
-	if t.UsdPerUnitGasByDestChainSelector != nil && len(t.UsdPerUnitGasByDestChainSelector) > 0 {
-		args["usdPerUnitGasByDestChainSelector"] = map[string]interface{}{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
+	if t.UsdPerUnitGasByDestChainSelector == nil {
+		t.UsdPerUnitGasByDestChainSelector = GENMAP{}
 	}
+	args["usdPerUnitGasByDestChainSelector"] = map[string]interface{}{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
 
-	if t.UsdPerToken != nil && len(t.UsdPerToken) > 0 {
-		args["usdPerToken"] = map[string]interface{}{"_type": "genmap", "value": t.UsdPerToken}
+	if t.UsdPerToken == nil {
+		t.UsdPerToken = GENMAP{}
 	}
+	args["usdPerToken"] = map[string]interface{}{"_type": "genmap", "value": t.UsdPerToken}
 
+	// priceUpdaters: if this is non-optional too, you must always include it.
+	// (Right now you include only if len>0; keep this if the template allows empty list.)
 	if len(t.PriceUpdaters) > 0 {
 		args["priceUpdaters"] = func() []interface{} {
 			res := make([]interface{}, 0, len(t.PriceUpdaters))

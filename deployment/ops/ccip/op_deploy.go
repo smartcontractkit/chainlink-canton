@@ -79,11 +79,28 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 		return CantonOpResult[DeployCCIPCommonOutput]{}, fmt.Errorf("failed to upload DAR file: %w", err)
 	}
 
-	// Parse chain selector
-	chainSelector, ok := new(big.Int).SetString(input.ChainSelectorValue, 10)
+	// Parse chain selector as integer
+	bi, ok := new(big.Int).SetString(input.ChainSelectorValue, 10)
 	if !ok {
-		return CantonOpResult[DeployCCIPCommonOutput]{}, fmt.Errorf("invalid chainSelectorValue: %s", input.ChainSelectorValue)
+		return CantonOpResult[DeployCCIPCommonOutput]{}, fmt.Errorf("invalid ChainSelectorValue: %q", input.ChainSelectorValue)
 	}
+
+	// If the Ledger encoder treats *big.Int as mantissa for Numeric scale=10,
+	// convert integer -> scale-10 mantissa by multiplying by 10^10.
+	scale10 := new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil) // 10^10
+	mantissa := new(big.Int).Mul(bi, scale10)
+
+	args := common.GlobalConfig{
+		CcipOwner:          types.PARTY(deps.Party),
+		InstanceId:         types.TEXT(input.InstanceID),
+		ChainSelector:      nil, // ignore the wrapper for this field
+		OnRampAddress:      types.TEXT(input.OnRampAddress),
+		DestChainConfigs:   types.GENMAP{},
+		SourceChainConfigs: types.GENMAP{},
+	}.CreateCommand().Arguments
+
+	// override to force Numeric 0
+	args["chainSelector"] = mantissa // "1111111111"
 
 	// Create GlobalConfig contract
 	// Note: We manually construct the command to ensure empty GENMAP fields are included
@@ -91,14 +108,7 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 	commandID := uuid.Must(uuid.NewUUID()).String()
 	createCmd := &model.CreateCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", common.PackageID, "CCIP.GlobalConfig", "GlobalConfig"),
-		Arguments: map[string]interface{}{
-			"ccipOwner":          types.PARTY(deps.Party).ToMap(),
-			"instanceId":         input.InstanceID,
-			"chainSelector":      chainSelector,
-			"onRampAddress":      input.OnRampAddress,
-			"destChainConfigs":   map[string]interface{}{"_type": "genmap", "value": map[string]interface{}{}},
-			"sourceChainConfigs": map[string]interface{}{"_type": "genmap", "value": map[string]interface{}{}},
-		},
+		Arguments:  args,
 	}
 
 	cmds := &model.SubmitAndWaitRequest{

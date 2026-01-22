@@ -72,7 +72,6 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	}
 
 	// Save GlobalConfig contract ID
-	// TODO: Define proper type and version constants
 	// typeAndVersionGlobalConfig := cldf.NewTypeAndVersion("CantonCCIPGlobalConfig", "1.0.0")
 	// err = ab.Save(config.ChainSelector, commonReport.Output.GlobalConfigContractID, typeAndVersionGlobalConfig)
 	// if err != nil {
