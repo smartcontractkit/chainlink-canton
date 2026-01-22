@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "fe245d32a4b2423bd45545b577bb8521773dbe9735f558e0dbe025a14d340d2a"
+const PackageID = "45af1f21760648bacb65a98a553d287ab43e9a766a680a500e6a74c515ea8d11"
 const SDKVersion = "3.4.8"
 
 type Template interface {
@@ -56,6 +56,7 @@ type ExecuteFromRouter struct {
 	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
 	EncodedMessage        TEXT          `json:"encodedMessage"`
 	CcvVerifyTickets      []CONTRACT_ID `json:"ccvVerifyTickets"`
+	TokenPoolCCVTicket    *CONTRACT_ID  `json:"tokenPoolCCVTicket"`
 }
 
 // ToMap converts ExecuteFromRouter to a map for DAML arguments
@@ -98,6 +99,17 @@ func (t ExecuteFromRouter) ToMap() map[string]interface{} {
 		return res
 	}()
 
+	if t.TokenPoolCCVTicket != nil {
+		m["tokenPoolCCVTicket"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.TokenPoolCCVTicket,
+		}
+	} else {
+		m["tokenPoolCCVTicket"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
 	return m
 }
 
@@ -115,11 +127,11 @@ func (t *ExecuteFromRouter) UnmarshalJSON(data []byte) error {
 
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
-	MessageHash         TEXT        `json:"messageHash"`
-	Message             MessageV1   `json:"message"`
-	SourceChainSelector NUMERIC     `json:"sourceChainSelector"`
-	SequenceNumber      NUMERIC     `json:"sequenceNumber"`
-	TokenReceiveTicket  CONTRACT_ID `json:"tokenReceiveTicket"`
+	MessageHash         TEXT         `json:"messageHash"`
+	Message             MessageV1    `json:"message"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
+	SequenceNumber      NUMERIC      `json:"sequenceNumber"`
+	TokenReceiveTicket  *CONTRACT_ID `json:"tokenReceiveTicket"`
 }
 
 // ToMap converts ExecuteFromRouterResult to a map for DAML arguments
@@ -140,13 +152,16 @@ func (t ExecuteFromRouterResult) ToMap() map[string]interface{} {
 
 	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
 
-	m["tokenReceiveTicket"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TokenReceiveTicket).(mapper); ok {
-			return m.toMap()
+	if t.TokenReceiveTicket != nil {
+		m["tokenReceiveTicket"] = map[string]interface{}{
+			"_type": "optional",
+			"value": *t.TokenReceiveTicket,
 		}
-		return t.TokenReceiveTicket
-	}()
+	} else {
+		m["tokenReceiveTicket"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
 
 	return m
 }

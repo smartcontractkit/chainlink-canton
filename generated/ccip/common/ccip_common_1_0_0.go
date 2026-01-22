@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "6ba8ec36756b5a001502b7650b0107915aff75bee02ab3d07d67e439e87fe060"
+const PackageID = "b3a2467c543c053b320d8d10b2ac52d72500aa152a0eddaceebd9a2c797090dc"
 const SDKVersion = "3.4.8"
 
 type Template interface {
@@ -285,6 +285,7 @@ type CCVRegistryIssueCCVTicket struct {
 	VerifierBlob         TEXT    `json:"verifierBlob"`
 	MessageSentObservers []PARTY `json:"messageSentObservers"`
 	Sender               PARTY   `json:"sender"`
+	Receipt              Receipt `json:"receipt"`
 }
 
 // ToMap converts CCVRegistryIssueCCVTicket to a map for DAML arguments
@@ -305,6 +306,14 @@ func (t CCVRegistryIssueCCVTicket) ToMap() map[string]interface{} {
 
 	m["sender"] = t.Sender.ToMap()
 
+	m["receipt"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Receipt).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Receipt
+	}()
+
 	return m
 }
 
@@ -323,7 +332,7 @@ func (t *CCVRegistryIssueCCVTicket) UnmarshalJSON(data []byte) error {
 // CCVRegistryIssueVerifyTicket is a Record type
 type CCVRegistryIssueVerifyTicket struct {
 	CcvOwner            PARTY   `json:"ccvOwner"`
-	CcvData             TEXT    `json:"ccvData"`
+	VerifierResults     TEXT    `json:"verifierResults"`
 	MessageHash         TEXT    `json:"messageHash"`
 	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
 	SequenceNumber      NUMERIC `json:"sequenceNumber"`
@@ -336,7 +345,7 @@ func (t CCVRegistryIssueVerifyTicket) ToMap() map[string]interface{} {
 
 	m["ccvOwner"] = t.CcvOwner.ToMap()
 
-	m["ccvData"] = string(t.CcvData)
+	m["verifierResults"] = string(t.VerifierResults)
 
 	m["messageHash"] = string(t.MessageHash)
 
@@ -369,6 +378,7 @@ type CCVTicket struct {
 	Sender               PARTY   `json:"sender"`
 	VerifierBlob         TEXT    `json:"verifierBlob"`
 	MessageSentObservers []PARTY `json:"messageSentObservers"`
+	Receipt              Receipt `json:"receipt"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -399,6 +409,14 @@ func (t CCVTicket) CreateCommand() *model.CreateCommand {
 			return res
 		}()
 	}
+
+	args["receipt"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Receipt).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Receipt
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -712,12 +730,12 @@ func (t *CrossChainVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 
 // CrossChainVerifierVerifyMessage is a Record type
 type CrossChainVerifierVerifyMessage struct {
-	CcvRegistryCid CONTRACT_ID `json:"ccvRegistryCid"`
-	Message        MessageV1   `json:"message"`
-	MessageId      TEXT        `json:"messageId"`
-	CcvData        TEXT        `json:"ccvData"`
-	Receiver       PARTY       `json:"receiver"`
-	Caller         PARTY       `json:"caller"`
+	CcvRegistryCid  CONTRACT_ID `json:"ccvRegistryCid"`
+	Message         MessageV1   `json:"message"`
+	MessageId       TEXT        `json:"messageId"`
+	VerifierResults TEXT        `json:"verifierResults"`
+	Receiver        PARTY       `json:"receiver"`
+	Caller          PARTY       `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierVerifyMessage to a map for DAML arguments
@@ -742,7 +760,7 @@ func (t CrossChainVerifierVerifyMessage) ToMap() map[string]interface{} {
 
 	m["messageId"] = string(t.MessageId)
 
-	m["ccvData"] = string(t.CcvData)
+	m["verifierResults"] = string(t.VerifierResults)
 
 	m["receiver"] = t.Receiver.ToMap()
 
@@ -1087,6 +1105,44 @@ func (t *MessageV1) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// Receipt is a Record type
+type Receipt struct {
+	Issuer            TEXT    `json:"issuer"`
+	DestGasLimit      INT64   `json:"destGasLimit"`
+	DestBytesOverhead INT64   `json:"destBytesOverhead"`
+	FeeTokenAmount    NUMERIC `json:"feeTokenAmount"`
+	ExtraArgs         TEXT    `json:"extraArgs"`
+}
+
+// ToMap converts Receipt to a map for DAML arguments
+func (t Receipt) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["issuer"] = string(t.Issuer)
+
+	m["destGasLimit"] = int64(t.DestGasLimit)
+
+	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
+
+	m["feeTokenAmount"] = (*big.Int)(t.FeeTokenAmount)
+
+	m["extraArgs"] = string(t.ExtraArgs)
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for Receipt using JsonCodec
+func (t Receipt) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Receipt using JsonCodec
+func (t *Receipt) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        BOOL   `json:"isEnabled"`
@@ -1169,17 +1225,120 @@ func (t *TokenAmount) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// TokenPoolCCVVerifiedTicket is a Template type
+type TokenPoolCCVVerifiedTicket struct {
+	PoolOwner           PARTY   `json:"poolOwner"`
+	CcipOwner           PARTY   `json:"ccipOwner"`
+	Receiver            PARTY   `json:"receiver"`
+	MessageHash         TEXT    `json:"messageHash"`
+	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
+	VerifiedCCVIds      []TEXT  `json:"verifiedCCVIds"`
+}
+
+// GetTemplateID returns the template ID for this template
+func (t TokenPoolCCVVerifiedTicket) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.Tickets", "TokenPoolCCVVerifiedTicket")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t TokenPoolCCVVerifiedTicket) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	args["poolOwner"] = t.PoolOwner.ToMap()
+
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	args["receiver"] = t.Receiver.ToMap()
+
+	args["messageHash"] = string(t.MessageHash)
+
+	if t.SourceChainSelector != nil {
+		args["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	}
+
+	if len(t.VerifiedCCVIds) > 0 {
+		args["verifiedCCVIds"] = func() []interface{} {
+			res := make([]interface{}, 0, len(t.VerifiedCCVIds))
+			for _, e := range t.VerifiedCCVIds {
+				res = append(res, string(e))
+			}
+			return res
+		}()
+	}
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// MarshalJSON implements custom JSON marshaling for TokenPoolCCVVerifiedTicket using JsonCodec
+func (t TokenPoolCCVVerifiedTicket) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolCCVVerifiedTicket using JsonCodec
+func (t *TokenPoolCCVVerifiedTicket) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// Choice methods for TokenPoolCCVVerifiedTicket
+
+// TokenPoolCCVVerifiedTicketConsume exercises the TokenPoolCCVVerifiedTicket_Consume choice on this TokenPoolCCVVerifiedTicket contract
+func (t TokenPoolCCVVerifiedTicket) TokenPoolCCVVerifiedTicketConsume(contractID string, args TokenPoolCCVVerifiedTicketConsume) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.Tickets", "TokenPoolCCVVerifiedTicket"),
+		ContractID: contractID,
+		Choice:     "TokenPoolCCVVerifiedTicket_Consume",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this TokenPoolCCVVerifiedTicket contract
+func (t TokenPoolCCVVerifiedTicket) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.Tickets", "TokenPoolCCVVerifiedTicket"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// TokenPoolCCVVerifiedTicketConsume is a Record type
+type TokenPoolCCVVerifiedTicketConsume struct {
+}
+
+// ToMap converts TokenPoolCCVVerifiedTicketConsume to a map for DAML arguments
+func (t TokenPoolCCVVerifiedTicketConsume) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
+}
+
+// MarshalJSON implements custom JSON marshaling for TokenPoolCCVVerifiedTicketConsume using JsonCodec
+func (t TokenPoolCCVVerifiedTicketConsume) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolCCVVerifiedTicketConsume using JsonCodec
+func (t *TokenPoolCCVVerifiedTicketConsume) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // TokenReceiveTicket is a Template type
 type TokenReceiveTicket struct {
-	CcipOwner           PARTY    `json:"ccipOwner"`
-	Receiver            PARTY    `json:"receiver"`
-	MessageHash         TEXT     `json:"messageHash"`
-	SourceChainSelector NUMERIC  `json:"sourceChainSelector"`
-	SequenceNumber      NUMERIC  `json:"sequenceNumber"`
-	HasTokenTransfer    BOOL     `json:"hasTokenTransfer"`
-	TokenAmount         *NUMERIC `json:"tokenAmount"`
-	DestTokenAddress    *TEXT    `json:"destTokenAddress"`
-	TokenReceiver       *PARTY   `json:"tokenReceiver"`
+	CcipOwner           PARTY        `json:"ccipOwner"`
+	PoolOwner           PARTY        `json:"poolOwner"`
+	Receiver            PARTY        `json:"receiver"`
+	TokenReceiver       PARTY        `json:"tokenReceiver"`
+	InstrumentId        InstrumentId `json:"instrumentId"`
+	Amount              NUMERIC      `json:"amount"`
+	MessageHash         TEXT         `json:"messageHash"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -1193,51 +1352,28 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
+	args["poolOwner"] = t.PoolOwner.ToMap()
+
 	args["receiver"] = t.Receiver.ToMap()
+
+	args["tokenReceiver"] = t.TokenReceiver.ToMap()
+
+	args["instrumentId"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
+
+	if t.Amount != nil {
+		args["amount"] = (*big.Int)(t.Amount)
+	}
 
 	args["messageHash"] = string(t.MessageHash)
 
 	if t.SourceChainSelector != nil {
 		args["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
-	}
-
-	if t.SequenceNumber != nil {
-		args["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
-	}
-
-	args["hasTokenTransfer"] = bool(t.HasTokenTransfer)
-
-	if t.TokenAmount != nil {
-		args["tokenAmount"] = map[string]interface{}{
-			"_type": "optional",
-			"value": (*big.Int)(*t.TokenAmount),
-		}
-	} else {
-		args["tokenAmount"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	if t.DestTokenAddress != nil {
-		args["destTokenAddress"] = map[string]interface{}{
-			"_type": "optional",
-			"value": string(*t.DestTokenAddress),
-		}
-	} else {
-		args["destTokenAddress"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	if t.TokenReceiver != nil {
-		args["tokenReceiver"] = map[string]interface{}{
-			"_type": "optional",
-			"value": (*t.TokenReceiver).ToMap(),
-		}
-	} else {
-		args["tokenReceiver"] = map[string]interface{}{
-			"_type": "optional",
-		}
 	}
 
 	return &model.CreateCommand{
@@ -1314,6 +1450,7 @@ type TokenSendTicket struct {
 	DestTokenAddress   TEXT         `json:"destTokenAddress"`
 	TokenReceiver      TEXT         `json:"tokenReceiver"`
 	ExtraData          TEXT         `json:"extraData"`
+	Receipt            Receipt      `json:"receipt"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -1350,6 +1487,14 @@ func (t TokenSendTicket) CreateCommand() *model.CreateCommand {
 	args["tokenReceiver"] = string(t.TokenReceiver)
 
 	args["extraData"] = string(t.ExtraData)
+
+	args["receipt"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Receipt).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Receipt
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),

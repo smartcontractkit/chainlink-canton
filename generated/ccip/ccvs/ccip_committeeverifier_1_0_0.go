@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "60ab65f876d9fcb12cd327fff8aafd91c8c42d2bc4cfe0722025267484666724"
+const PackageID = "b09db36c65a5d8e5edd9184f67f5e6ef13fad2cd1790fad5389aee97f7e49141"
 const SDKVersion = "3.4.8"
 
 type Template interface {
@@ -231,12 +231,12 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	CcvRegistryCid CONTRACT_ID `json:"ccvRegistryCid"`
-	Message        MessageV1   `json:"message"`
-	MessageId      TEXT        `json:"messageId"`
-	CcvData        TEXT        `json:"ccvData"`
-	Receiver       PARTY       `json:"receiver"`
-	Caller         PARTY       `json:"caller"`
+	CcvRegistryCid  CONTRACT_ID `json:"ccvRegistryCid"`
+	Message         MessageV1   `json:"message"`
+	MessageId       TEXT        `json:"messageId"`
+	VerifierResults TEXT        `json:"verifierResults"`
+	Receiver        PARTY       `json:"receiver"`
+	Caller          PARTY       `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
@@ -261,7 +261,7 @@ func (t CommitteeVerifierVerifyMessage) ToMap() map[string]interface{} {
 
 	m["messageId"] = string(t.MessageId)
 
-	m["ccvData"] = string(t.CcvData)
+	m["verifierResults"] = string(t.VerifierResults)
 
 	m["receiver"] = t.Receiver.ToMap()
 
