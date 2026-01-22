@@ -78,9 +78,12 @@ func NewParticipantWithOpts(adminApiURL string, adminOpts []grpc.DialOption, led
 }
 
 // NewParticipant creates a new Participant with insecure gRPC connections (no TLS).
+// Sets explicit authority for each connection to avoid gRPC connection pooling issues.
 func NewParticipant(adminApiURL, ledgerApiURL string) (*Participant, error) {
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-	return NewParticipantWithOpts(adminApiURL, opts, ledgerApiURL, opts)
+	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	adminOpts := []grpc.DialOption{insecureCreds, grpc.WithAuthority(adminApiURL)}
+	ledgerOpts := []grpc.DialOption{insecureCreds, grpc.WithAuthority(ledgerApiURL)}
+	return NewParticipantWithOpts(adminApiURL, adminOpts, ledgerApiURL, ledgerOpts)
 }
 
 func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, participants ...*Participant) ([]string, error) {

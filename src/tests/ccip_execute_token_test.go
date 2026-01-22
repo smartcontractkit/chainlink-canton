@@ -18,8 +18,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/securityprovider"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
@@ -53,18 +51,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	// Setup participants
-	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	ccipParticipant, err := NewParticipantWithOpts(
-		"localhost:1201", []grpc.DialOption{insecureCreds, grpc.WithAuthority("canton:1201")},
-		"localhost:1301", []grpc.DialOption{insecureCreds, grpc.WithAuthority("canton:1301")})
+	ccipParticipant, err := NewParticipant("localhost:1201", "localhost:1301")
 	require.NoError(t, err)
-	receiverParticipant, err := NewParticipantWithOpts(
-		"localhost:1202", []grpc.DialOption{insecureCreds, grpc.WithAuthority("canton:1202")},
-		"localhost:1302", []grpc.DialOption{insecureCreds, grpc.WithAuthority("canton:1302")})
+	receiverParticipant, err := NewParticipant("localhost:1202", "localhost:1302")
 	require.NoError(t, err)
-	tokenPoolOwnerParticipant, err := NewParticipantWithOpts(
-		"localhost:1203", []grpc.DialOption{insecureCreds, grpc.WithAuthority("canton:1203")},
-		"localhost:1303", []grpc.DialOption{insecureCreds, grpc.WithAuthority("canton:1303")})
+	tokenPoolOwnerParticipant, err := NewParticipant("localhost:1203", "localhost:1303")
 	require.NoError(t, err)
 
 	// DAR Uploading
