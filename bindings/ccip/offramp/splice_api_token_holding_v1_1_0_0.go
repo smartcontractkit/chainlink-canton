@@ -26,11 +26,15 @@ type IHolding interface {
 
 // HoldingView is a Record type
 type HoldingView struct {
-	Owner        PARTY        `json:"owner"`
+	Owner PARTY `json:"owner"`
+
 	InstrumentId InstrumentId `json:"instrumentId"`
-	Amount       NUMERIC      `json:"amount"`
-	Lock         *Lock        `json:"lock"`
-	Meta         Metadata     `json:"meta"`
+
+	Amount NUMERIC `json:"amount"`
+
+	Lock *Lock `json:"lock"`
+
+	Meta Metadata `json:"meta"`
 }
 
 // ToMap converts HoldingView to a map for DAML arguments
@@ -71,13 +75,11 @@ func (t HoldingView) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for HoldingView using JsonCodec
 func (t HoldingView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for HoldingView using JsonCodec
 func (t *HoldingView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -86,7 +88,8 @@ func (t *HoldingView) UnmarshalJSON(data []byte) error {
 // InstrumentId is a Record type
 type InstrumentId struct {
 	Admin PARTY `json:"admin"`
-	Id    TEXT  `json:"id"`
+
+	Id TEXT `json:"id"`
 }
 
 // ToMap converts InstrumentId to a map for DAML arguments
@@ -100,13 +103,11 @@ func (t InstrumentId) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for InstrumentId using JsonCodec
 func (t InstrumentId) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for InstrumentId using JsonCodec
 func (t *InstrumentId) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -114,10 +115,13 @@ func (t *InstrumentId) UnmarshalJSON(data []byte) error {
 
 // Lock is a Record type
 type Lock struct {
-	Holders      []PARTY    `json:"holders"`
-	ExpiresAt    *TIMESTAMP `json:"expiresAt"`
-	ExpiresAfter RELTIME    `json:"expiresAfter"`
-	Context      *TEXT      `json:"context"`
+	Holders []PARTY `json:"holders"`
+
+	ExpiresAt *TIMESTAMP `json:"expiresAt"`
+
+	ExpiresAfter RELTIME `json:"expiresAfter"`
+
+	Context *TEXT `json:"context"`
 }
 
 // ToMap converts Lock to a map for DAML arguments
@@ -165,13 +169,11 @@ func (t Lock) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for Lock using JsonCodec
 func (t Lock) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Lock using JsonCodec
 func (t *Lock) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

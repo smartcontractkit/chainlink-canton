@@ -53,25 +53,24 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
-
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{
-		"args": args,
-	}
+	return map[string]interface{}{"args": args}
 }
 
 // FeeInput is a Record type
 type FeeInput struct {
-	InstrumentId     InstrumentId  `json:"instrumentId"`
-	TransferFactory  CONTRACT_ID   `json:"transferFactory"`
-	ExtraArgs        ExtraArgs     `json:"extraArgs"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	TransferFactory CONTRACT_ID `json:"transferFactory"`
+
+	ExtraArgs ExtraArgs `json:"extraArgs"`
+
 	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
 }
 
@@ -114,13 +113,11 @@ func (t FeeInput) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for FeeInput using JsonCodec
 func (t FeeInput) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for FeeInput using JsonCodec
 func (t *FeeInput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -128,7 +125,8 @@ func (t *FeeInput) UnmarshalJSON(data []byte) error {
 
 // LockOrBurnResult is a Record type
 type LockOrBurnResult struct {
-	PoolChangeCids   []CONTRACT_ID `json:"poolChangeCids"`
+	PoolChangeCids []CONTRACT_ID `json:"poolChangeCids"`
+
 	SenderChangeCids []CONTRACT_ID `json:"senderChangeCids"`
 }
 
@@ -155,13 +153,11 @@ func (t LockOrBurnResult) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for LockOrBurnResult using JsonCodec
 func (t LockOrBurnResult) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for LockOrBurnResult using JsonCodec
 func (t *LockOrBurnResult) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -169,8 +165,9 @@ func (t *LockOrBurnResult) UnmarshalJSON(data []byte) error {
 
 // ReleaseOrMintResult is a Record type
 type ReleaseOrMintResult struct {
-	Output         ReleaseOrMintResultOutput `json:"output"`
-	PoolChangeCids []CONTRACT_ID             `json:"poolChangeCids"`
+	Output ReleaseOrMintResultOutput `json:"output"`
+
+	PoolChangeCids []CONTRACT_ID `json:"poolChangeCids"`
 }
 
 // ToMap converts ReleaseOrMintResult to a map for DAML arguments
@@ -196,13 +193,11 @@ func (t ReleaseOrMintResult) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for ReleaseOrMintResult using JsonCodec
 func (t ReleaseOrMintResult) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ReleaseOrMintResult using JsonCodec
 func (t *ReleaseOrMintResult) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -228,13 +223,11 @@ func (t ReleaseOrMintResultCompleted) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for ReleaseOrMintResultCompleted using JsonCodec
 func (t ReleaseOrMintResultCompleted) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ReleaseOrMintResultCompleted using JsonCodec
 func (t *ReleaseOrMintResultCompleted) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -242,7 +235,8 @@ func (t *ReleaseOrMintResultCompleted) UnmarshalJSON(data []byte) error {
 
 // ReleaseOrMintResultOutput is a variant/union type
 type ReleaseOrMintResultOutput struct {
-	ReleaseOrMintResultPending   *ReleaseOrMintResultPending   `json:"ReleaseOrMintResult_Pending,omitempty"`
+	ReleaseOrMintResultPending *ReleaseOrMintResultPending `json:"ReleaseOrMintResult_Pending,omitempty"`
+
 	ReleaseOrMintResultCompleted *ReleaseOrMintResultCompleted `json:"ReleaseOrMintResult_Completed,omitempty"`
 }
 
@@ -286,7 +280,6 @@ func (v ReleaseOrMintResultOutput) GetVariantValue() interface{} {
 	return nil
 }
 
-// Verify interface implementation
 var _ VARIANT = (*ReleaseOrMintResultOutput)(nil)
 
 // ReleaseOrMintResultPending is a Record type
@@ -309,13 +302,11 @@ func (t ReleaseOrMintResultPending) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for ReleaseOrMintResultPending using JsonCodec
 func (t ReleaseOrMintResultPending) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ReleaseOrMintResultPending using JsonCodec
 func (t *ReleaseOrMintResultPending) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -323,8 +314,10 @@ func (t *ReleaseOrMintResultPending) UnmarshalJSON(data []byte) error {
 
 // TokenInput is a Record type
 type TokenInput struct {
-	TransferFactory   CONTRACT_ID   `json:"transferFactory"`
-	ExtraArgs         ExtraArgs     `json:"extraArgs"`
+	TransferFactory CONTRACT_ID `json:"transferFactory"`
+
+	ExtraArgs ExtraArgs `json:"extraArgs"`
+
 	TokenPoolHoldings []CONTRACT_ID `json:"tokenPoolHoldings"`
 }
 
@@ -359,13 +352,11 @@ func (t TokenInput) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenInput using JsonCodec
 func (t TokenInput) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenInput using JsonCodec
 func (t *TokenInput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -373,8 +364,10 @@ func (t *TokenInput) UnmarshalJSON(data []byte) error {
 
 // TokenPoolView is a Record type
 type TokenPoolView struct {
-	Owner        PARTY        `json:"owner"`
-	CcipOwner    PARTY        `json:"ccipOwner"`
+	Owner PARTY `json:"owner"`
+
+	CcipOwner PARTY `json:"ccipOwner"`
+
 	InstrumentId InstrumentId `json:"instrumentId"`
 }
 
@@ -397,13 +390,11 @@ func (t TokenPoolView) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPoolView using JsonCodec
 func (t TokenPoolView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolView using JsonCodec
 func (t *TokenPoolView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -411,12 +402,17 @@ func (t *TokenPoolView) UnmarshalJSON(data []byte) error {
 
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
-	RemoteChainSelector NUMERIC           `json:"remoteChainSelector"`
-	Amount              NUMERIC           `json:"amount"`
-	Finality            INT64             `json:"finality"`
-	ExtraData           TEXT              `json:"extraData"`
-	Direction           TransferDirection `json:"direction"`
-	Caller              PARTY             `json:"caller"`
+	RemoteChainSelector NUMERIC `json:"remoteChainSelector"`
+
+	Amount NUMERIC `json:"amount"`
+
+	Finality INT64 `json:"finality"`
+
+	ExtraData TEXT `json:"extraData"`
+
+	Direction TransferDirection `json:"direction"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
@@ -444,13 +440,11 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPoolGetRequiredCCVs using JsonCodec
 func (t TokenPoolGetRequiredCCVs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolGetRequiredCCVs using JsonCodec
 func (t *TokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -458,15 +452,23 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
 
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
-	DestChainSelector     NUMERIC           `json:"destChainSelector"`
-	Message               Canton2AnyMessage `json:"message"`
-	TokenInput            TokenInput        `json:"tokenInput"`
-	FeeInput              FeeInput          `json:"feeInput"`
-	SenderInputCids       []CONTRACT_ID     `json:"senderInputCids"`
-	OnRampCid             CONTRACT_ID       `json:"onRampCid"`
-	FeeQuoterCid          CONTRACT_ID       `json:"feeQuoterCid"`
-	TokenAdminRegistryCid CONTRACT_ID       `json:"tokenAdminRegistryCid"`
-	Caller                PARTY             `json:"caller"`
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	Message Canton2AnyMessage `json:"message"`
+
+	TokenInput TokenInput `json:"tokenInput"`
+
+	FeeInput FeeInput `json:"feeInput"`
+
+	SenderInputCids []CONTRACT_ID `json:"senderInputCids"`
+
+	OnRampCid CONTRACT_ID `json:"onRampCid"`
+
+	FeeQuoterCid CONTRACT_ID `json:"feeQuoterCid"`
+
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
@@ -536,13 +538,11 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPoolLockOrBurn using JsonCodec
 func (t TokenPoolLockOrBurn) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolLockOrBurn using JsonCodec
 func (t *TokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -551,9 +551,12 @@ func (t *TokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
 // TokenPoolReleaseFromTicket is a Record type
 type TokenPoolReleaseFromTicket struct {
 	TokenReceiveTicketCid CONTRACT_ID `json:"tokenReceiveTicketCid"`
+
 	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	TokenInput            TokenInput  `json:"tokenInput"`
-	Caller                PARTY       `json:"caller"`
+
+	TokenInput TokenInput `json:"tokenInput"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenPoolReleaseFromTicket to a map for DAML arguments
@@ -589,13 +592,11 @@ func (t TokenPoolReleaseFromTicket) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPoolReleaseFromTicket using JsonCodec
 func (t TokenPoolReleaseFromTicket) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolReleaseFromTicket using JsonCodec
 func (t *TokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -603,12 +604,17 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
 
 // TokenPoolVerifyCCVs is a Record type
 type TokenPoolVerifyCCVs struct {
-	CcvVerifyTickets    []CONTRACT_ID `json:"ccvVerifyTickets"`
-	MessageHash         TEXT          `json:"messageHash"`
-	SourceChainSelector NUMERIC       `json:"sourceChainSelector"`
-	Amount              NUMERIC       `json:"amount"`
-	Receiver            PARTY         `json:"receiver"`
-	Caller              PARTY         `json:"caller"`
+	CcvVerifyTickets []CONTRACT_ID `json:"ccvVerifyTickets"`
+
+	MessageHash TEXT `json:"messageHash"`
+
+	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
+
+	Amount NUMERIC `json:"amount"`
+
+	Receiver PARTY `json:"receiver"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenPoolVerifyCCVs to a map for DAML arguments
@@ -636,13 +642,11 @@ func (t TokenPoolVerifyCCVs) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPoolVerifyCCVs using JsonCodec
 func (t TokenPoolVerifyCCVs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPoolVerifyCCVs using JsonCodec
 func (t *TokenPoolVerifyCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -653,32 +657,26 @@ type TransferDirection string
 
 const (
 	TransferDirectionOutbound TransferDirection = "Outbound"
-	TransferDirectionInbound  TransferDirection = "Inbound"
+
+	TransferDirectionInbound TransferDirection = "Inbound"
 )
 
-// GetEnumConstructor implements types.ENUM interface
-func (e TransferDirection) GetEnumConstructor() string {
-	return string(e)
-}
+func (e TransferDirection) GetEnumConstructor() string { return string(e) }
 
-// GetEnumTypeID implements types.ENUM interface
 func (e TransferDirection) GetEnumTypeID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.Interfaces.TokenPool", "TransferDirection")
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferDirection using JsonCodec
 func (e TransferDirection) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(e)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferDirection using JsonCodec
 func (e *TransferDirection) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, e)
 }
 
-// Verify interface implementation
 var _ ENUM = TransferDirection("")
 
 // IITokenPoolInterfaceID returns the interface ID for the IITokenPool interface

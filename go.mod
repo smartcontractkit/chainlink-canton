@@ -191,7 +191,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
 )
 
-replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260122211749-07f12aac9675
+replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260122230011-88bca2d21f5f
 
 require (
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
