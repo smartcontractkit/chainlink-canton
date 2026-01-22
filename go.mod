@@ -12,6 +12,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260116111622-f43b8c75cdda
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
