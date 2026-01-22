@@ -105,7 +105,7 @@ services:
     build:
       context: ./docker/console
       args:
-        BASE_NAME: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}
+        BASE_IMAGE: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}
     env_file:
       - ./env/common.env
     environment:
