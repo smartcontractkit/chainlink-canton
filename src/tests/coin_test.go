@@ -1233,7 +1233,7 @@ func TestCoin(t *testing.T) {
 	}
 	require.NotEmpty(t, holdingPkgID, "holding package not found on ledger (did the DAR include it?)")
 
-	// check how much bob owns via it's coinHoldingiD
+	// Template identifier for the CoinHolding template (packageId:module:entity).
 	holdingTemplateID := "38d5b6b6f815ced2f6bc8f81181719a3d1d7451808d1ce9795ce5ffd3de68ca2:Coin.Holding:CoinHolding"
 
 	coinHoldings, err := GetActiveContractsForPartyWithFilters(
