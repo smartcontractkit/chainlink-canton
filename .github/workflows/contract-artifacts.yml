@@ -1,4 +1,4 @@
-name: Contracts build + Bindings generation
+name: Contract artifacts
 
 on:
   push:
@@ -6,8 +6,32 @@ on:
   pull_request:
 
 jobs:
-  build-and-generate:
-    name: Build DARs + Generate Bindings
+  compile-contracts:
+    name: Compile contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+            go-version-file: go.mod
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Compile contracts
+        run: make compile-contracts
+      - name: Check if any files have been changed
+        run: |
+          if ! git diff --quiet HEAD; then
+              echo "The following artifacts don't match the latest compiled version, run \`make compile-contracts\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+              git diff --name-only | while read -r n ; do
+                  echo "- $n" >> $GITHUB_STEP_SUMMARY
+              done
+              exit 1
+          fi
+
+  generate-bindings:
+    name: Generate Bindings from Dar artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -17,19 +41,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
-      - name: Install DPM
-        uses: ./.github/actions/install-dpm
-
-      - name: Export DARs (compile once)
-        run: |
-          set -euo pipefail
-          rm -rf artifacts/dars
-          mkdir -p artifacts/dars
-          go run ./bindings/compile/cmd/export-dars -out artifacts/dars
-          ls -la artifacts/dars
-          test -f artifacts/dars/coin.dar
-          test -f artifacts/dars/mcms.dar
 
       - name: Add Go bin to PATH
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
@@ -63,9 +74,9 @@ jobs:
       - name: Verify generated files exist
         run: |
           set -euo pipefail
-          test -n "$(find generated/coin -name '*.go' -type f 2>/dev/null | head -1)"
-          test -n "$(find generated/ccip -name '*.go' -type f 2>/dev/null | head -1)"
-          test -n "$(find generated/mcms -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find bindings/coin -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find bindings/ccip -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find bindings/mcms -name '*.go' -type f 2>/dev/null | head -1)"
           echo "Generated files found"
 
       - name: Verify bindings are up-to-date

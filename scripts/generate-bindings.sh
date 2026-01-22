@@ -16,13 +16,13 @@ die() { log_error "$1"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-GEN_DIR="$PROJECT_ROOT/generated"
+GEN_DIR="$PROJECT_ROOT/bindings"
 COIN_OUTPUT_DIR="$GEN_DIR/coin"
 CCIP_OUTPUT_DIR="$GEN_DIR/ccip"
 MCMS_OUTPUT_DIR="$GEN_DIR/mcms"
 
 # DARs are exported by: go run ./bindings/compile/cmd/export-dars -out artifacts/dars
-DAR_DIR="$PROJECT_ROOT/artifacts/dars"
+DAR_DIR="$PROJECT_ROOT/contracts/dars"
 
 # Find godaml
 if command -v godaml >/dev/null 2>&1; then
@@ -105,30 +105,30 @@ run_godaml "$PROJECT_ROOT/contracts/dependencies/splice-api-token-burn-mint-v1-1
 # Coin (required)
 # -------------------------
 log_info "Generating coin bindings..."
-run_godaml "$DAR_DIR/coin.dar" "$COIN_OUTPUT_DIR" "coin" 1
+run_godaml "$DAR_DIR/coin-current.dar" "$COIN_OUTPUT_DIR" "coin" 1
 [ -n "$(find "$COIN_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for coin"
 
 # -------------------------
 # CCIP (required)
 # -------------------------
 log_info "Generating CCIP bindings..."
-run_godaml "$DAR_DIR/ccip-common.dar"               "$CCIP_OUTPUT_DIR/common"               "common"               1
-run_godaml "$DAR_DIR/ccip-feequoter.dar"            "$CCIP_OUTPUT_DIR/feequoter"            "feequoter"            1
-run_godaml "$DAR_DIR/ccip-tokenadminregistry.dar"   "$CCIP_OUTPUT_DIR/tokenadminregistry"   "tokenadminregistry"   1
-run_godaml "$DAR_DIR/ccip-receiver.dar"             "$CCIP_OUTPUT_DIR/ccipreceiver"         "ccipreceiver"         1
-run_godaml "$DAR_DIR/ccip-committeeverifier.dar"    "$CCIP_OUTPUT_DIR/ccvs"                 "ccvs"                 1
-run_godaml "$DAR_DIR/ccip-onramp.dar"               "$CCIP_OUTPUT_DIR/onramp"               "onramp"               1
-run_godaml "$DAR_DIR/ccip-offramp.dar"              "$CCIP_OUTPUT_DIR/offramp"              "offramp"              1
-run_godaml "$DAR_DIR/ccip-perpartyrouter.dar"       "$CCIP_OUTPUT_DIR/perpartyrouter"       "perpartyrouter"       1
-run_godaml "$DAR_DIR/ccip-tokenpool-interfaces.dar" "$CCIP_OUTPUT_DIR/interfaces"           "interfaces"           1
-run_godaml "$DAR_DIR/ccip-lockreleasetokenpool.dar" "$CCIP_OUTPUT_DIR/lockreleasetokenpool" "lockreleasetokenpool" 1
+run_godaml "$DAR_DIR/ccip-common-current.dar"               "$CCIP_OUTPUT_DIR/common"               "common"               1
+run_godaml "$DAR_DIR/ccip-feequoter-current.dar"            "$CCIP_OUTPUT_DIR/feequoter"            "feequoter"            1
+run_godaml "$DAR_DIR/ccip-tokenadminregistry-current.dar"   "$CCIP_OUTPUT_DIR/tokenadminregistry"   "tokenadminregistry"   1
+run_godaml "$DAR_DIR/ccip-receiver-current.dar"             "$CCIP_OUTPUT_DIR/ccipreceiver"         "ccipreceiver"         1
+run_godaml "$DAR_DIR/ccip-committeeverifier-current.dar"    "$CCIP_OUTPUT_DIR/ccvs"                 "ccvs"                 1
+run_godaml "$DAR_DIR/ccip-onramp-current.dar"               "$CCIP_OUTPUT_DIR/onramp"               "onramp"               1
+run_godaml "$DAR_DIR/ccip-offramp-current.dar"              "$CCIP_OUTPUT_DIR/offramp"              "offramp"              1
+run_godaml "$DAR_DIR/ccip-perpartyrouter-current.dar"       "$CCIP_OUTPUT_DIR/perpartyrouter"       "perpartyrouter"       1
+run_godaml "$DAR_DIR/ccip-tokenpool-interfaces-current.dar" "$CCIP_OUTPUT_DIR/interfaces"           "interfaces"           1
+run_godaml "$DAR_DIR/ccip-lockreleasetokenpool-current.dar" "$CCIP_OUTPUT_DIR/lockreleasetokenpool" "lockreleasetokenpool" 1
 [ -n "$(find "$CCIP_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for CCIP"
 
 # -------------------------
 # MCMS (required)
 # -------------------------
 log_info "Generating MCMS bindings..."
-run_godaml "$DAR_DIR/mcms.dar" "$MCMS_OUTPUT_DIR" "mcms" 1
+run_godaml "$DAR_DIR/mcms-current.dar" "$MCMS_OUTPUT_DIR" "mcms" 1
 [ -n "$(find "$MCMS_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for MCMS"
 
 log_info "All code generation complete!"
