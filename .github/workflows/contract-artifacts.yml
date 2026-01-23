@@ -52,7 +52,7 @@ jobs:
           mkdir -p "$GOBIN"
 
           echo "Building godaml from source..."
-          git clone --depth 1 https://github.com/stackman27/go-daml.git /tmp/go-daml
+          git clone https://github.com/stackman27/go-daml.git /tmp/go-daml
           cd /tmp/go-daml
           git checkout 07f12aac9675c2f2cdd2545f382525678621c497
 
