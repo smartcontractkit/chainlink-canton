@@ -249,6 +249,99 @@ var deployTokenAdminRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, 
 }
 
 // ============================================================================
+// CCV Registry Operations
+// ============================================================================
+
+// DeployCCVRegistryInput contains input for deploying CCVRegistry
+type DeployCCVRegistryInput struct {
+	InstanceID string
+}
+
+// DeployCCVRegistryOutput contains the deployed contract ID
+type DeployCCVRegistryOutput struct {
+	CCVRegistryContractID string
+	CCVRegistryTemplateID string
+}
+
+var deployCCVRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input DeployCCVRegistryInput) (output CantonOpResult[DeployCCVRegistryOutput], err error) {
+	ctx := b.GetContext()
+
+	// CCVRegistry is part of CCIP Common package, so we need to ensure it's uploaded
+	// Check if CCIP Common is already uploaded, if not upload it
+	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
+	if err != nil {
+		return CantonOpResult[DeployCCVRegistryOutput]{}, fmt.Errorf("failed to get DAR for package %s: %w", contracts.CCIPCommon, err)
+	}
+
+	// Try to validate and upload (may already be uploaded, but that's okay)
+	submissionID := "validate-ccv-registry-" + time.Now().Format("20060102150405")
+	err = deps.BindingClient.PackageMng.ValidateDarFile(ctx, commonDar, submissionID)
+	if err != nil {
+		// If validation fails, it might already be uploaded, continue anyway
+		// In a real scenario, you might want to check if the package is already known
+	}
+	uploadSubmissionID := "upload-ccv-registry-" + time.Now().Format("20060102150405")
+	err = deps.BindingClient.PackageMng.UploadDarFile(ctx, commonDar, uploadSubmissionID)
+	if err != nil {
+		// If upload fails, it might already be uploaded, continue anyway
+		// In a real scenario, you might want to check if the package is already known
+	}
+
+	// Create CCVRegistry contract
+	ccvRegistry := common.CCVRegistry{
+		CcipOwner:  types.PARTY(deps.Party),
+		InstanceId: types.TEXT(input.InstanceID),
+	}
+
+	// Submit via binding client's CommandService
+	commandID := uuid.Must(uuid.NewUUID()).String()
+	cmds := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID: "ccip-ccv-registry-deploy",
+			UserID:     deps.UserID,
+			CommandID:  commandID,
+			ActAs:      []string{deps.Party},
+			Commands:   []*model.Command{{Command: ccvRegistry.CreateCommand()}},
+		},
+	}
+
+	submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(ctx, cmds)
+	if err != nil {
+		return CantonOpResult[DeployCCVRegistryOutput]{}, fmt.Errorf("failed to submit CCVRegistry creation: %w", err)
+	}
+
+	// Retrieve the contract ID and template ID from the create event
+	ccvRegistryContractID := ""
+	ccvRegistryTemplateID := ""
+	for _, event := range submitResp.Transaction.Events {
+		if event.Created == nil {
+			continue
+		}
+
+		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
+		if normalizedTemplateID == "CCIP.CCVRegistry:CCVRegistry" {
+			ccvRegistryContractID = event.Created.ContractID
+			ccvRegistryTemplateID = event.Created.TemplateID
+			break
+		}
+	}
+
+	if ccvRegistryContractID == "" {
+		return CantonOpResult[DeployCCVRegistryOutput]{}, fmt.Errorf("failed to find CCVRegistry contract in transaction events")
+	}
+
+	fmt.Printf("Deployed CCVRegistry contract   id=%s\n", ccvRegistryContractID)
+
+	return CantonOpResult[DeployCCVRegistryOutput]{
+		TransactionID: commandID,
+		Output: DeployCCVRegistryOutput{
+			CCVRegistryContractID: ccvRegistryContractID,
+			CCVRegistryTemplateID: ccvRegistryTemplateID,
+		},
+	}, nil
+}
+
+// ============================================================================
 // Committee Verifier Operations
 // ============================================================================
 
@@ -555,8 +648,8 @@ type DeployPerPartyRouterInput struct {
 
 // DeployPerPartyRouterOutput contains the deployed contract ID
 type DeployPerPartyRouterOutput struct {
-	PerPartyRouterFactoryContractID string
-	PerPartyRouterFactoryTemplateID string
+	PerPartyRouterContractID string
+	PerPartyRouterTemplateID string
 }
 
 var deployPerPartyRouterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input DeployPerPartyRouterInput) (output CantonOpResult[DeployPerPartyRouterOutput], err error) {
@@ -579,11 +672,13 @@ var deployPerPartyRouterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inpu
 		return CantonOpResult[DeployPerPartyRouterOutput]{}, fmt.Errorf("failed to upload DAR file: %w", err)
 	}
 
-	// Create PerPartyRouterFactory contract (factory is deployed first, then users create their routers)
-	perPartyRouterFactory := perpartyrouter.PerPartyRouterFactory{
-		CcipOwner:         types.PARTY(deps.Party),
-		InstanceId:        types.TEXT(input.InstanceID),
-		RegisteredRouters: types.GENMAP{}, // Empty initially
+	// Create PerPartyRouter contract
+	perPartyRouter := perpartyrouter.PerPartyRouter{
+		PartyOwner:              types.PARTY(deps.Party),
+		InstanceId:              types.TEXT(input.InstanceID),
+		OutboundSequenceNumbers: types.GENMAP{},
+		ExecutionStates:         types.GENMAP{},
+		CcipOwner:               types.PARTY(deps.Party),
 	}
 
 	// Submit via binding client's CommandService
@@ -594,42 +689,42 @@ var deployPerPartyRouterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inpu
 			UserID:     deps.UserID,
 			CommandID:  commandID,
 			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: perPartyRouterFactory.CreateCommand()}},
+			Commands:   []*model.Command{{Command: perPartyRouter.CreateCommand()}},
 		},
 	}
 
 	submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(ctx, cmds)
 	if err != nil {
-		return CantonOpResult[DeployPerPartyRouterOutput]{}, fmt.Errorf("failed to submit PerPartyRouterFactory creation: %w", err)
+		return CantonOpResult[DeployPerPartyRouterOutput]{}, fmt.Errorf("failed to submit PerPartyRouter creation: %w", err)
 	}
 
 	// Retrieve the contract ID and template ID from the create event
-	perPartyRouterFactoryContractID := ""
-	perPartyRouterFactoryTemplateID := ""
+	perPartyRouterContractID := ""
+	perPartyRouterTemplateID := ""
 	for _, event := range submitResp.Transaction.Events {
 		if event.Created == nil {
 			continue
 		}
 
 		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
-		if normalizedTemplateID == "CCIP.PerPartyRouter:PerPartyRouterFactory" {
-			perPartyRouterFactoryContractID = event.Created.ContractID
-			perPartyRouterFactoryTemplateID = event.Created.TemplateID
+		if normalizedTemplateID == "CCIP.PerPartyRouter:PerPartyRouter" {
+			perPartyRouterContractID = event.Created.ContractID
+			perPartyRouterTemplateID = event.Created.TemplateID
 			break
 		}
 	}
 
-	if perPartyRouterFactoryContractID == "" {
-		return CantonOpResult[DeployPerPartyRouterOutput]{}, fmt.Errorf("failed to find PerPartyRouterFactory contract in transaction events")
+	if perPartyRouterContractID == "" {
+		return CantonOpResult[DeployPerPartyRouterOutput]{}, fmt.Errorf("failed to find PerPartyRouter contract in transaction events")
 	}
 
-	fmt.Printf("Deployed PerPartyRouterFactory contract   id=%s\n", perPartyRouterFactoryContractID)
+	fmt.Printf("Deployed PerPartyRouter contract   id=%s\n", perPartyRouterContractID)
 
 	return CantonOpResult[DeployPerPartyRouterOutput]{
 		TransactionID: commandID,
 		Output: DeployPerPartyRouterOutput{
-			PerPartyRouterFactoryContractID: perPartyRouterFactoryContractID,
-			PerPartyRouterFactoryTemplateID: perPartyRouterFactoryTemplateID,
+			PerPartyRouterContractID: perPartyRouterContractID,
+			PerPartyRouterTemplateID: perPartyRouterTemplateID,
 		},
 	}, nil
 }
@@ -743,6 +838,13 @@ var DeployTokenAdminRegistryOp = cld_ops.NewOperation(
 	deployTokenAdminRegistryHandler,
 )
 
+var DeployCCVRegistryOp = cld_ops.NewOperation(
+	"canton/ccip/ccvregistry/deploy",
+	semver.MustParse("0.1.0"),
+	"Deploys the CCIP CCVRegistry contract on Canton",
+	deployCCVRegistryHandler,
+)
+
 var DeployCommitteeVerifierOp = cld_ops.NewOperation(
 	"canton/ccip/committeeverifier/deploy",
 	semver.MustParse("0.1.0"),
@@ -767,7 +869,7 @@ var DeployOffRampOp = cld_ops.NewOperation(
 var DeployPerPartyRouterOp = cld_ops.NewOperation(
 	"canton/ccip/perpartyrouter/deploy",
 	semver.MustParse("0.1.0"),
-	"Deploys the CCIP PerPartyRouterFactory contract on Canton",
+	"Deploys the CCIP PerPartyRouter contract on Canton",
 	deployPerPartyRouterHandler,
 )
 

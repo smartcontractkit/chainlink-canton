@@ -7,15 +7,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/google/uuid"
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
 
@@ -75,37 +72,12 @@ func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 		require.NotEmpty(t, committeeVerifierTemplateID, "CommitteeVerifier template ID should not be empty")
 		t.Logf("Deployed CommitteeVerifier contract ID: %s", committeeVerifierContractID)
 
-		// Deploy CCVRegistry
-		ccvRegistry := common.CCVRegistry{
-			CcipOwner:  types.PARTY(deps.Party),
-			InstanceId: types.TEXT(instanceID),
-		}
-
-		commandID := uuid.Must(uuid.NewUUID()).String()
-		cmds := &model.SubmitAndWaitRequest{
-			Commands: &model.Commands{
-				WorkflowID: "ccv-registry-deploy",
-				UserID:     deps.UserID,
-				CommandID:  commandID,
-				ActAs:      []string{deps.Party},
-				Commands:   []*model.Command{{Command: ccvRegistry.CreateCommand()}},
-			},
-		}
-
-		submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(ctx, cmds)
+		// Deploy CCVRegistry using DeployCCVRegistryOp
+		ccvRegistryResult, err := cld_ops.ExecuteOperation(bundle, DeployCCVRegistryOp, deps, DeployCCVRegistryInput{
+			InstanceID: instanceID,
+		})
 		require.NoError(t, err, "failed to deploy CCVRegistry")
-
-		// Extract CCVRegistry contract ID
-		for _, event := range submitResp.Transaction.Events {
-			if event.Created == nil {
-				continue
-			}
-			normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
-			if normalizedTemplateID == "CCIP.CCVRegistry:CCVRegistry" {
-				ccvRegistryContractID = event.Created.ContractID
-				break
-			}
-		}
+		ccvRegistryContractID = ccvRegistryResult.Output.Output.CCVRegistryContractID
 		require.NotEmpty(t, ccvRegistryContractID, "CCVRegistry contract ID should not be empty")
 		t.Logf("Deployed CCVRegistry contract ID: %s", ccvRegistryContractID)
 	})

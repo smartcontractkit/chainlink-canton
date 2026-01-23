@@ -93,6 +93,19 @@ func TestDeployCCIPContracts(t *testing.T) {
 	})
 
 	// --------------------------
+	// Test CCV Registry Deployment
+	// --------------------------
+	t.Run("DeployCCVRegistry", func(t *testing.T) {
+		result, err := cld_ops.ExecuteOperation(bundle, DeployCCVRegistryOp, deps, DeployCCVRegistryInput{
+			InstanceID: instanceID,
+		})
+		require.NoError(t, err, "failed to deploy CCVRegistry")
+		require.NotEmpty(t, result.Output.Output.CCVRegistryContractID, "CCVRegistry contract ID should not be empty")
+		require.NotEmpty(t, result.Output.Output.CCVRegistryTemplateID, "CCVRegistry template ID should not be empty")
+		t.Logf("Deployed CCVRegistry contract ID: %s", result.Output.Output.CCVRegistryContractID)
+	})
+
+	// --------------------------
 	// Test Fee Quoter Deployment
 	// --------------------------
 	t.Run("DeployFeeQuoter", func(t *testing.T) {
@@ -126,9 +139,9 @@ func TestDeployCCIPContracts(t *testing.T) {
 			InstanceID: instanceID,
 		})
 		require.NoError(t, err, "failed to deploy PerPartyRouter")
-		require.NotEmpty(t, result.Output.Output.PerPartyRouterFactoryContractID, "PerPartyRouterFactory contract ID should not be empty")
-		require.NotEmpty(t, result.Output.Output.PerPartyRouterFactoryTemplateID, "PerPartyRouterFactory template ID should not be empty")
-		t.Logf("Deployed PerPartyRouterFactory contract ID: %s", result.Output.Output.PerPartyRouterFactoryContractID)
+		require.NotEmpty(t, result.Output.Output.PerPartyRouterContractID, "PerPartyRouter contract ID should not be empty")
+		require.NotEmpty(t, result.Output.Output.PerPartyRouterTemplateID, "PerPartyRouter template ID should not be empty")
+		t.Logf("Deployed PerPartyRouter contract ID: %s", result.Output.Output.PerPartyRouterContractID)
 	})
 
 	// --------------------------
