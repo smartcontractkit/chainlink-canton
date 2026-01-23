@@ -12,11 +12,16 @@ require (
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260116111622-f43b8c75cdda
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require github.com/shopspring/decimal v1.4.0 // indirect
+
+replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260122211749-07f12aac9675
 
 require (
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
@@ -31,6 +36,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
+	github.com/noders-team/go-daml v0.3.0
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect

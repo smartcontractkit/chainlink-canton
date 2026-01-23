@@ -1,0 +1,116 @@
+name: Contract artifacts
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+jobs:
+  compile-contracts:
+    name: Compile contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+            go-version-file: go.mod
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Compile contracts
+        run: make compile-contracts
+      - name: Check if any files have been changed
+        run: |
+          if ! git diff --quiet HEAD; then
+              echo "The following artifacts don't match the latest compiled version, run \`make compile-contracts\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+              git diff --name-only | while read -r n ; do
+                  echo "- $n" >> $GITHUB_STEP_SUMMARY
+              done
+              exit 1
+          fi
+
+  generate-bindings:
+    name: Generate Bindings from Dar artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Add Go bin to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Install godaml
+        run: |
+          set -euo pipefail
+          GOBIN="$(go env GOPATH)/bin"
+          mkdir -p "$GOBIN"
+
+          echo "Building godaml from source..."
+          git clone --depth 1 https://github.com/stackman27/go-daml.git /tmp/go-daml
+          cd /tmp/go-daml
+          git checkout 07f12aac9675c2f2cdd2545f382525678621c497
+
+          MAIN_DIRS="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | sed '/^$/d' || true)"
+          MAIN_DIR="$(echo "$MAIN_DIRS" | grep -E '/cmd/|/cli/' | head -n 1 || true)"
+          if [ -z "${MAIN_DIR:-}" ]; then MAIN_DIR="$(echo "$MAIN_DIRS" | head -n 1 || true)"; fi
+          if [ -z "${MAIN_DIR:-}" ]; then echo "Error: No Go 'main' package found"; exit 1; fi
+
+          go build -o "$GOBIN/godaml" "$MAIN_DIR"
+          command -v godaml >/dev/null
+          godaml -h >/dev/null
+
+      - name: Generate bindings
+        run: |
+          set -euo pipefail
+          chmod +x scripts/generate-bindings.sh
+          ./scripts/generate-bindings.sh
+
+      - name: Verify generated files exist
+        run: |
+          set -euo pipefail
+          test -n "$(find bindings/coin -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find bindings/ccip -name '*.go' -type f 2>/dev/null | head -1)"
+          test -n "$(find bindings/mcms -name '*.go' -type f 2>/dev/null | head -1)"
+          echo "Generated files found"
+
+      - name: Verify bindings are up-to-date
+        run: |
+          set -euo pipefail
+          
+          # Check for changes in the workspace
+          if ! git diff --quiet HEAD; then
+            echo "### Bindings are out of date!" >> $GITHUB_STEP_SUMMARY
+            echo "The bindings in the repository do not match the output of \`./scripts/generate-bindings.sh\` using godaml (Go 1.25.5)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### To fix this, run these commands locally and commit the result:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'gvm use go1.25.5' >> $GITHUB_STEP_SUMMARY
+            echo './scripts/generate-bindings.sh' >> $GITHUB_STEP_SUMMARY
+            echo 'git add . && git commit -m "chore: update generated bindings"' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            echo "#### Drifted Files:" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            git diff --name-only >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            # Show the raw diff in the CI log output for debugging
+            echo "Displaying diff for debugging..."
+            git diff
+            exit 1
+          else
+            echo "### Bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Cleanup exported DARs
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf artifacts/dars || true
+          echo "Cleaned artifacts/dars"

@@ -33,12 +33,35 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 	for k, v := range values {
 		f := v.(map[string]any)
 		tag := f["tag"].(string)
-		valueString := f["value"].(string)
+		rawValue := f["value"]
 
 		var value *apiv2.Value
-		switch tag { // TODO Add remaining cases
+		switch tag {
 		case "AV_ContractId":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
+			}
 			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
+		case "AV_Bool":
+			valueBool, ok := rawValue.(bool)
+			if !ok {
+				return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}
+		case "AV_Int":
+			// JSON numbers come as float64
+			valueFloat, ok := rawValue.(float64)
+			if !ok {
+				return nil, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}
+		case "AV_Text":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
 		default:
 			return nil, fmt.Errorf("unimplemented tag: %v", tag)
 		}
