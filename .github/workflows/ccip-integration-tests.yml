@@ -1,4 +1,4 @@
-name: Integration Tests
+name: CCIP Integration Tests
 on:
   push:
     branches: [develop, main]
@@ -6,23 +6,11 @@ on:
 
 jobs:
   test-coin:
-    name: Coin Integration Tests
+    name: TestCoin
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: integration-tests/go.mod
-      - name: Run Go tests
-        run: |
-          cd integration-tests/coin
-          go test -v -count 1 -timeout 20m ./...
-
-  test-ccip:
-    name: CCIP Integration Tests
+  test-ccip-execute:
+    name: TestCCIPExecuteE2E
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -34,4 +22,19 @@ jobs:
       - name: Run Go tests
         run: |
           cd integration-tests/ccip
-          go test -v -count 1 -timeout 20m ./...
+          go test -v -count 1 -timeout 20m -run TestCCIPExecuteE2E ./...
+
+  test-ccip-execute-token:
+    name: TestLnRTokenPool_FullReceiveFlow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: integration-tests/go.mod
+      - name: Run Go tests
+        run: |
+          cd integration-tests/ccip
+          go test -v -count 1 -timeout 20m -run TestLnRTokenPool_FullReceiveFlow ./...

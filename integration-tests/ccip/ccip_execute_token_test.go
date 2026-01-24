@@ -40,6 +40,8 @@ func encodeInstrumentId(admin, identifier string) ([]byte, error) {
 // - Call TokenPool_ReleaseFromTicket to transfer tokens from pool to receiver
 // - Verify receiver received the tokens
 func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
+	t.Parallel()
+
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(3))
 
 	// Setup participants
