@@ -1,10 +1,7 @@
 package tests
 
 import (
-	"context"
-	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,8 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
+	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 )
 
@@ -26,18 +24,11 @@ import (
 // 6. ExecuteOp - direct call to Counter via MCMSReceiver interface
 // 7. Verify counter value incremented
 func TestMCMS_ExecuteOpFlow(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	t.Parallel()
 
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
+
+	participant := env.Participant(1)
 
 	// ========================
 	// |   Setup: Upload DAR  |
@@ -45,10 +36,10 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	t.Log("Uploading MCMS DAR...")
 
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
 	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
 
@@ -56,9 +47,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	// |   Setup: Parties     |
 	// ========================
 
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
-	require.NoError(t, err)
-	ccipOwner := parties[0]
+	ccipOwner := participant.Party
 	t.Logf("Using party: %s", ccipOwner)
 
 	// ========================
@@ -153,7 +142,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	}}}
 
 	// Create MCMS contract (simplified - no ticket tracking)
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -198,7 +187,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	t.Log("Creating Counter contract with MCMSReceiver interface...")
 
-	counterCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	counterCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -303,7 +292,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	t.Log("Calling SetRoot...")
 
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -370,7 +359,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
 	}
 
-	executeOpRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	executeOpRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -472,7 +461,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	// Also query the ACS to verify the counter value
 	t.Log("Querying counter via ACS...")
-	counterContracts, err := GetActiveContractsForPartyTemplateId(ctx, participant, ccipOwner, &apiv2.Identifier{
+	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
 		PackageId:  "#mcms",
 		ModuleName: "MCMS.Counter",
 		EntityName: "Counter",
@@ -510,29 +499,31 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 // TestMCMS_SignatureVerificationFails tests that invalid signatures are rejected
 func TestMCMS_SignatureVerificationFails(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	t.Parallel()
 
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 
-	// Upload DAR
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
+	participant := env.Participant(1)
+
+	// ========================
+	// |   Setup: Upload DAR  |
+	// ========================
+
+	t.Log("Uploading MCMS DAR...")
+
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	// Setup party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
-	ccipOwner := parties[0]
+	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
+
+	// ========================
+	// |   Setup: Parties     |
+	// ========================
+
+	ccipOwner := participant.Party
+	t.Logf("Using party: %s", ccipOwner)
 
 	// Create signers
 	signer1, err := NewMCMSSigner()
@@ -589,7 +580,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 
 	// Create MCMS contract
 	t.Log("Creating MCMS contract...")
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -676,7 +667,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 
 	// Attempt SetRoot with invalid signatures - should fail
 	t.Log("Attempting SetRoot with invalid signatures...")
-	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -721,29 +712,31 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 
 // TestMCMS_ReplayProtection tests that the same root cannot be set twice
 func TestMCMS_ReplayProtection(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	t.Parallel()
 
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 
-	// Upload DAR
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
+	participant := env.Participant(1)
+
+	// ========================
+	// |   Setup: Upload DAR  |
+	// ========================
+
+	t.Log("Uploading MCMS DAR...")
+
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	// Setup party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
-	ccipOwner := parties[0]
+	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
+
+	// ========================
+	// |   Setup: Parties     |
+	// ========================
+
+	ccipOwner := participant.Party
+	t.Logf("Using party: %s", ccipOwner)
 
 	// Create signers
 	signer1, err := NewMCMSSigner()
@@ -801,7 +794,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	// Create MCMS contract
 	t.Log("Creating MCMS contract...")
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -884,7 +877,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	// First SetRoot - should succeed
 	t.Log("First SetRoot call (should succeed)...")
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -928,7 +921,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	// Second SetRoot with SAME signatures - should fail with E_ALREADY_SEEN_HASH
 	t.Log("Second SetRoot call with same signatures (should fail)...")
-	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -971,6 +964,8 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 // Run this test and copy the output to contracts/mcms/test/daml/MCMS/FlowTest.daml
 // This uses FIXED values (not random) so the output is deterministic.
 func TestMCMS_GenerateDamlTestValues(t *testing.T) {
+	t.Parallel()
+
 	t.Log("=======================================================================")
 	t.Log("GENERATING DAML TEST VALUES")
 	t.Log("Copy these values to contracts/mcms/test/daml/MCMS/FlowTest.daml")
@@ -1163,6 +1158,8 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 // TestMCMS_GenerateMcmsOpTestValues generates and prints test values for MCMS self-dispatch operations
 // These values can be used in Daml unit tests for cross-verification
 func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
+	t.Parallel()
+
 	t.Log("=======================================================================")
 	t.Log("GENERATING DAML TEST VALUES FOR MCMS OP (SELF-DISPATCH)")
 	t.Log("=======================================================================")
@@ -1363,43 +1360,34 @@ func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 // TestMCMS_ExecuteMcmsOp tests self-dispatch MCMS operations (Aptos pattern)
 // This demonstrates changing MCMS config via a signed proposal
 func TestMCMS_ExecuteMcmsOp(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	t.Parallel()
 
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
-	// Connect to random user participant
-	randomUserParticipant, err := NewParticipant(
-		"participant2.admin-api.localhost:8080",
-		"participant2.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
+	participant := env.Participant(1)
+	randomUserParticipant := env.Participant(2)
 
-	// Upload DAR
+	// ========================
+	// |   Setup: Upload DAR  |
+	// ========================
+
 	t.Log("Uploading MCMS DAR...")
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
+
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, randomUserParticipant)
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant, randomUserParticipant)
 	require.NoError(t, err)
+	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
 
-	// Setup party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant, randomUserParticipant)
-	require.NoError(t, err)
-	ccipOwner := parties[0]
-	randomUser := parties[1]
-	t.Logf("Using party: %s", ccipOwner)
-	t.Logf("Using party: %s", randomUser)
+	// ========================
+	// |   Setup: Parties     |
+	// ========================
+
+	ccipOwner := participant.Party
+	randomUser := randomUserParticipant.Party
+	t.Logf("Using CCIP party: %s", ccipOwner)
+	t.Logf("Using user party: %s", randomUser)
 
 	// ========================
 	// |   Setup: Signers     |
@@ -1472,7 +1460,7 @@ func TestMCMS_ExecuteMcmsOp(t *testing.T) {
 		},
 	}}}
 
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -1591,7 +1579,7 @@ func TestMCMS_ExecuteMcmsOp(t *testing.T) {
 
 	t.Log("Calling SetRoot with MCMS proposal...")
 
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -1635,7 +1623,7 @@ func TestMCMS_ExecuteMcmsOp(t *testing.T) {
 
 	// Query ACS to get disclosed contract with CreatedEventBlob (for bob to use)
 	// Transaction events don't include the blob by default, so we query the ACS
-	disclosedMcms, err := QueryDisclosedContract(ctx, mcmsCid, participant)
+	disclosedMcms, err := testhelpers.GetDisclosedContractById(t.Context(), participant, mcmsCid)
 	require.NoError(t, err, "Should get disclosed contract from ACS")
 	t.Logf("Got disclosed contract with blob size: %d bytes", len(disclosedMcms.CreatedEventBlob))
 
@@ -1681,7 +1669,7 @@ func TestMCMS_ExecuteMcmsOp(t *testing.T) {
 
 	// No separate params - params are encoded in op.operationData (like Aptos BCS)
 	// randomUser (bob) submits via randomUserParticipant with disclosed contract
-	_, err = randomUserParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = randomUserParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -1726,8 +1714,8 @@ func TestMCMS_ExecuteMcmsOp(t *testing.T) {
 	var newNumSigners int64 = -1
 	var newQuorum int64 = -1
 	var newMcmsCid string
-	offset, _ := GetCurrentOffset(ctx, participant)
-	acsRes, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+	offset, _ := testhelpers.GetCurrentOffset(t.Context(), participant)
+	acsRes, err := participant.StateServiceClient.GetActiveContracts(t.Context(), &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: offset,
 		EventFormat: &apiv2.EventFormat{
 			FiltersForAnyParty: &apiv2.Filters{Cumulative: []*apiv2.CumulativeFilter{
