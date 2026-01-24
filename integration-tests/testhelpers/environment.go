@@ -98,7 +98,6 @@ func LoadParticipantsWithCLDF(t *testing.T, numberOfValidators int) (Participant
 	for i, participant := range chain.Participants {
 		// This doesn't handle dynamic token providers yet, add if needed
 		jwt, err := participant.JWTProvider.Token(t.Context())
-		fmt.Printf("Using JWT for participant %v: %q\n", i+1, jwt)
 		require.NoErrorf(t, err, "Failed to get JWT token for participant %q", participant.Name)
 		participantConfig := ParticipantConfig{
 			Name:             participant.Name,

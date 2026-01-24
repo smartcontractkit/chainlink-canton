@@ -161,8 +161,6 @@ func EncodePartyID(partyID string) []byte {
 // TestCCIPExecuteE2E tests the full execute flow without token transfers.
 // Validates that the message payload returned from Execute matches the original.
 func TestCCIPExecuteE2E(t *testing.T) {
-	t.Parallel()
-
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
 	ccipParticipant := env.Participant(1)

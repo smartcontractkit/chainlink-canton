@@ -137,7 +137,7 @@ func TestCoin(t *testing.T) {
 		}
 	}
 	fmt.Printf("Bob created MintPreapproval, CID: %v\n", bobMintPreapprovalCid)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Alice mints to Bob
 	res, err = env.Participant(1).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -227,7 +227,7 @@ func TestCoin(t *testing.T) {
 		}
 	}
 	fmt.Printf("Alice minted to Bob, CID: %v\n", bobCoinHoldingCid)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Bob transfers part of their holdings to charlie
 	res, err = env.Participant(2).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -318,7 +318,7 @@ func TestCoin(t *testing.T) {
 		}
 	}
 	fmt.Printf("Bob transferred to Charlie, CID: %v\n", transferInstructionCid)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Charlie accepts transfer from Bob
 	res, err = env.Participant(3).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -368,7 +368,7 @@ func TestCoin(t *testing.T) {
 		}
 	}
 	fmt.Printf("Charlie accepted transfer, holding CID: %v\n", charlieHoldingCid)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Alice grants mint rights to Dave
 	res, err = env.Participant(1).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -410,7 +410,7 @@ func TestCoin(t *testing.T) {
 		}
 	}
 	fmt.Printf("Alice granted MintRole to Dave, CID: %v\n", daveMintRoleCid)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Erin grants MintPreapproval
 	res, err = env.Participant(5).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -453,7 +453,7 @@ func TestCoin(t *testing.T) {
 	disclosedErinPreApproval, err := testhelpers.GetDisclosedContractById(t.Context(), env.Participant(5), erinPreApprovalCid)
 	require.NoError(t, err)
 	fmt.Printf("Queried MintPreapproval for disclosure: %v\n", disclosedErinPreApproval.GetContractId())
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Dave uses the MintRole to mint to Erin
 

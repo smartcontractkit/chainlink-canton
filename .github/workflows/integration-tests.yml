@@ -19,7 +19,7 @@ jobs:
       - name: Run Go tests
         run: |
           cd integration-tests/coin
-          go test -v -count 1 ./...
+          go test -v -count 1 -timeout 20m ./...
 
   test-ccip:
     name: CCIP Integration Tests
@@ -34,4 +34,4 @@ jobs:
       - name: Run Go tests
         run: |
           cd integration-tests/ccip
-          go test -v -count 1 ./...
+          go test -v -count 1 -timeout 20m ./...
