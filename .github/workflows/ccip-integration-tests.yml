@@ -5,10 +5,6 @@ on:
   pull_request:
 
 jobs:
-  test-coin:
-    name: TestCoin
-    runs-on: ubuntu-latest
-
   test-ccip-execute:
     name: TestCCIPExecuteE2E
     runs-on: ubuntu-latest

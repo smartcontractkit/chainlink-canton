@@ -8,7 +8,6 @@ jobs:
   test-coin:
     name: TestCoin
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out code
         uses: actions/checkout@v4
