@@ -6,22 +6,23 @@ on:
 
 jobs:
   test-coin:
-    name: Coin
+    name: Coin Integration Tests
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: integration-tests/go.mod
       - name: Run Go tests
         run: |
           cd integration-tests/coin
           go test -v -count 1 ./...
 
   test-ccip:
-    name: CCIP
+    name: CCIP Integration Tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -29,7 +30,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: integration-tests/go.mod
       - name: Run Go tests
         run: |
           cd integration-tests/ccip
