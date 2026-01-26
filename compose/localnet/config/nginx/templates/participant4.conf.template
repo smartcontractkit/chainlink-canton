@@ -41,7 +41,7 @@ server {
 
 server {
     listen 8080;
-    server_name participant4.wallet.localhost;
+    server_name participant4.validator-api.localhost;
     location /api/validator {
         rewrite ^\/(.*) /$1 break;
         proxy_pass http://splice:${SPLICE_VALIDATOR_ADMIN_API_PORT_PREFIX}04/api/validator;

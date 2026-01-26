@@ -6,31 +6,25 @@
 //   - Generate ECDSA signatures and verify via CommitteeVerifier
 //   - Execute via PerPartyRouter
 //   - Validate the returned message payload matches the original
-//
-// Requires running localnet:
-//
-//	cd compose/localnet && docker compose up -d
-//	go test ./src/tests/... -run TestCCIPExecuteE2E -v
 
 package tests
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
+	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 )
 
@@ -162,41 +156,32 @@ func EncodePartyID(partyID string) []byte {
 // TestCCIPExecuteE2E tests the full execute flow without token transfers.
 // Validates that the message payload returned from Execute matches the original.
 func TestCCIPExecuteE2E(t *testing.T) {
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	t.Parallel()
 
-	// Setup participants
-	ccipParticipant, err := NewParticipant("localhost:1201", "localhost:1301")
-	require.NoError(t, err)
-	receiverParticipant, err := NewParticipant("localhost:1202", "localhost:1302")
-	require.NoError(t, err)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
+
+	ccipParticipant := env.Participant(1)
+	receiverParticipant := env.Participant(2)
 
 	// Upload DARs
-	commonDar, err := os.ReadFile("../../contracts/ccip/common/.daml/dist/ccip-common-1.0.0.dar")
+	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
 	require.NoError(t, err)
-	offRampDar, err := os.ReadFile("../../contracts/ccip/offramp/.daml/dist/ccip-offramp-1.0.0.dar")
+	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
 	require.NoError(t, err)
-	tokenAdminRegistryDar, err := os.ReadFile("../../contracts/ccip/tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-1.0.0.dar")
+	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
 	require.NoError(t, err)
-	committeeVerifierDar, err := os.ReadFile("../../contracts/ccip/ccvs/.daml/dist/ccip-committeeverifier-1.0.0.dar")
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
 	require.NoError(t, err)
-	perPartyRouterDar, err := os.ReadFile("../../contracts/ccip/perpartyrouter/.daml/dist/ccip-perpartyrouter-1.0.0.dar")
+	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
 	require.NoError(t, err)
 
 	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar}
-	_, err = UploadDARstoMultipleParticipants(ctx, dars, ccipParticipant)
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, dars, receiverParticipant)
-	require.NoError(t, err)
-	t.Log("Uploaded DARs to all participants")
+	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
+	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, ccipParticipant, receiverParticipant)
-	require.NoError(t, err)
-	partyCCIP := parties[0]
-	partyReceiver := parties[1]
+	partyCCIP := ccipParticipant.Party
+	partyReceiver := receiverParticipant.Party
 	t.Logf("Parties: CCIP=%s, Receiver=%s", partyCCIP, partyReceiver)
 
 	// Generate signer keys for CommitteeVerifier (3 signers, threshold 2)
@@ -212,7 +197,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
 	// Deploy CCVRegistry
-	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -234,7 +219,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Deploy CommitteeVerifier
 	versionTag := "49ff34ed"
 	ccvId := versionTag + "@" + partyCCIP
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -261,7 +246,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Deploy GlobalConfig with source chain config including the CCV
 	sourceChainSelector := "123"
 	destChainSelector := "456"
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -297,7 +282,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Deployed GlobalConfig: %s", globalConfigCid)
 
 	// Deploy TokenAdminRegistry (required by OffRamp even without token transfers)
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -318,7 +303,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Deployed TokenAdminRegistry: %s", tokenAdminRegistryCid)
 
 	// Deploy OffRamp
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -338,7 +323,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Deployed OffRamp: %s", offRampCid)
 
 	// Deploy PerPartyRouterFactory
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -359,12 +344,12 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Deployed PerPartyRouterFactory: %s", factoryCid)
 
 	// Create PerPartyRouter for receiver
-	disclosedFactory, err := getDisclosedContract(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
 	})
 	require.NoError(t, err)
 
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -427,11 +412,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	verifierResultsHex := hex.EncodeToString(verifierResults)
 
 	// Get disclosures for CommitteeVerifier_VerifyMessage
-	disclosedCCV, err := getDisclosedContract(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
 	})
 	require.NoError(t, err)
-	disclosedCCVRegistry, err := getDisclosedContract(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+	disclosedCCVRegistry, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-common", ModuleName: "CCIP.CCVRegistry", EntityName: "CCVRegistry",
 	})
 	require.NoError(t, err)
@@ -455,7 +440,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	}}}}
 
 	// Call CommitteeVerifier_VerifyMessage to get CCVVerifyTicket
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -492,29 +477,29 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Get disclosures for Execute
 	time.Sleep(500 * time.Millisecond)
-	disclosedRouter, err := getDisclosedContract(ctx, receiverParticipant, partyReceiver, &apiv2.Identifier{
+	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
 	require.NoError(t, err)
-	disclosedOffRamp, err := getDisclosedContract(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+	disclosedOffRamp, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-offramp", ModuleName: "CCIP.OffRamp", EntityName: "OffRamp",
 	})
 	require.NoError(t, err)
-	disclosedGlobalConfig, err := getDisclosedContract(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+	disclosedGlobalConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-common", ModuleName: "CCIP.GlobalConfig", EntityName: "GlobalConfig",
 	})
 	require.NoError(t, err)
-	disclosedTar, err := getDisclosedContract(ctx, ccipParticipant, partyCCIP, &apiv2.Identifier{
+	disclosedTar, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
 	})
 	require.NoError(t, err)
-	disclosedCCVVerifyTicket, err := getDisclosedContract(ctx, receiverParticipant, partyReceiver, &apiv2.Identifier{
+	disclosedCCVVerifyTicket, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-common", ModuleName: "CCIP.Tickets", EntityName: "CCVVerifyTicket",
 	})
 	require.NoError(t, err)
 
 	// Call PerPartyRouter.Execute
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
