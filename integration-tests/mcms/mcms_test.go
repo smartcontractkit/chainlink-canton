@@ -11,8 +11,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
+	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 )
 
@@ -29,31 +30,31 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 		t.Skip("Skipping integration test. Set INTEGRATION_TEST=1 to run.")
 	}
 
-	// Setup
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	t.Parallel()
 
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
+
+	participant := env.Participant(1)
+
+	// ========================
+	// |   Setup: Upload DAR  |
+	// ========================
+
+	t.Log("Uploading MCMS DAR...")
+
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	// Upload MCMS DAR
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
 	require.NoError(t, err)
+	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
 
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-	fmt.Printf("Uploaded MCMS DAR: %s\n", packageIDs)
+	// ========================
+	// |   Setup: Parties     |
+	// ========================
 
-	// Allocate party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
-	require.NoError(t, err)
-	mcmsOwner := parties[0]
-	fmt.Printf("MCMS Owner Party: %s\n", mcmsOwner)
+	mcmsOwner := participant.Party
+	t.Logf("Using party: %s", mcmsOwner)
 
 	// ===========================================================================
 	// Step 1: Generate Signers
@@ -82,7 +83,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	baseMcmsId := "mcms-test-001"
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
 
-	mcmsCid, err := createMCMS(ctx, participant, mcmsOwner, chainId, mcmsId)
+	mcmsCid, err := createMCMS(t.Context(), participant, mcmsOwner, chainId, mcmsId)
 	require.NoError(t, err)
 	fmt.Printf("Created MCMS: %s\n", mcmsCid)
 
@@ -92,7 +93,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	fmt.Println("\n=== Step 3: Configure Signers ===")
 
 	config := New2of3Config(signers)
-	mcmsCid, err = setMCMSConfig(ctx, participant, mcmsOwner, mcmsCid, config)
+	mcmsCid, err = setMCMSConfig(t.Context(), participant, mcmsOwner, mcmsCid, config)
 	require.NoError(t, err)
 	fmt.Printf("Configured MCMS with 2-of-3 config: %s\n", mcmsCid)
 
@@ -163,7 +164,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	// ===========================================================================
 	fmt.Println("\n=== Step 7: Submit SetRoot ===")
 
-	mcmsCid, err = setMCMSRoot(ctx, participant, mcmsOwner, mcmsCid,
+	mcmsCid, err = setMCMSRoot(t.Context(), participant, mcmsOwner, mcmsCid,
 		proposal.GetRoot(), validUntil, &proposal.Metadata, metadataProof, signatures)
 	require.NoError(t, err)
 	fmt.Printf("SetRoot succeeded! New MCMS CID: %s\n", mcmsCid)
@@ -188,6 +189,8 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 
 // TestMCMSCrypto_SignedHash tests the signed hash computation
 func TestMCMSCrypto_SignedHash(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("TEST: Signed Hash Computation")
 	fmt.Println(strings.Repeat("=", 80))
@@ -214,6 +217,8 @@ func TestMCMSCrypto_SignedHash(t *testing.T) {
 
 // TestMCMSCrypto_MerkleTree tests Merkle tree construction and proofs
 func TestMCMSCrypto_MerkleTree(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("TEST: Merkle Tree Construction & Proofs")
 	fmt.Println(strings.Repeat("=", 80))
@@ -260,6 +265,8 @@ func TestMCMSCrypto_MerkleTree(t *testing.T) {
 
 // TestMCMSCrypto_Signature tests ECDSA signing and recovery
 func TestMCMSCrypto_Signature(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("TEST: ECDSA secp256k1 Signing & Recovery")
 	fmt.Println(strings.Repeat("=", 80))
@@ -300,6 +307,8 @@ func TestMCMSCrypto_Signature(t *testing.T) {
 
 // TestMCMSCrypto_ProposalBuilder tests the full proposal building flow
 func TestMCMSCrypto_ProposalBuilder(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("TEST: Proposal Builder (Full Flow)")
 	fmt.Println(strings.Repeat("=", 80))
@@ -370,6 +379,8 @@ func TestMCMSCrypto_ProposalBuilder(t *testing.T) {
 
 // TestMCMSCrypto_2of3Config tests the 2-of-3 signer config generation
 func TestMCMSCrypto_2of3Config(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("TEST: 2-of-3 Signer Config")
 	fmt.Println(strings.Repeat("=", 80))
@@ -403,6 +414,8 @@ func TestMCMSCrypto_2of3Config(t *testing.T) {
 
 // TestMCMSCrypto_FullSigningFlow tests the full flow from proposal to signatures
 func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
+	t.Parallel()
+
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("TEST: Full MCMS Signing Flow (Copy these values to Daml tests!)")
 	fmt.Println(strings.Repeat("=", 80))
@@ -522,7 +535,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 // HELPER FUNCTIONS
 // ===========================================================================
 
-func createMCMS(ctx context.Context, participant *Participant, owner string, chainId int, mcmsId string) (string, error) {
+func createMCMS(ctx context.Context, participant testhelpers.Participant, owner string, chainId int, mcmsId string) (string, error) {
 	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
 	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
 	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -581,7 +594,7 @@ func createMCMS(ctx context.Context, participant *Participant, owner string, cha
 	return createRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId(), nil
 }
 
-func setMCMSConfig(ctx context.Context, participant *Participant, owner string, mcmsCid string, config MCMSConfig) (string, error) {
+func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, owner string, mcmsCid string, config MCMSConfig) (string, error) {
 	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
 	for i, si := range config.Signers {
 		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -643,7 +656,7 @@ func setMCMSConfig(ctx context.Context, participant *Participant, owner string, 
 	return "", fmt.Errorf("MCMS contract not found in SetConfig response")
 }
 
-func setMCMSRoot(ctx context.Context, participant *Participant, owner string, mcmsCid string,
+func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner string, mcmsCid string,
 	root string, validUntil time.Time, metadata *MCMSRootMetadata, metadataProof []string, signatures []RawSignature) (string, error) {
 
 	validUntilMicros := validUntil.UnixMicro()
@@ -734,6 +747,8 @@ func makeInt64List(count int, value int64) []*apiv2.Value {
 // TestMCMSCodec_SetConfigParams_Roundtrip tests that encoding and decoding
 // SetConfigParams produces the same result (like CCIP message codec tests)
 func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name   string
 		params SetConfigParams
@@ -800,6 +815,8 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Encode
 			encoded := EncodeSetConfigParams(tc.params)
 			t.Logf("Encoded %s: %s (%d hex chars = %d bytes)",
@@ -829,6 +846,8 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 
 // TestMCMSCodec_SetConfigParams_DecodeErrors tests that invalid data is rejected
 func TestMCMSCodec_SetConfigParams_DecodeErrors(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name    string
 		hexData string
@@ -863,6 +882,8 @@ func TestMCMSCodec_SetConfigParams_DecodeErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := DecodeSetConfigParams(tc.hexData)
 			require.Error(t, err, "should have failed to decode")
 			require.Contains(t, err.Error(), tc.errMsg)
@@ -873,6 +894,8 @@ func TestMCMSCodec_SetConfigParams_DecodeErrors(t *testing.T) {
 // TestMCMSCodec_SetConfigParams_KnownValues tests encoding against known/expected values
 // This ensures Go and Daml produce identical encodings
 func TestMCMSCodec_SetConfigParams_KnownValues(t *testing.T) {
+	t.Parallel()
+
 	// Test with a specific config and verify exact hex output
 	params := SetConfigParams{
 		Signers: []SignerInfo{
