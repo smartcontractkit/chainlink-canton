@@ -1,3 +1,9 @@
 # This tells GitHub to highlight Daml files as if they were Haskell. It's not
 # perfect, but it's better than no syntax highlighting at all.
 *.daml linguist-language=Haskell
+
+# Mark generated bindings as generated code
+bindings/** linguist-generated
+
+# Mark vendored Dars as vendored code
+contracts/dependencies/** linguist-vendored
