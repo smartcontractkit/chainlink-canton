@@ -8,7 +8,7 @@ registry_api_url="http://scan.localhost:8080"
 
 [[participants]]
 name="Participant 1"
-jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0" # long running JWT, valid for 10 years+
 username="ledger-api-user"
 json_ledger_api_url="http://participant1.json-ledger-api.localhost:8080"
 grpc_ledger_api_url="participant1.grpc-ledger-api.localhost:8080"
