@@ -1,0 +1,31 @@
+name: Lint Go
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gomods:
+    name: Go Modules Tidy Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Run gomods tidy
+        run: make gomodtidy
+      - name: Check if any files have been changed
+        run: |
+          if ! git diff --quiet HEAD; then
+              echo "The go modules are out-of-date, run \`make gomodtidy\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+              git diff --name-only | while read -r n ; do
+                  echo "- $n" >> $GITHUB_STEP_SUMMARY
+              done
+              exit 1
+          fi

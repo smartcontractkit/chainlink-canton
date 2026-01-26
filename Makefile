@@ -11,3 +11,7 @@ generate-bindings:
 
 .PHONY: contracts
 contracts: compile-contracts generate-bindings
+
+.PHONY: gomodtidy
+gomodtidy: ## Run go mod tidy on all modules.
+	go run github.com/jmank88/gomods@v0.1.7 tidy
