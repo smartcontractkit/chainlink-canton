@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-coin:
+  test-mcms:
     name: TestMCMS_Execute
     runs-on: ubuntu-latest
     steps:
