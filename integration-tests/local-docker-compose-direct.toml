@@ -1,0 +1,62 @@
+# Use this configuration file to run integration tests against a locally running Docker Compose environment.
+# This configuration does not use the Nginx reverse proxy, instead connecting directly to the services.
+# See /compose/localnet to set up the environment.
+
+selector=8706591216959472610
+
+scan_api_url="http://localhost:5012"
+registry_api_url="http://localhost:5012"
+
+[[participants]]
+name="Participant 1"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+username="ledger-api-user"
+json_ledger_api_url="http://localhost:1101"
+grpc_ledger_api_url="localhost:1301"
+admin_api_url="localhost:1201"
+validator_api_url="http://localhost:2201/api/validator"
+
+[[participants]]
+name="Participant 1"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+username="ledger-api-user"
+json_ledger_api_url="http://localhost:1101"
+grpc_ledger_api_url="localhost:1301"
+admin_api_url="localhost:1201"
+validator_api_url="http://localhost:2201/api/validator"
+
+[[participants]]
+name="Participant 2"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+username="ledger-api-user"
+json_ledger_api_url="http://localhost:1102"
+grpc_ledger_api_url="localhost:1302"
+admin_api_url="localhost:1202"
+validator_api_url="http://localhost:2202/api/validator"
+
+[[participants]]
+name="Participant 3"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+username="ledger-api-user"
+json_ledger_api_url="http://localhost:1103"
+grpc_ledger_api_url="localhost:1303"
+admin_api_url="localhost:1203"
+validator_api_url="http://localhost:2203/api/validator"
+
+[[participants]]
+name="Participant 4"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+username="ledger-api-user"
+json_ledger_api_url="http://localhost:1104"
+grpc_ledger_api_url="localhost:1304"
+admin_api_url="localhost:1204"
+validator_api_url="http://localhost:2204/api/validator"
+
+[[participants]]
+name="Participant 5"
+jwt="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+username="ledger-api-user"
+json_ledger_api_url="http://localhost:1105"
+grpc_ledger_api_url="localhost:1305"
+admin_api_url="localhost:1205"
+validator_api_url="http://localhost:2205/api/validator"

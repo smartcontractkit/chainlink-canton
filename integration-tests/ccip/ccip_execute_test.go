@@ -6,11 +6,6 @@
 //   - Generate ECDSA signatures and verify via CommitteeVerifier
 //   - Execute via PerPartyRouter
 //   - Validate the returned message payload matches the original
-//
-// Requires running localnet:
-//
-//	cd compose/localnet && docker compose up -d
-//	go test ./src/tests/... -run TestCCIPExecuteE2E -v
 
 package tests
 
