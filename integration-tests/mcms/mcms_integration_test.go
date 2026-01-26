@@ -1233,6 +1233,7 @@ func testExecuteMCMSOp(
 	})
 	require.NoError(t, err)
 	t.Log("ExecuteMcmsOp succeeded (bob executed with disclosed contract)")
+	time.Sleep(5 * time.Second) // Wait for ACS to update on ccip participant
 
 	// Bob can't see the created event (not an observer), so query from alice's participant
 	// The old contract should be archived, so find the active one
