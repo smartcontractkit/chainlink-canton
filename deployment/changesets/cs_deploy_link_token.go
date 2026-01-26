@@ -9,6 +9,7 @@ import (
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/chainlink-sui/deployment"
 )
 
 type DeployLinkTokenConfig struct {
@@ -54,24 +55,18 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 	}
 
 	// Run DeployLinkToken Operation
-	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, linkops.DeployLINKOp, deps, cld_ops.EmptyInput{})
+	deployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, linkops.DeployLINKOp, deps, cld_ops.EmptyInput{})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy LinkToken for Canton chain %d: %w", config.ChainSelector, err)
 	}
 
-	// Extract output
-	// deployResult, ok := result.Output.(linkops.CantonOpResult[linkops.DeployLinkTokenOutput])
-	// if !ok {
-	// 	return cldf.ChangesetOutput{}, fmt.Errorf("unexpected output type from DeployLINKOp")
-	// }
-
 	// Save LinkToken registry contract ID to the addressbook
 	// TODO: Define proper type and version constants
-	// typeAndVersionLinkToken := cldf.NewTypeAndVersion("CantonLinkTokenRegistry", "1.0.0")
-	// err = ab.Save(config.ChainSelector, deployResult.Output.RegistryContractID, typeAndVersionLinkToken)
-	// if err != nil {
-	// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken registry contract ID %s for Canton chain %d: %w", deployResult.Output.RegistryContractID, config.ChainSelector, err)
-	// }
+	typeAndVersionLinkToken := cldf.NewTypeAndVersion(deployment.CantonLinkTokenRegistryType, deployment.Version1_0_0)
+	err = ab.Save(config.ChainSelector, fmt.Sprintf("link::%s", deps.Party), typeAndVersionLinkToken)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken registry contract ID %s for Canton chain %d: %w", deployResult.Output.Output.RegistryContractID, config.ChainSelector, err)
+	}
 
 	// Add report
 

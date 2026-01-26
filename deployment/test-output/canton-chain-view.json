@@ -1,0 +1,45 @@
+{
+  "chainSelector": 1111111111,
+  "onRamp": {
+    "address": "00c74f2edc93fdab60e7c15ca3fdaad7d7cb2cb973bd346256e7e94ab1b107b954ca1212208c27a1af4d04c4947df599eee90aeb03577b19bc598d6ebdc8dbf22eb9dfeca3",
+    "owner": "participant1-localparty-1::1220e0f9273ab76b8176146d5086c94e3913376ebf1d04127329810a8e0e08f2ede4",
+    "templateId": "761fb4ac7f48a6a6f20df94b022c019a76bf2299769f520a26c7b8bfaf94df16:CCIP.OnRamp:OnRamp",
+    "ccipOwner": "participant1-localparty-1::1220e0f9273ab76b8176146d5086c94e3913376ebf1d04127329810a8e0e08f2ede4",
+    "instanceId": "test-state-view-instance"
+  },
+  "globalConfig": {
+    "address": "002f2e23e2230f700920e8a1a3314ca090c6ac07f3d6b32648ee946d8ddfe8c233ca121220cf1ccd90195ef1b1932f43d616fef1fad9aed9a0d8b42258514a772c0d2172bd",
+    "owner": "participant1-localparty-1::1220e0f9273ab76b8176146d5086c94e3913376ebf1d04127329810a8e0e08f2ede4",
+    "templateId": "b3a2467c543c053b320d8d10b2ac52d72500aa152a0eddaceebd9a2c797090dc:CCIP.GlobalConfig:GlobalConfig",
+    "ccipOwner": "participant1-localparty-1::1220e0f9273ab76b8176146d5086c94e3913376ebf1d04127329810a8e0e08f2ede4",
+    "instanceId": "test-state-view-instance",
+    "chainSelector": "1111111111",
+    "onRampAddress": "0000000000000000000000000000000000000001",
+    "destChainConfigs": {
+      "2222222222": {
+        "isEnabled": true,
+        "defaultExecutor": "executor-party",
+        "offRampAddress": "0000000000000000000000000000000000000002",
+        "laneMandatedCCVs": [
+          "ccv1",
+          "ccv2"
+        ],
+        "defaultCCVs": [
+          "default-ccv"
+        ]
+      }
+    },
+    "sourceChainConfigs": {
+      "3333333333": {
+        "isEnabled": true,
+        "onRampAddress": "0000000000000000000000000000000000000003",
+        "laneMandatedCCVs": [
+          "ccv3"
+        ],
+        "defaultCCVs": [
+          "default-source-ccv"
+        ]
+      }
+    }
+  }
+}
