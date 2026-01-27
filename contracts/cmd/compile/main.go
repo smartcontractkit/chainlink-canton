@@ -130,7 +130,7 @@ func main() {
 		// Create two files, one with the version included and one with `current`
 		for _, suffix := range []string{config.Version, "current"} {
 			outPath := filepath.Join(*artifactsDir, config.Name+"-"+suffix+".dar")
-			err = os.WriteFile(outPath, darBytes, 0o644)
+			err = os.WriteFile(outPath, darBytes, 0600)
 			if err != nil {
 				log.Fatalf("failed to write DAR file for package %q to artifacts directory: %v", pkg, err)
 			}

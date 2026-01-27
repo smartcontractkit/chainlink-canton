@@ -82,7 +82,7 @@ type CommitteeVerifierForward struct{}
 func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVerifierForwardConfig) (cldf.ChangesetOutput, error) {
 	ctx := context.Background()
 	ab := cldf.NewMemoryAddressBook()
-	seqReports := make([]cld_ops.Report[any, any], 0)
+	seqReports := make([]cld_ops.Report[any, any], 0, 1)
 
 	// Setup Canton client
 	setupResult, err := cantonclient.Setup(ctx, cantonclient.Config{
@@ -263,5 +263,6 @@ func (c CommitteeVerifierForward) VerifyPreconditions(e cldf.Environment, config
 	if config.FeeTokenAmount == "" {
 		return fmt.Errorf("feeTokenAmount is required")
 	}
+
 	return nil
 }

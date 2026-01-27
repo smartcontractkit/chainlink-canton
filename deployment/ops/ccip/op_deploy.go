@@ -11,6 +11,7 @@ import (
 
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
+
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
@@ -40,6 +41,7 @@ func normalizeTemplateKey(tid string) string {
 	if len(parts) < 3 {
 		return tid
 	}
+
 	return parts[len(parts)-2] + ":" + parts[len(parts)-1]
 }
 
@@ -139,6 +141,7 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 		if normalizedTemplateID == "CCIP.GlobalConfig:GlobalConfig" {
 			globalConfigContractID = event.Created.ContractID
 			globalConfigTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -229,6 +232,7 @@ var deployTokenAdminRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, 
 		if normalizedTemplateID == "CCIP.TokenAdminRegistry:TokenAdminRegistry" {
 			tokenAdminRegistryContractID = event.Created.ContractID
 			tokenAdminRegistryTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -275,17 +279,13 @@ var deployCCVRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input D
 
 	// Try to validate and upload (may already be uploaded, but that's okay)
 	submissionID := "validate-ccv-registry-" + time.Now().Format("20060102150405")
-	err = deps.BindingClient.PackageMng.ValidateDarFile(ctx, commonDar, submissionID)
-	if err != nil {
-		// If validation fails, it might already be uploaded, continue anyway
-		// In a real scenario, you might want to check if the package is already known
-	}
+	_ = deps.BindingClient.PackageMng.ValidateDarFile(ctx, commonDar, submissionID)
+	// If validation fails, it might already be uploaded, continue anyway
+	// In a real scenario, you might want to check if the package is already known
 	uploadSubmissionID := "upload-ccv-registry-" + time.Now().Format("20060102150405")
-	err = deps.BindingClient.PackageMng.UploadDarFile(ctx, commonDar, uploadSubmissionID)
-	if err != nil {
-		// If upload fails, it might already be uploaded, continue anyway
-		// In a real scenario, you might want to check if the package is already known
-	}
+	_ = deps.BindingClient.PackageMng.UploadDarFile(ctx, commonDar, uploadSubmissionID)
+	// If upload fails, it might already be uploaded, continue anyway
+	// In a real scenario, you might want to check if the package is already known
 
 	// Create CCVRegistry contract
 	ccvRegistry := common.CCVRegistry{
@@ -322,6 +322,7 @@ var deployCCVRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input D
 		if normalizedTemplateID == "CCIP.CCVRegistry:CCVRegistry" {
 			ccvRegistryContractID = event.Created.ContractID
 			ccvRegistryTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -434,6 +435,7 @@ var deployCommitteeVerifierHandler = func(b cld_ops.Bundle, deps CantonOpDeps, i
 		if normalizedTemplateID == "CCIP.CommitteeVerifier:CommitteeVerifier" {
 			committeeVerifierContractID = event.Created.ContractID
 			committeeVerifierTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -529,6 +531,7 @@ var deployFeeQuoterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Dep
 		if normalizedTemplateID == "CCIP.FeeQuoter:FeeQuoter" {
 			feeQuoterContractID = event.Created.ContractID
 			feeQuoterTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -618,6 +621,7 @@ var deployOffRampHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Deplo
 		if normalizedTemplateID == "CCIP.OffRamp:OffRamp" {
 			offRampContractID = event.Created.ContractID
 			offRampTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -710,6 +714,7 @@ var deployPerPartyRouterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inpu
 		if normalizedTemplateID == "CCIP.PerPartyRouter:PerPartyRouter" {
 			perPartyRouterContractID = event.Created.ContractID
 			perPartyRouterTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -801,6 +806,7 @@ var deployOnRampHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Deploy
 		if normalizedTemplateID == "CCIP.OnRamp:OnRamp" {
 			onRampContractID = event.Created.ContractID
 			onRampTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}

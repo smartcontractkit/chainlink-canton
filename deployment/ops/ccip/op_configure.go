@@ -117,6 +117,7 @@ var updateGlobalConfigDestChainConfigHandler = func(
 		if normalized == "CCIP.GlobalConfig:GlobalConfig" {
 			newGlobalConfigContractID = ev.Created.ContractID
 			newGlobalConfigTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
@@ -198,7 +199,7 @@ var updateGlobalConfigSourceChainConfigHandler = func(b cld_ops.Bundle, deps Can
 			CommandID:  commandID,
 			ActAs:      []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
-				// TODO find a better way rather than this this templateID override hack which exposes PackageID to the client
+				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipCommonPkgID, "CCIP.GlobalConfig", "GlobalConfig"),
 				ContractID: exerciseCmd.ContractID,
 				Choice:     exerciseCmd.Choice,
@@ -222,12 +223,14 @@ var updateGlobalConfigSourceChainConfigHandler = func(b cld_ops.Bundle, deps Can
 		if normalized == "CCIP.GlobalConfig:GlobalConfig" {
 			newGlobalConfigContractID = ev.Created.ContractID
 			newGlobalConfigTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
 	if newGlobalConfigTemplateID == "" {
 		return CantonOpResult[UpdateGlobalConfigSourceChainConfigOutput]{}, fmt.Errorf("source-chain update tx had no Created GlobalConfig event; refusing to continue with old CID=%s", input.GlobalConfigContractID)
 	}
+
 	return CantonOpResult[UpdateGlobalConfigSourceChainConfigOutput]{
 		TransactionID: commandID,
 		Output: UpdateGlobalConfigSourceChainConfigOutput{
@@ -293,7 +296,7 @@ var updateFeeQuoterPricesHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inp
 			CommandID:  commandID,
 			ActAs:      []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
-				// TODO find a better way rather than this this templateID override hack which exposes PackageID to the client
+				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipFeeQuoterPkgID, "CCIP.FeeQuoter", "FeeQuoter"),
 				ContractID: exerciseCmd.ContractID,
 				Choice:     exerciseCmd.Choice,
@@ -317,12 +320,14 @@ var updateFeeQuoterPricesHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inp
 		if normalized == "CCIP.FeeQuoter:FeeQuoter" {
 			newFeeQuoterContractID = ev.Created.ContractID
 			newFeeQuoterTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
 	if newFeeQuoterTemplateID == "" {
 		return CantonOpResult[UpdateFeeQuoterPricesOutput]{}, fmt.Errorf("fee-quoter-prices update tx had no Created FeeQuoter event; refusing to continue with old CID=%s", input.FeeQuoterContractID)
 	}
+
 	return CantonOpResult[UpdateFeeQuoterPricesOutput]{
 		TransactionID: commandID,
 		Output: UpdateFeeQuoterPricesOutput{
@@ -386,7 +391,7 @@ var applyFeeQuoterFeeTokenUpdatesHandler = func(b cld_ops.Bundle, deps CantonOpD
 			CommandID:  commandID,
 			ActAs:      []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
-				// TODO find a better way rather than this this templateID override hack which exposes PackageID to the client
+				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipFeeQuoterPkgID, "CCIP.FeeQuoter", "FeeQuoter"),
 				ContractID: exerciseCmd.ContractID,
 				Choice:     exerciseCmd.Choice,
@@ -410,6 +415,7 @@ var applyFeeQuoterFeeTokenUpdatesHandler = func(b cld_ops.Bundle, deps CantonOpD
 		if normalized == "CCIP.FeeQuoter:FeeQuoter" {
 			newFeeQuoterContractID = ev.Created.ContractID
 			newFeeQuoterTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
@@ -477,7 +483,7 @@ var applyFeeQuoterDestChainConfigUpdatesHandler = func(b cld_ops.Bundle, deps Ca
 			CommandID:  commandID,
 			ActAs:      []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
-				// TODO find a better way rather than this this templateID override hack which exposes PackageID to the client
+				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipFeeQuoterPkgID, "CCIP.FeeQuoter", "FeeQuoter"),
 				ContractID: exerciseCmd.ContractID,
 				Choice:     exerciseCmd.Choice,
@@ -501,12 +507,14 @@ var applyFeeQuoterDestChainConfigUpdatesHandler = func(b cld_ops.Bundle, deps Ca
 		if normalized == "CCIP.FeeQuoter:FeeQuoter" {
 			newFeeQuoterContractID = ev.Created.ContractID
 			newFeeQuoterTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
 	if newFeeQuoterTemplateID == "" {
 		return CantonOpResult[ApplyFeeQuoterDestChainConfigUpdatesOutput]{}, fmt.Errorf("fee-quoter-dest-chain-config-updates update tx had no Created FeeQuoter event; refusing to continue with old CID=%s", input.FeeQuoterContractID)
 	}
+
 	return CantonOpResult[ApplyFeeQuoterDestChainConfigUpdatesOutput]{
 		TransactionID: commandID,
 		Output: ApplyFeeQuoterDestChainConfigUpdatesOutput{

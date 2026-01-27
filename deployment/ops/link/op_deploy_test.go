@@ -51,5 +51,4 @@ func TestDeployAndMintLink(t *testing.T) {
 		Amount:             "100000",
 	})
 	require.NoError(t, err, "failed to mint LINK token")
-
 }

@@ -42,6 +42,7 @@ func normalizeTemplateKey(tid string) string {
 	if len(parts) < 3 {
 		return tid
 	}
+
 	return parts[len(parts)-2] + ":" + parts[len(parts)-1]
 }
 
@@ -107,6 +108,7 @@ var handler = func(b cld_ops.Bundle, deps CantonOpDeps, input cld_ops.EmptyInput
 		if normalizedTemplateID == "Coin.Registry:CoinRegistry" {
 			registryContractID = event.Created.ContractID
 			registryTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}
@@ -240,7 +242,7 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 			CommandID:  uuid.Must(uuid.NewUUID()).String(),
 			ActAs:      []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
-				// TODO find a better way rather than this this templateID override hack which exposes PackageID to the client
+				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", burnMintPkgID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory"),
 				ContractID: exerciseCmd.ContractID,
 				Choice:     exerciseCmd.Choice,
@@ -275,6 +277,7 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 	}
 
 	fmt.Printf("Minted token to tokenHoldingCID   id=%s\n", tokenHoldingCID)
+
 	return CantonOpResult[MintLinkTokenOutput]{
 		TransactionID: mintCommandID,
 		Output: MintLinkTokenOutput{

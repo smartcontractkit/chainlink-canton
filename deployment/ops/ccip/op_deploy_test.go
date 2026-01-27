@@ -50,6 +50,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test CCIP Common Deployment
 	// --------------------------
 	t.Run("DeployCCIPCommon", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployCCIPCommonOp, deps, DeployCCIPCommonInput{
 			InstanceID:         instanceID,
 			ChainSelectorValue: chainSelectorValue,
@@ -65,6 +67,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test Token Admin Registry Deployment
 	// --------------------------
 	t.Run("DeployTokenAdminRegistry", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployTokenAdminRegistryOp, deps, DeployTokenAdminRegistryInput{
 			InstanceID: instanceID,
 		})
@@ -78,6 +82,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test Committee Verifier Deployment
 	// --------------------------
 	t.Run("DeployCommitteeVerifier", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployCommitteeVerifierOp, deps, DeployCommitteeVerifierInput{
 			InstanceID:          instanceID,
 			VersionTag:          "1.0.0",
@@ -96,6 +102,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test CCV Registry Deployment
 	// --------------------------
 	t.Run("DeployCCVRegistry", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployCCVRegistryOp, deps, DeployCCVRegistryInput{
 			InstanceID: instanceID,
 		})
@@ -109,6 +117,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test Fee Quoter Deployment
 	// --------------------------
 	t.Run("DeployFeeQuoter", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployFeeQuoterOp, deps, DeployFeeQuoterInput{
 			InstanceID: instanceID,
 		})
@@ -122,6 +132,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test OffRamp Deployment
 	// --------------------------
 	t.Run("DeployOffRamp", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployOffRampOp, deps, DeployOffRampInput{
 			InstanceID: instanceID,
 		})
@@ -135,6 +147,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test PerPartyRouter Deployment
 	// --------------------------
 	t.Run("DeployPerPartyRouter", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployPerPartyRouterOp, deps, DeployPerPartyRouterInput{
 			InstanceID: instanceID,
 		})
@@ -148,6 +162,8 @@ func TestDeployCCIPContracts(t *testing.T) {
 	// Test OnRamp Deployment
 	// --------------------------
 	t.Run("DeployOnRamp", func(t *testing.T) {
+		t.Parallel()
+
 		result, err := cld_ops.ExecuteOperation(bundle, DeployOnRampOp, deps, DeployOnRampInput{
 			InstanceID:           instanceID,
 			DestChainSelector:    "2222222222",
