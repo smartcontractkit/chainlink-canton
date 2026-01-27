@@ -10,6 +10,7 @@ import (
 
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
+
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
@@ -114,7 +115,7 @@ var updateGlobalConfigDestChainConfigHandler = func(
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
 		// NOTE: keep this consistent with your normalizeTemplateKey behavior
 		// If it produces "CCIP.GlobalConfig:GlobalConfig" this is correct.
-		if normalized == "CCIP.GlobalConfig:GlobalConfig" {
+		if normalized == GlobalConfigTemplateKey {
 			newGlobalConfigContractID = ev.Created.ContractID
 			newGlobalConfigTemplateID = ev.Created.TemplateID
 
@@ -220,7 +221,7 @@ var updateGlobalConfigSourceChainConfigHandler = func(b cld_ops.Bundle, deps Can
 			continue
 		}
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
-		if normalized == "CCIP.GlobalConfig:GlobalConfig" {
+		if normalized == GlobalConfigTemplateKey {
 			newGlobalConfigContractID = ev.Created.ContractID
 			newGlobalConfigTemplateID = ev.Created.TemplateID
 
@@ -317,7 +318,7 @@ var updateFeeQuoterPricesHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inp
 			continue
 		}
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
-		if normalized == "CCIP.FeeQuoter:FeeQuoter" {
+		if normalized == FeeQuoterTemplateKey {
 			newFeeQuoterContractID = ev.Created.ContractID
 			newFeeQuoterTemplateID = ev.Created.TemplateID
 
@@ -412,7 +413,7 @@ var applyFeeQuoterFeeTokenUpdatesHandler = func(b cld_ops.Bundle, deps CantonOpD
 			continue
 		}
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
-		if normalized == "CCIP.FeeQuoter:FeeQuoter" {
+		if normalized == FeeQuoterTemplateKey {
 			newFeeQuoterContractID = ev.Created.ContractID
 			newFeeQuoterTemplateID = ev.Created.TemplateID
 
@@ -504,7 +505,7 @@ var applyFeeQuoterDestChainConfigUpdatesHandler = func(b cld_ops.Bundle, deps Ca
 			continue
 		}
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
-		if normalized == "CCIP.FeeQuoter:FeeQuoter" {
+		if normalized == FeeQuoterTemplateKey {
 			newFeeQuoterContractID = ev.Created.ContractID
 			newFeeQuoterTemplateID = ev.Created.TemplateID
 

@@ -25,6 +25,11 @@ import (
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
 
+const (
+	GlobalConfigTemplateKey = "CCIP.GlobalConfig:GlobalConfig"
+	FeeQuoterTemplateKey    = "CCIP.FeeQuoter:FeeQuoter"
+)
+
 // CantonOpDeps is an alias for the shared type in the client package
 type CantonOpDeps = compileClient.CantonOpDeps
 
@@ -138,7 +143,7 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 		}
 
 		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
-		if normalizedTemplateID == "CCIP.GlobalConfig:GlobalConfig" {
+		if normalizedTemplateID == GlobalConfigTemplateKey {
 			globalConfigContractID = event.Created.ContractID
 			globalConfigTemplateID = event.Created.TemplateID
 
@@ -528,7 +533,7 @@ var deployFeeQuoterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Dep
 		}
 
 		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
-		if normalizedTemplateID == "CCIP.FeeQuoter:FeeQuoter" {
+		if normalizedTemplateID == FeeQuoterTemplateKey {
 			feeQuoterContractID = event.Created.ContractID
 			feeQuoterTemplateID = event.Created.TemplateID
 
