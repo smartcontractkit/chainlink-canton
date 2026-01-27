@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "6ba5bb3a281c00a5d2784368ff43bb0ab2af24d85ac6ccf429f93788a7353947"
+const PackageID = "fbb6f00c5aa22cb2efa84283b86a80b04fd6c7458bc75588a495771f8f1bc526"
 const SDKVersion = "3.4.9"
 
 type Template interface {
@@ -36,6 +36,9 @@ type IMCMSReceiver interface {
 
 	// MCMSReceiverEntrypoint executes the MCMSReceiver_Entrypoint choice
 	MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand
+
+	// MCMSReceiverIssueAuthTicket executes the MCMSReceiver_IssueAuthTicket choice
+	MCMSReceiverIssueAuthTicket(contractID string, args MCMSReceiverIssueAuthTicket) *model.ExerciseCommand
 }
 
 func argsToMap(args interface{}) map[string]interface{} {
@@ -294,6 +297,27 @@ func (t *CanExecuteOp) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// Consume is a Record type
+type Consume struct {
+}
+
+// ToMap converts Consume to a map for DAML arguments
+func (t Consume) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
+}
+
+func (t Consume) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *Consume) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // Counter is a Template type
 type Counter struct {
 	Owner PARTY `json:"owner"`
@@ -404,6 +428,19 @@ func (t Counter) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntr
 	}
 }
 
+// MCMSReceiverIssueAuthTicket exercises the MCMSReceiver_IssueAuthTicket choice on this Counter contract via the IMCMSReceiver interface
+func (t Counter) MCMSReceiverIssueAuthTicket(contractID string, args MCMSReceiverIssueAuthTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSReceiver"),
+
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_IssueAuthTicket",
+
+		Arguments: argsToMap(args),
+	}
+}
+
 // Verify interface implementations for Counter
 
 var _ IMCMSReceiver = (*Counter)(nil)
@@ -458,6 +495,8 @@ type ExecuteOp struct {
 
 	TargetCid CONTRACT_ID `json:"targetCid"`
 
+	AuthTicketCid CONTRACT_ID `json:"authTicketCid"`
+
 	Op Op `json:"op"`
 
 	OpProof []TEXT `json:"opProof"`
@@ -477,6 +516,14 @@ func (t ExecuteOp) ToMap() map[string]interface{} {
 			return m.toMap()
 		}
 		return t.TargetCid
+	}()
+
+	m["authTicketCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.AuthTicketCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.AuthTicketCid
 	}()
 
 	m["op"] = func() interface{} {
@@ -616,6 +663,34 @@ func (t GetValue) MarshalJSON() ([]byte, error) {
 }
 
 func (t *GetValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// Lookup is a Record type
+type Lookup struct {
+	Caller PARTY `json:"caller"`
+
+	InstanceId TEXT `json:"instanceId"`
+}
+
+// ToMap converts Lookup to a map for DAML arguments
+func (t Lookup) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["caller"] = t.Caller.ToMap()
+
+	m["instanceId"] = string(t.InstanceId)
+
+	return m
+}
+
+func (t Lookup) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *Lookup) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -992,6 +1067,140 @@ func (t *MCMSReceiverGetInstanceId) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MCMSReceiverIssueAuthTicket is a Record type
+type MCMSReceiverIssueAuthTicket struct {
+	Caller PARTY `json:"caller"`
+}
+
+// ToMap converts MCMSReceiverIssueAuthTicket to a map for DAML arguments
+func (t MCMSReceiverIssueAuthTicket) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t MCMSReceiverIssueAuthTicket) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *MCMSReceiverIssueAuthTicket) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// MCMSRegistry is a Template type
+type MCMSRegistry struct {
+	McmsOwner PARTY `json:"mcmsOwner"`
+
+	Registrations GENMAP `json:"registrations"`
+}
+
+// GetTemplateID returns the template ID for this template
+func (t MCMSRegistry) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSRegistry", "MCMSRegistry")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t MCMSRegistry) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["mcmsOwner"] = t.McmsOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["registrations"] = func() interface{} {
+		if t.Registrations == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.Registrations}
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+func (t MCMSRegistry) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *MCMSRegistry) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// Choice methods for MCMSRegistry
+
+// Register exercises the Register choice on this MCMSRegistry contract
+func (t MCMSRegistry) Register(contractID string, args Register) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
+
+		ContractID: contractID,
+		Choice:     "Register",
+
+		Arguments: argsToMap(args),
+	}
+}
+
+// UpdateRegistration exercises the UpdateRegistration choice on this MCMSRegistry contract
+func (t MCMSRegistry) UpdateRegistration(contractID string, args UpdateRegistration) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
+
+		ContractID: contractID,
+		Choice:     "UpdateRegistration",
+
+		Arguments: argsToMap(args),
+	}
+}
+
+// Unregister exercises the Unregister choice on this MCMSRegistry contract
+func (t MCMSRegistry) Unregister(contractID string, args Unregister) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
+
+		ContractID: contractID,
+		Choice:     "Unregister",
+
+		Arguments: argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this MCMSRegistry contract
+func (t MCMSRegistry) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
+
+		ContractID: contractID,
+		Choice:     "Archive",
+
+		Arguments: map[string]interface{}{},
+	}
+}
+
+// Lookup exercises the Lookup choice on this MCMSRegistry contract
+func (t MCMSRegistry) Lookup(contractID string, args Lookup) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
+
+		ContractID: contractID,
+		Choice:     "Lookup",
+
+		Arguments: argsToMap(args),
+	}
+}
+
 // MCMSState is a Record type
 type MCMSState struct {
 	Role Role `json:"role"`
@@ -1169,6 +1378,40 @@ func (t RawSignature) MarshalJSON() ([]byte, error) {
 }
 
 func (t *RawSignature) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// Register is a Record type
+type Register struct {
+	InstanceId TEXT `json:"instanceId"`
+
+	TargetCid CONTRACT_ID `json:"targetCid"`
+}
+
+// ToMap converts Register to a map for DAML arguments
+func (t Register) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["targetCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetCid
+	}()
+
+	return m
+}
+
+func (t Register) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *Register) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -1451,6 +1694,141 @@ func (t SignerInfo) MarshalJSON() ([]byte, error) {
 }
 
 func (t *SignerInfo) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// TargetAuthTicket is a Template type
+type TargetAuthTicket struct {
+	Owner PARTY `json:"owner"`
+
+	InstanceId TEXT `json:"instanceId"`
+
+	TargetCid CONTRACT_ID `json:"targetCid"`
+}
+
+// GetTemplateID returns the template ID for this template
+func (t TargetAuthTicket) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSReceiver", "TargetAuthTicket")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t TargetAuthTicket) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["owner"] = t.Owner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["targetCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetCid
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+func (t TargetAuthTicket) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *TargetAuthTicket) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// Choice methods for TargetAuthTicket
+
+// Archive exercises the Archive choice on this TargetAuthTicket contract
+func (t TargetAuthTicket) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSReceiver", "TargetAuthTicket"),
+
+		ContractID: contractID,
+		Choice:     "Archive",
+
+		Arguments: map[string]interface{}{},
+	}
+}
+
+// Consume exercises the Consume choice on this TargetAuthTicket contract
+func (t TargetAuthTicket) Consume(contractID string, args Consume) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.MCMSReceiver", "TargetAuthTicket"),
+
+		ContractID: contractID,
+		Choice:     "Consume",
+
+		Arguments: argsToMap(args),
+	}
+}
+
+// Unregister is a Record type
+type Unregister struct {
+	InstanceId TEXT `json:"instanceId"`
+}
+
+// ToMap converts Unregister to a map for DAML arguments
+func (t Unregister) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["instanceId"] = string(t.InstanceId)
+
+	return m
+}
+
+func (t Unregister) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *Unregister) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// UpdateRegistration is a Record type
+type UpdateRegistration struct {
+	InstanceId TEXT `json:"instanceId"`
+
+	NewTargetCid CONTRACT_ID `json:"newTargetCid"`
+}
+
+// ToMap converts UpdateRegistration to a map for DAML arguments
+func (t UpdateRegistration) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["newTargetCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.NewTargetCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewTargetCid
+	}()
+
+	return m
+}
+
+func (t UpdateRegistration) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *UpdateRegistration) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
