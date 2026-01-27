@@ -17,8 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "b09db36c65a5d8e5edd9184f67f5e6ef13fad2cd1790fad5389aee97f7e49141"
-const SDKVersion = "3.4.8"
+const PackageID = "0da0d748f2ae6863684e7e73556810d4063a56b2316cbe8d37ff52ec7e099490"
+const SDKVersion = "3.4.10"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
