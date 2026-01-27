@@ -182,16 +182,6 @@ func TimeToHex(t time.Time) string {
 	return strings.Repeat("0", 64)
 }
 
-// TimeToHexUnix converts time to 32-byte hex with Unix timestamp
-// Use this if Canton updates to use actual timestamps
-func TimeToHexUnix(t time.Time) string {
-	timestamp := uint64(t.Unix())
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, timestamp)
-	// Pad to 32 bytes (64 hex chars)
-	return strings.Repeat("0", 48) + hex.EncodeToString(buf)
-}
-
 // HashOpLeaf hashes an operation to get its Merkle leaf
 // Matches Canton's hashOpLeafNative
 func HashOpLeaf(op MCMSOp) string {
@@ -450,8 +440,8 @@ func New2of3Config(signers []*MCMSSigner) MCMSConfig {
 // These helpers create Canton API values for MCMS contracts
 
 // BuildSignerInfoValue creates Canton Value for SignerInfo
-func BuildSignerInfoValue(si SignerInfo) map[string]interface{} {
-	return map[string]interface{}{
+func BuildSignerInfoValue(si SignerInfo) map[string]any {
+	return map[string]any{
 		"signerAddress": si.SignerAddress,
 		"signerIndex":   si.SignerIndex,
 		"signerGroup":   si.SignerGroup,
@@ -459,8 +449,8 @@ func BuildSignerInfoValue(si SignerInfo) map[string]interface{} {
 }
 
 // BuildRawSignatureValue creates Canton Value for RawSignature
-func BuildRawSignatureValue(sig RawSignature) map[string]interface{} {
-	return map[string]interface{}{
+func BuildRawSignatureValue(sig RawSignature) map[string]any {
+	return map[string]any{
 		"publicKey": sig.PublicKey,
 		"r":         sig.R,
 		"s":         sig.S,
@@ -468,8 +458,8 @@ func BuildRawSignatureValue(sig RawSignature) map[string]interface{} {
 }
 
 // BuildOpValue creates Canton Value for Op
-func BuildOpValue(op MCMSOp) map[string]interface{} {
-	return map[string]interface{}{
+func BuildOpValue(op MCMSOp) map[string]any {
+	return map[string]any{
 		"chainId":          op.ChainId,
 		"multisigId":       op.MultisigId,
 		"nonce":            op.Nonce,
@@ -480,8 +470,8 @@ func BuildOpValue(op MCMSOp) map[string]interface{} {
 }
 
 // BuildMetadataValue creates Canton Value for RootMetadata
-func BuildMetadataValue(meta MCMSRootMetadata) map[string]interface{} {
-	return map[string]interface{}{
+func BuildMetadataValue(meta MCMSRootMetadata) map[string]any {
+	return map[string]any{
 		"chainId":              meta.ChainId,
 		"multisigId":           meta.MultisigId,
 		"preOpCount":           meta.PreOpCount,
@@ -543,7 +533,7 @@ func (p *MCMSProposal) SetOverride(override bool) *MCMSProposal {
 
 // Build builds the Merkle tree for the proposal
 func (p *MCMSProposal) Build() *MCMSProposal {
-	var leaves []string
+	leaves := make([]string, 0, len(p.Operations)+1)
 
 	// Add metadata leaf
 	metadataLeaf := HashMetadataLeaf(p.Metadata)
@@ -681,12 +671,12 @@ func EncodeSetConfigParams(params SetConfigParams) string {
 
 		// SignerIndex (4 bytes, big-endian)
 		indexBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(indexBytes, uint32(signer.SignerIndex))
+		binary.BigEndian.PutUint32(indexBytes, uint32(signer.SignerIndex)) //nolint:gosec
 		buf = append(buf, indexBytes...)
 
 		// SignerGroup (4 bytes, big-endian)
 		groupBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(groupBytes, uint32(signer.SignerGroup))
+		binary.BigEndian.PutUint32(groupBytes, uint32(signer.SignerGroup)) //nolint:gosec
 		buf = append(buf, groupBytes...)
 	}
 
@@ -694,7 +684,7 @@ func EncodeSetConfigParams(params SetConfigParams) string {
 	buf = append(buf, byte(len(params.GroupQuorums))) // numQuorums (1 byte)
 	for _, quorum := range params.GroupQuorums {
 		quorumBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(quorumBytes, uint32(quorum))
+		binary.BigEndian.PutUint32(quorumBytes, uint32(quorum)) //nolint:gosec
 		buf = append(buf, quorumBytes...)
 	}
 
@@ -702,7 +692,7 @@ func EncodeSetConfigParams(params SetConfigParams) string {
 	buf = append(buf, byte(len(params.GroupParents))) // numParents (1 byte)
 	for _, parent := range params.GroupParents {
 		parentBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(parentBytes, uint32(parent))
+		binary.BigEndian.PutUint32(parentBytes, uint32(parent)) //nolint:gosec
 		buf = append(buf, parentBytes...)
 	}
 

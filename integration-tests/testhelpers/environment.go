@@ -201,6 +201,7 @@ func dialParticipant(t *testing.T, config ParticipantConfig) Participant {
 	authProvider, err := securityprovider.NewSecurityProviderBearerToken(config.JWT)
 	require.NoError(t, err, "Failed to create security provider")
 	scanProxyClient, err := scanProxy.NewClientWithResponses(config.ValidatorAPIURL, scanProxy.WithRequestEditorFn(authProvider.Intercept))
+	require.NoError(t, err, "Failed to create scan proxy client")
 
 	p := Participant{
 		Name: config.Name,

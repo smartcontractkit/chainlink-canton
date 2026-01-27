@@ -80,18 +80,18 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	buf.Write(msg.Receiver)
 
 	// 2-byte length prefixed fields
-	binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob)))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob))) //nolint:gosec
 	buf.Write(msg.DestBlob)
 
 	if msg.TokenTransfer != nil {
 		tokenBytes := encodeTokenTransferV1(msg.TokenTransfer)
-		binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes)))
+		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes))) //nolint:gosec
 		buf.Write(tokenBytes)
 	} else {
-		binary.Write(&buf, binary.BigEndian, uint16(0))
+		_ = binary.Write(&buf, binary.BigEndian, uint16(0))
 	}
 
-	binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData)))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData))) //nolint:gosec
 	buf.Write(msg.MessageData)
 
 	return buf.Bytes(), nil
@@ -117,7 +117,7 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 	buf.WriteByte(uint8(len(tt.TokenReceiver))) //nolint:gosec
 	buf.Write(tt.TokenReceiver)
 
-	binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData)))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData))) //nolint:gosec
 	buf.Write(tt.ExtraData)
 
 	return buf.Bytes()
@@ -142,7 +142,7 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 
 	var result bytes.Buffer
 	result.Write(versionTag)
-	binary.Write(&result, binary.BigEndian, uint16(len(signatures)))
+	_ = binary.Write(&result, binary.BigEndian, uint16(len(signatures))) //nolint:gosec
 	result.Write(signatures)
 
 	return result.Bytes(), nil
@@ -177,6 +177,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
+	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
@@ -185,8 +186,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Parties: CCIP=%s, Receiver=%s", partyCCIP, partyReceiver)
 
 	// Generate signer keys for CommitteeVerifier (3 signers, threshold 2)
-	var ccvSignerKeys []*ecdsa.PrivateKey
-	var ccvSignerPubKeys []*apiv2.Value
+	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
+	ccvSignerPubKeys := make([]*apiv2.Value, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -219,7 +220,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Deploy CommitteeVerifier
 	versionTag := "49ff34ed"
 	ccvId := versionTag + "@" + partyCCIP
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{

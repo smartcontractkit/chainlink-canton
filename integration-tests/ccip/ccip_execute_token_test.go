@@ -21,7 +21,7 @@ import (
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 )
 
-func encodeInstrumentId(admin, identifier string) ([]byte, error) {
+func encodeInstrumentId(admin, identifier string) []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(byte(len(admin)))
@@ -29,7 +29,7 @@ func encodeInstrumentId(admin, identifier string) ([]byte, error) {
 	buf.WriteByte(byte(len(identifier)))
 	buf.WriteString(identifier)
 
-	return buf.Bytes(), nil
+	return buf.Bytes()
 }
 
 // TestLnRTokenPool_FullReceiveFlow tests the complete CCIP inbound token release flow.
@@ -68,6 +68,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	// Upload DARs to all participants
 	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, tokenPoolDar, perPartyRouterDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
+	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
@@ -94,8 +95,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// CCV Setup
 	// Generate signer keys for CommitteeVerifier
-	var ccvSignerKeys []*ecdsa.PrivateKey
-	var ccvSignerPubKeys []string
+	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
+	ccvSignerPubKeys := make([]string, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
@@ -351,7 +352,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	tokenAdminRegistryCid = extractCreatedContractId(res)
-	t.Log("Called ProposeAdministrator")
+	t.Log("Called ProposeAdministrator, tokenAdminRegistryCid:", tokenAdminRegistryCid)
 
 	// Step 2: AcceptAdminRole
 	time.Sleep(500 * time.Millisecond)
@@ -380,7 +381,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	tokenAdminRegistryCid = extractCreatedContractId(res)
-	t.Log("Called AcceptAdminRole")
+	t.Log("Called AcceptAdminRole, tokenAdminRegistryCid:", tokenAdminRegistryCid)
 
 	// Step 3: SetPool
 	time.Sleep(500 * time.Millisecond)
@@ -414,8 +415,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Build Message
 	// Encode instrumentId for destTokenAddress
-	encodedInstrumentId, err := encodeInstrumentId(registryAdmin, "Amulet")
-	require.NoError(t, err)
+	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
 	encodedInstrumentIdHex := hex.EncodeToString(encodedInstrumentId)
 
 	// Build token transfer (5 AMT in Splice Decimal format)
@@ -722,7 +722,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, acceptContextResp.StatusCode(), "Failed to get accept context: %s", string(acceptContextResp.Body))
 
-		var acceptDisclosures []*apiv2.DisclosedContract
+		acceptDisclosures := make([]*apiv2.DisclosedContract, 0, len(acceptContextResp.JSON200.DisclosedContracts))
 		for _, contract := range acceptContextResp.JSON200.DisclosedContracts {
 			id, err := testhelpers.TemplateIdFromString(contract.TemplateId)
 			require.NoError(t, err)
