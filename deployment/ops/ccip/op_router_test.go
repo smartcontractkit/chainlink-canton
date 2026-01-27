@@ -70,6 +70,8 @@ func TestRouterOperations(t *testing.T) {
 	// Get CCIPSend tickets from CCV
 	var ccvTickets []string
 	t.Run("DeployContracts", func(t *testing.T) {
+		t.Parallel()
+
 		// Deploy GlobalConfig
 		commonResult, err := cld_ops.ExecuteOperation(bundle, DeployCCIPCommonOp, deps, DeployCCIPCommonInput{
 			InstanceID:         instanceID,
@@ -265,6 +267,8 @@ func TestRouterOperations(t *testing.T) {
 	// Test Router CCIPSend
 	// --------------------------
 	t.Run("RouterCCIPSend", func(t *testing.T) {
+		t.Parallel()
+
 		// Create test payload
 		testPayload := "48656c6c6f2043434950" // "Hello CCIP" in hex
 

@@ -8,7 +8,7 @@ import (
 )
 
 func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, participants ...Participant) ([]string, error) {
-	var darData []*participantv30.UploadDarRequest_UploadDarData
+	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(dars))
 	for _, dar := range dars {
 		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{
 			Bytes: dar,
@@ -27,5 +27,6 @@ func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, partic
 		}
 		packageIDs = append(packageIDs, res.GetDarIds()...)
 	}
+
 	return packageIDs, nil
 }

@@ -16,7 +16,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.89
 	github.com/smartcontractkit/chainlink-canton-internal v0.0.0-00010101000000-000000000000
-	github.com/smartcontractkit/chainlink-deployments-framework v0.76.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.76.1
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 )

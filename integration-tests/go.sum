@@ -471,8 +471,8 @@ github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250
 github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250805210128-7f8a0f403c3a/go.mod h1:xtZNi6pOKdC3sLvokDvXOhgHzT+cyBqH/gWwvxTxqrg=
 github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114190811-74301cd99dc3 h1:VINIWIvYhgbGJpaI7O3aBuBOAZgMEN6BGA61zQIqvFw=
 github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114190811-74301cd99dc3/go.mod h1:DAwaVSiQMgAsCjHa8nOnIAM9GixuIQWsgEZFGpf3JxE=
-github.com/smartcontractkit/chainlink-deployments-framework v0.76.0 h1:MmC0yZUR7bn8uOyBmy7m3Z7ebanc/+o8lqIRcQKVsyM=
-github.com/smartcontractkit/chainlink-deployments-framework v0.76.0/go.mod h1:k1L8KorYEh2pPnZcmI9kk6gH44YECp9WJvFKm5OdkrU=
+github.com/smartcontractkit/chainlink-deployments-framework v0.76.1 h1:PC1fan1q2dWDOG3pWlN3hQmc7GN6Eif/LXCGV/wqyNs=
+github.com/smartcontractkit/chainlink-deployments-framework v0.76.1/go.mod h1:/+7bkxjQ8IaVE+K2O+yFerYoJ1iwemoMKWNIuU74pDg=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.9 h1:V4Uk2UJqySd+7jwcRuY2l0Xq6ni4zr52C9I8TawX3nM=
 github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.9/go.mod h1:RAr+u340HtgzqHcZhAR7qi3ILgaJmh3nNRqS9nOms6E=
 github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20250908203554-5bd9d2fe9513 h1:XRNxgcNqagXu6e4smJuS1crRK5cUAcCVd7u+iLduHDM=

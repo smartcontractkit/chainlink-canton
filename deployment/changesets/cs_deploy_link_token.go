@@ -93,5 +93,6 @@ func (d DeployLinkToken) VerifyPreconditions(e cldf.Environment, config DeployLi
 	if config.AdminAPIURL == "" {
 		return fmt.Errorf("adminApiUrl is required")
 	}
+
 	return nil
 }

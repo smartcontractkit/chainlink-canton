@@ -49,6 +49,7 @@ func GetJWT() (string, error) {
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ID:        "",
 	})
+
 	return t.SignedString([]byte("unsafe"))
 }
 
@@ -60,6 +61,7 @@ func NewBindingClient(ctx context.Context, jwtToken, ledgerAPIURL, adminAPIURL s
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DAML binding client: %w", err)
 	}
+
 	return bindingClient, nil
 }
 
@@ -83,6 +85,7 @@ func GetOrAllocateParty(ctx context.Context, bindingClient *client.DamlBindingCl
 	if err != nil {
 		return "", fmt.Errorf("failed to allocate party: %w", err)
 	}
+
 	return resp.Party, nil
 }
 
@@ -95,8 +98,10 @@ func EnsureUserRights(ctx context.Context, bindingClient *client.DamlBindingClie
 	if err != nil {
 		// Ignore error if rights already exist
 		// This is a common case and not necessarily an error
+		//nolint:nilerr
 		return nil
 	}
+
 	return nil
 }
 

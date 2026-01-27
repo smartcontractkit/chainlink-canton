@@ -82,7 +82,7 @@ type CommitteeVerifierForward struct{}
 func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVerifierForwardConfig) (cldf.ChangesetOutput, error) {
 	ctx := context.Background()
 	ab := cldf.NewMemoryAddressBook()
-	seqReports := make([]cld_ops.Report[any, any], 0)
+	seqReports := make([]cld_ops.Report[any, any], 0, 1)
 
 	// Setup Canton client
 	setupResult, err := cantonclient.Setup(ctx, cantonclient.Config{
@@ -128,6 +128,59 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 	}
 	sequenceNumberMantissa := new(big.Int).Mul(sequenceNumber, scale10)
 
+	// Convert token transfer if provided
+	var tokenTransfer *ccvs.TokenTransferV1
+	if config.Message.TokenTransfer != nil {
+		// Parse message ID for token transfer
+		// tokenTransferMessageId, ok := new(big.Int).SetString(config.Message.TokenTransfer.MessageId, 10)
+		// if !ok {
+		// 	return cldf.ChangesetOutput{}, fmt.Errorf("invalid tokenTransfer.messageId: %s", config.Message.TokenTransfer.MessageId)
+		// }
+		// tokenTransferMessageIdMantissa := new(big.Int).Mul(tokenTransferMessageId, scale10)
+
+		// Convert source token data
+		sourceTokenData := make([]ccvs.TokenAmount, len(config.Message.TokenTransfer.SourceTokenData))
+		for i, st := range config.Message.TokenTransfer.SourceTokenData {
+			amount, ok := new(big.Int).SetString(st.Amount, 10)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("invalid sourceTokenData[%d].amount: %s", i, st.Amount)
+			}
+			amountMantissa := new(big.Int).Mul(amount, scale10)
+
+			sourceTokenData[i] = ccvs.TokenAmount{
+				InstrumentId: ccvs.InstrumentId{
+					Admin: types.PARTY(st.InstrumentId.Admin),
+					Id:    types.TEXT(st.InstrumentId.Id),
+				},
+				Amount: types.NUMERIC(amountMantissa),
+			}
+		}
+
+		// Convert dest token amounts
+		destTokenAmounts := make([]ccvs.TokenAmount, len(config.Message.TokenTransfer.DestTokenAmounts))
+		for i, dt := range config.Message.TokenTransfer.DestTokenAmounts {
+			amount, ok := new(big.Int).SetString(dt.Amount, 10)
+			if !ok {
+				return cldf.ChangesetOutput{}, fmt.Errorf("invalid destTokenAmounts[%d].amount: %s", i, dt.Amount)
+			}
+			amountMantissa := new(big.Int).Mul(amount, scale10)
+
+			destTokenAmounts[i] = ccvs.TokenAmount{
+				InstrumentId: ccvs.InstrumentId{
+					Admin: types.PARTY(dt.InstrumentId.Admin),
+					Id:    types.TEXT(dt.InstrumentId.Id),
+				},
+				Amount: types.NUMERIC(amountMantissa),
+			}
+		}
+
+		tokenTransfer = &ccvs.TokenTransferV1{
+			//	MessageId:        types.NUMERIC(tokenTransferMessageIdMantissa),
+			//	SourceTokenData:  sourceTokenData,
+			//	DestTokenAmounts: destTokenAmounts,
+		}
+	}
+
 	message := ccvs.MessageV1{
 		SourceChainSelector: types.NUMERIC(sourceChainSelectorMantissa),
 		DestChainSelector:   types.NUMERIC(destChainSelectorMantissa),
@@ -142,7 +195,7 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 		Receiver:            types.TEXT(config.Message.Receiver),
 		DestBlob:            types.TEXT(config.Message.DestBlob),
 		MessageData:         types.TEXT(config.Message.MessageData),
-		TokenTransfer:       &ccvs.TokenTransferV1{},
+		TokenTransfer:       tokenTransfer,
 	}
 
 	// Convert fee token
@@ -165,6 +218,13 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to forward message to CommitteeVerifier: %w", err)
 	}
+
+	// Save CCVTicket contract ID to address book if needed
+	// typeAndVersionCCVTicket := cldf.NewTypeAndVersion("CantonCCVTicket", "1.0.0")
+	// err = ab.Save(config.ChainSelector, result.Output.Output.CCVTicketContractID, typeAndVersionCCVTicket)
+	// if err != nil {
+	// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCVTicket contract ID: %w", err)
+	// }
 
 	seqReports = append(seqReports, []cld_ops.Report[any, any]{result.ToGenericReport()}...)
 
@@ -203,5 +263,6 @@ func (c CommitteeVerifierForward) VerifyPreconditions(e cldf.Environment, config
 	if config.FeeTokenAmount == "" {
 		return fmt.Errorf("feeTokenAmount is required")
 	}
+
 	return nil
 }

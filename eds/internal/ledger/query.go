@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -51,7 +52,7 @@ func (c *Client) GetAllContractsForParty(ctx context.Context, party string) ([]*
 	var contracts []*ActiveContract
 	for {
 		resp, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

@@ -38,6 +38,7 @@ func (c *Client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
 	}
+
 	return nil
 }
 
@@ -48,6 +49,7 @@ func (c *Client) AuthContext(ctx context.Context) (context.Context, error) {
 	}
 
 	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", token))
+
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
 
@@ -58,6 +60,7 @@ func (c *Client) generateJWT() (string, error) {
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	})
+
 	return t.SignedString([]byte(c.jwtSecret))
 }
 
@@ -66,6 +69,7 @@ func (c *Client) GetCurrentOffset(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ledger end: %w", err)
 	}
+
 	return resp.GetOffset(), nil
 }
 

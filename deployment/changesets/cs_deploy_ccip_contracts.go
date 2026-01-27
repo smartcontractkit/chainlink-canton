@@ -259,5 +259,6 @@ func (d DeployCCIPContracts) VerifyPreconditions(e cldf.Environment, config Depl
 	if config.ChainSelectorValue == "" {
 		return fmt.Errorf("chainSelectorValue is required")
 	}
+
 	return nil
 }
