@@ -250,7 +250,7 @@ func testExecuteOpFlow(
 
 	t.Log("Issuing MCMS target auth ticket...")
 
-	issueTicketRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	issueTicketRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -266,14 +266,14 @@ func testExecuteOpFlow(
 							Choice:     "MCMSReceiver_IssueAuthTicket",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+									{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 								},
 							}}},
 						},
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
