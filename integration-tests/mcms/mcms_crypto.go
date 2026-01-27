@@ -98,6 +98,7 @@ func NewMCMSSigner() (*MCMSSigner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
+
 	return NewMCMSSignerFromKey(privateKey), nil
 }
 
@@ -147,6 +148,7 @@ func SortSignersByAddress(signers []*MCMSSigner) []*MCMSSigner {
 	sort.Slice(sorted, func(i, j int) bool {
 		return sorted[i].Address < sorted[j].Address
 	})
+
 	return sorted
 }
 
@@ -201,6 +203,7 @@ func HashOpLeaf(op MCMSOp) string {
 		op.OperationData
 
 	data, _ := hex.DecodeString(encoded)
+
 	return hex.EncodeToString(crypto.Keccak256(data))
 }
 
@@ -219,6 +222,7 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 		overrideFlag
 
 	data, _ := hex.DecodeString(encoded)
+
 	return hex.EncodeToString(crypto.Keccak256(data))
 }
 
@@ -291,7 +295,7 @@ func (t *MerkleTree) GetProof(leafHash string) ([]string, error) {
 	var proof []string
 	currentIdx := idx
 
-	for layerNum := 0; layerNum < len(t.Layers)-1; layerNum++ {
+	for layerNum := range len(t.Layers) - 1 {
 		layer := t.Layers[layerNum]
 		layerLen := len(layer)
 
@@ -326,6 +330,7 @@ func HashPair(a, b string) string {
 	}
 
 	data, _ := hex.DecodeString(first + second)
+
 	return hex.EncodeToString(crypto.Keccak256(data))
 }
 
@@ -336,6 +341,7 @@ func VerifyMerkleProof(root, leaf string, proof []string) bool {
 	for _, proofElement := range proof {
 		computedHash = HashPair(computedHash, proofElement)
 	}
+
 	return computedHash == root
 }
 
@@ -376,6 +382,7 @@ func PadLeft32(hexStr string) string {
 	if len(hexStr) >= 64 {
 		return hexStr[:64]
 	}
+
 	return strings.Repeat("0", 64-len(hexStr)) + hexStr
 }
 
@@ -384,6 +391,7 @@ func IntToHex(n int) string {
 	if n == 0 {
 		return "0"
 	}
+
 	return fmt.Sprintf("%x", n)
 }
 
@@ -418,7 +426,7 @@ func New2of3Config(signers []*MCMSSigner) MCMSConfig {
 	sorted := SortSignersByAddress(signers)
 
 	signerInfos := make([]SignerInfo, 3)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		signerInfos[i] = sorted[i].ToSignerInfo(i, 0) // All in group 0
 	}
 
@@ -523,6 +531,7 @@ func (p *MCMSProposal) AddOperation(targetInstanceId, functionName, operationDat
 	}
 	p.Operations = append(p.Operations, op)
 	p.Metadata.PostOpCount++
+
 	return p
 }
 
@@ -547,6 +556,7 @@ func (p *MCMSProposal) Build() *MCMSProposal {
 	}
 
 	p.Tree = NewMerkleTree(leaves)
+
 	return p
 }
 
@@ -555,6 +565,7 @@ func (p *MCMSProposal) GetRoot() string {
 	if p.Tree == nil {
 		p.Build()
 	}
+
 	return p.Tree.Root
 }
 
@@ -564,6 +575,7 @@ func (p *MCMSProposal) GetMetadataProof() ([]string, error) {
 		p.Build()
 	}
 	metadataLeaf := HashMetadataLeaf(p.Metadata)
+
 	return p.Tree.GetProof(metadataLeaf)
 }
 
@@ -576,6 +588,7 @@ func (p *MCMSProposal) GetOpProof(opIndex int) ([]string, error) {
 		return nil, fmt.Errorf("operation index %d out of range", opIndex)
 	}
 	opLeaf := HashOpLeaf(p.Operations[opIndex])
+
 	return p.Tree.GetProof(opLeaf)
 }
 
@@ -632,6 +645,7 @@ func VerifySignature(messageHash []byte, sig RawSignature) (string, error) {
 	}
 
 	address := crypto.PubkeyToAddress(*pubKey)
+
 	return strings.ToLower(address.Hex()[2:]), nil
 }
 
@@ -722,7 +736,7 @@ func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 	offset++
 
 	result.Signers = make([]SignerInfo, numSigners)
-	for i := 0; i < numSigners; i++ {
+	for i := range numSigners {
 		if offset >= len(data) {
 			return nil, fmt.Errorf("data truncated at signer %d address length", i)
 		}
@@ -763,7 +777,7 @@ func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 	offset++
 
 	result.GroupQuorums = make([]int, numQuorums)
-	for i := 0; i < numQuorums; i++ {
+	for i := range numQuorums {
 		if offset+4 > len(data) {
 			return nil, fmt.Errorf("data truncated at quorum %d", i)
 		}
@@ -779,7 +793,7 @@ func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 	offset++
 
 	result.GroupParents = make([]int, numParents)
-	for i := 0; i < numParents; i++ {
+	for i := range numParents {
 		if offset+4 > len(data) {
 			return nil, fmt.Errorf("data truncated at parent %d", i)
 		}

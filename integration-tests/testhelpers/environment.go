@@ -19,14 +19,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
+
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/transferInstructionV1"
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin"
 	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"

@@ -27,5 +27,6 @@ func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, partic
 		}
 		packageIDs = append(packageIDs, res.GetDarIds()...)
 	}
+
 	return packageIDs, nil
 }

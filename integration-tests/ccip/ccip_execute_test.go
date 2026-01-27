@@ -61,22 +61,22 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.WriteByte(0x01) // Version
-	binary.Write(&buf, binary.BigEndian, msg.SourceChainSelector)
-	binary.Write(&buf, binary.BigEndian, msg.DestChainSelector)
-	binary.Write(&buf, binary.BigEndian, msg.SequenceNumber)
-	binary.Write(&buf, binary.BigEndian, msg.ExecutionGasLimit)
-	binary.Write(&buf, binary.BigEndian, msg.CCIPReceiveGasLimit)
-	binary.Write(&buf, binary.BigEndian, msg.Finality)
+	_ = binary.Write(&buf, binary.BigEndian, msg.SourceChainSelector)
+	_ = binary.Write(&buf, binary.BigEndian, msg.DestChainSelector)
+	_ = binary.Write(&buf, binary.BigEndian, msg.SequenceNumber)
+	_ = binary.Write(&buf, binary.BigEndian, msg.ExecutionGasLimit)
+	_ = binary.Write(&buf, binary.BigEndian, msg.CCIPReceiveGasLimit)
+	_ = binary.Write(&buf, binary.BigEndian, msg.Finality)
 	buf.Write(msg.CCVAndExecutorHash[:])
 
 	// Length-prefixed fields (1-byte length)
-	buf.WriteByte(uint8(len(msg.OnRampAddress)))
+	buf.WriteByte(uint8(len(msg.OnRampAddress))) //nolint:gosec
 	buf.Write(msg.OnRampAddress)
-	buf.WriteByte(uint8(len(msg.OffRampAddress)))
+	buf.WriteByte(uint8(len(msg.OffRampAddress))) //nolint:gosec
 	buf.Write(msg.OffRampAddress)
-	buf.WriteByte(uint8(len(msg.Sender)))
+	buf.WriteByte(uint8(len(msg.Sender))) //nolint:gosec
 	buf.Write(msg.Sender)
-	buf.WriteByte(uint8(len(msg.Receiver)))
+	buf.WriteByte(uint8(len(msg.Receiver))) //nolint:gosec
 	buf.Write(msg.Receiver)
 
 	// 2-byte length prefixed fields
@@ -108,13 +108,13 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 	}
 	buf.Write(amountBytes)
 
-	buf.WriteByte(uint8(len(tt.SourcePoolAddress)))
+	buf.WriteByte(uint8(len(tt.SourcePoolAddress))) //nolint:gosec
 	buf.Write(tt.SourcePoolAddress)
-	buf.WriteByte(uint8(len(tt.SourceTokenAddress)))
+	buf.WriteByte(uint8(len(tt.SourceTokenAddress))) //nolint:gosec
 	buf.Write(tt.SourceTokenAddress)
-	buf.WriteByte(uint8(len(tt.DestTokenAddress)))
+	buf.WriteByte(uint8(len(tt.DestTokenAddress))) //nolint:gosec
 	buf.Write(tt.DestTokenAddress)
-	buf.WriteByte(uint8(len(tt.TokenReceiver)))
+	buf.WriteByte(uint8(len(tt.TokenReceiver))) //nolint:gosec
 	buf.Write(tt.TokenReceiver)
 
 	binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData)))
@@ -187,7 +187,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Generate signer keys for CommitteeVerifier (3 signers, threshold 2)
 	var ccvSignerKeys []*ecdsa.PrivateKey
 	var ccvSignerPubKeys []*apiv2.Value
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
@@ -534,9 +534,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "ExecutionStateChanged" {
 				// ExecutionStateChanged has: ccipOwner, receiver, event
-				// event is ExecutionStateChangedEvent with: sourceChainSelector, sequenceNumber, messageId, state, returnData
+				// is ExecutionStateChangedEvent with: sourceChainSelector, sequenceNumber, messageId, state, returnData
 				eventRecord := e.Created.GetCreateArguments().GetFields()[2].GetValue().GetRecord()
 				returnedMessageId = eventRecord.GetFields()[2].GetValue().GetText()
+
 				break
 			}
 		}

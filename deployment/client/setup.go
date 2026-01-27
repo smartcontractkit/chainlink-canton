@@ -95,6 +95,7 @@ func EnsureUserRights(ctx context.Context, bindingClient *client.DamlBindingClie
 	if err != nil {
 		// Ignore error if rights already exist
 		// This is a common case and not necessarily an error
+		//nolint:nilerr
 		return nil
 	}
 	return nil

@@ -28,6 +28,7 @@ func encodeInstrumentId(admin, identifier string) ([]byte, error) {
 	buf.WriteString(admin)
 	buf.WriteByte(byte(len(identifier)))
 	buf.WriteString(identifier)
+
 	return buf.Bytes(), nil
 }
 
@@ -95,7 +96,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	// Generate signer keys for CommitteeVerifier
 	var ccvSignerKeys []*ecdsa.PrivateKey
 	var ccvSignerPubKeys []string
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
@@ -736,7 +737,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		acceptContext, err := testhelpers.ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
 		require.NoError(t, err)
 
-		res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		_, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 			Commands: &apiv2.Commands{
 				CommandId: uuid.Must(uuid.NewUUID()).String(),
 				Commands: []*apiv2.Command{{
@@ -781,6 +782,7 @@ func getHoldingsBalance(holdings []*apiv2.ActiveContract) float64 {
 		balanceFloat, _ := balance.Float64()
 		total += balanceFloat
 	}
+
 	return total
 }
 
@@ -791,6 +793,7 @@ func extractCreatedContractId(res *apiv2.SubmitAndWaitForTransactionResponse) st
 			return e.Created.ContractId
 		}
 	}
+
 	return ""
 }
 

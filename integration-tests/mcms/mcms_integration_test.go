@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -75,15 +76,19 @@ func TestMCMS_Execute(t *testing.T) {
 
 	// Run tests
 	t.Run("ExecuteOp Flow", func(t *testing.T) {
+		t.Parallel()
 		testExecuteOpFlow(t, config, chainId, sortedSigners, participant, ccipOwner)
 	})
 	t.Run("Signature Verification Failure", func(t *testing.T) {
+		t.Parallel()
 		testSignatureVerificationFails(t, config, chainId, participant, ccipOwner)
 	})
 	t.Run("Replay Protection", func(t *testing.T) {
+		t.Parallel()
 		testReplayProtection(t, config, chainId, sortedSigners, participant, ccipOwner)
 	})
 	t.Run("MCMS Op", func(t *testing.T) {
+		t.Parallel()
 		testExecuteMCMSOp(t, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
 	})
 }
@@ -102,8 +107,6 @@ func testExecuteOpFlow(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// ========================
 	// |   Contract Constants |
 	// ========================
@@ -134,13 +137,13 @@ func testExecuteOpFlow(
 
 	// Build group quorums (32 ints)
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 	}
 
 	// Build group parents (32 ints)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
 
@@ -475,7 +478,7 @@ func testExecuteOpFlow(
 	require.True(t, eventFound, "MCMSEntrypointEvent should be emitted by Counter.mcmsEntrypoint")
 	assert.Equal(t, instanceId, eventInstanceId, "Event instanceId should match Counter instanceId")
 	assert.Equal(t, "increment", eventFunctionName, "Event functionName should be 'increment'")
-	assert.Equal(t, "", eventOperationData, "Event operationData should be empty for increment")
+	assert.Empty(t, eventOperationData, "Event operationData should be empty for increment")
 
 	// Verify contractIds were passed through the chain
 	require.Len(t, eventContractIdsAsText, 1, "Should have 1 contractId passed through")
@@ -534,8 +537,6 @@ func testSignatureVerificationFails(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// Build config values
 	baseMcmsId := "mcms-sig-fail-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
@@ -553,7 +554,7 @@ func testSignatureVerificationFails(
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -718,8 +719,6 @@ func testReplayProtection(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// Build config values
 	baseMcmsId := "mcms-replay-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
@@ -737,7 +736,7 @@ func testReplayProtection(
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -923,7 +922,7 @@ func testReplayProtection(
 	})
 
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "E_ALREADY_SEEN_HASH"),
+	require.Contains(t, err.Error(), "E_ALREADY_SEEN_HASH",
 		"Expected E_ALREADY_SEEN_HASH error, got: %v", err)
 
 	t.Log("✓ Second SetRoot correctly rejected with E_ALREADY_SEEN_HASH (replay protection working)")
@@ -939,8 +938,6 @@ func testExecuteMCMSOp(
 	ccipParticipant, userParticipant testhelpers.Participant,
 	ccipOwnerParty, userParty string,
 ) {
-	t.Parallel()
-
 	// ========================
 	// |   Contract Constants |
 	// ========================
@@ -969,7 +966,7 @@ func testExecuteMCMSOp(
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -1278,7 +1275,7 @@ func testExecuteMCMSOp(
 
 	for {
 		ac, err := acsRes.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		require.NoError(t, err)
@@ -1304,6 +1301,7 @@ func testExecuteMCMSOp(
 								}
 							}
 						}
+
 						break
 					}
 				}

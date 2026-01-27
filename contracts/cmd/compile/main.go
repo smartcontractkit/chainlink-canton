@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -20,6 +21,8 @@ type packageDaml struct {
 }
 
 func main() {
+	ctx := context.Background()
+
 	artifactsDir := flag.String("artifacts", "dar", "Path to the artifacts directory")
 	rootDir := flag.String("root", "", "Path to the contracts root directory, must contain multi-package.yaml file, defaults to current working directory")
 	flag.Parse()
@@ -59,7 +62,7 @@ func main() {
 	slices.Sort(versions)
 	log.Printf("Installing required DAML SDK versions: %v...", versions)
 	for _, version := range versions {
-		cmd := exec.Command("dpm", "install", version)
+		cmd := exec.CommandContext(ctx, "dpm", "install", version)
 		if *rootDir != "" {
 			cmd.Dir = *rootDir
 		}
@@ -79,7 +82,7 @@ func main() {
 
 	// Compile contracts using dpm
 	log.Printf("Compiling contracts using dpm...")
-	cmd := exec.Command("dpm", "build", "--all")
+	cmd := exec.CommandContext(ctx, "dpm", "build", "--all")
 	if *rootDir != "" {
 		cmd.Dir = *rootDir
 	}

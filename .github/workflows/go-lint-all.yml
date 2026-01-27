@@ -7,6 +7,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GOLANGCI_LINT_VERSION: v2.8.0
+
 jobs:
   gomods:
     name: Go Modules Tidy Check
@@ -30,3 +33,26 @@ jobs:
             done
             exit 1
           fi
+
+  lint:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - .
+          - eds
+          - integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ matrix.dir }}/go.mod
+      - name: Linting Go
+        uses: golangci/golangci-lint-action@v9.2.0
+        with:
+          only-new-issues: "false"
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: ${{ matrix.dir }}

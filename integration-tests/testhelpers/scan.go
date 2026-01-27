@@ -17,6 +17,7 @@ func TemplateIdFromString(s string) (*apiv2.Identifier, error) {
 	if len(split) != 3 {
 		return nil, fmt.Errorf("invalid template id format: %s", s)
 	}
+
 	return &apiv2.Identifier{
 		PackageId:  split[0],
 		ModuleName: split[1],
@@ -37,6 +38,7 @@ func GetAmuletRulesContract(ctx context.Context, scanProxyClient scanProxy.Clien
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to parse amulet rules template id: %w", err)
 	}
+
 	return amuletRulesResponse.JSON200.AmuletRules.Contract.ContractId, amuletRulesId, nil
 }
 
@@ -51,6 +53,7 @@ func GetFirstOpenMiningRound(ctx context.Context, scanProxyClient scanProxy.Clie
 	slices.SortFunc(openMiningRoundResponse.JSON200.OpenMiningRounds, func(a, b scanProxy.ContractWithState) int {
 		aOpen, _ := time.Parse(time.RFC3339, a.Contract.Payload["opensAt"].(string))
 		bOpen, _ := time.Parse(time.RFC3339, b.Contract.Payload["opensAt"].(string))
+
 		return int(aOpen.UnixMilli() - bOpen.UnixMilli())
 	})
 	var openMiningRoundCid string
@@ -67,5 +70,6 @@ func GetFirstOpenMiningRound(ctx context.Context, scanProxyClient scanProxy.Clie
 			openMiningRoundCid = round.Contract.ContractId
 		}
 	}
+
 	return openMiningRoundCid, nil
 }

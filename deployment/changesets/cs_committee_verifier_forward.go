@@ -44,26 +44,26 @@ type CommitteeVerifierForwardConfig struct {
 
 // MessageV1Input represents the input structure for MessageV1
 type MessageV1Input struct {
-	SourceChainSelector    string `yaml:"sourceChainSelector"`    // Chain selector as string
-	DestChainSelector      string `yaml:"destChainSelector"`      // Chain selector as string
-	SequenceNumber          string `yaml:"sequenceNumber"`         // Numeric value as string
-	ExecutionGasLimit       int64  `yaml:"executionGasLimit"`
-	CcipReceiveGasLimit     int64  `yaml:"ccipReceiveGasLimit"`
-	Finality                int64  `yaml:"finality"`
-	CcvAndExecutorHash      string `yaml:"ccvAndExecutorHash"`
-	OnRampAddress          string `yaml:"onRampAddress"`
-	OffRampAddress         string `yaml:"offRampAddress"`
-	Sender                 string `yaml:"sender"`
-	Receiver               string `yaml:"receiver"`
-	DestBlob               string `yaml:"destBlob"`
-	MessageData            string `yaml:"messageData"`
-	TokenTransfer          *TokenTransferV1Input `yaml:"tokenTransfer"` // Optional
+	SourceChainSelector string                `yaml:"sourceChainSelector"` // Chain selector as string
+	DestChainSelector   string                `yaml:"destChainSelector"`   // Chain selector as string
+	SequenceNumber      string                `yaml:"sequenceNumber"`      // Numeric value as string
+	ExecutionGasLimit   int64                 `yaml:"executionGasLimit"`
+	CcipReceiveGasLimit int64                 `yaml:"ccipReceiveGasLimit"`
+	Finality            int64                 `yaml:"finality"`
+	CcvAndExecutorHash  string                `yaml:"ccvAndExecutorHash"`
+	OnRampAddress       string                `yaml:"onRampAddress"`
+	OffRampAddress      string                `yaml:"offRampAddress"`
+	Sender              string                `yaml:"sender"`
+	Receiver            string                `yaml:"receiver"`
+	DestBlob            string                `yaml:"destBlob"`
+	MessageData         string                `yaml:"messageData"`
+	TokenTransfer       *TokenTransferV1Input `yaml:"tokenTransfer"` // Optional
 }
 
 // TokenTransferV1Input represents the input structure for TokenTransferV1
 type TokenTransferV1Input struct {
-	MessageId      string              `yaml:"messageId"`
-	SourceTokenData []TokenAmountInput `yaml:"sourceTokenData"`
+	MessageId        string             `yaml:"messageId"`
+	SourceTokenData  []TokenAmountInput `yaml:"sourceTokenData"`
 	DestTokenAmounts []TokenAmountInput `yaml:"destTokenAmounts"`
 }
 
@@ -132,11 +132,11 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 	var tokenTransfer *ccvs.TokenTransferV1
 	if config.Message.TokenTransfer != nil {
 		// Parse message ID for token transfer
-		tokenTransferMessageId, ok := new(big.Int).SetString(config.Message.TokenTransfer.MessageId, 10)
-		if !ok {
-			return cldf.ChangesetOutput{}, fmt.Errorf("invalid tokenTransfer.messageId: %s", config.Message.TokenTransfer.MessageId)
-		}
-		tokenTransferMessageIdMantissa := new(big.Int).Mul(tokenTransferMessageId, scale10)
+		// tokenTransferMessageId, ok := new(big.Int).SetString(config.Message.TokenTransfer.MessageId, 10)
+		// if !ok {
+		// 	return cldf.ChangesetOutput{}, fmt.Errorf("invalid tokenTransfer.messageId: %s", config.Message.TokenTransfer.MessageId)
+		// }
+		// tokenTransferMessageIdMantissa := new(big.Int).Mul(tokenTransferMessageId, scale10)
 
 		// Convert source token data
 		sourceTokenData := make([]ccvs.TokenAmount, len(config.Message.TokenTransfer.SourceTokenData))
@@ -175,27 +175,27 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 		}
 
 		tokenTransfer = &ccvs.TokenTransferV1{
-			MessageId:        types.NUMERIC(tokenTransferMessageIdMantissa),
-			SourceTokenData:  sourceTokenData,
-			DestTokenAmounts: destTokenAmounts,
+			//	MessageId:        types.NUMERIC(tokenTransferMessageIdMantissa),
+			//	SourceTokenData:  sourceTokenData,
+			//	DestTokenAmounts: destTokenAmounts,
 		}
 	}
 
 	message := ccvs.MessageV1{
-		SourceChainSelector:    types.NUMERIC(sourceChainSelectorMantissa),
-		DestChainSelector:      types.NUMERIC(destChainSelectorMantissa),
-		SequenceNumber:          types.NUMERIC(sequenceNumberMantissa),
-		ExecutionGasLimit:       types.INT64(config.Message.ExecutionGasLimit),
-		CcipReceiveGasLimit:     types.INT64(config.Message.CcipReceiveGasLimit),
-		Finality:                types.INT64(config.Message.Finality),
-		CcvAndExecutorHash:      types.TEXT(config.Message.CcvAndExecutorHash),
-		OnRampAddress:          types.TEXT(config.Message.OnRampAddress),
-		OffRampAddress:         types.TEXT(config.Message.OffRampAddress),
-		Sender:                 types.TEXT(config.Message.Sender),
-		Receiver:               types.TEXT(config.Message.Receiver),
-		DestBlob:               types.TEXT(config.Message.DestBlob),
-		MessageData:            types.TEXT(config.Message.MessageData),
-		TokenTransfer:          tokenTransfer,
+		SourceChainSelector: types.NUMERIC(sourceChainSelectorMantissa),
+		DestChainSelector:   types.NUMERIC(destChainSelectorMantissa),
+		SequenceNumber:      types.NUMERIC(sequenceNumberMantissa),
+		ExecutionGasLimit:   types.INT64(config.Message.ExecutionGasLimit),
+		CcipReceiveGasLimit: types.INT64(config.Message.CcipReceiveGasLimit),
+		Finality:            types.INT64(config.Message.Finality),
+		CcvAndExecutorHash:  types.TEXT(config.Message.CcvAndExecutorHash),
+		OnRampAddress:       types.TEXT(config.Message.OnRampAddress),
+		OffRampAddress:      types.TEXT(config.Message.OffRampAddress),
+		Sender:              types.TEXT(config.Message.Sender),
+		Receiver:            types.TEXT(config.Message.Receiver),
+		DestBlob:            types.TEXT(config.Message.DestBlob),
+		MessageData:         types.TEXT(config.Message.MessageData),
+		TokenTransfer:       tokenTransfer,
 	}
 
 	// Convert fee token
@@ -226,7 +226,7 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 	// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCVTicket contract ID: %w", err)
 	// }
 
-	seqReports = append(seqReports, result)
+	seqReports = append(seqReports, []cld_ops.Report[any, any]{result.ToGenericReport()}...)
 
 	return cldf.ChangesetOutput{
 		AddressBook: ab,
