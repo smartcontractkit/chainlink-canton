@@ -180,5 +180,6 @@ func ExtractInstanceID(args *apiv2.Record) string {
 			}
 		}
 	}
+
 	return ""
 }

@@ -388,5 +388,6 @@ func (c ConfigureEVMChain) VerifyPreconditions(e cldf.Environment, config Config
 	if config.EVMChainSelector == "" {
 		return fmt.Errorf("evmChainSelector is required")
 	}
+
 	return nil
 }

@@ -1,0 +1,58 @@
+name: Lint Go
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GOLANGCI_LINT_VERSION: v2.8.0
+
+jobs:
+  gomods:
+    name: Go Modules Tidy Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Run gomods tidy
+        run: make gomodtidy
+      - name: Check if any files have been changed
+        run: |
+          if ! git diff --quiet HEAD; then
+            echo "❌ Some go.mod files are out-of-date, run \`make gomodtidy\` and commit your changes."
+            echo "❌ Some go.mod files are out-of-date, run \`make gomodtidy\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+            git diff --name-only | while read -r n ; do
+                echo "- $n" >> $GITHUB_STEP_SUMMARY
+            done
+            exit 1
+          fi
+
+  lint:
+    strategy:
+      fail-fast: false
+      matrix:
+        dir:
+          - .
+          - eds
+          - integration-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ${{ matrix.dir }}/go.mod
+      - name: Linting Go
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          only-new-issues: "false"
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: ${{ matrix.dir }}
