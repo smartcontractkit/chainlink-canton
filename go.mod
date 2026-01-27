@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114190811-74301cd99dc3
-	github.com/smartcontractkit/chainlink-deployments-framework v0.76.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.76.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3
