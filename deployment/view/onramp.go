@@ -30,12 +30,12 @@ type OnRampView struct {
 func GenerateOnRampView(
 	ctx context.Context,
 	stateService ledger.StateService,
-	onRampContractID string,
+	onRampContractAddress string,
 	ccipOnRampPkgID string,
 	party string, // Party that can read the contract
 ) (OnRampView, error) {
-	if onRampContractID == "" {
-		return OnRampView{}, fmt.Errorf("onRampContractID cannot be empty")
+	if onRampContractAddress == "" {
+		return OnRampView{}, fmt.Errorf("onRampContractAddress cannot be empty")
 	}
 	if party == "" {
 		return OnRampView{}, fmt.Errorf("party cannot be empty")
@@ -86,7 +86,7 @@ func GenerateOnRampView(
 				continue
 			}
 			createdEvent := entry.ActiveContract.CreatedEvent
-			if createdEvent.ContractID == onRampContractID {
+			if createdEvent.ContractID == onRampContractAddress {
 				contractEvent = createdEvent
 				templateID = createdEvent.TemplateID
 				goto done
@@ -106,7 +106,7 @@ func GenerateOnRampView(
 done:
 
 	if contractEvent == nil {
-		return OnRampView{}, fmt.Errorf("contract with ID %s not found for party %s", onRampContractID, party)
+		return OnRampView{}, fmt.Errorf("contract with ID %s not found for party %s", onRampContractAddress, party)
 	}
 
 	// CreateArguments is a Record with json dump like below
@@ -129,7 +129,7 @@ done:
 
 	return OnRampView{
 		ContractMetaData: ContractMetaData{
-			Address:    onRampContractID,
+			Address:    onRampContractAddress,
 			Owner:      ccipOwner,
 			TemplateID: templateID,
 			InstanceID: instanceId,

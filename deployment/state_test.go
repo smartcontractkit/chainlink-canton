@@ -49,7 +49,7 @@ func TestCantonChainStateGenerateView(t *testing.T) {
 		reporter,
 	)
 
-	instanceID := "test-state-view-instance"
+	instanceID := "local-v1"
 	chainSelectorValue := "1111111111"
 	onRampAddress := "0000000000000000000000000000000000000001"
 	destChainSelector := "2222222222"
@@ -136,10 +136,10 @@ func TestCantonChainStateGenerateView(t *testing.T) {
 	t.Run("GenerateChainView", func(t *testing.T) {
 		// Create chain state
 		chainState := CantonChainState{
-			BindingClient:          setupResult.BindingClient,
-			Party:                  deps.Party,
-			GlobalConfigContractID: globalConfigContractID,
-			OnRampContractID:       onRampContractID,
+			BindingClient:               setupResult.BindingClient,
+			Party:                       deps.Party,
+			GlobalConfigContractAddress: globalConfigContractID,
+			OnRampContractAddress:       onRampContractID,
 		}
 
 		// Create environment

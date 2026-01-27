@@ -8,10 +8,14 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/noders-team/go-daml/pkg/client"
+	"github.com/noders-team/go-daml/pkg/model"
 
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/chainlink-canton-internal/deployment/view"
 )
 
@@ -31,19 +35,20 @@ type CantonChainState struct {
 	Party         string                    // Party that can read the contracts
 
 	// CCIP Contract IDs
-	GlobalConfigContractID       string
-	TokenAdminRegistryContractID string
-	FeeQuoterContractID          string
-	OnRampContractID             string
-	OffRampContractID            string
-	PerPartyRouterContractID     string
-	CommitteeVerifierContractID  string
-	CCVRegistryContractID        string
+	GlobalConfigContractAddress       string
+	TokenAdminRegistryContractAddress string
+	FeeQuoterContractAddress          string
+	OnRampContractAddress             string
+	OffRampContractAddress            string
+	PerPartyRouterContractAddress     string
+	CommitteeVerifierContractAddress  string
+	CCVRegistryContractAddress        string
 
 	// LINK Token related
-	LinkTokenRegistryContractID string
+	LinkTokenRegistryContractAddress string
 }
 
+// GenerateView generates contracts views are active and visible to a specific party
 func (s CantonChainState) GenerateView(e *cldf.Environment, selector uint64, chainName string) (CantonChainView, error) {
 	lggr := e.Logger
 	chainView := CantonChainView{
@@ -63,39 +68,46 @@ func (s CantonChainState) GenerateView(e *cldf.Environment, selector uint64, cha
 	g, ctxG := errgroup.WithContext(ctx)
 
 	// OnRamp
-	if s.OnRampContractID != "" {
+	if s.OnRampContractAddress != "" {
 		g.Go(func() error {
-			// List known packages to find the package ID for ccip-onramp
-			ListKnownPackagesResp, err := s.BindingClient.PackageMng.ListKnownPackages(ctx)
+			// get address from datastore for onramp
+			address, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType("onramp"), semver.MustParse("1.0.0"), ""))
 			if err != nil {
-				return fmt.Errorf("failed to list known packages: %w", err)
+				return fmt.Errorf("failed to get address: %w", err)
 			}
 
-			var ccipOnRampPkgID string
-			for _, p := range ListKnownPackagesResp {
-				if strings.Contains(strings.ToLower(p.Name), "ccip-onramp") {
-					ccipOnRampPkgID = p.PackageID
-					break
-				}
-			}
-			if ccipOnRampPkgID == "" {
-				return fmt.Errorf("failed to find ccip-onramp package")
+			// parse party from address
+			instanceID, party, err := parsePartyFromAddress(address.Address)
+			if err != nil {
+				return fmt.Errorf("failed to parse party from address: %w", err)
 			}
 
-			onRampView, err := view.GenerateOnRampView(ctxG, s.BindingClient.StateService, s.OnRampContractID, ccipOnRampPkgID, s.Party)
+			// get all contract for this party
+			contracts, err := getAllActiveContractsForParty(ctx, e, selector, s.BindingClient.StateService, party)
 			if err != nil {
-				return fmt.Errorf("failed to generate onramp view for onramp %s: %w", s.OnRampContractID, err)
+				return fmt.Errorf("failed to get active contracts: %w", err)
+			}
+
+			// find specific contract for this party based on the createdEvent from contractCreation
+			contractID, err := findContractBasedOnModuleIdAndExpectedEnvID(contracts, instanceID)
+			if err != nil {
+				return fmt.Errorf("failed to find contract: %w", err)
+			}
+
+			onRampView, err := view.GenerateOnRampView(ctxG, s.BindingClient.StateService, s.OnRampContractAddress, contractID, s.Party)
+			if err != nil {
+				return fmt.Errorf("failed to generate onramp view for onramp %s: %w", s.OnRampContractAddress, err)
 			}
 			mu.Lock()
 			chainView.OnRamp = onRampView
 			mu.Unlock()
-			lggr.Infow("generated onRamp view", "onRampContractID", s.OnRampContractID, "chain", chainName)
+			lggr.Infow("generated onRamp view", "onRampContractAddress", s.OnRampContractAddress, "chain", chainName)
 			return nil
 		})
 	}
 
 	// GlobalConfig
-	if s.GlobalConfigContractID != "" {
+	if s.GlobalConfigContractAddress != "" {
 		g.Go(func() error {
 			// List known packages to find the package ID for ccip-common
 			ListKnownPackagesResp, err := s.BindingClient.PackageMng.ListKnownPackages(ctx)
@@ -114,14 +126,14 @@ func (s CantonChainState) GenerateView(e *cldf.Environment, selector uint64, cha
 				return fmt.Errorf("failed to find ccip-common package")
 			}
 
-			globalConfigView, err := view.GenerateGlobalConfigView(ctxG, s.BindingClient.StateService, s.GlobalConfigContractID, ccipCommonPkgID, s.Party)
+			globalConfigView, err := view.GenerateGlobalConfigView(ctxG, s.BindingClient.StateService, s.GlobalConfigContractAddress, ccipCommonPkgID, s.Party)
 			if err != nil {
-				return fmt.Errorf("failed to generate globalconfig view for globalconfig %s: %w", s.GlobalConfigContractID, err)
+				return fmt.Errorf("failed to generate globalconfig view for globalconfig %s: %w", s.GlobalConfigContractAddress, err)
 			}
 			mu.Lock()
 			chainView.GlobalConfig = globalConfigView
 			mu.Unlock()
-			lggr.Infow("generated GlobalConfig view", "globalConfigContractID", s.GlobalConfigContractID, "chain", chainName)
+			lggr.Infow("generated GlobalConfig view", "globalConfigContractAddress", s.GlobalConfigContractAddress, "chain", chainName)
 			return nil
 		})
 	}
@@ -167,25 +179,102 @@ func LoadCantonChainStateFromAddresses(
 		// Parse addresses based on type
 		switch typeAndVersion.Type {
 		case CantonCCIPOnRampType:
-			chainState.OnRampContractID = addr
+			chainState.OnRampContractAddress = addr
 		case CantonCCIPOffRampType:
-			chainState.OffRampContractID = addr
+			chainState.OffRampContractAddress = addr
 		case CantonCCIPFeeQuoterType:
-			chainState.FeeQuoterContractID = addr
+			chainState.FeeQuoterContractAddress = addr
 		case CantonCCIPTokenAdminRegistryType:
-			chainState.TokenAdminRegistryContractID = addr
+			chainState.TokenAdminRegistryContractAddress = addr
 		case CantonCCIPCommitteeVerifierType:
-			chainState.CommitteeVerifierContractID = addr
+			chainState.CommitteeVerifierContractAddress = addr
 		case CantonCCIPPerPartyRouterType:
-			chainState.PerPartyRouterContractID = addr
+			chainState.PerPartyRouterContractAddress = addr
 		case CantonCCIPCCVRegistryType:
-			chainState.CCVRegistryContractID = addr
+			chainState.CCVRegistryContractAddress = addr
 		case CantonCCIPGlobalConfigType:
-			chainState.GlobalConfigContractID = addr
+			chainState.GlobalConfigContractAddress = addr
 		case CantonLinkTokenRegistryType:
-			chainState.LinkTokenRegistryContractID = addr
+			chainState.LinkTokenRegistryContractAddress = addr
 		}
 	}
 
 	return chainState, nil
+}
+
+func getAllActiveContractsForParty(ctx context.Context, e *cldf.Environment, selector uint64, stateService ledger.StateService, party string) ([]*model.CreatedEvent, error) {
+	// Get current offset
+	ledgerEndResp, err := stateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ledger end: %w", err)
+	}
+
+	// Query active contracts for the party using wildcard filter
+	// Following the pattern from GetActiveContractsForPartyWithFilters
+	req := &model.GetActiveContractsRequest{
+		ActiveAtOffset: ledgerEndResp.Offset,
+		EventFormat: &model.EventFormat{
+			FiltersByParty: map[string]*model.Filters{
+				party: {Inclusive: &model.InclusiveFilters{
+					TemplateFilters: []*model.TemplateFilter{}, // Empty = wildcard
+				}},
+			},
+			Verbose: true,
+		},
+	}
+
+	responseChan, errorChan := stateService.GetActiveContracts(ctx, req)
+
+	for {
+		select {
+		case resp, ok := <-responseChan:
+			if !ok {
+				return []*model.CreatedEvent{}, nil
+			}
+			if resp == nil || resp.ContractEntry == nil {
+				continue
+			}
+			entry, ok := resp.ContractEntry.(*model.ActiveContractEntry)
+			if !ok || entry.ActiveContract == nil || entry.ActiveContract.CreatedEvent == nil {
+				continue
+			}
+			return []*model.CreatedEvent{entry.ActiveContract.CreatedEvent}, nil
+		case err, ok := <-errorChan:
+			if !ok {
+				errorChan = nil
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to receive active contract: %w", err)
+			}
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
+func findContractBasedOnModuleIdAndExpectedEnvID(contracts []*model.CreatedEvent, expectedEnvID string) (string, error) {
+	for _, contract := range contracts {
+		// instanceId assertion
+		for _, field := range contract.CreateArguments.(map[string]interface{}) {
+			if field == "instanceId" {
+				if field != expectedEnvID {
+					continue
+				}
+			}
+		}
+
+		return contract.ContractID, nil
+	}
+	return "", fmt.Errorf("contract not found with expectedEnvID %s", expectedEnvID)
+}
+
+// instanceID@party
+// Address looks like this local-v1-globalconfig@participant1-localparty-1::1220cc68db908cfcb2bea8383297dc05f6d2c58566866a3e47a397efbdc29c1cb0dd
+func parsePartyFromAddress(address string) (string, string, error) {
+	parts := strings.Split(address, "@")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid address: %s", address)
+	}
+	return parts[0], parts[1], nil
 }
