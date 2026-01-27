@@ -256,7 +256,7 @@ func NewMerkleTree(leaves []string) *MerkleTree {
 		workingLayer := make([]string, len(currentLayer))
 		copy(workingLayer, currentLayer)
 		if len(workingLayer)%2 != 0 {
-			workingLayer = append(workingLayer, workingLayer[len(workingLayer)-1])
+			workingLayer = append(workingLayer, workingLayer[len(workingLayer)-1]) //nolint:makezero // This is intentional padding
 		}
 
 		var nextLayer []string
