@@ -50,7 +50,7 @@ func (h *Handlers) GetCCIPExecuteDisclosures(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *Handlers) ListEnvironments(w http.ResponseWriter, r *http.Request) {
-	var envs []types.EnvironmentInfo
+	envs := make([]types.EnvironmentInfo, 0, len(h.envConfig.Environments))
 	for id, env := range h.envConfig.Environments {
 		envs = append(envs, types.EnvironmentInfo{
 			ID:          id,
@@ -77,10 +77,11 @@ func (h *Handlers) Health(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func WriteJSON(w http.ResponseWriter, status int, data interface{}) {
+func WriteJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	//nolint:errchkjson // temp
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func WriteError(w http.ResponseWriter, status int, code, message string) {

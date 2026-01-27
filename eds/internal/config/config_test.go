@@ -9,6 +9,8 @@ import (
 )
 
 func TestLoad(t *testing.T) {
+	t.Parallel()
+
 	// Save original env vars
 	origJWTSecret := os.Getenv("JWT_SECRET")
 	origPort := os.Getenv("PORT")
@@ -20,13 +22,17 @@ func TestLoad(t *testing.T) {
 	}()
 
 	t.Run("returns error when JWT_SECRET is missing", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("JWT_SECRET", "")
 		_, err := Load()
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "JWT_SECRET")
 	})
 
 	t.Run("loads config with defaults", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("JWT_SECRET", "test-secret")
 		os.Setenv("PORT", "")
 		os.Setenv("HOST", "")
@@ -44,6 +50,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("loads config from env vars", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("JWT_SECRET", "my-secret")
 		os.Setenv("PORT", "9090")
 		os.Setenv("HOST", "127.0.0.1")
@@ -65,6 +73,8 @@ func TestLoad(t *testing.T) {
 	})
 
 	t.Run("handles invalid port gracefully", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("JWT_SECRET", "test-secret")
 		os.Setenv("PORT", "invalid")
 
@@ -75,7 +85,11 @@ func TestLoad(t *testing.T) {
 }
 
 func TestGetEnv(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns env value when set", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("TEST_VAR", "test-value")
 		defer os.Unsetenv("TEST_VAR")
 
@@ -84,6 +98,8 @@ func TestGetEnv(t *testing.T) {
 	})
 
 	t.Run("returns default when env not set", func(t *testing.T) {
+		t.Parallel()
+
 		os.Unsetenv("TEST_VAR_UNSET")
 
 		result := getEnv("TEST_VAR_UNSET", "default-value")
@@ -92,7 +108,11 @@ func TestGetEnv(t *testing.T) {
 }
 
 func TestGetEnvInt(t *testing.T) {
+	t.Parallel()
+
 	t.Run("returns env value as int when valid", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("TEST_INT", "42")
 		defer os.Unsetenv("TEST_INT")
 
@@ -101,6 +121,8 @@ func TestGetEnvInt(t *testing.T) {
 	})
 
 	t.Run("returns default when env not set", func(t *testing.T) {
+		t.Parallel()
+
 		os.Unsetenv("TEST_INT_UNSET")
 
 		result := getEnvInt("TEST_INT_UNSET", 100)
@@ -108,6 +130,8 @@ func TestGetEnvInt(t *testing.T) {
 	})
 
 	t.Run("returns default when env value is invalid", func(t *testing.T) {
+		t.Parallel()
+
 		os.Setenv("TEST_INT_INVALID", "not-a-number")
 		defer os.Unsetenv("TEST_INT_INVALID")
 
