@@ -61,7 +61,7 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 	}
 
 	// Run DeployLinkToken Operation
-	deployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, linkops.DeployLINKOp, deps, cld_ops.EmptyInput{})
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, linkops.DeployLINKOp, deps, cld_ops.EmptyInput{})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy LinkToken for Canton chain %d: %w", config.ChainSelector, err)
 	}
@@ -70,8 +70,8 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       deployResult.Output.Output.RegistryContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-linktokenregistry@%s", config.InstanceID, config.DeployerParty)),
+			Address:       fmt.Sprintf("%s-linktokenregistry@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("linktokenregistry"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)

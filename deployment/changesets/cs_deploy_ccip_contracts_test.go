@@ -71,14 +71,14 @@ func TestDeployCCIPContracts(t *testing.T) {
 	t.Logf("\n=== All Contracts in DataStore ===")
 	t.Logf("AddressRefStore: %+v", addressRefStore)
 
-	// The changeset successfully deployed 7 contracts:
-	// 1. GlobalConfig (CCIP Common) - local-v1-globalconfig@{party}
-	// 2. CommitteeVerifier (CCV) - local-v1-ccv@{party}
-	// 3. TokenAdminRegistry (TAR) - local-v1-tar@{party}
-	// 4. FeeQuoter - local-v1-feequoter@{party}
-	// 5. OffRamp - local-v1-offramp@{party}
-	// 6. PerPartyRouter - local-v1-perpartyrouter@{party}
-	// 7. OnRamp - local-v1-onramp@{party}
+	// The changeset successfully deployed 7 contracts and saved them with these addresses:
+	// 1. GlobalConfig - {instanceID}-globalconfig@{party}
+	// 2. CommitteeVerifier (CCV) - {instanceID}-ccv@{party}
+	// 3. TokenAdminRegistry (TAR) - {instanceID}-tar@{party}
+	// 4. FeeQuoter - {instanceID}-feequoter@{party}
+	// 5. OffRamp - {instanceID}-offramp@{party}
+	// 6. PerPartyRouter - {instanceID}-perpartyrouter@{party}
+	// 7. OnRamp - {instanceID}-onramp@{party}
 	t.Logf("All 7 CCIP contracts have been deployed and saved to the datastore")
 
 	// Verify reports

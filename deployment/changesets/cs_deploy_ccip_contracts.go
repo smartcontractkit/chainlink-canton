@@ -74,7 +74,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	// --------------------------
 	// CCIP COMMON (GlobalConfig, CCVRegistry)
 	// --------------------------
-	globalConfigDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployCCIPCommonOp, deps, ccipops.DeployCCIPCommonInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployCCIPCommonOp, deps, ccipops.DeployCCIPCommonInput{
 		InstanceID:         config.InstanceID + "-globalconfig",
 		ChainSelectorValue: config.ChainSelectorValue,
 		OnRampAddress:      config.OnRampAddress,
@@ -87,8 +87,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       globalConfigDeployResult.Output.Output.GlobalConfigContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-globalconfig@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-globalconfig@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("globalconfig"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
@@ -97,7 +97,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	}
 
 	// Deploy Committee Verifier
-	committeeVerifierDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployCommitteeVerifierOp, deps, ccipops.DeployCommitteeVerifierInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployCommitteeVerifierOp, deps, ccipops.DeployCommitteeVerifierInput{
 		InstanceID:          config.InstanceID + "-ccv",
 		VersionTag:          config.CCVVersionTag,
 		StorageLocation:     config.CCVStorageLocation,
@@ -113,8 +113,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       committeeVerifierDeployResult.Output.Output.CommitteeVerifierContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-ccv@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-ccv@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("ccv"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
@@ -125,7 +125,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	// --------------------------
 	// TOKEN ADMIN REGISTRY
 	// --------------------------
-	tokenAdminRegistryDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployTokenAdminRegistryOp, deps, ccipops.DeployTokenAdminRegistryInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployTokenAdminRegistryOp, deps, ccipops.DeployTokenAdminRegistryInput{
 		InstanceID: config.InstanceID + "-tar",
 	})
 	if err != nil {
@@ -136,8 +136,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       tokenAdminRegistryDeployResult.Output.Output.TokenAdminRegistryContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-tar@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-tar@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("tar"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
@@ -148,7 +148,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	// --------------------------
 	// FEE QUOTER
 	// --------------------------
-	feeQuoterDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployFeeQuoterOp, deps, ccipops.DeployFeeQuoterInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployFeeQuoterOp, deps, ccipops.DeployFeeQuoterInput{
 		InstanceID: config.InstanceID + "-feequoter",
 	})
 	if err != nil {
@@ -159,8 +159,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       feeQuoterDeployResult.Output.Output.FeeQuoterContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-feequoter@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-feequoter@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("feequoter"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
@@ -171,7 +171,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	// --------------------------
 	// OFFRAMP
 	// --------------------------
-	offRampDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployOffRampOp, deps, ccipops.DeployOffRampInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployOffRampOp, deps, ccipops.DeployOffRampInput{
 		InstanceID: config.InstanceID + "-offramp",
 	})
 	if err != nil {
@@ -182,8 +182,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       offRampDeployResult.Output.Output.OffRampContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-offramp@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-offramp@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("offramp"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
@@ -194,7 +194,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	// --------------------------
 	// PER PARTY ROUTER
 	// --------------------------
-	perPartyRouterDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployPerPartyRouterOp, deps, ccipops.DeployPerPartyRouterInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployPerPartyRouterOp, deps, ccipops.DeployPerPartyRouterInput{
 		InstanceID: config.InstanceID + "-perpartyrouter",
 	})
 	if err != nil {
@@ -205,8 +205,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       perPartyRouterDeployResult.Output.Output.PerPartyRouterContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-perpartyrouter@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-perpartyrouter@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("perpartyrouter"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
@@ -217,7 +217,7 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	// --------------------------
 	// ONRAMP
 	// --------------------------
-	onRampDeployResult, err := cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployOnRampOp, deps, ccipops.DeployOnRampInput{
+	_, err = cld_ops.ExecuteOperation(e.OperationsBundle, ccipops.DeployOnRampOp, deps, ccipops.DeployOnRampInput{
 		InstanceID:           config.InstanceID + "-onramp",
 		DestChainSelector:    config.DestChainSelector,
 		DestChainOnRampBytes: config.DestChainOnRampBytes,
@@ -230,8 +230,8 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	err = ds.AddressRefStore.Add(
 		datastore.AddressRef{
 			ChainSelector: config.ChainSelector,
-			Address:       onRampDeployResult.Output.Output.OnRampContractID,
-			Type:          datastore.ContractType(fmt.Sprintf("%s-onramp@%s", config.InstanceID, deps.Party)),
+			Address:       fmt.Sprintf("%s-onramp@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("onramp"),
 			Version:       semver.MustParse("1.0.0"),
 		},
 	)
