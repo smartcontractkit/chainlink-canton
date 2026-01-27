@@ -17,8 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "06090241f8bdf9177dc3f2cd8a313f653f2baae16220bfd51d6345afb4ca0b0e"
-const SDKVersion = "3.4.8"
+const PackageID = "3b6cfc5b1c742a9ed56ffcf4a662494093879f70fd703dc6d857934684fad706"
+const SDKVersion = "3.4.10"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -34,27 +34,27 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
+	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
+
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]interface{}{
+		"args": args,
+	}
 }
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	Owner PARTY `json:"owner"`
-
-	CcipOwner PARTY `json:"ccipOwner"`
-
+	Owner        PARTY         `json:"owner"`
+	CcipOwner    PARTY         `json:"ccipOwner"`
 	RequiredCCVs []CONTRACT_ID `json:"requiredCCVs"`
-
 	OptionalCCVs []CONTRACT_ID `json:"optionalCCVs"`
-
-	Threshold INT64 `json:"threshold"`
+	Threshold    INT64         `json:"threshold"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -66,31 +66,30 @@ func (t CCIPReceiver) GetTemplateID() string {
 func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["requiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.RequiredCCVs))
-		for _, e := range t.RequiredCCVs {
-			res = append(res, e)
-		}
-		return res
-	}()
+	if len(t.RequiredCCVs) > 0 {
+		args["requiredCCVs"] = func() []interface{} {
+			res := make([]interface{}, 0, len(t.RequiredCCVs))
+			for _, e := range t.RequiredCCVs {
+				res = append(res, e)
+			}
+			return res
+		}()
+	}
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["optionalCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OptionalCCVs))
-		for _, e := range t.OptionalCCVs {
-			res = append(res, e)
-		}
-		return res
-	}()
+	if len(t.OptionalCCVs) > 0 {
+		args["optionalCCVs"] = func() []interface{} {
+			res := make([]interface{}, 0, len(t.OptionalCCVs))
+			for _, e := range t.OptionalCCVs {
+				res = append(res, e)
+			}
+			return res
+		}()
+	}
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["threshold"] = int64(t.Threshold)
 
 	return &model.CreateCommand{
@@ -99,11 +98,13 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for CCIPReceiver using JsonCodec
 func (t CCIPReceiver) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for CCIPReceiver using JsonCodec
 func (t *CCIPReceiver) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -114,39 +115,30 @@ func (t *CCIPReceiver) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this CCIPReceiver contract
 func (t CCIPReceiver) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CCIPReceiver", "CCIPReceiver"),
-
 		ContractID: contractID,
 		Choice:     "Archive",
-
-		Arguments: map[string]interface{}{},
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // Any2CantonMessageReceiverGetCCVs exercises the Any2CantonMessageReceiver_GetCCVs choice on this CCIPReceiver contract via the IIAny2CantonMessageReceiver interface
 func (t CCIPReceiver) Any2CantonMessageReceiverGetCCVs(contractID string, args Any2CantonMessageReceiverGetCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CCIPReceiver", "IAny2CantonMessageReceiver"),
-
 		ContractID: contractID,
 		Choice:     "Any2CantonMessageReceiver_GetCCVs",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Any2CantonMessageReceiverCCIPReceive exercises the Any2CantonMessageReceiver_CCIPReceive choice on this CCIPReceiver contract via the IIAny2CantonMessageReceiver interface
 func (t CCIPReceiver) Any2CantonMessageReceiverCCIPReceive(contractID string, args Any2CantonMessageReceiverCCIPReceive) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CCIPReceiver", "IAny2CantonMessageReceiver"),
-
 		ContractID: contractID,
 		Choice:     "Any2CantonMessageReceiver_CCIPReceive",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -156,8 +148,7 @@ var _ IIAny2CantonMessageReceiver = (*CCIPReceiver)(nil)
 
 // MessageReceived is a Template type
 type MessageReceived struct {
-	Owner PARTY `json:"owner"`
-
+	Owner   PARTY             `json:"owner"`
 	Message Any2CantonMessage `json:"message"`
 }
 
@@ -170,10 +161,8 @@ func (t MessageReceived) GetTemplateID() string {
 func (t MessageReceived) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["message"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
 		if m, ok := any(t.Message).(mapper); ok {
@@ -188,11 +177,13 @@ func (t MessageReceived) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for MessageReceived using JsonCodec
 func (t MessageReceived) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MessageReceived using JsonCodec
 func (t *MessageReceived) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -203,12 +194,9 @@ func (t *MessageReceived) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this MessageReceived contract
 func (t MessageReceived) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CCIPReceiver", "MessageReceived"),
-
 		ContractID: contractID,
 		Choice:     "Archive",
-
-		Arguments: map[string]interface{}{},
+		Arguments:  map[string]interface{}{},
 	}
 }

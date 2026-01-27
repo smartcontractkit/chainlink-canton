@@ -17,8 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "b09db36c65a5d8e5edd9184f67f5e6ef13fad2cd1790fad5389aee97f7e49141"
-const SDKVersion = "3.4.8"
+const PackageID = "0da0d748f2ae6863684e7e73556810d4063a56b2316cbe8d37ff52ec7e099490"
+const SDKVersion = "3.4.10"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -34,33 +34,30 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
+	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
+
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]interface{}{
+		"args": args,
+	}
 }
 
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
-	CcipOwner PARTY `json:"ccipOwner"`
-
-	VersionTag TEXT `json:"versionTag"`
-
-	MessageSentObserver PARTY `json:"messageSentObserver"`
-
-	StorageLocation TEXT `json:"storageLocation"`
-
-	Threshold INT64 `json:"threshold"`
-
-	Signers []TEXT `json:"signers"`
+	Owner               PARTY  `json:"owner"`
+	InstanceId          TEXT   `json:"instanceId"`
+	CcipOwner           PARTY  `json:"ccipOwner"`
+	VersionTag          TEXT   `json:"versionTag"`
+	MessageSentObserver PARTY  `json:"messageSentObserver"`
+	StorageLocation     TEXT   `json:"storageLocation"`
+	Threshold           INT64  `json:"threshold"`
+	Signers             []TEXT `json:"signers"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -72,35 +69,29 @@ func (t CommitteeVerifier) GetTemplateID() string {
 func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["versionTag"] = string(t.VersionTag)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["messageSentObserver"] = t.MessageSentObserver.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["storageLocation"] = string(t.StorageLocation)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["threshold"] = int64(t.Threshold)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["signers"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Signers))
-		for _, e := range t.Signers {
-			res = append(res, string(e))
-		}
-		return res
-	}()
+	if len(t.Signers) > 0 {
+		args["signers"] = func() []interface{} {
+			res := make([]interface{}, 0, len(t.Signers))
+			for _, e := range t.Signers {
+				res = append(res, string(e))
+			}
+			return res
+		}()
+	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -108,11 +99,13 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for CommitteeVerifier using JsonCodec
 func (t CommitteeVerifier) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for CommitteeVerifier using JsonCodec
 func (t *CommitteeVerifier) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -123,65 +116,50 @@ func (t *CommitteeVerifier) UnmarshalJSON(data []byte) error {
 // CommitteeVerifierVerifyMessage exercises the CommitteeVerifier_VerifyMessage choice on this CommitteeVerifier contract
 func (t CommitteeVerifier) CommitteeVerifierVerifyMessage(contractID string, args CommitteeVerifierVerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_VerifyMessage",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this CommitteeVerifier contract
 func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-
 		ContractID: contractID,
 		Choice:     "Archive",
-
-		Arguments: map[string]interface{}{},
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // CommitteeVerifierForwardToVerifier exercises the CommitteeVerifier_ForwardToVerifier choice on this CommitteeVerifier contract
 func (t CommitteeVerifier) CommitteeVerifierForwardToVerifier(contractID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_ForwardToVerifier",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // CrossChainVerifierVerifyMessage exercises the CrossChainVerifier_VerifyMessage choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 func (t CommitteeVerifier) CrossChainVerifierVerifyMessage(contractID string, args CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
-
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_VerifyMessage",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // CrossChainVerifierForwardToVerifier exercises the CrossChainVerifier_ForwardToVerifier choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string, args CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
-
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_ForwardToVerifier",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -191,19 +169,13 @@ var _ IICrossChainVerifier = (*CommitteeVerifier)(nil)
 
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
-	CcvRegistryCid CONTRACT_ID `json:"ccvRegistryCid"`
-
-	Message MessageV1 `json:"message"`
-
-	MessageId TEXT `json:"messageId"`
-
-	FeeToken InstrumentId `json:"feeToken"`
-
-	FeeTokenAmount NUMERIC `json:"feeTokenAmount"`
-
-	VerifierArgs TEXT `json:"verifierArgs"`
-
-	Caller PARTY `json:"caller"`
+	CcvRegistryCid CONTRACT_ID  `json:"ccvRegistryCid"`
+	Message        MessageV1    `json:"message"`
+	MessageId      TEXT         `json:"messageId"`
+	FeeToken       InstrumentId `json:"feeToken"`
+	FeeTokenAmount NUMERIC      `json:"feeTokenAmount"`
+	VerifierArgs   TEXT         `json:"verifierArgs"`
+	Caller         PARTY        `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
@@ -245,11 +217,13 @@ func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for CommitteeVerifierForwardToVerifier using JsonCodec
 func (t CommitteeVerifierForwardToVerifier) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for CommitteeVerifierForwardToVerifier using JsonCodec
 func (t *CommitteeVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -257,17 +231,12 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	CcvRegistryCid CONTRACT_ID `json:"ccvRegistryCid"`
-
-	Message MessageV1 `json:"message"`
-
-	MessageId TEXT `json:"messageId"`
-
-	VerifierResults TEXT `json:"verifierResults"`
-
-	Receiver PARTY `json:"receiver"`
-
-	Caller PARTY `json:"caller"`
+	CcvRegistryCid  CONTRACT_ID `json:"ccvRegistryCid"`
+	Message         MessageV1   `json:"message"`
+	MessageId       TEXT        `json:"messageId"`
+	VerifierResults TEXT        `json:"verifierResults"`
+	Receiver        PARTY       `json:"receiver"`
+	Caller          PARTY       `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
@@ -301,11 +270,13 @@ func (t CommitteeVerifierVerifyMessage) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for CommitteeVerifierVerifyMessage using JsonCodec
 func (t CommitteeVerifierVerifyMessage) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for CommitteeVerifierVerifyMessage using JsonCodec
 func (t *CommitteeVerifierVerifyMessage) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

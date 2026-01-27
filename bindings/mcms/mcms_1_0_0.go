@@ -17,8 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "6ba5bb3a281c00a5d2784368ff43bb0ab2af24d85ac6ccf429f93788a7353947"
-const SDKVersion = "3.4.9"
+const PackageID = "c72fb09e1c4bfcf76004f3c8079de2ce0670d9e78c06aea1d48abfae80a5c199"
+const SDKVersion = "3.4.10"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -47,25 +47,26 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
+	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
+
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]interface{}{
+		"args": args,
+	}
 }
 
 // APSetConfig is a Record type
 type APSetConfig struct {
-	ApSigners []SignerInfo `json:"apSigners"`
-
-	ApGroupQuorums []INT64 `json:"apGroupQuorums"`
-
-	ApGroupParents []INT64 `json:"apGroupParents"`
-
-	ApClearRoot BOOL `json:"apClearRoot"`
+	ApSigners      []SignerInfo `json:"apSigners"`
+	ApGroupQuorums []INT64      `json:"apGroupQuorums"`
+	ApGroupParents []INT64      `json:"apGroupParents"`
+	ApClearRoot    BOOL         `json:"apClearRoot"`
 }
 
 // ToMap converts APSetConfig to a map for DAML arguments
@@ -106,11 +107,13 @@ func (t APSetConfig) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for APSetConfig using JsonCodec
 func (t APSetConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for APSetConfig using JsonCodec
 func (t *APSetConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -162,6 +165,7 @@ func (v AdminParams) GetVariantValue() interface{} {
 	return nil
 }
 
+// Verify interface implementation
 var _ VARIANT = (*AdminParams)(nil)
 
 // ArchiveMCMSEntrypointEvent is a Record type
@@ -175,11 +179,13 @@ func (t ArchiveMCMSEntrypointEvent) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ArchiveMCMSEntrypointEvent using JsonCodec
 func (t ArchiveMCMSEntrypointEvent) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ArchiveMCMSEntrypointEvent using JsonCodec
 func (t *ArchiveMCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -258,13 +264,13 @@ func (v ArgValue) GetVariantValue() interface{} {
 	return nil
 }
 
+// Verify interface implementation
 var _ VARIANT = (*ArgValue)(nil)
 
 // CanExecuteOp is a Record type
 type CanExecuteOp struct {
 	Submitter PARTY `json:"submitter"`
-
-	Op Op `json:"op"`
+	Op        Op    `json:"op"`
 }
 
 // ToMap converts CanExecuteOp to a map for DAML arguments
@@ -284,11 +290,13 @@ func (t CanExecuteOp) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for CanExecuteOp using JsonCodec
 func (t CanExecuteOp) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for CanExecuteOp using JsonCodec
 func (t *CanExecuteOp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -296,11 +304,9 @@ func (t *CanExecuteOp) UnmarshalJSON(data []byte) error {
 
 // Counter is a Template type
 type Counter struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
-	Value INT64 `json:"value"`
+	Owner      PARTY `json:"owner"`
+	InstanceId TEXT  `json:"instanceId"`
+	Value      INT64 `json:"value"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -312,13 +318,10 @@ func (t Counter) GetTemplateID() string {
 func (t Counter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["value"] = int64(t.Value)
 
 	return &model.CreateCommand{
@@ -327,11 +330,13 @@ func (t Counter) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for Counter using JsonCodec
 func (t Counter) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for Counter using JsonCodec
 func (t *Counter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -342,65 +347,50 @@ func (t *Counter) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this Counter contract
 func (t Counter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter"),
-
 		ContractID: contractID,
 		Choice:     "Archive",
-
-		Arguments: map[string]interface{}{},
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // GetValue exercises the GetValue choice on this Counter contract
 func (t Counter) GetValue(contractID string, args GetValue) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter"),
-
 		ContractID: contractID,
 		Choice:     "GetValue",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // GetInstanceIdChoice exercises the GetInstanceIdChoice choice on this Counter contract
 func (t Counter) GetInstanceIdChoice(contractID string, args GetInstanceIdChoice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter"),
-
 		ContractID: contractID,
 		Choice:     "GetInstanceIdChoice",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this Counter contract via the IMCMSReceiver interface
 func (t Counter) MCMSReceiverGetInstanceId(contractID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSReceiver"),
-
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_GetInstanceId",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this Counter contract via the IMCMSReceiver interface
 func (t Counter) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSReceiver"),
-
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -410,11 +400,9 @@ var _ IMCMSReceiver = (*Counter)(nil)
 
 // ExecuteMcmsOp is a Record type
 type ExecuteMcmsOp struct {
-	Submitter PARTY `json:"submitter"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
+	Submitter PARTY  `json:"submitter"`
+	Op        Op     `json:"op"`
+	OpProof   []TEXT `json:"opProof"`
 }
 
 // ToMap converts ExecuteMcmsOp to a map for DAML arguments
@@ -442,11 +430,13 @@ func (t ExecuteMcmsOp) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ExecuteMcmsOp using JsonCodec
 func (t ExecuteMcmsOp) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ExecuteMcmsOp using JsonCodec
 func (t *ExecuteMcmsOp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -454,14 +444,10 @@ func (t *ExecuteMcmsOp) UnmarshalJSON(data []byte) error {
 
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	Submitter PARTY `json:"submitter"`
-
-	TargetCid CONTRACT_ID `json:"targetCid"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
-
+	Submitter   PARTY         `json:"submitter"`
+	TargetCid   CONTRACT_ID   `json:"targetCid"`
+	Op          Op            `json:"op"`
+	OpProof     []TEXT        `json:"opProof"`
 	ContractIds []CONTRACT_ID `json:"contractIds"`
 }
 
@@ -506,11 +492,13 @@ func (t ExecuteOp) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ExecuteOp using JsonCodec
 func (t ExecuteOp) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ExecuteOp using JsonCodec
 func (t *ExecuteOp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -518,11 +506,9 @@ func (t *ExecuteOp) UnmarshalJSON(data []byte) error {
 
 // ExpiringRoot is a Record type
 type ExpiringRoot struct {
-	Root TEXT `json:"root"`
-
+	Root       TEXT      `json:"root"`
 	ValidUntil TIMESTAMP `json:"validUntil"`
-
-	OpCount INT64 `json:"opCount"`
+	OpCount    INT64     `json:"opCount"`
 }
 
 // ToMap converts ExpiringRoot to a map for DAML arguments
@@ -538,11 +524,13 @@ func (t ExpiringRoot) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ExpiringRoot using JsonCodec
 func (t ExpiringRoot) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ExpiringRoot using JsonCodec
 func (t *ExpiringRoot) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -562,11 +550,13 @@ func (t GetInstanceIdChoice) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for GetInstanceIdChoice using JsonCodec
 func (t GetInstanceIdChoice) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for GetInstanceIdChoice using JsonCodec
 func (t *GetInstanceIdChoice) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -586,11 +576,13 @@ func (t GetState) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for GetState using JsonCodec
 func (t GetState) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for GetState using JsonCodec
 func (t *GetState) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -610,11 +602,13 @@ func (t GetValue) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for GetValue using JsonCodec
 func (t GetValue) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for GetValue using JsonCodec
 func (t *GetValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -622,21 +616,14 @@ func (t *GetValue) UnmarshalJSON(data []byte) error {
 
 // MCMS is a Template type
 type MCMS struct {
-	Owner PARTY `json:"owner"`
-
-	Role Role `json:"role"`
-
-	ChainId INT64 `json:"chainId"`
-
-	McmsId TEXT `json:"mcmsId"`
-
-	Config MultisigConfig `json:"config"`
-
-	SeenHashes GENMAP `json:"seenHashes"`
-
-	ExpiringRoot ExpiringRoot `json:"expiringRoot"`
-
-	RootMetadata RootMetadata `json:"rootMetadata"`
+	Owner        PARTY          `json:"owner"`
+	Role         Role           `json:"role"`
+	ChainId      INT64          `json:"chainId"`
+	McmsId       TEXT           `json:"mcmsId"`
+	Config       MultisigConfig `json:"config"`
+	SeenHashes   GENMAP         `json:"seenHashes"`
+	ExpiringRoot ExpiringRoot   `json:"expiringRoot"`
+	RootMetadata RootMetadata   `json:"rootMetadata"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -648,7 +635,6 @@ func (t MCMS) GetTemplateID() string {
 func (t MCMS) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
 	if t.Role != "" {
@@ -661,13 +647,10 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 		}()
 	}
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["chainId"] = int64(t.ChainId)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["mcmsId"] = string(t.McmsId)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["config"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
 		if m, ok := any(t.Config).(mapper); ok {
@@ -676,15 +659,10 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 		return t.Config
 	}()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["seenHashes"] = func() interface{} {
-		if t.SeenHashes == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
-		}
-		return map[string]interface{}{"_type": "genmap", "value": t.SeenHashes}
-	}()
+	if t.SeenHashes != nil && len(t.SeenHashes) > 0 {
+		args["seenHashes"] = map[string]interface{}{"_type": "genmap", "value": t.SeenHashes}
+	}
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["expiringRoot"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
 		if m, ok := any(t.ExpiringRoot).(mapper); ok {
@@ -693,7 +671,6 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 		return t.ExpiringRoot
 	}()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["rootMetadata"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
 		if m, ok := any(t.RootMetadata).(mapper); ok {
@@ -708,11 +685,13 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for MCMS using JsonCodec
 func (t MCMS) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MCMS using JsonCodec
 func (t *MCMS) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -723,104 +702,79 @@ func (t *MCMS) UnmarshalJSON(data []byte) error {
 // SetRoot exercises the SetRoot choice on this MCMS contract
 func (t MCMS) SetRoot(contractID string, args SET) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "SetRoot",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // ExecuteOp exercises the ExecuteOp choice on this MCMS contract
 func (t MCMS) ExecuteOp(contractID string, args ExecuteOp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "ExecuteOp",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // ExecuteMcmsOp exercises the ExecuteMcmsOp choice on this MCMS contract
 func (t MCMS) ExecuteMcmsOp(contractID string, args ExecuteMcmsOp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "ExecuteMcmsOp",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // SetConfig exercises the SetConfig choice on this MCMS contract
 func (t MCMS) SetConfig(contractID string, args SET) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "SetConfig",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // CanExecuteOp exercises the CanExecuteOp choice on this MCMS contract
 func (t MCMS) CanExecuteOp(contractID string, args CanExecuteOp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "CanExecuteOp",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this MCMS contract
 func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "Archive",
-
-		Arguments: map[string]interface{}{},
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // GetState exercises the GetState choice on this MCMS contract
 func (t MCMS) GetState(contractID string, args GetState) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
 		ContractID: contractID,
 		Choice:     "GetState",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSEntrypointEvent is a Template type
 type MCMSEntrypointEvent struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
-
+	Owner             PARTY  `json:"owner"`
+	InstanceId        TEXT   `json:"instanceId"`
+	FunctionName      TEXT   `json:"functionName"`
+	OperationData     TEXT   `json:"operationData"`
 	ContractIdsAsText []TEXT `json:"contractIdsAsText"`
 }
 
@@ -833,26 +787,23 @@ func (t MCMSEntrypointEvent) GetTemplateID() string {
 func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["functionName"] = string(t.FunctionName)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operationData"] = string(t.OperationData)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["contractIdsAsText"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ContractIdsAsText))
-		for _, e := range t.ContractIdsAsText {
-			res = append(res, string(e))
-		}
-		return res
-	}()
+	if len(t.ContractIdsAsText) > 0 {
+		args["contractIdsAsText"] = func() []interface{} {
+			res := make([]interface{}, 0, len(t.ContractIdsAsText))
+			for _, e := range t.ContractIdsAsText {
+				res = append(res, string(e))
+			}
+			return res
+		}()
+	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -860,11 +811,13 @@ func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for MCMSEntrypointEvent using JsonCodec
 func (t MCMSEntrypointEvent) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MCMSEntrypointEvent using JsonCodec
 func (t *MCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -875,34 +828,27 @@ func (t *MCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this MCMSEntrypointEvent contract
 func (t MCMSEntrypointEvent) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSEntrypointEvent"),
-
 		ContractID: contractID,
 		Choice:     "Archive",
-
-		Arguments: map[string]interface{}{},
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // ArchiveMCMSEntrypointEvent exercises the Archive_MCMSEntrypointEvent choice on this MCMSEntrypointEvent contract
 func (t MCMSEntrypointEvent) ArchiveMCMSEntrypointEvent(contractID string, args ArchiveMCMSEntrypointEvent) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSEntrypointEvent"),
-
 		ContractID: contractID,
 		Choice:     "Archive_MCMSEntrypointEvent",
-
-		Arguments: argsToMap(args),
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSReceiverView is a Record type
 type MCMSReceiverView struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
+	Owner      PARTY `json:"owner"`
+	InstanceId TEXT  `json:"instanceId"`
 }
 
 // ToMap converts MCMSReceiverView to a map for DAML arguments
@@ -916,11 +862,13 @@ func (t MCMSReceiverView) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for MCMSReceiverView using JsonCodec
 func (t MCMSReceiverView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MCMSReceiverView using JsonCodec
 func (t *MCMSReceiverView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -928,13 +876,10 @@ func (t *MCMSReceiverView) UnmarshalJSON(data []byte) error {
 
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
-	Caller PARTY `json:"caller"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
-
-	ContractIds []CONTRACT_ID `json:"contractIds"`
+	Caller        PARTY         `json:"caller"`
+	FunctionName  TEXT          `json:"functionName"`
+	OperationData TEXT          `json:"operationData"`
+	ContractIds   []CONTRACT_ID `json:"contractIds"`
 }
 
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
@@ -958,11 +903,13 @@ func (t MCMSReceiverEntrypoint) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for MCMSReceiverEntrypoint using JsonCodec
 func (t MCMSReceiverEntrypoint) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MCMSReceiverEntrypoint using JsonCodec
 func (t *MCMSReceiverEntrypoint) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -982,11 +929,13 @@ func (t MCMSReceiverGetInstanceId) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for MCMSReceiverGetInstanceId using JsonCodec
 func (t MCMSReceiverGetInstanceId) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MCMSReceiverGetInstanceId using JsonCodec
 func (t *MCMSReceiverGetInstanceId) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -994,17 +943,12 @@ func (t *MCMSReceiverGetInstanceId) UnmarshalJSON(data []byte) error {
 
 // MCMSState is a Record type
 type MCMSState struct {
-	Role Role `json:"role"`
-
-	OpCount INT64 `json:"opCount"`
-
-	PostOpCount INT64 `json:"postOpCount"`
-
-	ValidUntil TIMESTAMP `json:"validUntil"`
-
-	HasActiveRoot BOOL `json:"hasActiveRoot"`
-
-	NumSigners INT64 `json:"numSigners"`
+	Role          Role      `json:"role"`
+	OpCount       INT64     `json:"opCount"`
+	PostOpCount   INT64     `json:"postOpCount"`
+	ValidUntil    TIMESTAMP `json:"validUntil"`
+	HasActiveRoot BOOL      `json:"hasActiveRoot"`
+	NumSigners    INT64     `json:"numSigners"`
 }
 
 // ToMap converts MCMSState to a map for DAML arguments
@@ -1032,11 +976,13 @@ func (t MCMSState) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for MCMSState using JsonCodec
 func (t MCMSState) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MCMSState using JsonCodec
 func (t *MCMSState) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1044,11 +990,9 @@ func (t *MCMSState) UnmarshalJSON(data []byte) error {
 
 // MultisigConfig is a Record type
 type MultisigConfig struct {
-	Signers []SignerInfo `json:"signers"`
-
-	GroupQuorums []INT64 `json:"groupQuorums"`
-
-	GroupParents []INT64 `json:"groupParents"`
+	Signers      []SignerInfo `json:"signers"`
+	GroupQuorums []INT64      `json:"groupQuorums"`
+	GroupParents []INT64      `json:"groupParents"`
 }
 
 // ToMap converts MultisigConfig to a map for DAML arguments
@@ -1087,11 +1031,13 @@ func (t MultisigConfig) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for MultisigConfig using JsonCodec
 func (t MultisigConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for MultisigConfig using JsonCodec
 func (t *MultisigConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1099,17 +1045,12 @@ func (t *MultisigConfig) UnmarshalJSON(data []byte) error {
 
 // Op is a Record type
 type Op struct {
-	ChainId INT64 `json:"chainId"`
-
-	MultisigId TEXT `json:"multisigId"`
-
-	Nonce INT64 `json:"nonce"`
-
-	TargetInstanceId TEXT `json:"targetInstanceId"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
+	ChainId          INT64 `json:"chainId"`
+	MultisigId       TEXT  `json:"multisigId"`
+	Nonce            INT64 `json:"nonce"`
+	TargetInstanceId TEXT  `json:"targetInstanceId"`
+	FunctionName     TEXT  `json:"functionName"`
+	OperationData    TEXT  `json:"operationData"`
 }
 
 // ToMap converts Op to a map for DAML arguments
@@ -1131,11 +1072,13 @@ func (t Op) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for Op using JsonCodec
 func (t Op) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for Op using JsonCodec
 func (t *Op) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1144,10 +1087,8 @@ func (t *Op) UnmarshalJSON(data []byte) error {
 // RawSignature is a Record type
 type RawSignature struct {
 	PublicKey TEXT `json:"publicKey"`
-
-	R TEXT `json:"r"`
-
-	S TEXT `json:"s"`
+	R         TEXT `json:"r"`
+	S         TEXT `json:"s"`
 }
 
 // ToMap converts RawSignature to a map for DAML arguments
@@ -1163,11 +1104,13 @@ func (t RawSignature) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for RawSignature using JsonCodec
 func (t RawSignature) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for RawSignature using JsonCodec
 func (t *RawSignature) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1180,35 +1123,38 @@ const (
 	RoleProposer Role = "Proposer"
 )
 
-func (e Role) GetEnumConstructor() string { return string(e) }
+// GetEnumConstructor implements types.ENUM interface
+func (e Role) GetEnumConstructor() string {
+	return string(e)
+}
 
+// GetEnumTypeID implements types.ENUM interface
 func (e Role) GetEnumTypeID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Types", "Role")
 }
 
+// MarshalJSON implements custom JSON marshaling for Role using JsonCodec
 func (e Role) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(e)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for Role using JsonCodec
 func (e *Role) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, e)
 }
 
+// Verify interface implementation
 var _ ENUM = Role("")
 
 // RootMetadata is a Record type
 type RootMetadata struct {
-	ChainId INT64 `json:"chainId"`
-
-	MultisigId TEXT `json:"multisigId"`
-
-	PreOpCount INT64 `json:"preOpCount"`
-
-	PostOpCount INT64 `json:"postOpCount"`
-
-	OverridePreviousRoot BOOL `json:"overridePreviousRoot"`
+	ChainId              INT64 `json:"chainId"`
+	MultisigId           TEXT  `json:"multisigId"`
+	PreOpCount           INT64 `json:"preOpCount"`
+	PostOpCount          INT64 `json:"postOpCount"`
+	OverridePreviousRoot BOOL  `json:"overridePreviousRoot"`
 }
 
 // ToMap converts RootMetadata to a map for DAML arguments
@@ -1228,11 +1174,13 @@ func (t RootMetadata) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for RootMetadata using JsonCodec
 func (t RootMetadata) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for RootMetadata using JsonCodec
 func (t *RootMetadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1240,13 +1188,10 @@ func (t *RootMetadata) UnmarshalJSON(data []byte) error {
 
 // SetConfig is a Record type
 type SetConfig struct {
-	NewSigners []SignerInfo `json:"newSigners"`
-
-	NewGroupQuorums []INT64 `json:"newGroupQuorums"`
-
-	NewGroupParents []INT64 `json:"newGroupParents"`
-
-	ClearRoot BOOL `json:"clearRoot"`
+	NewSigners      []SignerInfo `json:"newSigners"`
+	NewGroupQuorums []INT64      `json:"newGroupQuorums"`
+	NewGroupParents []INT64      `json:"newGroupParents"`
+	ClearRoot       BOOL         `json:"clearRoot"`
 }
 
 // ToMap converts SetConfig to a map for DAML arguments
@@ -1287,11 +1232,13 @@ func (t SetConfig) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for SetConfig using JsonCodec
 func (t SetConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for SetConfig using JsonCodec
 func (t *SetConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1299,13 +1246,10 @@ func (t *SetConfig) UnmarshalJSON(data []byte) error {
 
 // SetConfigParams is a Record type
 type SetConfigParams struct {
-	Signers []SignerInfo `json:"signers"`
-
-	GroupQuorums []INT64 `json:"groupQuorums"`
-
-	GroupParents []INT64 `json:"groupParents"`
-
-	ClearRoot BOOL `json:"clearRoot"`
+	Signers      []SignerInfo `json:"signers"`
+	GroupQuorums []INT64      `json:"groupQuorums"`
+	GroupParents []INT64      `json:"groupParents"`
+	ClearRoot    BOOL         `json:"clearRoot"`
 }
 
 // ToMap converts SetConfigParams to a map for DAML arguments
@@ -1346,11 +1290,13 @@ func (t SetConfigParams) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for SetConfigParams using JsonCodec
 func (t SetConfigParams) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for SetConfigParams using JsonCodec
 func (t *SetConfigParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1358,17 +1304,12 @@ func (t *SetConfigParams) UnmarshalJSON(data []byte) error {
 
 // SetRoot is a Record type
 type SetRoot struct {
-	Submitter PARTY `json:"submitter"`
-
-	NewRoot TEXT `json:"newRoot"`
-
-	ValidUntil TIMESTAMP `json:"validUntil"`
-
-	Metadata RootMetadata `json:"metadata"`
-
-	MetadataProof []TEXT `json:"metadataProof"`
-
-	Signatures []RawSignature `json:"signatures"`
+	Submitter     PARTY          `json:"submitter"`
+	NewRoot       TEXT           `json:"newRoot"`
+	ValidUntil    TIMESTAMP      `json:"validUntil"`
+	Metadata      RootMetadata   `json:"metadata"`
+	MetadataProof []TEXT         `json:"metadataProof"`
+	Signatures    []RawSignature `json:"signatures"`
 }
 
 // ToMap converts SetRoot to a map for DAML arguments
@@ -1413,11 +1354,13 @@ func (t SetRoot) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for SetRoot using JsonCodec
 func (t SetRoot) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for SetRoot using JsonCodec
 func (t *SetRoot) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -1425,11 +1368,9 @@ func (t *SetRoot) UnmarshalJSON(data []byte) error {
 
 // SignerInfo is a Record type
 type SignerInfo struct {
-	SignerAddress TEXT `json:"signerAddress"`
-
-	SignerIndex INT64 `json:"signerIndex"`
-
-	SignerGroup INT64 `json:"signerGroup"`
+	SignerAddress TEXT  `json:"signerAddress"`
+	SignerIndex   INT64 `json:"signerIndex"`
+	SignerGroup   INT64 `json:"signerGroup"`
 }
 
 // ToMap converts SignerInfo to a map for DAML arguments
@@ -1445,11 +1386,13 @@ func (t SignerInfo) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for SignerInfo using JsonCodec
 func (t SignerInfo) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for SignerInfo using JsonCodec
 func (t *SignerInfo) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

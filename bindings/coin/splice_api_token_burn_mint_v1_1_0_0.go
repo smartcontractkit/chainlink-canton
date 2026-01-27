@@ -32,9 +32,8 @@ type IBurnMintFactory interface {
 
 // BurnMintFactoryView is a Record type
 type BurnMintFactoryView struct {
-	Admin PARTY `json:"admin"`
-
-	Meta Metadata `json:"meta"`
+	Admin PARTY    `json:"admin"`
+	Meta  Metadata `json:"meta"`
 }
 
 // ToMap converts BurnMintFactoryView to a map for DAML arguments
@@ -54,11 +53,13 @@ func (t BurnMintFactoryView) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for BurnMintFactoryView using JsonCodec
 func (t BurnMintFactoryView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for BurnMintFactoryView using JsonCodec
 func (t *BurnMintFactoryView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -66,17 +67,12 @@ func (t *BurnMintFactoryView) UnmarshalJSON(data []byte) error {
 
 // BurnMintFactoryBurnMint is a Record type
 type BurnMintFactoryBurnMint struct {
-	ExpectedAdmin PARTY `json:"expectedAdmin"`
-
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
-
-	Outputs []BurnMintOutput `json:"outputs"`
-
-	ExtraActors []PARTY `json:"extraActors"`
-
-	ExtraArgs ExtraArgs `json:"extraArgs"`
+	ExpectedAdmin    PARTY            `json:"expectedAdmin"`
+	InstrumentId     InstrumentId     `json:"instrumentId"`
+	InputHoldingCids []CONTRACT_ID    `json:"inputHoldingCids"`
+	Outputs          []BurnMintOutput `json:"outputs"`
+	ExtraActors      []PARTY          `json:"extraActors"`
+	ExtraArgs        ExtraArgs        `json:"extraArgs"`
 }
 
 // ToMap converts BurnMintFactoryBurnMint to a map for DAML arguments
@@ -133,11 +129,13 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for BurnMintFactoryBurnMint using JsonCodec
 func (t BurnMintFactoryBurnMint) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for BurnMintFactoryBurnMint using JsonCodec
 func (t *BurnMintFactoryBurnMint) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -163,11 +161,13 @@ func (t BurnMintFactoryBurnMintResult) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for BurnMintFactoryBurnMintResult using JsonCodec
 func (t BurnMintFactoryBurnMintResult) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for BurnMintFactoryBurnMintResult using JsonCodec
 func (t *BurnMintFactoryBurnMintResult) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -176,8 +176,7 @@ func (t *BurnMintFactoryBurnMintResult) UnmarshalJSON(data []byte) error {
 // BurnMintFactoryPublicFetch is a Record type
 type BurnMintFactoryPublicFetch struct {
 	ExpectedAdmin PARTY `json:"expectedAdmin"`
-
-	Actor PARTY `json:"actor"`
+	Actor         PARTY `json:"actor"`
 }
 
 // ToMap converts BurnMintFactoryPublicFetch to a map for DAML arguments
@@ -191,11 +190,13 @@ func (t BurnMintFactoryPublicFetch) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for BurnMintFactoryPublicFetch using JsonCodec
 func (t BurnMintFactoryPublicFetch) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for BurnMintFactoryPublicFetch using JsonCodec
 func (t *BurnMintFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -203,10 +204,8 @@ func (t *BurnMintFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 
 // BurnMintOutput is a Record type
 type BurnMintOutput struct {
-	Owner PARTY `json:"owner"`
-
-	Amount NUMERIC `json:"amount"`
-
+	Owner   PARTY         `json:"owner"`
+	Amount  NUMERIC       `json:"amount"`
 	Context ChoiceContext `json:"context"`
 }
 
@@ -229,11 +228,13 @@ func (t BurnMintOutput) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for BurnMintOutput using JsonCodec
 func (t BurnMintOutput) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for BurnMintOutput using JsonCodec
 func (t *BurnMintOutput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

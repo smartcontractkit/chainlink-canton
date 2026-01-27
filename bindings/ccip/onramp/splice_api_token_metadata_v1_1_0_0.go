@@ -35,11 +35,13 @@ func (t AnyContractView) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for AnyContractView using JsonCodec
 func (t AnyContractView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for AnyContractView using JsonCodec
 func (t *AnyContractView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -172,6 +174,7 @@ func (v AnyValue) GetVariantValue() interface{} {
 	return nil
 }
 
+// Verify interface implementation
 var _ VARIANT = (*AnyValue)(nil)
 
 // ChoiceContext is a Record type
@@ -194,11 +197,13 @@ func (t ChoiceContext) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ChoiceContext using JsonCodec
 func (t ChoiceContext) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ChoiceContext using JsonCodec
 func (t *ChoiceContext) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -224,11 +229,13 @@ func (t ChoiceExecutionMetadata) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ChoiceExecutionMetadata using JsonCodec
 func (t ChoiceExecutionMetadata) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ChoiceExecutionMetadata using JsonCodec
 func (t *ChoiceExecutionMetadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -237,8 +244,7 @@ func (t *ChoiceExecutionMetadata) UnmarshalJSON(data []byte) error {
 // ExtraArgs is a Record type
 type ExtraArgs struct {
 	Context ChoiceContext `json:"context"`
-
-	Meta Metadata `json:"meta"`
+	Meta    Metadata      `json:"meta"`
 }
 
 // ToMap converts ExtraArgs to a map for DAML arguments
@@ -264,11 +270,13 @@ func (t ExtraArgs) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for ExtraArgs using JsonCodec
 func (t ExtraArgs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for ExtraArgs using JsonCodec
 func (t *ExtraArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -294,11 +302,13 @@ func (t Metadata) ToMap() map[string]interface{} {
 	return m
 }
 
+// MarshalJSON implements custom JSON marshaling for Metadata using JsonCodec
 func (t Metadata) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for Metadata using JsonCodec
 func (t *Metadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
