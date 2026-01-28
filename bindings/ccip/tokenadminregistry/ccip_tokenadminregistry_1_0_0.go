@@ -17,8 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "c1917d2c7479eeeff08327d29492300e7a9563cd6512635db83a292414da2447"
-const SDKVersion = "3.4.8"
+const PackageID = "f804e1cf588d2bd9854e990297f2595d215cb808d9fec918460796b5d3d49b2c"
+const SDKVersion = "3.4.10"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -34,28 +34,29 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
-
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{
-		"args": args,
-	}
+	return map[string]interface{}{"args": args}
 }
 
 // ConsumeReceiveTicketResult is a Record type
 type ConsumeReceiveTicketResult struct {
-	InstrumentId        InstrumentId `json:"instrumentId"`
-	Amount              NUMERIC      `json:"amount"`
-	Receiver            PARTY        `json:"receiver"`
-	TokenReceiver       PARTY        `json:"tokenReceiver"`
-	MessageHash         TEXT         `json:"messageHash"`
-	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	Amount NUMERIC `json:"amount"`
+
+	Receiver PARTY `json:"receiver"`
+
+	TokenReceiver PARTY `json:"tokenReceiver"`
+
+	MessageHash TEXT `json:"messageHash"`
+
+	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
 }
 
 // ToMap converts ConsumeReceiveTicketResult to a map for DAML arguments
@@ -83,13 +84,11 @@ func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for ConsumeReceiveTicketResult using JsonCodec
 func (t ConsumeReceiveTicketResult) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ConsumeReceiveTicketResult using JsonCodec
 func (t *ConsumeReceiveTicketResult) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -97,8 +96,10 @@ func (t *ConsumeReceiveTicketResult) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistry is a Template type
 type TokenAdminRegistry struct {
-	Owner        PARTY  `json:"owner"`
-	InstanceId   TEXT   `json:"instanceId"`
+	Owner PARTY `json:"owner"`
+
+	InstanceId TEXT `json:"instanceId"`
+
 	TokenConfigs GENMAP `json:"tokenConfigs"`
 }
 
@@ -111,13 +112,19 @@ func (t TokenAdminRegistry) GetTemplateID() string {
 func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.TokenConfigs != nil && len(t.TokenConfigs) > 0 {
-		args["tokenConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.TokenConfigs}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenConfigs"] = func() interface{} {
+		if t.TokenConfigs == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.TokenConfigs}
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -125,13 +132,11 @@ func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistry using JsonCodec
 func (t TokenAdminRegistry) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistry using JsonCodec
 func (t *TokenAdminRegistry) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -142,107 +147,138 @@ func (t *TokenAdminRegistry) UnmarshalJSON(data []byte) error {
 // TokenAdminRegistryGetTokenConfig exercises the TokenAdminRegistry_GetTokenConfig choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_GetTokenConfig",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistrySetPool exercises the TokenAdminRegistry_SetPool choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args SET) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetPool",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryAcceptAdminRole exercises the TokenAdminRegistry_AcceptAdminRole choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRole(contractID string, args TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AcceptAdminRole",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryTransferAdminRole exercises the TokenAdminRegistry_TransferAdminRole choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRole(contractID string, args TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_TransferAdminRole",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IsAdministrator",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryProposeAdministrator exercises the TokenAdminRegistry_ProposeAdministrator choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID string, args TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ProposeAdministrator",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryIssueSendTicket exercises the TokenAdminRegistry_IssueSendTicket choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryIssueSendTicket(contractID string, args TokenAdminRegistryIssueSendTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IssueSendTicket",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryIssueReceiveTicket exercises the TokenAdminRegistry_IssueReceiveTicket choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicket(contractID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+
+		Arguments: map[string]interface{}{},
 	}
 }
 
 // TokenAdminRegistryConsumeReceiveTicket exercises the TokenAdminRegistry_ConsumeReceiveTicket choice on this TokenAdminRegistry contract
 func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryAcceptAdminRole is a Record type
 type TokenAdminRegistryAcceptAdminRole struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-	Caller       PARTY        `json:"caller"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryAcceptAdminRole to a map for DAML arguments
@@ -262,13 +298,11 @@ func (t TokenAdminRegistryAcceptAdminRole) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryAcceptAdminRole using JsonCodec
 func (t TokenAdminRegistryAcceptAdminRole) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryAcceptAdminRole using JsonCodec
 func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -276,9 +310,11 @@ func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryConsumeReceiveTicket is a Record type
 type TokenAdminRegistryConsumeReceiveTicket struct {
-	TicketCid    CONTRACT_ID  `json:"ticketCid"`
+	TicketCid CONTRACT_ID `json:"ticketCid"`
+
 	InstrumentId InstrumentId `json:"instrumentId"`
-	PoolOwner    PARTY        `json:"poolOwner"`
+
+	PoolOwner PARTY `json:"poolOwner"`
 }
 
 // ToMap converts TokenAdminRegistryConsumeReceiveTicket to a map for DAML arguments
@@ -306,13 +342,11 @@ func (t TokenAdminRegistryConsumeReceiveTicket) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryConsumeReceiveTicket using JsonCodec
 func (t TokenAdminRegistryConsumeReceiveTicket) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryConsumeReceiveTicket using JsonCodec
 func (t *TokenAdminRegistryConsumeReceiveTicket) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -321,7 +355,8 @@ func (t *TokenAdminRegistryConsumeReceiveTicket) UnmarshalJSON(data []byte) erro
 // TokenAdminRegistryGetTokenConfig is a Record type
 type TokenAdminRegistryGetTokenConfig struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-	Caller       PARTY        `json:"caller"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryGetTokenConfig to a map for DAML arguments
@@ -341,13 +376,11 @@ func (t TokenAdminRegistryGetTokenConfig) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryGetTokenConfig using JsonCodec
 func (t TokenAdminRegistryGetTokenConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryGetTokenConfig using JsonCodec
 func (t *TokenAdminRegistryGetTokenConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -355,9 +388,11 @@ func (t *TokenAdminRegistryGetTokenConfig) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryIsAdministrator is a Record type
 type TokenAdminRegistryIsAdministrator struct {
-	InstrumentId  InstrumentId `json:"instrumentId"`
-	Administrator PARTY        `json:"administrator"`
-	Caller        PARTY        `json:"caller"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	Administrator PARTY `json:"administrator"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryIsAdministrator to a map for DAML arguments
@@ -379,13 +414,11 @@ func (t TokenAdminRegistryIsAdministrator) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryIsAdministrator using JsonCodec
 func (t TokenAdminRegistryIsAdministrator) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryIsAdministrator using JsonCodec
 func (t *TokenAdminRegistryIsAdministrator) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -393,14 +426,21 @@ func (t *TokenAdminRegistryIsAdministrator) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryIssueReceiveTicket is a Record type
 type TokenAdminRegistryIssueReceiveTicket struct {
-	InstrumentId        InstrumentId `json:"instrumentId"`
-	PoolOwner           PARTY        `json:"poolOwner"`
-	Receiver            PARTY        `json:"receiver"`
-	TokenReceiver       PARTY        `json:"tokenReceiver"`
-	Amount              NUMERIC      `json:"amount"`
-	MessageHash         TEXT         `json:"messageHash"`
-	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
-	Caller              PARTY        `json:"caller"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	PoolOwner PARTY `json:"poolOwner"`
+
+	Receiver PARTY `json:"receiver"`
+
+	TokenReceiver PARTY `json:"tokenReceiver"`
+
+	Amount NUMERIC `json:"amount"`
+
+	MessageHash TEXT `json:"messageHash"`
+
+	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
@@ -432,13 +472,11 @@ func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryIssueReceiveTicket using JsonCodec
 func (t TokenAdminRegistryIssueReceiveTicket) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryIssueReceiveTicket using JsonCodec
 func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -446,15 +484,23 @@ func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalJSON(data []byte) error 
 
 // TokenAdminRegistryIssueSendTicket is a Record type
 type TokenAdminRegistryIssueSendTicket struct {
-	InstrumentId       InstrumentId `json:"instrumentId"`
-	Sender             PARTY        `json:"sender"`
-	Amount             NUMERIC      `json:"amount"`
-	SourceTokenAddress TEXT         `json:"sourceTokenAddress"`
-	DestTokenAddress   TEXT         `json:"destTokenAddress"`
-	TokenReceiver      TEXT         `json:"tokenReceiver"`
-	ExtraData          TEXT         `json:"extraData"`
-	Receipt            Receipt      `json:"receipt"`
-	PoolOwner          PARTY        `json:"poolOwner"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	Sender PARTY `json:"sender"`
+
+	Amount NUMERIC `json:"amount"`
+
+	SourceTokenAddress TEXT `json:"sourceTokenAddress"`
+
+	DestTokenAddress TEXT `json:"destTokenAddress"`
+
+	TokenReceiver TEXT `json:"tokenReceiver"`
+
+	ExtraData TEXT `json:"extraData"`
+
+	Receipt Receipt `json:"receipt"`
+
+	PoolOwner PARTY `json:"poolOwner"`
 }
 
 // ToMap converts TokenAdminRegistryIssueSendTicket to a map for DAML arguments
@@ -494,13 +540,11 @@ func (t TokenAdminRegistryIssueSendTicket) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryIssueSendTicket using JsonCodec
 func (t TokenAdminRegistryIssueSendTicket) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryIssueSendTicket using JsonCodec
 func (t *TokenAdminRegistryIssueSendTicket) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -509,8 +553,10 @@ func (t *TokenAdminRegistryIssueSendTicket) UnmarshalJSON(data []byte) error {
 // TokenAdminRegistryProposeAdministrator is a Record type
 type TokenAdminRegistryProposeAdministrator struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-	NewAdmin     PARTY        `json:"newAdmin"`
-	Caller       PARTY        `json:"caller"`
+
+	NewAdmin PARTY `json:"newAdmin"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryProposeAdministrator to a map for DAML arguments
@@ -532,13 +578,11 @@ func (t TokenAdminRegistryProposeAdministrator) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryProposeAdministrator using JsonCodec
 func (t TokenAdminRegistryProposeAdministrator) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryProposeAdministrator using JsonCodec
 func (t *TokenAdminRegistryProposeAdministrator) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -546,9 +590,11 @@ func (t *TokenAdminRegistryProposeAdministrator) UnmarshalJSON(data []byte) erro
 
 // TokenAdminRegistrySetPool is a Record type
 type TokenAdminRegistrySetPool struct {
-	InstrumentId      InstrumentId `json:"instrumentId"`
-	OptTokenPoolOwner *PARTY       `json:"optTokenPoolOwner"`
-	Caller            PARTY        `json:"caller"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	OptTokenPoolOwner *PARTY `json:"optTokenPoolOwner"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistrySetPool to a map for DAML arguments
@@ -579,13 +625,11 @@ func (t TokenAdminRegistrySetPool) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistrySetPool using JsonCodec
 func (t TokenAdminRegistrySetPool) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistrySetPool using JsonCodec
 func (t *TokenAdminRegistrySetPool) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -594,8 +638,10 @@ func (t *TokenAdminRegistrySetPool) UnmarshalJSON(data []byte) error {
 // TokenAdminRegistryTransferAdminRole is a Record type
 type TokenAdminRegistryTransferAdminRole struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-	NewAdmin     PARTY        `json:"newAdmin"`
-	Caller       PARTY        `json:"caller"`
+
+	NewAdmin PARTY `json:"newAdmin"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryTransferAdminRole to a map for DAML arguments
@@ -617,13 +663,11 @@ func (t TokenAdminRegistryTransferAdminRole) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenAdminRegistryTransferAdminRole using JsonCodec
 func (t TokenAdminRegistryTransferAdminRole) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenAdminRegistryTransferAdminRole using JsonCodec
 func (t *TokenAdminRegistryTransferAdminRole) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -631,8 +675,10 @@ func (t *TokenAdminRegistryTransferAdminRole) UnmarshalJSON(data []byte) error {
 
 // TokenConfig is a Record type
 type TokenConfig struct {
-	Admin          *PARTY `json:"admin"`
-	PendingAdmin   *PARTY `json:"pendingAdmin"`
+	Admin *PARTY `json:"admin"`
+
+	PendingAdmin *PARTY `json:"pendingAdmin"`
+
 	TokenPoolOwner *PARTY `json:"tokenPoolOwner"`
 }
 
@@ -676,13 +722,11 @@ func (t TokenConfig) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenConfig using JsonCodec
 func (t TokenConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenConfig using JsonCodec
 func (t *TokenConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

@@ -51,14 +51,21 @@ type ITransferInstruction interface {
 
 // Transfer is a Record type
 type Transfer struct {
-	Sender           PARTY         `json:"sender"`
-	Receiver         PARTY         `json:"receiver"`
-	Amount           NUMERIC       `json:"amount"`
-	InstrumentId     InstrumentId  `json:"instrumentId"`
-	RequestedAt      TIMESTAMP     `json:"requestedAt"`
-	ExecuteBefore    TIMESTAMP     `json:"executeBefore"`
+	Sender PARTY `json:"sender"`
+
+	Receiver PARTY `json:"receiver"`
+
+	Amount NUMERIC `json:"amount"`
+
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	RequestedAt TIMESTAMP `json:"requestedAt"`
+
+	ExecuteBefore TIMESTAMP `json:"executeBefore"`
+
 	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
-	Meta             Metadata      `json:"meta"`
+
+	Meta Metadata `json:"meta"`
 }
 
 // ToMap converts Transfer to a map for DAML arguments
@@ -102,13 +109,11 @@ func (t Transfer) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for Transfer using JsonCodec
 func (t Transfer) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Transfer using JsonCodec
 func (t *Transfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -116,8 +121,9 @@ func (t *Transfer) UnmarshalJSON(data []byte) error {
 
 // TransferFactoryView is a Record type
 type TransferFactoryView struct {
-	Admin PARTY    `json:"admin"`
-	Meta  Metadata `json:"meta"`
+	Admin PARTY `json:"admin"`
+
+	Meta Metadata `json:"meta"`
 }
 
 // ToMap converts TransferFactoryView to a map for DAML arguments
@@ -137,13 +143,11 @@ func (t TransferFactoryView) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferFactoryView using JsonCodec
 func (t TransferFactoryView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferFactoryView using JsonCodec
 func (t *TransferFactoryView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -152,7 +156,8 @@ func (t *TransferFactoryView) UnmarshalJSON(data []byte) error {
 // TransferFactoryPublicFetch is a Record type
 type TransferFactoryPublicFetch struct {
 	ExpectedAdmin PARTY `json:"expectedAdmin"`
-	Actor         PARTY `json:"actor"`
+
+	Actor PARTY `json:"actor"`
 }
 
 // ToMap converts TransferFactoryPublicFetch to a map for DAML arguments
@@ -166,13 +171,11 @@ func (t TransferFactoryPublicFetch) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferFactoryPublicFetch using JsonCodec
 func (t TransferFactoryPublicFetch) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferFactoryPublicFetch using JsonCodec
 func (t *TransferFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -180,9 +183,11 @@ func (t *TransferFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 
 // TransferFactoryTransfer is a Record type
 type TransferFactoryTransfer struct {
-	ExpectedAdmin PARTY     `json:"expectedAdmin"`
-	Transfer      Transfer  `json:"transfer"`
-	ExtraArgs     ExtraArgs `json:"extraArgs"`
+	ExpectedAdmin PARTY `json:"expectedAdmin"`
+
+	Transfer Transfer `json:"transfer"`
+
+	ExtraArgs ExtraArgs `json:"extraArgs"`
 }
 
 // ToMap converts TransferFactoryTransfer to a map for DAML arguments
@@ -210,13 +215,11 @@ func (t TransferFactoryTransfer) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferFactoryTransfer using JsonCodec
 func (t TransferFactoryTransfer) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferFactoryTransfer using JsonCodec
 func (t *TransferFactoryTransfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -224,9 +227,11 @@ func (t *TransferFactoryTransfer) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionResult is a Record type
 type TransferInstructionResult struct {
-	Output           TransferInstructionResultOutput `json:"output"`
-	SenderChangeCids []CONTRACT_ID                   `json:"senderChangeCids"`
-	Meta             Metadata                        `json:"meta"`
+	Output TransferInstructionResultOutput `json:"output"`
+
+	SenderChangeCids []CONTRACT_ID `json:"senderChangeCids"`
+
+	Meta Metadata `json:"meta"`
 }
 
 // ToMap converts TransferInstructionResult to a map for DAML arguments
@@ -260,13 +265,11 @@ func (t TransferInstructionResult) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionResult using JsonCodec
 func (t TransferInstructionResult) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionResult using JsonCodec
 func (t *TransferInstructionResult) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -292,13 +295,11 @@ func (t TransferInstructionResultCompleted) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionResultCompleted using JsonCodec
 func (t TransferInstructionResultCompleted) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionResultCompleted using JsonCodec
 func (t *TransferInstructionResultCompleted) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -359,7 +360,6 @@ func (v TransferInstructionResultOutput) GetVariantValue() interface{} {
 	return nil
 }
 
-// Verify interface implementation
 var _ VARIANT = (*TransferInstructionResultOutput)(nil)
 
 // TransferInstructionResultPending is a Record type
@@ -382,13 +382,11 @@ func (t TransferInstructionResultPending) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionResultPending using JsonCodec
 func (t TransferInstructionResultPending) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionResultPending using JsonCodec
 func (t *TransferInstructionResultPending) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -440,15 +438,17 @@ func (v TransferInstructionStatus) GetVariantValue() interface{} {
 	return nil
 }
 
-// Verify interface implementation
 var _ VARIANT = (*TransferInstructionStatus)(nil)
 
 // TransferInstructionView is a Record type
 type TransferInstructionView struct {
-	OriginalInstructionCid *CONTRACT_ID              `json:"originalInstructionCid"`
-	Transfer               Transfer                  `json:"transfer"`
-	Status                 TransferInstructionStatus `json:"status"`
-	Meta                   Metadata                  `json:"meta"`
+	OriginalInstructionCid *CONTRACT_ID `json:"originalInstructionCid"`
+
+	Transfer Transfer `json:"transfer"`
+
+	Status TransferInstructionStatus `json:"status"`
+
+	Meta Metadata `json:"meta"`
 }
 
 // ToMap converts TransferInstructionView to a map for DAML arguments
@@ -493,13 +493,11 @@ func (t TransferInstructionView) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionView using JsonCodec
 func (t TransferInstructionView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionView using JsonCodec
 func (t *TransferInstructionView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -525,13 +523,11 @@ func (t TransferInstructionAccept) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionAccept using JsonCodec
 func (t TransferInstructionAccept) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionAccept using JsonCodec
 func (t *TransferInstructionAccept) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -557,13 +553,11 @@ func (t TransferInstructionReject) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionReject using JsonCodec
 func (t TransferInstructionReject) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionReject using JsonCodec
 func (t *TransferInstructionReject) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -571,8 +565,9 @@ func (t *TransferInstructionReject) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionUpdate is a Record type
 type TransferInstructionUpdate struct {
-	ExtraActors []PARTY   `json:"extraActors"`
-	ExtraArgs   ExtraArgs `json:"extraArgs"`
+	ExtraActors []PARTY `json:"extraActors"`
+
+	ExtraArgs ExtraArgs `json:"extraArgs"`
 }
 
 // ToMap converts TransferInstructionUpdate to a map for DAML arguments
@@ -598,13 +593,11 @@ func (t TransferInstructionUpdate) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionUpdate using JsonCodec
 func (t TransferInstructionUpdate) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionUpdate using JsonCodec
 func (t *TransferInstructionUpdate) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -630,13 +623,11 @@ func (t TransferInstructionWithdraw) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferInstructionWithdraw using JsonCodec
 func (t TransferInstructionWithdraw) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionWithdraw using JsonCodec
 func (t *TransferInstructionWithdraw) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -651,18 +642,21 @@ type TransferPendingInternalWorkflow struct {
 func (t TransferPendingInternalWorkflow) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["pendingActions"] = map[string]interface{}{"_type": "genmap", "value": t.PendingActions}
+	m["pendingActions"] = func() interface{} {
+		if t.PendingActions == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.PendingActions}
+	}()
 
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TransferPendingInternalWorkflow using JsonCodec
 func (t TransferPendingInternalWorkflow) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferPendingInternalWorkflow using JsonCodec
 func (t *TransferPendingInternalWorkflow) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

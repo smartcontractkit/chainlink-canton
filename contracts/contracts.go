@@ -66,5 +66,6 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read embedded DAR file %s: %w", path, err)
 	}
+
 	return data, nil
 }

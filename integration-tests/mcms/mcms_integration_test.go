@@ -1,10 +1,8 @@
 package tests
 
 import (
-	"context"
-	"fmt"
+	"errors"
 	"io"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,43 +10,28 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
+	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
 	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
 )
 
-// TestMCMS_ExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
-// 1. Deploy MCMS and Counter contracts
-// 2. Configure signers (2-of-3)
-// 3. Create proposal with "increment" operation
-// 4. Sign with 2 signers
-// 5. SetRoot with real signatures
-// 6. ExecuteOp - direct call to Counter via MCMSReceiver interface
-// 7. Verify counter value incremented
-func TestMCMS_ExecuteOpFlow(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
+func TestMCMS_Execute(t *testing.T) {
+	t.Parallel()
 
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
+	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
+
+	participant := env.Participant(1)
+	randomUserParticipant := env.Participant(2)
 
 	// ========================
 	// |   Setup: Upload DAR  |
 	// ========================
 
-	t.Log("Uploading MCMS DAR...")
-
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	packageIDs, err := UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant, randomUserParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
 
@@ -56,10 +39,10 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	// |   Setup: Parties     |
 	// ========================
 
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
-	require.NoError(t, err)
-	ccipOwner := parties[0]
-	t.Logf("Using party: %s", ccipOwner)
+	ccipOwner := participant.Party
+	randomUser := randomUserParticipant.Party
+	t.Logf("Using CCIP party: %s", ccipOwner)
+	t.Logf("Using user party: %s", randomUser)
 
 	// ========================
 	// |   Setup: Signers     |
@@ -90,6 +73,44 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	// ========================
 
 	chainId := int64(1)
+
+	// Run tests
+	t.Run("ExecuteOp Flow", func(t *testing.T) {
+		t.Parallel()
+		testExecuteOpFlow(t, config, chainId, sortedSigners, participant, ccipOwner)
+	})
+	t.Run("Signature Verification Failure", func(t *testing.T) {
+		t.Parallel()
+		testSignatureVerificationFails(t, config, chainId, participant, ccipOwner)
+	})
+	t.Run("Replay Protection", func(t *testing.T) {
+		t.Parallel()
+		testReplayProtection(t, config, chainId, sortedSigners, participant, ccipOwner)
+	})
+	t.Run("MCMS Op", func(t *testing.T) {
+		t.Parallel()
+		testExecuteMCMSOp(t, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
+	})
+}
+
+// testExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
+// 3. Create proposal with "increment" operation
+// 4. Sign with 2 signers
+// 5. SetRoot with real signatures
+// 6. ExecuteOp - direct call to Counter via MCMSReceiver interface
+// 7. Verify counter value incremented
+func testExecuteOpFlow(
+	t *testing.T,
+	config MCMSConfig,
+	chainId int64,
+	sortedSigners []*MCMSSigner,
+	participant testhelpers.Participant,
+	ccipOwnerParty string,
+) {
+	// ========================
+	// |   Contract Constants |
+	// ========================
+
 	baseMcmsId := "mcms-integration-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
 	instanceId := "counter-env-" + uuid.New().String()[:8] // Stable instance ID for Counter
@@ -116,13 +137,13 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	// Build group quorums (32 ints)
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 	}
 
 	// Build group parents (32 ints)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
 
@@ -153,7 +174,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	}}}
 
 	// Create MCMS contract (simplified - no ticket tracking)
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -166,7 +187,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainId}}},
 								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
@@ -185,7 +206,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -198,7 +219,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	t.Log("Creating Counter contract with MCMSReceiver interface...")
 
-	counterCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	counterCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -211,7 +232,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 								EntityName: "Counter",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceId}}},
 								{Label: "value", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 							}},
@@ -219,7 +240,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -303,7 +324,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	t.Log("Calling SetRoot...")
 
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -319,7 +340,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
 									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
 									{Label: "metadata", Value: metadataValue},
@@ -331,7 +352,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -370,7 +391,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
 	}
 
-	executeOpRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	executeOpRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -386,7 +407,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 							Choice:     "ExecuteOp",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
@@ -399,7 +420,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -457,7 +478,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	require.True(t, eventFound, "MCMSEntrypointEvent should be emitted by Counter.mcmsEntrypoint")
 	assert.Equal(t, instanceId, eventInstanceId, "Event instanceId should match Counter instanceId")
 	assert.Equal(t, "increment", eventFunctionName, "Event functionName should be 'increment'")
-	assert.Equal(t, "", eventOperationData, "Event operationData should be empty for increment")
+	assert.Empty(t, eventOperationData, "Event operationData should be empty for increment")
 
 	// Verify contractIds were passed through the chain
 	require.Len(t, eventContractIdsAsText, 1, "Should have 1 contractId passed through")
@@ -472,7 +493,7 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 
 	// Also query the ACS to verify the counter value
 	t.Log("Querying counter via ACS...")
-	counterContracts, err := GetActiveContractsForPartyTemplateId(ctx, participant, ccipOwner, &apiv2.Identifier{
+	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
 		PackageId:  "#mcms",
 		ModuleName: "MCMS.Counter",
 		EntityName: "Counter",
@@ -508,48 +529,18 @@ func TestMCMS_ExecuteOpFlow(t *testing.T) {
 	t.Log("  7. Counter value = 1 ✓")
 }
 
-// TestMCMS_SignatureVerificationFails tests that invalid signatures are rejected
-func TestMCMS_SignatureVerificationFails(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
-
-	// Upload DAR
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-
-	// Setup party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
-	require.NoError(t, err)
-	ccipOwner := parties[0]
-
-	// Create signers
-	signer1, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer2, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer3, err := NewMCMSSigner()
-	require.NoError(t, err)
-
-	signers := []*MCMSSigner{signer1, signer2, signer3}
-	config := New2of3Config(signers)
-
-	chainId := int64(1)
+// testSignatureVerificationFails tests that invalid signatures are rejected
+func testSignatureVerificationFails(
+	t *testing.T,
+	config MCMSConfig,
+	chainId int64,
+	participant testhelpers.Participant,
+	ccipOwnerParty string,
+) {
+	// Build config values
 	baseMcmsId := "mcms-sig-fail-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
 
-	// Build config values
 	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
 	for i, si := range config.Signers {
 		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -563,7 +554,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -589,7 +580,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 
 	// Create MCMS contract
 	t.Log("Creating MCMS contract...")
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -602,7 +593,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainId}}},
 								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
@@ -621,7 +612,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -676,7 +667,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 
 	// Attempt SetRoot with invalid signatures - should fail
 	t.Log("Attempting SetRoot with invalid signatures...")
-	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -692,7 +683,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
 									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
 									{Label: "metadata", Value: metadataValue},
@@ -704,7 +695,7 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 
@@ -719,49 +710,19 @@ func TestMCMS_SignatureVerificationFails(t *testing.T) {
 	t.Log("✓ SetRoot correctly rejected invalid signatures")
 }
 
-// TestMCMS_ReplayProtection tests that the same root cannot be set twice
-func TestMCMS_ReplayProtection(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
-
-	// Upload DAR
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-
-	// Setup party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant)
-	require.NoError(t, err)
-	ccipOwner := parties[0]
-
-	// Create signers
-	signer1, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer2, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer3, err := NewMCMSSigner()
-	require.NoError(t, err)
-
-	signers := []*MCMSSigner{signer1, signer2, signer3}
-	config := New2of3Config(signers)
-	sortedSigners := SortSignersByAddress(signers)
-
-	chainId := int64(1)
+// testReplayProtection tests that the same root cannot be set twice
+func testReplayProtection(
+	t *testing.T,
+	config MCMSConfig,
+	chainId int64,
+	sortedSigners []*MCMSSigner,
+	participant testhelpers.Participant,
+	ccipOwnerParty string,
+) {
+	// Build config values
 	baseMcmsId := "mcms-replay-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
 
-	// Build config values
 	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
 	for i, si := range config.Signers {
 		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -775,7 +736,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -801,7 +762,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	// Create MCMS contract
 	t.Log("Creating MCMS contract...")
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -814,7 +775,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 								EntityName: "MCMS",
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainId}}},
 								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
@@ -833,7 +794,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -884,7 +845,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	// First SetRoot - should succeed
 	t.Log("First SetRoot call (should succeed)...")
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -900,7 +861,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
 									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
 									{Label: "metadata", Value: metadataValue},
@@ -912,7 +873,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 	require.NoError(t, err)
@@ -928,7 +889,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 
 	// Second SetRoot with SAME signatures - should fail with E_ALREADY_SEEN_HASH
 	t.Log("Second SetRoot call with same signatures (should fail)...")
-	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -944,7 +905,7 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
 									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
 									{Label: "metadata", Value: metadataValue},
@@ -956,21 +917,423 @@ func TestMCMS_ReplayProtection(t *testing.T) {
 					},
 				},
 			},
-			ActAs: []string{ccipOwner},
+			ActAs: []string{ccipOwnerParty},
 		},
 	})
 
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "E_ALREADY_SEEN_HASH"),
+	require.Contains(t, err.Error(), "E_ALREADY_SEEN_HASH",
 		"Expected E_ALREADY_SEEN_HASH error, got: %v", err)
 
 	t.Log("✓ Second SetRoot correctly rejected with E_ALREADY_SEEN_HASH (replay protection working)")
+}
+
+// testExecuteMCMSOp tests self-dispatch MCMS operations (Aptos pattern)
+// This demonstrates changing MCMS config via a signed proposal
+func testExecuteMCMSOp(
+	t *testing.T,
+	config MCMSConfig,
+	chainId int64,
+	sortedSigners []*MCMSSigner,
+	ccipParticipant, userParticipant testhelpers.Participant,
+	ccipOwnerParty, userParty string,
+) {
+	// ========================
+	// |   Contract Constants |
+	// ========================
+
+	baseMcmsId := "mcms-op-test-" + uuid.New().String()[:8]
+	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
+	t.Logf("MCMS ID: %s", mcmsId)
+
+	// ========================
+	// |   1. Create MCMS |
+	// ========================
+
+	t.Log("Creating MCMS contract...")
+
+	// Build signer info values
+	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
+	for i, si := range config.Signers {
+		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+			Fields: []*apiv2.RecordField{
+				{Label: "signerAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: si.SignerAddress}}},
+				{Label: "signerIndex", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerIndex)}}},
+				{Label: "signerGroup", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerGroup)}}},
+			},
+		}}}
+	}
+
+	groupQuorumValues := make([]*apiv2.Value, NumGroups)
+	groupParentValues := make([]*apiv2.Value, NumGroups)
+	for i := range NumGroups {
+		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
+		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
+	}
+
+	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
+	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
+	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "root", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
+			{Label: "validUntil", Value: epochTime},
+			{Label: "opCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+		},
+	}}}
+	emptyRootMetadata := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
+			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+		},
+	}}}
+
+	mcmsCreateRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Create{
+						Create: &apiv2.CreateCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
+							},
+							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
+								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
+								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainId}}},
+								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
+								{Label: "config", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+									Fields: []*apiv2.RecordField{
+										{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signerInfoValues}}}},
+										{Label: "groupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupQuorumValues}}}},
+										{Label: "groupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupParentValues}}}},
+									},
+								}}}},
+								{Label: "seenHashes", Value: emptyMap},
+								{Label: "expiringRoot", Value: emptyExpiringRoot},
+								{Label: "rootMetadata", Value: emptyRootMetadata},
+							}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwnerParty},
+		},
+	})
+	require.NoError(t, err)
+	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
+	t.Logf("Created MCMS contract: %s", mcmsCid)
+
+	// ========================
+	// |   2. Build Proposal  |
+	// ========================
+
+	t.Log("Building MCMS proposal (set_config targeting 'self')...")
+
+	// Prepare new config params (change from 2-of-3 to 1-of-3)
+	newQuorums := make([]int, NumGroups)
+	newQuorums[0] = 1 // Changed from 2 to 1
+	newParents := make([]int, NumGroups)
+
+	// Encode SetConfigParams into operationData (like Aptos BCS)
+	setConfigParams := SetConfigParams{
+		Signers:      config.Signers,
+		GroupQuorums: newQuorums,
+		GroupParents: newParents,
+		ClearRoot:    false,
+	}
+	encodedParams := EncodeSetConfigParams(setConfigParams)
+	t.Logf("Encoded set_config params: %s... (%d bytes)", encodedParams[:min(40, len(encodedParams))], len(encodedParams)/2)
+
+	// Build proposal with MCMS operation targeting "self"
+	// operationData contains the encoded params (like Aptos)
+	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
+	proposal.AddOperation("self", "set_config", encodedParams) // Params encoded in operationData
+	proposal.Build()
+
+	root := proposal.GetRoot()
+	t.Logf("MCMS proposal root: %s", root)
+
+	metadataProof, err := proposal.GetMetadataProof()
+	require.NoError(t, err)
+
+	opProof, err := proposal.GetOpProof(0)
+	require.NoError(t, err)
+
+	// ========================
+	// |   3. Sign Proposal   |
+	// ========================
+
+	t.Log("Signing MCMS proposal with 2 signers...")
+
+	validUntil := time.Now().Add(time.Hour)
+	validUntilMicros := validUntil.UnixMicro()
+
+	signaturesRaw, err := proposal.Sign(validUntil, sortedSigners[:2])
+	require.NoError(t, err)
+
+	signatureValues := make([]*apiv2.Value, len(signaturesRaw))
+	for i, sig := range signaturesRaw {
+		signatureValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+			Fields: []*apiv2.RecordField{
+				{Label: "publicKey", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.PublicKey}}},
+				{Label: "r", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.R}}},
+				{Label: "s", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.S}}},
+			},
+		}}}
+	}
+
+	metadataProofValues := make([]*apiv2.Value, len(metadataProof))
+	for i, p := range metadataProof {
+		metadataProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+	}
+
+	metadataValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.ChainId)}}},
+			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: proposal.Metadata.MultisigId}}},
+			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PreOpCount)}}},
+			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PostOpCount)}}},
+			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: proposal.Metadata.OverridePreviousRoot}}},
+		},
+	}}}
+
+	// ========================
+	// |   4. SetRoot         |
+	// ========================
+
+	t.Log("Calling SetRoot with MCMS proposal...")
+
+	setRootRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Exercise{
+						Exercise: &apiv2.ExerciseCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
+							},
+							ContractId: mcmsCid,
+							Choice:     "SetRoot",
+							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+								Fields: []*apiv2.RecordField{
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
+									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
+									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
+									{Label: "metadata", Value: metadataValue},
+									{Label: "metadataProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: metadataProofValues}}}},
+									{Label: "signatures", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signatureValues}}}},
+								},
+							}}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwnerParty},
+		},
+	})
+	require.NoError(t, err)
+
+	// Get new contract ID from SetRoot result
+	for _, event := range setRootRes.GetTransaction().GetEvents() {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+			mcmsCid = created.GetContractId()
+			break
+		}
+	}
+	t.Logf("SetRoot succeeded, new MCMS CID: %s", mcmsCid)
+
+	// Query ACS to get disclosed contract with CreatedEventBlob (for bob to use)
+	// Transaction events don't include the blob by default, so we query the ACS
+	disclosedMcms, err := testhelpers.GetDisclosedContractById(t.Context(), ccipParticipant, mcmsCid)
+	require.NoError(t, err, "Should get disclosed contract from ACS")
+	t.Logf("Got disclosed contract with blob size: %d bytes", len(disclosedMcms.CreatedEventBlob))
+
+	// ========================
+	// |   5. ExecuteMcmsOp  |
+	// ========================
+	//
+	// ANYONE CAN EXECUTE OPS IN MCMS
+	// ==============================
+	// Security does NOT come from who submits the transaction.
+	// Security comes from:
+	//   1. SetRoot validated the signatures from required signers (2-of-3)
+	//   2. SetRoot stored the merkle root on-chain
+	//   3. ExecuteMcmsOp validates the merkle proof against the stored root
+	//   4. The operation data is cryptographically bound to the merkle leaf
+	//
+	// This means bob (randomUser) can execute the operation even though:
+	//   - bob is NOT a signer
+	//   - bob did NOT create the contract
+	//   - bob only has visibility via contract disclosure
+	//
+	// The merkle proof verification ensures only pre-approved operations can execute.
+
+	t.Log("Calling ExecuteMcmsOp as randomUser (bob) with disclosed contract...")
+
+	// Build op value
+	op := proposal.Operations[0]
+	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
+			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
+			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
+			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
+			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
+			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
+		},
+	}}}
+
+	opProofValues := make([]*apiv2.Value, len(opProof))
+	for i, p := range opProof {
+		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+	}
+
+	// No separate params - params are encoded in op.operationData (like Aptos BCS)
+	// randomUser (bob) submits via userParticipant with disclosed contract
+	_, err = userParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Exercise{
+						Exercise: &apiv2.ExerciseCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
+							},
+							ContractId: mcmsCid,
+							Choice:     "ExecuteMcmsOp",
+							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+								Fields: []*apiv2.RecordField{
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: userParty}}},
+									{Label: "op", Value: opValue},
+									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
+								},
+							}}},
+						},
+					},
+				},
+			},
+			ActAs:              []string{userParty},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedMcms}, // Grant bob visibility
+		},
+	})
+	require.NoError(t, err)
+	t.Log("ExecuteMcmsOp succeeded (bob executed with disclosed contract)")
+	time.Sleep(5 * time.Second) // Wait for ACS to update on ccip participant
+
+	// Bob can't see the created event (not an observer), so query from alice's participant
+	// The old contract should be archived, so find the active one
+	t.Log("Querying ACS from alice's participant to find the new contract...")
+
+	// ========================
+	// |   6. Verify Config   |
+	// ========================
+
+	// Query via GetActiveContracts with verbose to get the actual config
+	// Find the MCMS contract with our mcmsId (the old one is archived, new one is active)
+	var newNumSigners int64 = -1
+	var newQuorum int64 = -1
+	var newMcmsCid string
+	offset, _ := testhelpers.GetCurrentOffset(t.Context(), ccipParticipant)
+	acsRes, err := ccipParticipant.StateServiceClient.GetActiveContracts(t.Context(), &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: offset,
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				ccipOwnerParty: {
+					Cumulative: []*apiv2.CumulativeFilter{
+						{
+							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+								TemplateFilter: &apiv2.TemplateFilter{
+									TemplateId: &apiv2.Identifier{
+										PackageId:  "#mcms",
+										ModuleName: "MCMS.Main",
+										EntityName: "MCMS",
+									},
+									IncludeCreatedEventBlob: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	require.NoError(t, err)
+	defer acsRes.CloseSend()
+
+	for {
+		ac, err := acsRes.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		require.NoError(t, err)
+		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMS" {
+				// Check if this is our MCMS by matching mcmsId
+				for _, field := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
+					if field.GetLabel() == "mcmsId" && field.GetValue().GetText() == mcmsId {
+						newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
+						for _, f := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
+							if f.GetLabel() == "config" {
+								configRecord := f.GetValue().GetRecord()
+								for _, configField := range configRecord.GetFields() {
+									if configField.GetLabel() == "signers" {
+										newNumSigners = int64(len(configField.GetValue().GetList().GetElements()))
+									}
+									if configField.GetLabel() == "groupQuorums" {
+										quorums := configField.GetValue().GetList().GetElements()
+										if len(quorums) > 0 {
+											newQuorum = quorums[0].GetInt64()
+										}
+									}
+								}
+							}
+						}
+
+						break
+					}
+				}
+			}
+		}
+		if newMcmsCid != "" {
+			break
+		}
+	}
+	require.NotEmpty(t, newMcmsCid, "Should find new MCMS contract in ACS")
+	t.Logf("Found new MCMS contract: %s", newMcmsCid)
+	t.Logf("Verified config from ACS: numSigners=%d, quorum=%d", newNumSigners, newQuorum)
+
+	require.Equal(t, int64(3), newNumSigners, "Should still have 3 signers")
+	require.Equal(t, int64(1), newQuorum, "Quorum should be changed to 1")
+
+	t.Log("✓ ExecuteMcmsOp test completed successfully!")
+	t.Log("Summary:")
+	t.Log("  1. Created MCMS with 2-of-3 config")
+	t.Log("  2. Built MCMS proposal with set_config targeting 'self'")
+	t.Log("  3. Signed with 2 signers")
+	t.Log("  4. SetRoot with on-chain verification")
+	t.Log("  5. ExecuteMcmsOp - self-dispatch to change config")
+	t.Log("  6. Config changed from 2-of-3 to 1-of-3 ✓")
 }
 
 // TestMCMS_GenerateDamlTestValues generates all cryptographic values needed for Daml unit tests.
 // Run this test and copy the output to contracts/mcms/test/daml/MCMS/FlowTest.daml
 // This uses FIXED values (not random) so the output is deterministic.
 func TestMCMS_GenerateDamlTestValues(t *testing.T) {
+	t.Parallel()
+
 	t.Log("=======================================================================")
 	t.Log("GENERATING DAML TEST VALUES")
 	t.Log("Copy these values to contracts/mcms/test/daml/MCMS/FlowTest.daml")
@@ -1163,6 +1526,8 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 // TestMCMS_GenerateMcmsOpTestValues generates and prints test values for MCMS self-dispatch operations
 // These values can be used in Daml unit tests for cross-verification
 func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
+	t.Parallel()
+
 	t.Log("=======================================================================")
 	t.Log("GENERATING DAML TEST VALUES FOR MCMS OP (SELF-DISPATCH)")
 	t.Log("=======================================================================")
@@ -1358,443 +1723,4 @@ func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 	t.Log("=======================================================================")
 	t.Log("END OF MCMS OP DAML TEST VALUES")
 	t.Log("=======================================================================")
-}
-
-// TestMCMS_ExecuteMcmsOp tests self-dispatch MCMS operations (Aptos pattern)
-// This demonstrates changing MCMS config via a signed proposal
-func TestMCMS_ExecuteMcmsOp(t *testing.T) {
-	// Setup context with JWT auth
-	jwToken, err := getJWT()
-	require.NoError(t, err)
-	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", jwToken))
-	ctx := metadata.NewOutgoingContext(context.Background(), md)
-
-	// Connect to participant
-	participant, err := NewParticipant(
-		"participant1.admin-api.localhost:8080",
-		"participant1.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
-
-	// Connect to random user participant
-	randomUserParticipant, err := NewParticipant(
-		"participant2.admin-api.localhost:8080",
-		"participant2.grpc-ledger-api.localhost:8080",
-	)
-	require.NoError(t, err)
-
-	// Upload DAR
-	t.Log("Uploading MCMS DAR...")
-	mcmsDar, err := os.ReadFile("../../contracts/mcms/.daml/dist/mcms-1.0.0.dar")
-	require.NoError(t, err)
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-
-	_, err = UploadDARstoMultipleParticipants(ctx, [][]byte{mcmsDar}, randomUserParticipant)
-	require.NoError(t, err)
-
-	// Setup party
-	parties, err := EnsurePartyOnMultipleParticipants(ctx, participant, randomUserParticipant)
-	require.NoError(t, err)
-	ccipOwner := parties[0]
-	randomUser := parties[1]
-	t.Logf("Using party: %s", ccipOwner)
-	t.Logf("Using party: %s", randomUser)
-
-	// ========================
-	// |   Setup: Signers     |
-	// ========================
-
-	t.Log("Creating signers...")
-
-	// Create 3 signers for 2-of-3 config
-	signer1, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer2, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer3, err := NewMCMSSigner()
-	require.NoError(t, err)
-
-	signers := []*MCMSSigner{signer1, signer2, signer3}
-	config := New2of3Config(signers)
-	sortedSigners := SortSignersByAddress(signers)
-
-	// ========================
-	// |   Contract Constants |
-	// ========================
-
-	chainId := int64(1)
-	baseMcmsId := "mcms-op-test-" + uuid.New().String()[:8]
-	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
-	t.Logf("MCMS ID: %s", mcmsId)
-
-	// ========================
-	// |   1. Create MCMS |
-	// ========================
-
-	t.Log("Creating MCMS contract...")
-
-	// Build signer info values
-	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
-	for i, si := range config.Signers {
-		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "signerAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: si.SignerAddress}}},
-				{Label: "signerIndex", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerIndex)}}},
-				{Label: "signerGroup", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerGroup)}}},
-			},
-		}}}
-	}
-
-	groupQuorumValues := make([]*apiv2.Value, NumGroups)
-	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
-		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
-		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
-	}
-
-	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
-	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
-	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "root", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-			{Label: "validUntil", Value: epochTime},
-			{Label: "opCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-		},
-	}}}
-	emptyRootMetadata := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-		},
-	}}}
-
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Create{
-						Create: &apiv2.CreateCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
-								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
-								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainId}}},
-								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
-								{Label: "config", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-									Fields: []*apiv2.RecordField{
-										{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signerInfoValues}}}},
-										{Label: "groupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupQuorumValues}}}},
-										{Label: "groupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupParentValues}}}},
-									},
-								}}}},
-								{Label: "seenHashes", Value: emptyMap},
-								{Label: "expiringRoot", Value: emptyExpiringRoot},
-								{Label: "rootMetadata", Value: emptyRootMetadata},
-							}},
-						},
-					},
-				},
-			},
-			ActAs: []string{ccipOwner},
-		},
-	})
-	require.NoError(t, err)
-	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
-	t.Logf("Created MCMS contract: %s", mcmsCid)
-
-	// ========================
-	// |   2. Build Proposal  |
-	// ========================
-
-	t.Log("Building MCMS proposal (set_config targeting 'self')...")
-
-	// Prepare new config params (change from 2-of-3 to 1-of-3)
-	newQuorums := make([]int, NumGroups)
-	newQuorums[0] = 1 // Changed from 2 to 1
-	newParents := make([]int, NumGroups)
-
-	// Encode SetConfigParams into operationData (like Aptos BCS)
-	setConfigParams := SetConfigParams{
-		Signers:      config.Signers,
-		GroupQuorums: newQuorums,
-		GroupParents: newParents,
-		ClearRoot:    false,
-	}
-	encodedParams := EncodeSetConfigParams(setConfigParams)
-	t.Logf("Encoded set_config params: %s... (%d bytes)", encodedParams[:min(40, len(encodedParams))], len(encodedParams)/2)
-
-	// Build proposal with MCMS operation targeting "self"
-	// operationData contains the encoded params (like Aptos)
-	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
-	proposal.AddOperation("self", "set_config", encodedParams) // Params encoded in operationData
-	proposal.Build()
-
-	root := proposal.GetRoot()
-	t.Logf("MCMS proposal root: %s", root)
-
-	metadataProof, err := proposal.GetMetadataProof()
-	require.NoError(t, err)
-
-	opProof, err := proposal.GetOpProof(0)
-	require.NoError(t, err)
-
-	// ========================
-	// |   3. Sign Proposal   |
-	// ========================
-
-	t.Log("Signing MCMS proposal with 2 signers...")
-
-	validUntil := time.Now().Add(time.Hour)
-	validUntilMicros := validUntil.UnixMicro()
-
-	signaturesRaw, err := proposal.Sign(validUntil, sortedSigners[:2])
-	require.NoError(t, err)
-
-	signatureValues := make([]*apiv2.Value, len(signaturesRaw))
-	for i, sig := range signaturesRaw {
-		signatureValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "publicKey", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.PublicKey}}},
-				{Label: "r", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.R}}},
-				{Label: "s", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.S}}},
-			},
-		}}}
-	}
-
-	metadataProofValues := make([]*apiv2.Value, len(metadataProof))
-	for i, p := range metadataProof {
-		metadataProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
-	}
-
-	metadataValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: proposal.Metadata.MultisigId}}},
-			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PreOpCount)}}},
-			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PostOpCount)}}},
-			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: proposal.Metadata.OverridePreviousRoot}}},
-		},
-	}}}
-
-	// ========================
-	// |   4. SetRoot         |
-	// ========================
-
-	t.Log("Calling SetRoot with MCMS proposal...")
-
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							ContractId: mcmsCid,
-							Choice:     "SetRoot",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwner}}},
-									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
-									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
-									{Label: "metadata", Value: metadataValue},
-									{Label: "metadataProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: metadataProofValues}}}},
-									{Label: "signatures", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signatureValues}}}},
-								},
-							}}},
-						},
-					},
-				},
-			},
-			ActAs: []string{ccipOwner},
-		},
-	})
-	require.NoError(t, err)
-
-	// Get new contract ID from SetRoot result
-	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
-			mcmsCid = created.GetContractId()
-			break
-		}
-	}
-	t.Logf("SetRoot succeeded, new MCMS CID: %s", mcmsCid)
-
-	// Query ACS to get disclosed contract with CreatedEventBlob (for bob to use)
-	// Transaction events don't include the blob by default, so we query the ACS
-	disclosedMcms, err := QueryDisclosedContract(ctx, mcmsCid, participant)
-	require.NoError(t, err, "Should get disclosed contract from ACS")
-	t.Logf("Got disclosed contract with blob size: %d bytes", len(disclosedMcms.CreatedEventBlob))
-
-	// ========================
-	// |   5. ExecuteMcmsOp  |
-	// ========================
-	//
-	// ANYONE CAN EXECUTE OPS IN MCMS
-	// ==============================
-	// Security does NOT come from who submits the transaction.
-	// Security comes from:
-	//   1. SetRoot validated the signatures from required signers (2-of-3)
-	//   2. SetRoot stored the merkle root on-chain
-	//   3. ExecuteMcmsOp validates the merkle proof against the stored root
-	//   4. The operation data is cryptographically bound to the merkle leaf
-	//
-	// This means bob (randomUser) can execute the operation even though:
-	//   - bob is NOT a signer
-	//   - bob did NOT create the contract
-	//   - bob only has visibility via contract disclosure
-	//
-	// The merkle proof verification ensures only pre-approved operations can execute.
-
-	t.Log("Calling ExecuteMcmsOp as randomUser (bob) with disclosed contract...")
-
-	// Build op value
-	op := proposal.Operations[0]
-	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
-			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
-			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
-			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
-			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
-		},
-	}}}
-
-	opProofValues := make([]*apiv2.Value, len(opProof))
-	for i, p := range opProof {
-		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
-	}
-
-	// No separate params - params are encoded in op.operationData (like Aptos BCS)
-	// randomUser (bob) submits via randomUserParticipant with disclosed contract
-	_, err = randomUserParticipant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  "#mcms",
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							ContractId: mcmsCid,
-							Choice:     "ExecuteMcmsOp",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-								Fields: []*apiv2.RecordField{
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: randomUser}}},
-									{Label: "op", Value: opValue},
-									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
-								},
-							}}},
-						},
-					},
-				},
-			},
-			ActAs:              []string{randomUser},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedMcms}, // Grant bob visibility
-		},
-	})
-	require.NoError(t, err)
-	t.Log("ExecuteMcmsOp succeeded (bob executed with disclosed contract)")
-
-	// Bob can't see the created event (not an observer), so query from alice's participant
-	// The old contract should be archived, so find the active one
-	t.Log("Querying ACS from alice's participant to find the new contract...")
-
-	// ========================
-	// |   6. Verify Config   |
-	// ========================
-
-	// Query via GetActiveContracts with verbose to get the actual config
-	// Find the MCMS contract with our mcmsId (the old one is archived, new one is active)
-	var newNumSigners int64 = -1
-	var newQuorum int64 = -1
-	var newMcmsCid string
-	offset, _ := GetCurrentOffset(ctx, participant)
-	acsRes, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: offset,
-		EventFormat: &apiv2.EventFormat{
-			FiltersForAnyParty: &apiv2.Filters{Cumulative: []*apiv2.CumulativeFilter{
-				{
-					IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
-						WildcardFilter: &apiv2.WildcardFilter{
-							IncludeCreatedEventBlob: true,
-						},
-					},
-				},
-			}},
-			Verbose: true,
-		},
-	})
-	require.NoError(t, err)
-	defer acsRes.CloseSend()
-
-	for {
-		ac, err := acsRes.Recv()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMS" {
-				// Check if this is our MCMS by matching mcmsId
-				for _, field := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
-					if field.GetLabel() == "mcmsId" && field.GetValue().GetText() == mcmsId {
-						newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
-						for _, f := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
-							if f.GetLabel() == "config" {
-								configRecord := f.GetValue().GetRecord()
-								for _, configField := range configRecord.GetFields() {
-									if configField.GetLabel() == "signers" {
-										newNumSigners = int64(len(configField.GetValue().GetList().GetElements()))
-									}
-									if configField.GetLabel() == "groupQuorums" {
-										quorums := configField.GetValue().GetList().GetElements()
-										if len(quorums) > 0 {
-											newQuorum = quorums[0].GetInt64()
-										}
-									}
-								}
-							}
-						}
-						break
-					}
-				}
-			}
-		}
-		if newMcmsCid != "" {
-			break
-		}
-	}
-	require.NotEmpty(t, newMcmsCid, "Should find new MCMS contract in ACS")
-	t.Logf("Found new MCMS contract: %s", newMcmsCid)
-	t.Logf("Verified config from ACS: numSigners=%d, quorum=%d", newNumSigners, newQuorum)
-
-	require.Equal(t, int64(3), newNumSigners, "Should still have 3 signers")
-	require.Equal(t, int64(1), newQuorum, "Quorum should be changed to 1")
-
-	t.Log("✓ ExecuteMcmsOp test completed successfully!")
-	t.Log("Summary:")
-	t.Log("  1. Created MCMS with 2-of-3 config")
-	t.Log("  2. Built MCMS proposal with set_config targeting 'self'")
-	t.Log("  3. Signed with 2 signers")
-	t.Log("  4. SetRoot with on-chain verification")
-	t.Log("  5. ExecuteMcmsOp - self-dispatch to change config")
-	t.Log("  6. Config changed from 2-of-3 to 1-of-3 ✓")
 }

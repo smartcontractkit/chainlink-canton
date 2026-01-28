@@ -19,17 +19,27 @@ var (
 
 // CCIPSendFromRouter is a Record type
 type CCIPSendFromRouter struct {
-	RouterPartyOwner      PARTY         `json:"routerPartyOwner"`
-	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
-	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	DestChainSelector     NUMERIC       `json:"destChainSelector"`
-	Receiver              TEXT          `json:"receiver"`
-	Payload               TEXT          `json:"payload"`
-	ExecutionGasLimit     INT64         `json:"executionGasLimit"`
-	CcipReceiveGasLimit   INT64         `json:"ccipReceiveGasLimit"`
-	CurrentSequenceNumber NUMERIC       `json:"currentSequenceNumber"`
-	TokenSendTicket       *CONTRACT_ID  `json:"tokenSendTicket"`
-	CcvTickets            []CONTRACT_ID `json:"ccvTickets"`
+	RouterPartyOwner PARTY `json:"routerPartyOwner"`
+
+	GlobalConfigCid CONTRACT_ID `json:"globalConfigCid"`
+
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	Receiver TEXT `json:"receiver"`
+
+	Payload TEXT `json:"payload"`
+
+	ExecutionGasLimit INT64 `json:"executionGasLimit"`
+
+	CcipReceiveGasLimit INT64 `json:"ccipReceiveGasLimit"`
+
+	CurrentSequenceNumber NUMERIC `json:"currentSequenceNumber"`
+
+	TokenSendTicket *CONTRACT_ID `json:"tokenSendTicket"`
+
+	CcvTickets []CONTRACT_ID `json:"ccvTickets"`
 }
 
 // ToMap converts CCIPSendFromRouter to a map for DAML arguments
@@ -88,13 +98,11 @@ func (t CCIPSendFromRouter) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for CCIPSendFromRouter using JsonCodec
 func (t CCIPSendFromRouter) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for CCIPSendFromRouter using JsonCodec
 func (t *CCIPSendFromRouter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -102,13 +110,19 @@ func (t *CCIPSendFromRouter) UnmarshalJSON(data []byte) error {
 
 // CCIPSendFromRouterResult is a Record type
 type CCIPSendFromRouterResult struct {
-	MessageId            TEXT      `json:"messageId"`
-	EncodedMessage       TEXT      `json:"encodedMessage"`
-	NewSequenceNumber    NUMERIC   `json:"newSequenceNumber"`
-	DestChainSelector    NUMERIC   `json:"destChainSelector"`
-	VerifierBlobs        []TEXT    `json:"verifierBlobs"`
-	MessageSentObservers []PARTY   `json:"messageSentObservers"`
-	Receipts             []Receipt `json:"receipts"`
+	MessageId TEXT `json:"messageId"`
+
+	EncodedMessage TEXT `json:"encodedMessage"`
+
+	NewSequenceNumber NUMERIC `json:"newSequenceNumber"`
+
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	VerifierBlobs []TEXT `json:"verifierBlobs"`
+
+	MessageSentObservers []PARTY `json:"messageSentObservers"`
+
+	Receipts []Receipt `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
@@ -155,13 +169,11 @@ func (t CCIPSendFromRouterResult) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for CCIPSendFromRouterResult using JsonCodec
 func (t CCIPSendFromRouterResult) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for CCIPSendFromRouterResult using JsonCodec
 func (t *CCIPSendFromRouterResult) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -169,11 +181,15 @@ func (t *CCIPSendFromRouterResult) UnmarshalJSON(data []byte) error {
 
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
-	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
-	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	DestChainSelector     NUMERIC       `json:"destChainSelector"`
-	HasTokenTransfer      BOOL          `json:"hasTokenTransfer"`
-	InstrumentId          *InstrumentId `json:"instrumentId"`
+	GlobalConfigCid CONTRACT_ID `json:"globalConfigCid"`
+
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	HasTokenTransfer BOOL `json:"hasTokenTransfer"`
+
+	InstrumentId *InstrumentId `json:"instrumentId"`
 }
 
 // ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
@@ -214,13 +230,11 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetRequiredCCVsForSend using JsonCodec
 func (t GetRequiredCCVsForSend) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetRequiredCCVsForSend using JsonCodec
 func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -228,8 +242,9 @@ func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
 
 // OnRamp is a Template type
 type OnRamp struct {
-	CcipOwner  PARTY `json:"ccipOwner"`
-	InstanceId TEXT  `json:"instanceId"`
+	CcipOwner PARTY `json:"ccipOwner"`
+
+	InstanceId TEXT `json:"instanceId"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -241,8 +256,10 @@ func (t OnRamp) GetTemplateID() string {
 func (t OnRamp) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
 	return &model.CreateCommand{
@@ -251,13 +268,11 @@ func (t OnRamp) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for OnRamp using JsonCodec
 func (t OnRamp) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for OnRamp using JsonCodec
 func (t *OnRamp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -268,29 +283,38 @@ func (t *OnRamp) UnmarshalJSON(data []byte) error {
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this OnRamp contract
 func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
+
 		ContractID: contractID,
 		Choice:     "GetRequiredCCVsForSend",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this OnRamp contract
 func (t OnRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
+
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+
+		Arguments: map[string]interface{}{},
 	}
 }
 
 // CCIPSendFromRouter exercises the CCIPSendFromRouter choice on this OnRamp contract
 func (t OnRamp) CCIPSendFromRouter(contractID string, args CCIPSendFromRouter) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
+
 		ContractID: contractID,
 		Choice:     "CCIPSendFromRouter",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }

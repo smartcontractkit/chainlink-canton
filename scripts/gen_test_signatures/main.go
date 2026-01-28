@@ -41,8 +41,8 @@ func main() {
 	numKeys := 20
 
 	// Generate key pairs
-	var privateKeys []*ecdsa.PrivateKey
-	for i := 0; i < numKeys; i++ {
+	privateKeys := make([]*ecdsa.PrivateKey, 0, numKeys)
+	for range numKeys {
 		pk, err := crypto.GenerateKey()
 		if err != nil {
 			log.Fatalf("Failed to generate key: %v", err)
@@ -65,7 +65,8 @@ func main() {
 	fmt.Println("    ]")
 
 	// Sign and collect r/s values
-	var rValues, sValues [][]byte
+	rValues := make([][]byte, 0, numKeys)
+	sValues := make([][]byte, 0, numKeys)
 	for _, pk := range privateKeys {
 		sig, err := crypto.Sign(hash, pk)
 		if err != nil {

@@ -17,8 +17,8 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "62704b4af1eca3814913842db7af4f77a304518c9e5af07e24e8bd453978e5d1"
-const SDKVersion = "3.4.8"
+const PackageID = "f44fc7cf231fb1d54fc771f641d3c4cd2f77d1b7c5124fd1f989d8f0048c489e"
+const SDKVersion = "3.4.10"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -34,18 +34,14 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
-
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{
-		"args": args,
-	}
+	return map[string]interface{}{"args": args}
 }
 
 // ApplyDestChainConfigUpdates is a Record type
@@ -73,13 +69,11 @@ func (t ApplyDestChainConfigUpdates) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for ApplyDestChainConfigUpdates using JsonCodec
 func (t ApplyDestChainConfigUpdates) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ApplyDestChainConfigUpdates using JsonCodec
 func (t *ApplyDestChainConfigUpdates) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -88,8 +82,10 @@ func (t *ApplyDestChainConfigUpdates) UnmarshalJSON(data []byte) error {
 // ApplyFeeTokenUpdates is a Record type
 type ApplyFeeTokenUpdates struct {
 	FeeTokensToRemove []InstrumentId `json:"feeTokensToRemove"`
-	FeeTokensToAdd    []FeeTokenArgs `json:"feeTokensToAdd"`
-	Caller            PARTY          `json:"caller"`
+
+	FeeTokensToAdd []FeeTokenArgs `json:"feeTokensToAdd"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts ApplyFeeTokenUpdates to a map for DAML arguments
@@ -127,13 +123,11 @@ func (t ApplyFeeTokenUpdates) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for ApplyFeeTokenUpdates using JsonCodec
 func (t ApplyFeeTokenUpdates) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ApplyFeeTokenUpdates using JsonCodec
 func (t *ApplyFeeTokenUpdates) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -141,16 +135,25 @@ func (t *ApplyFeeTokenUpdates) UnmarshalJSON(data []byte) error {
 
 // DestChainConfig2 is a Record type
 type DestChainConfig2 struct {
-	IsEnabled                   BOOL    `json:"isEnabled"`
-	MaxDataBytes                INT64   `json:"maxDataBytes"`
-	MaxPerMsgGasLimit           INT64   `json:"maxPerMsgGasLimit"`
-	DestGasOverhead             INT64   `json:"destGasOverhead"`
-	DestGasPerPayloadByteBase   INT64   `json:"destGasPerPayloadByteBase"`
-	ChainFamilySelector         TEXT    `json:"chainFamilySelector"`
-	DefaultTxGasLimit           INT64   `json:"defaultTxGasLimit"`
-	NetworkFeeUSD               NUMERIC `json:"networkFeeUSD"`
-	DefaultTokenFeeUSD          NUMERIC `json:"defaultTokenFeeUSD"`
-	DefaultTokenDestGasOverhead INT64   `json:"defaultTokenDestGasOverhead"`
+	IsEnabled BOOL `json:"isEnabled"`
+
+	MaxDataBytes INT64 `json:"maxDataBytes"`
+
+	MaxPerMsgGasLimit INT64 `json:"maxPerMsgGasLimit"`
+
+	DestGasOverhead INT64 `json:"destGasOverhead"`
+
+	DestGasPerPayloadByteBase INT64 `json:"destGasPerPayloadByteBase"`
+
+	ChainFamilySelector TEXT `json:"chainFamilySelector"`
+
+	DefaultTxGasLimit INT64 `json:"defaultTxGasLimit"`
+
+	NetworkFeeUSD NUMERIC `json:"networkFeeUSD"`
+
+	DefaultTokenFeeUSD NUMERIC `json:"defaultTokenFeeUSD"`
+
+	DefaultTokenDestGasOverhead INT64 `json:"defaultTokenDestGasOverhead"`
 }
 
 // ToMap converts DestChainConfig2 to a map for DAML arguments
@@ -180,13 +183,11 @@ func (t DestChainConfig2) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for DestChainConfig2 using JsonCodec
 func (t DestChainConfig2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for DestChainConfig2 using JsonCodec
 func (t *DestChainConfig2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -194,8 +195,9 @@ func (t *DestChainConfig2) UnmarshalJSON(data []byte) error {
 
 // DestChainConfigArgs is a Record type
 type DestChainConfigArgs struct {
-	DestChainSelector NUMERIC          `json:"destChainSelector"`
-	DestChainConfig   DestChainConfig2 `json:"destChainConfig"`
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	DestChainConfig DestChainConfig2 `json:"destChainConfig"`
 }
 
 // ToMap converts DestChainConfigArgs to a map for DAML arguments
@@ -215,13 +217,11 @@ func (t DestChainConfigArgs) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for DestChainConfigArgs using JsonCodec
 func (t DestChainConfigArgs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for DestChainConfigArgs using JsonCodec
 func (t *DestChainConfigArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -229,14 +229,21 @@ func (t *DestChainConfigArgs) UnmarshalJSON(data []byte) error {
 
 // FeeQuoter is a Template type
 type FeeQuoter struct {
-	Owner                            PARTY   `json:"owner"`
-	InstanceId                       TEXT    `json:"instanceId"`
-	FeeTokens                        GENMAP  `json:"feeTokens"`
-	DestChainConfigs                 GENMAP  `json:"destChainConfigs"`
-	TokenTransferFeeConfigs          GENMAP  `json:"tokenTransferFeeConfigs"`
-	UsdPerUnitGasByDestChainSelector GENMAP  `json:"usdPerUnitGasByDestChainSelector"`
-	UsdPerToken                      GENMAP  `json:"usdPerToken"`
-	PriceUpdaters                    []PARTY `json:"priceUpdaters"`
+	Owner PARTY `json:"owner"`
+
+	InstanceId TEXT `json:"instanceId"`
+
+	FeeTokens GENMAP `json:"feeTokens"`
+
+	DestChainConfigs GENMAP `json:"destChainConfigs"`
+
+	TokenTransferFeeConfigs GENMAP `json:"tokenTransferFeeConfigs"`
+
+	UsdPerUnitGasByDestChainSelector GENMAP `json:"usdPerUnitGasByDestChainSelector"`
+
+	UsdPerToken GENMAP `json:"usdPerToken"`
+
+	PriceUpdaters []PARTY `json:"priceUpdaters"`
 }
 
 // GetTemplateID returns the template ID for this template
@@ -248,39 +255,60 @@ func (t FeeQuoter) GetTemplateID() string {
 func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.FeeTokens != nil && len(t.FeeTokens) > 0 {
-		args["feeTokens"] = map[string]interface{}{"_type": "genmap", "value": t.FeeTokens}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["feeTokens"] = func() interface{} {
+		if t.FeeTokens == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.FeeTokens}
+	}()
 
-	if t.DestChainConfigs != nil && len(t.DestChainConfigs) > 0 {
-		args["destChainConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["destChainConfigs"] = func() interface{} {
+		if t.DestChainConfigs == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
+	}()
 
-	if t.TokenTransferFeeConfigs != nil && len(t.TokenTransferFeeConfigs) > 0 {
-		args["tokenTransferFeeConfigs"] = map[string]interface{}{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenTransferFeeConfigs"] = func() interface{} {
+		if t.TokenTransferFeeConfigs == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
+	}()
 
-	if t.UsdPerUnitGasByDestChainSelector != nil && len(t.UsdPerUnitGasByDestChainSelector) > 0 {
-		args["usdPerUnitGasByDestChainSelector"] = map[string]interface{}{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["usdPerUnitGasByDestChainSelector"] = func() interface{} {
+		if t.UsdPerUnitGasByDestChainSelector == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
+	}()
 
-	if t.UsdPerToken != nil && len(t.UsdPerToken) > 0 {
-		args["usdPerToken"] = map[string]interface{}{"_type": "genmap", "value": t.UsdPerToken}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["usdPerToken"] = func() interface{} {
+		if t.UsdPerToken == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.UsdPerToken}
+	}()
 
-	if len(t.PriceUpdaters) > 0 {
-		args["priceUpdaters"] = func() []interface{} {
-			res := make([]interface{}, 0, len(t.PriceUpdaters))
-			for _, e := range t.PriceUpdaters {
-				res = append(res, e.ToMap())
-			}
-			return res
-		}()
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["priceUpdaters"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.PriceUpdaters))
+		for _, e := range t.PriceUpdaters {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -288,13 +316,11 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for FeeQuoter using JsonCodec
 func (t FeeQuoter) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for FeeQuoter using JsonCodec
 func (t *FeeQuoter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -305,128 +331,166 @@ func (t *FeeQuoter) UnmarshalJSON(data []byte) error {
 // GetTokenPrice exercises the GetTokenPrice choice on this FeeQuoter contract
 func (t FeeQuoter) GetTokenPrice(contractID string, args GetTokenPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "GetTokenPrice",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // GetDestinationChainGasPrice exercises the GetDestinationChainGasPrice choice on this FeeQuoter contract
 func (t FeeQuoter) GetDestinationChainGasPrice(contractID string, args GetDestinationChainGasPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "GetDestinationChainGasPrice",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // UpdatePrices exercises the UpdatePrices choice on this FeeQuoter contract
 func (t FeeQuoter) UpdatePrices(contractID string, args UpdatePrices) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "UpdatePrices",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // GetValidatedFee exercises the GetValidatedFee choice on this FeeQuoter contract
 func (t FeeQuoter) GetValidatedFee(contractID string, args GetValidatedFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "GetValidatedFee",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
 func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // FeeQuoterQuoteGasForExec exercises the FeeQuoter_QuoteGasForExec choice on this FeeQuoter contract
 func (t FeeQuoter) FeeQuoterQuoteGasForExec(contractID string, args FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "FeeQuoter_QuoteGasForExec",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // GetFeeTokens exercises the GetFeeTokens choice on this FeeQuoter contract
 func (t FeeQuoter) GetFeeTokens(contractID string, args GetFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "GetFeeTokens",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // GetPremiumMultiplierWeiPerEth exercises the GetPremiumMultiplierWeiPerEth choice on this FeeQuoter contract
 func (t FeeQuoter) GetPremiumMultiplierWeiPerEth(contractID string, args GetPremiumMultiplierWeiPerEth) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "GetPremiumMultiplierWeiPerEth",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // ApplyFeeTokenUpdates exercises the ApplyFeeTokenUpdates choice on this FeeQuoter contract
 func (t FeeQuoter) ApplyFeeTokenUpdates(contractID string, args ApplyFeeTokenUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "ApplyFeeTokenUpdates",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // GetDestChainConfig exercises the GetDestChainConfig choice on this FeeQuoter contract
 func (t FeeQuoter) GetDestChainConfig(contractID string, args GetDestChainConfig2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "GetDestChainConfig",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this FeeQuoter contract
 func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+
+		Arguments: map[string]interface{}{},
 	}
 }
 
 // ApplyDestChainConfigUpdates exercises the ApplyDestChainConfigUpdates choice on this FeeQuoter contract
 func (t FeeQuoter) ApplyDestChainConfigUpdates(contractID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
+
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.FeeQuoter", "FeeQuoter"),
+
 		ContractID: contractID,
 		Choice:     "ApplyDestChainConfigUpdates",
-		Arguments:  argsToMap(args),
+
+		Arguments: argsToMap(args),
 	}
 }
 
 // FeeQuoterGetTokenTransferFee is a Record type
 type FeeQuoterGetTokenTransferFee struct {
-	DestChainSelector NUMERIC      `json:"destChainSelector"`
-	Token             InstrumentId `json:"token"`
-	Caller            PARTY        `json:"caller"`
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	Token InstrumentId `json:"token"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts FeeQuoterGetTokenTransferFee to a map for DAML arguments
@@ -448,13 +512,11 @@ func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for FeeQuoterGetTokenTransferFee using JsonCodec
 func (t FeeQuoterGetTokenTransferFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for FeeQuoterGetTokenTransferFee using JsonCodec
 func (t *FeeQuoterGetTokenTransferFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -462,11 +524,15 @@ func (t *FeeQuoterGetTokenTransferFee) UnmarshalJSON(data []byte) error {
 
 // FeeQuoterQuoteGasForExec is a Record type
 type FeeQuoterQuoteGasForExec struct {
-	DestChainSelector NUMERIC      `json:"destChainSelector"`
-	NonCalldataGas    INT64        `json:"nonCalldataGas"`
-	CalldataSize      INT64        `json:"calldataSize"`
-	FeeToken          InstrumentId `json:"feeToken"`
-	Caller            PARTY        `json:"caller"`
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	NonCalldataGas INT64 `json:"nonCalldataGas"`
+
+	CalldataSize INT64 `json:"calldataSize"`
+
+	FeeToken InstrumentId `json:"feeToken"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts FeeQuoterQuoteGasForExec to a map for DAML arguments
@@ -492,13 +558,11 @@ func (t FeeQuoterQuoteGasForExec) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for FeeQuoterQuoteGasForExec using JsonCodec
 func (t FeeQuoterQuoteGasForExec) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for FeeQuoterQuoteGasForExec using JsonCodec
 func (t *FeeQuoterQuoteGasForExec) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -506,8 +570,9 @@ func (t *FeeQuoterQuoteGasForExec) UnmarshalJSON(data []byte) error {
 
 // FeeTokenArgs is a Record type
 type FeeTokenArgs struct {
-	InstrumentId      InstrumentId `json:"instrumentId"`
-	PremiumMultiplier NUMERIC      `json:"premiumMultiplier"`
+	InstrumentId InstrumentId `json:"instrumentId"`
+
+	PremiumMultiplier NUMERIC `json:"premiumMultiplier"`
 }
 
 // ToMap converts FeeTokenArgs to a map for DAML arguments
@@ -527,13 +592,11 @@ func (t FeeTokenArgs) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for FeeTokenArgs using JsonCodec
 func (t FeeTokenArgs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for FeeTokenArgs using JsonCodec
 func (t *FeeTokenArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -542,7 +605,8 @@ func (t *FeeTokenArgs) UnmarshalJSON(data []byte) error {
 // GasPriceUpdate is a Record type
 type GasPriceUpdate struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
-	UsdPerUnitGas     NUMERIC `json:"usdPerUnitGas"`
+
+	UsdPerUnitGas NUMERIC `json:"usdPerUnitGas"`
 }
 
 // ToMap converts GasPriceUpdate to a map for DAML arguments
@@ -556,13 +620,11 @@ func (t GasPriceUpdate) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GasPriceUpdate using JsonCodec
 func (t GasPriceUpdate) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GasPriceUpdate using JsonCodec
 func (t *GasPriceUpdate) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -571,7 +633,8 @@ func (t *GasPriceUpdate) UnmarshalJSON(data []byte) error {
 // GetDestChainConfig2 is a Record type
 type GetDestChainConfig2 struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
-	Caller            PARTY   `json:"caller"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts GetDestChainConfig2 to a map for DAML arguments
@@ -585,13 +648,11 @@ func (t GetDestChainConfig2) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetDestChainConfig2 using JsonCodec
 func (t GetDestChainConfig2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetDestChainConfig2 using JsonCodec
 func (t *GetDestChainConfig2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -600,7 +661,8 @@ func (t *GetDestChainConfig2) UnmarshalJSON(data []byte) error {
 // GetDestinationChainGasPrice is a Record type
 type GetDestinationChainGasPrice struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
-	Caller            PARTY   `json:"caller"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts GetDestinationChainGasPrice to a map for DAML arguments
@@ -614,13 +676,11 @@ func (t GetDestinationChainGasPrice) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetDestinationChainGasPrice using JsonCodec
 func (t GetDestinationChainGasPrice) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetDestinationChainGasPrice using JsonCodec
 func (t *GetDestinationChainGasPrice) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -640,13 +700,11 @@ func (t GetFeeTokens) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetFeeTokens using JsonCodec
 func (t GetFeeTokens) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetFeeTokens using JsonCodec
 func (t *GetFeeTokens) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -654,8 +712,9 @@ func (t *GetFeeTokens) UnmarshalJSON(data []byte) error {
 
 // GetPremiumMultiplierWeiPerEth is a Record type
 type GetPremiumMultiplierWeiPerEth struct {
-	Token  InstrumentId `json:"token"`
-	Caller PARTY        `json:"caller"`
+	Token InstrumentId `json:"token"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts GetPremiumMultiplierWeiPerEth to a map for DAML arguments
@@ -675,13 +734,11 @@ func (t GetPremiumMultiplierWeiPerEth) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetPremiumMultiplierWeiPerEth using JsonCodec
 func (t GetPremiumMultiplierWeiPerEth) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetPremiumMultiplierWeiPerEth using JsonCodec
 func (t *GetPremiumMultiplierWeiPerEth) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -690,7 +747,8 @@ func (t *GetPremiumMultiplierWeiPerEth) UnmarshalJSON(data []byte) error {
 // GetTokenPrice is a Record type
 type GetTokenPrice struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-	Caller       PARTY        `json:"caller"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts GetTokenPrice to a map for DAML arguments
@@ -710,13 +768,11 @@ func (t GetTokenPrice) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetTokenPrice using JsonCodec
 func (t GetTokenPrice) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetTokenPrice using JsonCodec
 func (t *GetTokenPrice) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -724,9 +780,11 @@ func (t *GetTokenPrice) UnmarshalJSON(data []byte) error {
 
 // GetValidatedFee is a Record type
 type GetValidatedFee struct {
-	DestChainSelector NUMERIC           `json:"destChainSelector"`
-	Message           Canton2AnyMessage `json:"message"`
-	Caller            PARTY             `json:"caller"`
+	DestChainSelector NUMERIC `json:"destChainSelector"`
+
+	Message Canton2AnyMessage `json:"message"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts GetValidatedFee to a map for DAML arguments
@@ -748,13 +806,11 @@ func (t GetValidatedFee) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for GetValidatedFee using JsonCodec
 func (t GetValidatedFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for GetValidatedFee using JsonCodec
 func (t *GetValidatedFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -763,7 +819,8 @@ func (t *GetValidatedFee) UnmarshalJSON(data []byte) error {
 // PriceUpdates is a Record type
 type PriceUpdates struct {
 	TokenPriceUpdates []TokenPriceUpdate `json:"tokenPriceUpdates"`
-	GasPriceUpdates   []GasPriceUpdate   `json:"gasPriceUpdates"`
+
+	GasPriceUpdates []GasPriceUpdate `json:"gasPriceUpdates"`
 }
 
 // ToMap converts PriceUpdates to a map for DAML arguments
@@ -799,13 +856,11 @@ func (t PriceUpdates) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for PriceUpdates using JsonCodec
 func (t PriceUpdates) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for PriceUpdates using JsonCodec
 func (t *PriceUpdates) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -813,7 +868,8 @@ func (t *PriceUpdates) UnmarshalJSON(data []byte) error {
 
 // TimestampedPrice is a Record type
 type TimestampedPrice struct {
-	Price     NUMERIC   `json:"price"`
+	Price NUMERIC `json:"price"`
+
 	Timestamp TIMESTAMP `json:"timestamp"`
 }
 
@@ -828,13 +884,11 @@ func (t TimestampedPrice) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TimestampedPrice using JsonCodec
 func (t TimestampedPrice) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TimestampedPrice using JsonCodec
 func (t *TimestampedPrice) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -843,7 +897,8 @@ func (t *TimestampedPrice) UnmarshalJSON(data []byte) error {
 // TokenPriceUpdate is a Record type
 type TokenPriceUpdate struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-	UsdPerToken  NUMERIC      `json:"usdPerToken"`
+
+	UsdPerToken NUMERIC `json:"usdPerToken"`
 }
 
 // ToMap converts TokenPriceUpdate to a map for DAML arguments
@@ -863,13 +918,11 @@ func (t TokenPriceUpdate) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenPriceUpdate using JsonCodec
 func (t TokenPriceUpdate) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenPriceUpdate using JsonCodec
 func (t *TokenPriceUpdate) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -877,9 +930,11 @@ func (t *TokenPriceUpdate) UnmarshalJSON(data []byte) error {
 
 // TokenTransferFeeConfig is a Record type
 type TokenTransferFeeConfig struct {
-	FeeUSD            NUMERIC `json:"feeUSD"`
-	DestGasOverhead   INT64   `json:"destGasOverhead"`
-	DestBytesOverhead INT64   `json:"destBytesOverhead"`
+	FeeUSD NUMERIC `json:"feeUSD"`
+
+	DestGasOverhead INT64 `json:"destGasOverhead"`
+
+	DestBytesOverhead INT64 `json:"destBytesOverhead"`
 }
 
 // ToMap converts TokenTransferFeeConfig to a map for DAML arguments
@@ -895,13 +950,11 @@ func (t TokenTransferFeeConfig) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for TokenTransferFeeConfig using JsonCodec
 func (t TokenTransferFeeConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TokenTransferFeeConfig using JsonCodec
 func (t *TokenTransferFeeConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -910,7 +963,8 @@ func (t *TokenTransferFeeConfig) UnmarshalJSON(data []byte) error {
 // UpdatePrices is a Record type
 type UpdatePrices struct {
 	PriceUpdates PriceUpdates `json:"priceUpdates"`
-	Caller       PARTY        `json:"caller"`
+
+	Caller PARTY `json:"caller"`
 }
 
 // ToMap converts UpdatePrices to a map for DAML arguments
@@ -930,13 +984,11 @@ func (t UpdatePrices) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for UpdatePrices using JsonCodec
 func (t UpdatePrices) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for UpdatePrices using JsonCodec
 func (t *UpdatePrices) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
