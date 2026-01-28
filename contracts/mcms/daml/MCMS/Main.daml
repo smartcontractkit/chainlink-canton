@@ -7,9 +7,10 @@
 -- Direct Invocation Pattern:
 --   1. Anyone submits: proofs + signatures + targetCid
 --   2. MCMS validates proofs and signatures on-chain
---   3. MCMS calls target.getInstanceId() and verifies against op.targetInstanceId
---   4. MCMS calls target.mcmsEntrypoint(functionName, operationData, contractIds)
---   5. ccip_owner authority flows through the call chain
+--   3. MCMS fetches target and verifies owner is a signatory (security check)
+--   4. MCMS verifies target's instanceId matches op.targetInstanceId
+--   5. MCMS calls target.mcmsEntrypoint(functionName, operationData, contractIds)
+--   6. ccip_owner authority flows through the call chain
 module MCMS.Main where
 
 import DA.Map qualified as Map
@@ -19,8 +20,8 @@ import DA.Crypto.Text (BytesHex)
 import MCMS.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), numGroups, maxNumSigners, roleToText)
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_GetInstanceId(..), MCMSReceiver_Entrypoint(..))
-import MCMS.Codec (decodeSetConfigParams, SetConfigParams(..))
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..))
+import MCMS.Codec (decodeSetConfigParams)
 
 template MCMS
   with
@@ -135,14 +136,14 @@ template MCMS
     -- | Execute an operation directly on a target contract
     -- This is the main execution flow:
     --   1. Validate merkle proof against the root set by SetRoot
-    --   2. Call target.getInstanceId() and verify it matches op.targetInstanceId
-    --   3. Call target.mcmsEntrypoint(functionName, operationData, contractIds)
+    --   2. Fetch target and verify MCMS owner is a signatory (prevents target impersonation)
+    --   3. Verify target's instanceId matches op.targetInstanceId
+    --   4. Call target.mcmsEntrypoint(functionName, operationData, contractIds)
     --
-    -- ANYONE CAN EXECUTE - Security comes from merkle proof verification:
-    --   1. SetRoot already validated signatures from required signers
-    --   2. SetRoot stored the merkle root on-chain
-    --   3. This function validates the merkle proof against the stored root
-    --   4. operationData is part of the merkle leaf, so it's cryptographically bound
+    -- ANYONE CAN EXECUTE - Security comes from:
+    --   1. Merkle proof verification (operation was approved by signers)
+    --   2. Signatory check (target must be owned by same ccip_owner as MCMS)
+    --   3. InstanceId check (target identity matches what was approved)
     choice ExecuteOp : ContractId MCMS
       with
         submitter : Party                          -- Anyone can submit
@@ -175,19 +176,23 @@ template MCMS
         assertMsg "E_INVALID_OP_MERKLE_PROOF" $
           verifyMerkleProof expiringRoot.root opLeaf opProof
 
-        -- 6. Verify target contract's instanceId matches op.targetInstanceId
-        targetInstId <- exercise targetCid MCMSReceiver_GetInstanceId with c = owner
-        assertMsg ("E_WRONG_TARGET: expected " <> op.targetInstanceId <> " got " <> targetInstId) $
-          targetInstId == op.targetInstanceId
+        -- 6. Fetch target and verify MCMS owner is a signatory of the target contract
+        target <- fetch targetCid
+        assertMsg "E_TARGET_NOT_OWNED_BY_MCMS_OWNER" $ owner `elem` signatory target
 
-        -- 7. Call target's mcmsEntrypoint (MCMS is ccip_owner, authority passes through)
+        -- 7. Verify target's instanceId matches op.targetInstanceId
+        let targetView = view target
+        assertMsg ("E_WRONG_TARGET: expected " <> op.targetInstanceId <> " got " <> targetView.instanceId) $
+          targetView.instanceId == op.targetInstanceId
+
+        -- 8. Call target's mcmsEntrypoint (MCMS is ccip_owner, authority passes through)
         _ <- exercise targetCid MCMSReceiver_Entrypoint with
           caller = owner
           functionName = op.functionName
           operationData = op.operationData
           contractIds = contractIds
 
-        -- 8. Increment opCount (operation executed)
+        -- 9. Increment opCount (operation executed)
         create this with
           expiringRoot = expiringRoot with opCount = expiringRoot.opCount + 1
 

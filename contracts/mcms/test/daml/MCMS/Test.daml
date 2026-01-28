@@ -48,6 +48,12 @@ testAll = script do
   testNonceOrdering
   testRootExpiry
 
+  -- Signatory check tests (security)
+  debug ""
+  debug "--- Signatory Check Tests ---"
+  testSignatoryCheckRejectsWrongOwner
+  testSignatoryCheckAcceptsCorrectOwner
+
   debug ""
   debug "=========================================="
   debug "All MCMS POC tests completed! ✓"

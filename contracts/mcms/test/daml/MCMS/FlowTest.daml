@@ -8,6 +8,7 @@ import Daml.Script
 import MCMS.Types
 import MCMS.Main
 import MCMS.Counter
+import MCMS.MCMSReceiver (MCMSReceiver)
 import MCMS.Crypto (RawSignature(..))
 import MCMS.TestHelpers
 import MCMS.Codec (encodeSetConfigParams, decodeSetConfigParams, SetConfigParams(..))
@@ -290,6 +291,175 @@ testRootExpiry = script do
   pure ()
 
 -- ===========================================================================
+-- SIGNATORY CHECK TESTS
+-- ===========================================================================
+
+-- | Test that ExecuteOp rejects targets not owned by MCMS owner
+testSignatoryCheckRejectsWrongOwner : Script ()
+testSignatoryCheckRejectsWrongOwner = script do
+  -- Setup: Two different parties
+  ccipOwner <- allocateParty "ccip_owner"
+  attacker <- allocateParty "attacker"
+
+  -- Step 1: Create MCMS owned by ccipOwner
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig  -- 2-of-3 config
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  -- Step 2: Create Counter owned by ATTACKER (not ccipOwner!)
+  -- This simulates a malicious contract submission
+  let counterId = realTestOp.targetInstanceId
+  attackerCounterCid <- submit attacker do
+    createCmd Counter with
+      owner = attacker  -- Different owner!
+      instanceId = counterId
+      value = 999
+
+  -- Step 3: SetRoot with valid signatures (same as testFullFlowWithRealSignatures)
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  -- Step 4: Try ExecuteOp with attacker's contract as target
+  -- This MUST fail with E_TARGET_NOT_OWNED_BY_MCMS_OWNER
+  -- because the Counter is owned by attacker, not ccipOwner
+  let attackerCounterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver attackerCounterCid
+  
+  submitMustFail ccipOwner do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = ccipOwner
+      targetCid = attackerCounterAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  debug "Signatory check test PASSED - correctly rejected target not owned by MCMS owner!"
+  pure ()
+
+-- | Test that ExecuteOp succeeds when target IS owned by MCMS owner
+testSignatoryCheckAcceptsCorrectOwner : Script ()
+testSignatoryCheckAcceptsCorrectOwner = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  -- Step 1: Create MCMS
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  -- Step 2: Create Counter owned by SAME ccipOwner
+  let counterId = realTestOp.targetInstanceId
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner  -- Same owner as MCMS
+      instanceId = counterId
+      value = 0
+
+  -- Step 3: SetRoot with valid signatures
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  -- Step 4: ExecuteOp should SUCCEED because Counter is owned by ccipOwner
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+  
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = ccipOwner
+      targetCid = counterAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  debug "Signatory check test PASSED - correctly accepted target owned by MCMS owner!"
+  pure ()
+
+-- | Test that a non-stakeholder cannot call ExecuteOp
+-- Even if they know the contractId, fetch will fail
+-- This demonstrates that explicit disclosure doesn't bypass Canton's stakeholder authorization
+testNonStakeholderCannotExecute : Script ()
+testNonStakeholderCannotExecute = script do
+  -- Setup: Two different parties
+  ccipOwner <- allocateParty "ccip_owner"
+  randomParty <- allocateParty "random_party"
+
+  -- Step 1: Create MCMS owned by ccipOwner
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  -- Step 2: Create Counter owned by ccipOwner
+  let counterId = realTestOp.targetInstanceId
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counterId
+      value = 0
+
+  -- Step 3: SetRoot with valid signatures
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  -- Step 4: Try to have randomParty (non-stakeholder) call ExecuteOp
+  -- This MUST fail because randomParty is not a stakeholder of Counter
+  -- The fetch inside ExecuteOp will fail at Canton level, not at MCMS signatory check
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Use trySubmit to capture the actual error message
+  res <- randomParty `trySubmit` do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = randomParty  -- Not a stakeholder!
+      targetCid = counterAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  case res of
+    Left _ -> do
+      debug "✓ Non-stakeholder test PASSED"
+      debug "Canton fetch authorization prevents non-stakeholder ExecuteOp"
+    Right r -> do
+      abort $ "ERROR: Transaction should have failed: " <> show r
+
+  pure ()
+
+-- ===========================================================================
 -- CODEC TESTS
 -- ===========================================================================
 
@@ -427,6 +597,10 @@ runFlowTests = script do
   testReplayProtection
   testNonceOrdering
   testRootExpiry
+  -- Signatory check tests (security)
+  testSignatoryCheckRejectsWrongOwner
+  testSignatoryCheckAcceptsCorrectOwner
+  testNonStakeholderCannotExecute
   -- Codec tests
   testCodecRoundtrip
   testExecuteMcmsOp

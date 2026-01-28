@@ -86,6 +86,9 @@ func TestMCMS_Execute(t *testing.T) {
 	t.Run("MCMS Op", func(t *testing.T) {
 		testExecuteMCMSOp(t, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
 	})
+	t.Run("Signatory Check", func(t *testing.T) {
+		testSignatoryCheck(t, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
+	})
 }
 
 // testExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
@@ -1328,6 +1331,355 @@ func testExecuteMCMSOp(
 	t.Log("  4. SetRoot with on-chain verification")
 	t.Log("  5. ExecuteMcmsOp - self-dispatch to change config")
 	t.Log("  6. Config changed from 2-of-3 to 1-of-3 ✓")
+}
+
+// testSignatoryCheck verifies that MCMS can only execute operations
+// on contracts where the MCMS owner is a signatory of the target.
+//
+// Note: Due to Canton's participant-party model, we cannot create a contract
+// on participant1 owned by participant2's party. This test verifies that
+// when both MCMS and Counter have the same owner, ExecuteOp succeeds.
+//
+// The signatory check rejection case is covered by Daml unit tests in
+// contracts/mcms/test/daml/MCMS/FlowTest.daml:TestSignatoryCheckRejectsWrongOwner
+// which creates MCMS and Counter with different owners in the same participant.
+func testSignatoryCheck(
+	t *testing.T,
+	config MCMSConfig,
+	chainId int64,
+	sortedSigners []*MCMSSigner,
+	ccipParticipant, userParticipant testhelpers.Participant,
+	ccipOwnerParty, userParty string,
+) {
+	t.Parallel()
+
+	// ========================
+	// |   Contract Constants |
+	// ========================
+
+	baseMcmsId := "mcms-signatory-test-" + uuid.New().String()[:8]
+	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
+	instanceId := "counter-signatory-" + uuid.New().String()[:8]
+	t.Logf("MCMS ID: %s", mcmsId)
+	t.Logf("Counter Instance ID: %s", instanceId)
+
+	// ========================
+	// |   1. Create MCMS (owned by ccipOwner) |
+	// ========================
+
+	t.Log("Creating MCMS contract owned by ccipOwner...")
+
+	// Build signer info values
+	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
+	for i, si := range config.Signers {
+		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+			Fields: []*apiv2.RecordField{
+				{Label: "signerAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: si.SignerAddress}}},
+				{Label: "signerIndex", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerIndex)}}},
+				{Label: "signerGroup", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerGroup)}}},
+			},
+		}}}
+	}
+
+	groupQuorumValues := make([]*apiv2.Value, NumGroups)
+	groupParentValues := make([]*apiv2.Value, NumGroups)
+	for i := 0; i < NumGroups; i++ {
+		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
+		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
+	}
+
+	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
+	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
+	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "root", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
+			{Label: "validUntil", Value: epochTime},
+			{Label: "opCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+		},
+	}}}
+	emptyRootMetadata := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
+			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+		},
+	}}}
+
+	mcmsCreateRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Create{
+						Create: &apiv2.CreateCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
+							},
+							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
+								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
+								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainId}}},
+								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
+								{Label: "config", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+									Fields: []*apiv2.RecordField{
+										{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signerInfoValues}}}},
+										{Label: "groupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupQuorumValues}}}},
+										{Label: "groupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupParentValues}}}},
+									},
+								}}}},
+								{Label: "seenHashes", Value: emptyMap},
+								{Label: "expiringRoot", Value: emptyExpiringRoot},
+								{Label: "rootMetadata", Value: emptyRootMetadata},
+							}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwnerParty},
+		},
+	})
+	require.NoError(t, err)
+	mcmsCid := mcmsCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
+	t.Logf("Created MCMS contract: %s", mcmsCid)
+
+	// ========================
+	// |   2. Create Counter (also owned by ccipOwner, SAME as MCMS owner) |
+	// ========================
+	//
+	// This tests the SUCCESS case of the signatory check:
+	// - MCMS owner = ccipOwnerParty
+	// - Counter owner = ccipOwnerParty (same!)
+	// - Signatory check: ccipOwnerParty `elem` signatory Counter ✓ PASSES
+
+	t.Log("Creating Counter contract also owned by ccipOwner (same as MCMS owner)...")
+
+	counterCreateRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Create{
+						Create: &apiv2.CreateCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Counter",
+								EntityName: "Counter",
+							},
+							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
+								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceId}}},
+								{Label: "value", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+							}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwnerParty},
+		},
+	})
+	require.NoError(t, err)
+	counterCid := counterCreateRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
+	t.Logf("Created Counter contract: %s", counterCid)
+
+	// ========================
+	// |   3. Build Proposal  |
+	// ========================
+
+	t.Log("Building proposal targeting the counter...")
+
+	// Build proposal with "increment" operation targeting the counter's instanceId
+	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
+	proposal.AddOperation(instanceId, "increment", "")
+	proposal.Build()
+
+	root := proposal.GetRoot()
+	t.Logf("Proposal root: %s", root)
+
+	metadataProof, err := proposal.GetMetadataProof()
+	require.NoError(t, err)
+
+	opProof, err := proposal.GetOpProof(0)
+	require.NoError(t, err)
+
+	// ========================
+	// |   4. Sign Proposal   |
+	// ========================
+
+	t.Log("Signing proposal with 2 signers...")
+
+	validUntil := time.Now().Add(time.Hour)
+	validUntilMicros := validUntil.UnixMicro()
+
+	signaturesRaw, err := proposal.Sign(validUntil, sortedSigners[:2])
+	require.NoError(t, err)
+	require.Len(t, signaturesRaw, 2)
+
+	signatureValues := make([]*apiv2.Value, len(signaturesRaw))
+	for i, sig := range signaturesRaw {
+		signatureValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+			Fields: []*apiv2.RecordField{
+				{Label: "publicKey", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.PublicKey}}},
+				{Label: "r", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.R}}},
+				{Label: "s", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.S}}},
+			},
+		}}}
+	}
+
+	metadataProofValues := make([]*apiv2.Value, len(metadataProof))
+	for i, p := range metadataProof {
+		metadataProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+	}
+
+	metadataValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.ChainId)}}},
+			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: proposal.Metadata.MultisigId}}},
+			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PreOpCount)}}},
+			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PostOpCount)}}},
+			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: proposal.Metadata.OverridePreviousRoot}}},
+		},
+	}}}
+
+	// ========================
+	// |   5. SetRoot         |
+	// ========================
+
+	t.Log("Calling SetRoot (should succeed - root doesn't check ownership)...")
+
+	setRootRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Exercise{
+						Exercise: &apiv2.ExerciseCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
+							},
+							ContractId: mcmsCid,
+							Choice:     "SetRoot",
+							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+								Fields: []*apiv2.RecordField{
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
+									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
+									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
+									{Label: "metadata", Value: metadataValue},
+									{Label: "metadataProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: metadataProofValues}}}},
+									{Label: "signatures", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signatureValues}}}},
+								},
+							}}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwnerParty},
+		},
+	})
+	require.NoError(t, err, "SetRoot should succeed even though counter is owned by different party")
+
+	// Get new MCMS contract ID
+	for _, event := range setRootRes.GetTransaction().GetEvents() {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+			mcmsCid = created.GetContractId()
+			break
+		}
+	}
+	t.Logf("SetRoot succeeded, new MCMS CID: %s", mcmsCid)
+
+	// ========================
+	// |   6. ExecuteOp (should SUCCEED - same owner) |
+	// ========================
+	//
+	// Both MCMS and Counter are owned by ccipOwnerParty (same owner).
+	// The signatory check: ccipOwnerParty `elem` signatory Counter ✓ PASSES
+	// This verifies the signatory check logic is working correctly.
+
+	t.Log("Calling ExecuteOp (should succeed - same owner, signatory check passes)...")
+
+	// Build op value
+	op := proposal.Operations[0]
+	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
+			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
+			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
+			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
+			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
+			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
+		},
+	}}}
+
+	opProofValues := make([]*apiv2.Value, len(opProof))
+	for i, p := range opProof {
+		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+	}
+
+	// ExecuteOp - should SUCCEED because both MCMS and Counter have the same owner
+	executeOpRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.New().String(),
+			Commands: []*apiv2.Command{
+				{
+					Command: &apiv2.Command_Exercise{
+						Exercise: &apiv2.ExerciseCommand{
+							TemplateId: &apiv2.Identifier{
+								PackageId:  "#mcms",
+								ModuleName: "MCMS.Main",
+								EntityName: "MCMS",
+							},
+							ContractId: mcmsCid,
+							Choice:     "ExecuteOp",
+							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+								Fields: []*apiv2.RecordField{
+									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
+									{Label: "targetCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}}},
+									{Label: "op", Value: opValue},
+									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
+									{Label: "contractIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+										{Sum: &apiv2.Value_ContractId{ContractId: counterCid}},
+									}}}}},
+								},
+							}}},
+						},
+					},
+				},
+			},
+			ActAs: []string{ccipOwnerParty},
+		},
+	})
+	require.NoError(t, err, "ExecuteOp should succeed when MCMS owner is a signatory of target")
+
+	// Verify counter was incremented
+	var counterValue int64 = -1
+	for _, event := range executeOpRes.GetTransaction().GetEvents() {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "Counter" {
+			for _, field := range created.GetCreateArguments().GetFields() {
+				if field.GetLabel() == "value" {
+					counterValue = field.GetValue().GetInt64()
+					break
+				}
+			}
+		}
+	}
+	require.Equal(t, int64(1), counterValue, "Counter should be incremented to 1")
+
+	t.Log("✓ Signatory check test completed successfully!")
+	t.Log("Summary:")
+	t.Log("  1. Created MCMS owned by ccipOwner")
+	t.Log("  2. Created Counter also owned by ccipOwner (same owner)")
+	t.Log("  3. Built and signed proposal with valid signatures")
+	t.Log("  4. SetRoot succeeded (root doesn't check ownership)")
+	t.Log("  5. ExecuteOp succeeded ✓")
+	t.Log("     Signatory check passed: ccipOwner is a signatory of Counter")
+	t.Log("")
+	t.Log("Note: The rejection case (different owners) is covered by Daml unit tests:")
+	t.Log("  contracts/mcms/test/daml/MCMS/FlowTest.daml:TestSignatoryCheckRejectsWrongOwner")
 }
 
 // TestMCMS_GenerateDamlTestValues generates all cryptographic values needed for Daml unit tests.
