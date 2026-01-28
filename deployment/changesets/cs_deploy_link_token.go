@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+
 	cantonclient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 	linkops "github.com/smartcontractkit/chainlink-canton-internal/deployment/ops/link"
 
