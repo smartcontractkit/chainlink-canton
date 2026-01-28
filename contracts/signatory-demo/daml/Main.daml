@@ -1,0 +1,60 @@
+module Main where
+
+import Daml.Script
+import DA.Optional (fromSome)
+
+template ContractB
+  with
+    partyB : Party
+    secretData : Text
+  where
+    signatory partyB
+
+template ContractA
+  with
+    partyB : Party
+  where
+    signatory partyB
+
+    -- fetches ContractB and returns its data and signatories.
+    -- succeeds because partyB's authorization flows into the choice body.
+    nonconsuming choice FetchContractB : (Text, [Party])
+      with
+        submitter : Party
+        contractBCid : ContractId ContractB
+      controller submitter
+      do
+        contractB <- fetch contractBCid
+        let sigs = signatory contractB
+        pure (contractB.secretData, sigs)
+
+signatoryAuthorizationFlowTest = script do
+    partyA <- allocateParty "PartyA"
+    partyB <- allocateParty "PartyB"
+
+    -- creates ContractB with only partyB as signatory
+    contractBCid <- submit partyB do
+        createCmd ContractB with
+            partyB = partyB
+            secretData = "secret data only partyB should access"
+
+    -- creates ContractA with only partyB as signatory
+    contractACid <- submit partyB do
+        createCmd ContractA with
+            partyB = partyB
+
+    -- partyB gets disclosures and sends them to partyA along with the contract ids
+    disclosureA <- fromSome <$> queryDisclosure partyB contractACid
+    disclosureB <- fromSome <$> queryDisclosure partyB contractBCid
+
+    -- partyA exercises choice using disclosures and contract ids received from partyB
+    (secretData, sigs) <- submitWithDisclosures partyA [disclosureA, disclosureB] do
+        exerciseCmd contractACid FetchContractB with
+            submitter = partyA
+            contractBCid = contractBCid
+
+    assertMsg "should have fetched ContractB data" (secretData == "secret data only partyB should access")
+    assertMsg "partyB should be signatory of ContractB" (partyB `elem` sigs)
+    assertMsg "partyA should not be signatory of ContractB" (partyA `notElem` sigs)
+
+    pure ()

@@ -19,3 +19,5 @@ packages:
   - test/proxy
   - test/receiver
   - test/test
+
+  - signatory-demo
