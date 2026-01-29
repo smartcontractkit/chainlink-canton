@@ -108,9 +108,10 @@ var setRootHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input SetRootInpu
 			continue
 		}
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
-		if normalized == "MCMS.Main:MCMS" {
+		if normalized == MCMSTemplateKey {
 			newMCMSContractID = ev.Created.ContractID
 			newMCMSTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
@@ -198,9 +199,10 @@ var setConfigHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input SetConfig
 			continue
 		}
 		normalized := normalizeTemplateKey(ev.Created.TemplateID)
-		if normalized == "MCMS.Main:MCMS" {
+		if normalized == MCMSTemplateKey {
 			newMCMSContractID = ev.Created.ContractID
 			newMCMSTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}

@@ -26,6 +26,10 @@ type CantonOpResult[T any] struct {
 	Output        T
 }
 
+const (
+	MCMSTemplateKey = "MCMS.Main:MCMS"
+)
+
 // normalizeTemplateKey normalizes template ID to match the pattern used in tests
 func normalizeTemplateKey(tid string) string {
 	tid = strings.TrimPrefix(tid, "#")
@@ -122,9 +126,10 @@ var deployMCMSHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input DeployMC
 		}
 
 		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
-		if normalizedTemplateID == "MCMS.Main:MCMS" {
+		if normalizedTemplateID == MCMSTemplateKey {
 			mcmsContractID = event.Created.ContractID
 			mcmsTemplateID = event.Created.TemplateID
+
 			break
 		}
 	}

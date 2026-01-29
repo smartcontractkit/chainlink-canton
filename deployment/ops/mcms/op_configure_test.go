@@ -15,9 +15,9 @@ import (
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
 
+//nolint:paralleltest // Cannot run in parallel due to shared state (mcmsContractID, mcmsTemplateID)
 func TestConfigureMCMS(t *testing.T) {
 	t.Parallel()
-
 	ctx := context.Background()
 
 	setupResult, err := compileClient.Setup(ctx, compileClient.Config{
