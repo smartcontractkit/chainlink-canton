@@ -8,7 +8,7 @@ replace github.com/smartcontractkit/chainlink-canton-internal => ../
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 require (
-	github.com/BurntSushi/toml v1.5.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/deepmap/oapi-codegen v1.6.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
