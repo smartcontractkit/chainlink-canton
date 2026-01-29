@@ -383,7 +383,7 @@ const file_com_daml_ledger_api_v2_version_service_proto_rawDesc = "" +
 	"$max_offset_checkpoint_emission_delay\x18\x01 \x01(\v2\x19.google.protobuf.DurationR maxOffsetCheckpointEmissionDelay2\x90\x01\n" +
 	"\x0eVersionService\x12~\n" +
 	"\x13GetLedgerApiVersion\x122.com.daml.ledger.api.v2.GetLedgerApiVersionRequest\x1a3.com.daml.ledger.api.v2.GetLedgerApiVersionResponseB\x89\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x13VersionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x13VersionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_version_service_proto_rawDescOnce sync.Once

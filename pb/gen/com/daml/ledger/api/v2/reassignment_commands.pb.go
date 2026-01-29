@@ -383,7 +383,7 @@ const file_com_daml_ledger_api_v2_reassignment_commands_proto_rawDesc = "" +
 	"unassignId\x12\x16\n" +
 	"\x06source\x18\x02 \x01(\tR\x06source\x12\x16\n" +
 	"\x06target\x18\x03 \x01(\tR\x06targetB\x8f\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x19ReassignmentCommandsProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x19ReassignmentCommandsProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_reassignment_commands_proto_rawDescOnce sync.Once

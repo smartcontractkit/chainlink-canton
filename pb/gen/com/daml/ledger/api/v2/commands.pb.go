@@ -903,7 +903,7 @@ const file_com_daml_ledger_api_v2_commands_proto_rawDesc = "" +
 	"\vtemplate_id\x18\x01 \x01(\v2\".com.daml.ledger.api.v2.IdentifierR\n" +
 	"templateId\x12@\n" +
 	"\fcontract_key\x18\x02 \x01(\v2\x1d.com.daml.ledger.api.v2.ValueR\vcontractKeyB\x83\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\rCommandsProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\rCommandsProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_commands_proto_rawDescOnce sync.Once

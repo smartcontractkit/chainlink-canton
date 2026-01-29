@@ -10,8 +10,8 @@
 package participantv30
 
 import (
-	v30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/crypto/v30"
-	_ "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/scalapb"
+	v30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/crypto/v30"
+	_ "github.com/smartcontractkit/chainlink-canton/pb/gen/scalapb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -374,7 +374,7 @@ const file_com_digitalasset_canton_admin_participant_v30_active_contract_proto_r
 	"\fpackage_name\x18\x03 \x01(\tR\vpackageName\"r\n" +
 	"\x0eActiveContract\x12'\n" +
 	"\x0factive_contract\x18\x01 \x01(\fR\x0eactiveContract:7\xe2?4\x122com.digitalasset.canton.version.StableProtoVersionB\x9e\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B\x13ActiveContractProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B\x13ActiveContractProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_active_contract_proto_rawDescOnce sync.Once

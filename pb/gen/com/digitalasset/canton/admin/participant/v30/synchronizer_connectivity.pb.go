@@ -10,8 +10,8 @@
 package participantv30
 
 import (
-	v30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/sequencer/v30"
-	v301 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/time/v30"
+	v30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/sequencer/v30"
+	v301 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/time/v30"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -1340,7 +1340,7 @@ const file_com_digitalasset_canton_admin_participant_v30_synchronizer_connectivi
 	"\x1aListConnectedSynchronizers\x12P.com.digitalasset.canton.admin.participant.v30.ListConnectedSynchronizersRequest\x1aQ.com.digitalasset.canton.admin.participant.v30.ListConnectedSynchronizersResponse\x12\xc4\x01\n" +
 	"\x1bListRegisteredSynchronizers\x12Q.com.digitalasset.canton.admin.participant.v30.ListRegisteredSynchronizersRequest\x1aR.com.digitalasset.canton.admin.participant.v30.ListRegisteredSynchronizersResponse\x12\xa6\x01\n" +
 	"\x11GetSynchronizerId\x12G.com.digitalasset.canton.admin.participant.v30.GetSynchronizerIdRequest\x1aH.com.digitalasset.canton.admin.participant.v30.GetSynchronizerIdResponseB\xa8\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B\x1dSynchronizerConnectivityProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B\x1dSynchronizerConnectivityProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_synchronizer_connectivity_proto_rawDescOnce sync.Once

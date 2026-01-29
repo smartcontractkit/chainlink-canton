@@ -228,7 +228,7 @@ const file_com_daml_ledger_api_v2_crypto_proto_rawDesc = "" +
 	"\x15CRYPTO_KEY_FORMAT_DER\x10\x01\x12\x19\n" +
 	"\x15CRYPTO_KEY_FORMAT_RAW\x10\x02\x126\n" +
 	"2CRYPTO_KEY_FORMAT_DER_X509_SUBJECT_PUBLIC_KEY_INFO\x10\x03\"\x06\b\x90N\x10\x90NB\x81\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\vCryptoProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\vCryptoProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_crypto_proto_rawDescOnce sync.Once

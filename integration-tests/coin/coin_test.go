@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 func TestCoin(t *testing.T) {

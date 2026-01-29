@@ -85,7 +85,7 @@ const file_com_digitalasset_canton_admin_participant_v30_reassignment_id_proto_r
 	"\x0eReassignmentId\x124\n" +
 	"\x16source_synchronizer_id\x18\x01 \x01(\tR\x14sourceSynchronizerId\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestampB\x9e\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B\x13ReassignmentIdProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B\x13ReassignmentIdProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_reassignment_id_proto_rawDescOnce sync.Once

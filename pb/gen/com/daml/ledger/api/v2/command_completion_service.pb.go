@@ -195,7 +195,7 @@ const file_com_daml_ledger_api_v2_command_completion_service_proto_rawDesc = "" 
 	"\x13completion_response2\x93\x01\n" +
 	"\x18CommandCompletionService\x12w\n" +
 	"\x10CompletionStream\x12/.com.daml.ledger.api.v2.CompletionStreamRequest\x1a0.com.daml.ledger.api.v2.CompletionStreamResponse0\x01B\x93\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x1dCommandCompletionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x1dCommandCompletionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_command_completion_service_proto_rawDescOnce sync.Once

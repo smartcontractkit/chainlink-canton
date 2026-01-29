@@ -1510,7 +1510,7 @@ const file_com_digitalasset_canton_admin_participant_v30_package_service_proto_r
 	"\x0eGetDarContents\x12D.com.digitalasset.canton.admin.participant.v30.GetDarContentsRequest\x1aE.com.digitalasset.canton.admin.participant.v30.GetDarContentsResponse\x12\x85\x01\n" +
 	"\x06VetDar\x12<.com.digitalasset.canton.admin.participant.v30.VetDarRequest\x1a=.com.digitalasset.canton.admin.participant.v30.VetDarResponse\x12\x8b\x01\n" +
 	"\bUnvetDar\x12>.com.digitalasset.canton.admin.participant.v30.UnvetDarRequest\x1a?.com.digitalasset.canton.admin.participant.v30.UnvetDarResponseB\x9e\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B\x13PackageServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B\x13PackageServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_package_service_proto_rawDescOnce sync.Once

@@ -106,7 +106,7 @@ const file_com_digitalasset_canton_admin_participant_v30_enterprise_participant_
 	"'EnterpriseParticipantReplicationService\x12\x91\x01\n" +
 	"\n" +
 	"SetPassive\x12@.com.digitalasset.canton.admin.participant.v30.SetPassiveRequest\x1aA.com.digitalasset.canton.admin.participant.v30.SetPassiveResponseB\xb7\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B,EnterpriseParticipantReplicationServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B,EnterpriseParticipantReplicationServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_enterprise_participant_replication_service_proto_rawDescOnce sync.Once

@@ -11,7 +11,7 @@ package participantv30
 
 import (
 	context "context"
-	v30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/pruning/v30"
+	v30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/pruning/v30"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"

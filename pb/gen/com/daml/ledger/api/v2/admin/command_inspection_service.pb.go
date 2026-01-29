@@ -10,7 +10,7 @@
 package admin
 
 import (
-	v2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	v2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -526,7 +526,7 @@ const file_com_daml_ledger_api_v2_admin_command_inspection_service_proto_rawDesc
 	"\x14COMMAND_STATE_FAILED\x10\x032\x9e\x01\n" +
 	"\x18CommandInspectionService\x12\x81\x01\n" +
 	"\x10GetCommandStatus\x125.com.daml.ledger.api.v2.admin.GetCommandStatusRequest\x1a6.com.daml.ledger.api.v2.admin.GetCommandStatusResponseB\xb4\x02\n" +
-	" com.com.daml.ledger.api.v2.adminB\x1dCommandInspectionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
+	" com.com.daml.ledger.api.v2.adminB\x1dCommandInspectionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_admin_command_inspection_service_proto_rawDescOnce sync.Once

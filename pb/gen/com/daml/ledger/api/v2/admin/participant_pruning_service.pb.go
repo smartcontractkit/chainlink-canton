@@ -153,7 +153,7 @@ const file_com_daml_ledger_api_v2_admin_participant_pruning_service_proto_rawDes
 	"\rPruneResponse2}\n" +
 	"\x19ParticipantPruningService\x12`\n" +
 	"\x05Prune\x12*.com.daml.ledger.api.v2.admin.PruneRequest\x1a+.com.daml.ledger.api.v2.admin.PruneResponseB\xb5\x02\n" +
-	" com.com.daml.ledger.api.v2.adminB\x1eParticipantPruningServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
+	" com.com.daml.ledger.api.v2.adminB\x1eParticipantPruningServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_admin_participant_pruning_service_proto_rawDescOnce sync.Once

@@ -10,7 +10,7 @@
 package participantv30
 
 import (
-	_ "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/scalapb"
+	_ "github.com/smartcontractkit/chainlink-canton/pb/gen/scalapb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -2436,7 +2436,7 @@ const file_com_digitalasset_canton_admin_participant_v30_participant_inspection_
 	"#GetConfigForSlowCounterParticipants\x12Y.com.digitalasset.canton.admin.participant.v30.GetConfigForSlowCounterParticipantsRequest\x1aZ.com.digitalasset.canton.admin.participant.v30.GetConfigForSlowCounterParticipantsResponse\x12\xeb\x01\n" +
 	"(GetIntervalsBehindForCounterParticipants\x12^.com.digitalasset.canton.admin.participant.v30.GetIntervalsBehindForCounterParticipantsRequest\x1a_.com.digitalasset.canton.admin.participant.v30.GetIntervalsBehindForCounterParticipantsResponse\x12\x9a\x01\n" +
 	"\rCountInFlight\x12C.com.digitalasset.canton.admin.participant.v30.CountInFlightRequest\x1aD.com.digitalasset.canton.admin.participant.v30.CountInFlightResponseB\xac\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B!ParticipantInspectionServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B!ParticipantInspectionServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_participant_inspection_service_proto_rawDescOnce sync.Once

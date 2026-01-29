@@ -10,7 +10,7 @@
 package participantv30
 
 import (
-	v30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/pruning/v30"
+	v30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/pruning/v30"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -310,7 +310,7 @@ const file_com_digitalasset_canton_admin_participant_v30_pruning_service_proto_r
 	"\x18SetNoWaitCommitmentsFrom\x12J.com.digitalasset.canton.admin.pruning.v30.SetNoWaitCommitmentsFromRequest\x1aK.com.digitalasset.canton.admin.pruning.v30.SetNoWaitCommitmentsFromResponse\x12\xb9\x01\n" +
 	"\x1aResetNoWaitCommitmentsFrom\x12L.com.digitalasset.canton.admin.pruning.v30.ResetNoWaitCommitmentsFromRequest\x1aM.com.digitalasset.canton.admin.pruning.v30.ResetNoWaitCommitmentsFromResponse\x12\xb3\x01\n" +
 	"\x18GetNoWaitCommitmentsFrom\x12J.com.digitalasset.canton.admin.pruning.v30.GetNoWaitCommitmentsFromRequest\x1aK.com.digitalasset.canton.admin.pruning.v30.GetNoWaitCommitmentsFromResponseB\x9e\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B\x13PruningServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B\x13PruningServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_pruning_service_proto_rawDescOnce sync.Once

@@ -167,7 +167,7 @@ const file_com_digitalasset_canton_admin_time_v30_time_tracker_config_proto_rawD
 	"\x11patience_duration\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x10patienceDuration\x12S\n" +
 	"\x18min_observation_duration\x18\x03 \x01(\v2\x19.google.protobuf.DurationR\x16minObservationDuration\x12l\n" +
 	"\x12time_proof_request\x18\x04 \x01(\v2>.com.digitalasset.canton.admin.time.v30.TimeProofRequestConfigR\x10timeProofRequestB\xf0\x02\n" +
-	"*com.com.digitalasset.canton.admin.time.v30B\x16TimeTrackerConfigProtoP\x01Zkgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/time/v30;timev30\xa2\x02\x05CDCAT\xaa\x02&Com.Digitalasset.Canton.Admin.Time.V30\xca\x02&Com\\Digitalasset\\Canton\\Admin\\Time\\V30\xe2\x022Com\\Digitalasset\\Canton\\Admin\\Time\\V30\\GPBMetadata\xea\x02+Com::Digitalasset::Canton::Admin::Time::V30b\x06proto3"
+	"*com.com.digitalasset.canton.admin.time.v30B\x16TimeTrackerConfigProtoP\x01Zkgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/time/v30;timev30\xa2\x02\x05CDCAT\xaa\x02&Com.Digitalasset.Canton.Admin.Time.V30\xca\x02&Com\\Digitalasset\\Canton\\Admin\\Time\\V30\xe2\x022Com\\Digitalasset\\Canton\\Admin\\Time\\V30\\GPBMetadata\xea\x02+Com::Digitalasset::Canton::Admin::Time::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_time_v30_time_tracker_config_proto_rawDescOnce sync.Once

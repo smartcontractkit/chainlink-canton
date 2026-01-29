@@ -10,7 +10,7 @@
 package mediatorv30
 
 import (
-	v30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/health/v30"
+	v30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/health/v30"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -219,7 +219,7 @@ const file_com_digitalasset_canton_admin_mediator_v30_mediator_status_service_pr
 	"\x04kind2\xb1\x01\n" +
 	"\x15MediatorStatusService\x12\x97\x01\n" +
 	"\x0eMediatorStatus\x12A.com.digitalasset.canton.admin.mediator.v30.MediatorStatusRequest\x1aB.com.digitalasset.canton.admin.mediator.v30.MediatorStatusResponseB\x90\x03\n" +
-	".com.com.digitalasset.canton.admin.mediator.v30B\x1aMediatorStatusServiceProtoP\x01Zsgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/mediator/v30;mediatorv30\xa2\x02\x05CDCAM\xaa\x02*Com.Digitalasset.Canton.Admin.Mediator.V30\xca\x02*Com\\Digitalasset\\Canton\\Admin\\Mediator\\V30\xe2\x026Com\\Digitalasset\\Canton\\Admin\\Mediator\\V30\\GPBMetadata\xea\x02/Com::Digitalasset::Canton::Admin::Mediator::V30b\x06proto3"
+	".com.com.digitalasset.canton.admin.mediator.v30B\x1aMediatorStatusServiceProtoP\x01Zsgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/mediator/v30;mediatorv30\xa2\x02\x05CDCAM\xaa\x02*Com.Digitalasset.Canton.Admin.Mediator.V30\xca\x02*Com\\Digitalasset\\Canton\\Admin\\Mediator\\V30\xe2\x026Com\\Digitalasset\\Canton\\Admin\\Mediator\\V30\\GPBMetadata\xea\x02/Com::Digitalasset::Canton::Admin::Mediator::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_mediator_v30_mediator_status_service_proto_rawDescOnce sync.Once

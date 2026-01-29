@@ -413,7 +413,7 @@ const file_com_daml_ledger_api_v2_admin_package_management_service_proto_rawDesc
 	"\x11ListKnownPackages\x126.com.daml.ledger.api.v2.admin.ListKnownPackagesRequest\x1a7.com.daml.ledger.api.v2.admin.ListKnownPackagesResponse\x12x\n" +
 	"\rUploadDarFile\x122.com.daml.ledger.api.v2.admin.UploadDarFileRequest\x1a3.com.daml.ledger.api.v2.admin.UploadDarFileResponse\x12~\n" +
 	"\x0fValidateDarFile\x124.com.daml.ledger.api.v2.admin.ValidateDarFileRequest\x1a5.com.daml.ledger.api.v2.admin.ValidateDarFileResponseB\xb4\x02\n" +
-	" com.com.daml.ledger.api.v2.adminB\x1dPackageManagementServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
+	" com.com.daml.ledger.api.v2.adminB\x1dPackageManagementServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_admin_package_management_service_proto_rawDescOnce sync.Once

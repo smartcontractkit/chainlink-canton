@@ -323,7 +323,7 @@ const file_com_digitalasset_canton_admin_participant_v30_ping_pong_service_proto
 	"\bresponse2\x8e\x01\n" +
 	"\vPingService\x12\x7f\n" +
 	"\x04Ping\x12:.com.digitalasset.canton.admin.participant.v30.PingRequest\x1a;.com.digitalasset.canton.admin.participant.v30.PingResponseB\x9f\x03\n" +
-	"1com.com.digitalasset.canton.admin.participant.v30B\x14PingPongServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
+	"1com.com.digitalasset.canton.admin.participant.v30B\x14PingPongServiceProtoP\x01Zygithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30;participantv30\xa2\x02\x05CDCAP\xaa\x02-Com.Digitalasset.Canton.Admin.Participant.V30\xca\x02-Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\xe2\x029Com\\Digitalasset\\Canton\\Admin\\Participant\\V30\\GPBMetadata\xea\x022Com::Digitalasset::Canton::Admin::Participant::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_participant_v30_ping_pong_service_proto_rawDescOnce sync.Once

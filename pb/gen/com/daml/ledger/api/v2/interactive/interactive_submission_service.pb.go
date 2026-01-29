@@ -10,8 +10,8 @@
 package interactive
 
 import (
-	v2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	v1 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/interactive/transaction/v1"
+	v2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
+	v1 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/interactive/transaction/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -2011,7 +2011,7 @@ const file_com_daml_ledger_api_v2_interactive_interactive_submission_service_pro
 	"\x11ExecuteSubmission\x12<.com.daml.ledger.api.v2.interactive.ExecuteSubmissionRequest\x1a=.com.daml.ledger.api.v2.interactive.ExecuteSubmissionResponse\x12\xab\x01\n" +
 	"\x1aGetPreferredPackageVersion\x12E.com.daml.ledger.api.v2.interactive.GetPreferredPackageVersionRequest\x1aF.com.daml.ledger.api.v2.interactive.GetPreferredPackageVersionResponse\x12\x99\x01\n" +
 	"\x14GetPreferredPackages\x12?.com.daml.ledger.api.v2.interactive.GetPreferredPackagesRequest\x1a@.com.daml.ledger.api.v2.interactive.GetPreferredPackagesResponseB\xdc\x02\n" +
-	"&com.com.daml.ledger.api.v2.interactiveB!InteractiveSubmissionServiceProtoP\x01Z_github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/interactive\xa2\x02\x06CDLAVI\xaa\x02\"Com.Daml.Ledger.Api.V2.Interactive\xca\x02\"Com\\Daml\\Ledger\\Api\\V2\\Interactive\xe2\x02.Com\\Daml\\Ledger\\Api\\V2\\Interactive\\GPBMetadata\xea\x02'Com::Daml::Ledger::Api::V2::Interactiveb\x06proto3"
+	"&com.com.daml.ledger.api.v2.interactiveB!InteractiveSubmissionServiceProtoP\x01Z_github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/interactive\xa2\x02\x06CDLAVI\xaa\x02\"Com.Daml.Ledger.Api.V2.Interactive\xca\x02\"Com\\Daml\\Ledger\\Api\\V2\\Interactive\xe2\x02.Com\\Daml\\Ledger\\Api\\V2\\Interactive\\GPBMetadata\xea\x02'Com::Daml::Ledger::Api::V2::Interactiveb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_interactive_interactive_submission_service_proto_rawDescOnce sync.Once

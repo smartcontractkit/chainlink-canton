@@ -10,7 +10,7 @@
 package sequencerv30
 
 import (
-	_ "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/scalapb"
+	_ "github.com/smartcontractkit/chainlink-canton/pb/gen/scalapb"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
@@ -369,7 +369,7 @@ const file_com_digitalasset_canton_admin_sequencer_v30_sequencer_connection_prot
 	"&SEQUENCER_CONNECTION_VALIDATION_ACTIVE\x10\x02\x12'\n" +
 	"#SEQUENCER_CONNECTION_VALIDATION_ALL\x10\x03\x124\n" +
 	"0SEQUENCER_CONNECTION_VALIDATION_THRESHOLD_ACTIVE\x10\x04B\x95\x03\n" +
-	"/com.com.digitalasset.canton.admin.sequencer.v30B\x18SequencerConnectionProtoP\x01Zugithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/sequencer/v30;sequencerv30\xa2\x02\x05CDCAS\xaa\x02+Com.Digitalasset.Canton.Admin.Sequencer.V30\xca\x02+Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\xe2\x027Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\\GPBMetadata\xea\x020Com::Digitalasset::Canton::Admin::Sequencer::V30b\x06proto3"
+	"/com.com.digitalasset.canton.admin.sequencer.v30B\x18SequencerConnectionProtoP\x01Zugithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/sequencer/v30;sequencerv30\xa2\x02\x05CDCAS\xaa\x02+Com.Digitalasset.Canton.Admin.Sequencer.V30\xca\x02+Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\xe2\x027Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\\GPBMetadata\xea\x020Com::Digitalasset::Canton::Admin::Sequencer::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_sequencer_v30_sequencer_connection_proto_rawDescOnce sync.Once

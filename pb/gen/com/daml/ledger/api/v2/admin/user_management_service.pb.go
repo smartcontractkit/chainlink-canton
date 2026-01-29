@@ -1657,7 +1657,7 @@ const file_com_daml_ledger_api_v2_admin_user_management_service_proto_rawDesc = 
 	"\x10RevokeUserRights\x125.com.daml.ledger.api.v2.admin.RevokeUserRightsRequest\x1a6.com.daml.ledger.api.v2.admin.RevokeUserRightsResponse\x12{\n" +
 	"\x0eListUserRights\x123.com.daml.ledger.api.v2.admin.ListUserRightsRequest\x1a4.com.daml.ledger.api.v2.admin.ListUserRightsResponse\x12\xa5\x01\n" +
 	"\x1cUpdateUserIdentityProviderId\x12A.com.daml.ledger.api.v2.admin.UpdateUserIdentityProviderIdRequest\x1aB.com.daml.ledger.api.v2.admin.UpdateUserIdentityProviderIdResponseB\xb1\x02\n" +
-	" com.com.daml.ledger.api.v2.adminB\x1aUserManagementServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
+	" com.com.daml.ledger.api.v2.adminB\x1aUserManagementServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_admin_user_management_service_proto_rawDescOnce sync.Once

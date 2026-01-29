@@ -10,7 +10,7 @@
 package sequencerv30
 
 import (
-	v30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/health/v30"
+	v30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/health/v30"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -455,7 +455,7 @@ const file_com_digitalasset_canton_admin_sequencer_v30_sequencer_status_service_
 	"\x15accepts_admin_changes\x18\x01 \x01(\bR\x13acceptsAdminChanges2\xb7\x01\n" +
 	"\x16SequencerStatusService\x12\x9c\x01\n" +
 	"\x0fSequencerStatus\x12C.com.digitalasset.canton.admin.sequencer.v30.SequencerStatusRequest\x1aD.com.digitalasset.canton.admin.sequencer.v30.SequencerStatusResponseB\x98\x03\n" +
-	"/com.com.digitalasset.canton.admin.sequencer.v30B\x1bSequencerStatusServiceProtoP\x01Zugithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/sequencer/v30;sequencerv30\xa2\x02\x05CDCAS\xaa\x02+Com.Digitalasset.Canton.Admin.Sequencer.V30\xca\x02+Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\xe2\x027Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\\GPBMetadata\xea\x020Com::Digitalasset::Canton::Admin::Sequencer::V30b\x06proto3"
+	"/com.com.digitalasset.canton.admin.sequencer.v30B\x1bSequencerStatusServiceProtoP\x01Zugithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/sequencer/v30;sequencerv30\xa2\x02\x05CDCAS\xaa\x02+Com.Digitalasset.Canton.Admin.Sequencer.V30\xca\x02+Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\xe2\x027Com\\Digitalasset\\Canton\\Admin\\Sequencer\\V30\\GPBMetadata\xea\x020Com::Digitalasset::Canton::Admin::Sequencer::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_sequencer_v30_sequencer_status_service_proto_rawDescOnce sync.Once

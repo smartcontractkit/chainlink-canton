@@ -445,7 +445,7 @@ const file_com_daml_ledger_api_v2_transaction_proto_rawDesc = "" +
 	"\rtrace_context\x18\b \x01(\v2$.com.daml.ledger.api.v2.TraceContextR\ftraceContext\x12;\n" +
 	"\vrecord_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"recordTimeB\x86\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x10TransactionProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x10TransactionProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_transaction_proto_rawDescOnce sync.Once

@@ -1643,7 +1643,7 @@ const file_scalapb_scalapb_proto_rawDesc = "" +
 	"enum_value\x12!.google.protobuf.EnumValueOptions\x18\xfc\a \x01(\v2\x19.scalapb.EnumValueOptionsR\tenumValue:K\n" +
 	"\x05oneof\x12\x1d.google.protobuf.OneofOptions\x18\xfc\a \x01(\v2\x15.scalapb.OneofOptionsR\x05oneofB\xb3\x01\xe2?\x13\n" +
 	"\x0fscalapb.options\x10\x01\n" +
-	"\vcom.scalapbB\fScalapbProtoP\x01ZDgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/scalapb\xa2\x02\x03SXX\xaa\x02\aScalapb\xca\x02\aScalapb\xe2\x02\x13Scalapb\\GPBMetadata\xea\x02\aScalapb"
+	"\vcom.scalapbB\fScalapbProtoP\x01ZDgithub.com/smartcontractkit/chainlink-canton/pb/gen/scalapb\xa2\x02\x03SXX\xaa\x02\aScalapb\xca\x02\aScalapb\xe2\x02\x13Scalapb\\GPBMetadata\xea\x02\aScalapb"
 
 var (
 	file_scalapb_scalapb_proto_rawDescOnce sync.Once

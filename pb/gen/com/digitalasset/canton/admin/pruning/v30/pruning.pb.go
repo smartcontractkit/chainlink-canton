@@ -1314,7 +1314,7 @@ const file_com_digitalasset_canton_admin_pruning_v30_pruning_proto_rawDesc = "" 
 	"\x14WaitCommitmentsSetup\x126\n" +
 	"\x17counter_participant_uid\x18\x01 \x01(\tR\x15counterParticipantUid\x12^\n" +
 	"\rsynchronizers\x18\x02 \x01(\v28.com.digitalasset.canton.admin.pruning.v30.SynchronizersR\rsynchronizersB\xfb\x02\n" +
-	"-com.com.digitalasset.canton.admin.pruning.v30B\fPruningProtoP\x01Zqgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/pruning/v30;pruningv30\xa2\x02\x05CDCAP\xaa\x02)Com.Digitalasset.Canton.Admin.Pruning.V30\xca\x02)Com\\Digitalasset\\Canton\\Admin\\Pruning\\V30\xe2\x025Com\\Digitalasset\\Canton\\Admin\\Pruning\\V30\\GPBMetadata\xea\x02.Com::Digitalasset::Canton::Admin::Pruning::V30b\x06proto3"
+	"-com.com.digitalasset.canton.admin.pruning.v30B\fPruningProtoP\x01Zqgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/pruning/v30;pruningv30\xa2\x02\x05CDCAP\xaa\x02)Com.Digitalasset.Canton.Admin.Pruning.V30\xca\x02)Com\\Digitalasset\\Canton\\Admin\\Pruning\\V30\xe2\x025Com\\Digitalasset\\Canton\\Admin\\Pruning\\V30\\GPBMetadata\xea\x02.Com::Digitalasset::Canton::Admin::Pruning::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_pruning_v30_pruning_proto_rawDescOnce sync.Once

@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 type Client struct {

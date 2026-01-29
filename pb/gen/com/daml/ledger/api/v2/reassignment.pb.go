@@ -552,7 +552,7 @@ const file_com_daml_ledger_api_v2_reassignment_proto_rawDesc = "" +
 	"\tsubmitter\x18\x04 \x01(\tR\tsubmitter\x121\n" +
 	"\x14reassignment_counter\x18\x05 \x01(\x04R\x13reassignmentCounter\x12I\n" +
 	"\rcreated_event\x18\x06 \x01(\v2$.com.daml.ledger.api.v2.CreatedEventR\fcreatedEventB\x87\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x11ReassignmentProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x11ReassignmentProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_reassignment_proto_rawDescOnce sync.Once

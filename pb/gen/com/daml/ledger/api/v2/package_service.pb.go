@@ -435,7 +435,7 @@ const file_com_daml_ledger_api_v2_package_service_proto_rawDesc = "" +
 	"\n" +
 	"GetPackage\x12).com.daml.ledger.api.v2.GetPackageRequest\x1a*.com.daml.ledger.api.v2.GetPackageResponse\x12u\n" +
 	"\x10GetPackageStatus\x12/.com.daml.ledger.api.v2.GetPackageStatusRequest\x1a0.com.daml.ledger.api.v2.GetPackageStatusResponseB\x89\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x13PackageServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x13PackageServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_package_service_proto_rawDescOnce sync.Once

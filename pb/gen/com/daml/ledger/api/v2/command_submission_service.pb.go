@@ -203,7 +203,7 @@ const file_com_daml_ledger_api_v2_command_submission_service_proto_rawDesc = "" 
 	"\x18CommandSubmissionService\x12W\n" +
 	"\x06Submit\x12%.com.daml.ledger.api.v2.SubmitRequest\x1a&.com.daml.ledger.api.v2.SubmitResponse\x12{\n" +
 	"\x12SubmitReassignment\x121.com.daml.ledger.api.v2.SubmitReassignmentRequest\x1a2.com.daml.ledger.api.v2.SubmitReassignmentResponseB\x93\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x1dCommandSubmissionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x1dCommandSubmissionServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_command_submission_service_proto_rawDescOnce sync.Once

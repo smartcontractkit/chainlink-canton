@@ -10,8 +10,8 @@
 package admin
 
 import (
-	v2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	interactive "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/interactive"
+	v2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
+	interactive "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/interactive"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -1207,7 +1207,7 @@ const file_com_daml_ledger_api_v2_admin_party_management_service_proto_rawDesc =
 	"\x12UpdatePartyDetails\x127.com.daml.ledger.api.v2.admin.UpdatePartyDetailsRequest\x1a8.com.daml.ledger.api.v2.admin.UpdatePartyDetailsResponse\x12\xa8\x01\n" +
 	"\x1dUpdatePartyIdentityProviderId\x12B.com.daml.ledger.api.v2.admin.UpdatePartyIdentityProviderIdRequest\x1aC.com.daml.ledger.api.v2.admin.UpdatePartyIdentityProviderIdResponse\x12\xa8\x01\n" +
 	"\x1dGenerateExternalPartyTopology\x12B.com.daml.ledger.api.v2.admin.GenerateExternalPartyTopologyRequest\x1aC.com.daml.ledger.api.v2.admin.GenerateExternalPartyTopologyResponseB\xb2\x02\n" +
-	" com.com.daml.ledger.api.v2.adminB\x1bPartyManagementServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
+	" com.com.daml.ledger.api.v2.adminB\x1bPartyManagementServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_admin_party_management_service_proto_rawDescOnce sync.Once

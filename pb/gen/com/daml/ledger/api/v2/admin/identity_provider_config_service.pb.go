@@ -612,7 +612,7 @@ const file_com_daml_ledger_api_v2_admin_identity_provider_config_service_proto_r
 	"\x1cUpdateIdentityProviderConfig\x12A.com.daml.ledger.api.v2.admin.UpdateIdentityProviderConfigRequest\x1aB.com.daml.ledger.api.v2.admin.UpdateIdentityProviderConfigResponse\x12\xa2\x01\n" +
 	"\x1bListIdentityProviderConfigs\x12@.com.daml.ledger.api.v2.admin.ListIdentityProviderConfigsRequest\x1aA.com.daml.ledger.api.v2.admin.ListIdentityProviderConfigsResponse\x12\xa5\x01\n" +
 	"\x1cDeleteIdentityProviderConfig\x12A.com.daml.ledger.api.v2.admin.DeleteIdentityProviderConfigRequest\x1aB.com.daml.ledger.api.v2.admin.DeleteIdentityProviderConfigResponseB\xb9\x02\n" +
-	" com.com.daml.ledger.api.v2.adminB\"IdentityProviderConfigServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
+	" com.com.daml.ledger.api.v2.adminB\"IdentityProviderConfigServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin\xa2\x02\x06CDLAVA\xaa\x02\x1cCom.Daml.Ledger.Api.V2.Admin\xca\x02\x1cCom\\Daml\\Ledger\\Api\\V2\\Admin\xe2\x02(Com\\Daml\\Ledger\\Api\\V2\\Admin\\GPBMetadata\xea\x02!Com::Daml::Ledger::Api::V2::Adminb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_admin_identity_provider_config_service_proto_rawDescOnce sync.Once

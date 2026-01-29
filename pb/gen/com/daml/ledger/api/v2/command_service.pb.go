@@ -416,7 +416,7 @@ const file_com_daml_ledger_api_v2_command_service_proto_rawDesc = "" +
 	"\x1bSubmitAndWaitForTransaction\x12:.com.daml.ledger.api.v2.SubmitAndWaitForTransactionRequest\x1a;.com.daml.ledger.api.v2.SubmitAndWaitForTransactionResponse\x12\x95\x01\n" +
 	"\x1fSubmitAndWaitForTransactionTree\x12,.com.daml.ledger.api.v2.SubmitAndWaitRequest\x1a?.com.daml.ledger.api.v2.SubmitAndWaitForTransactionTreeResponse\"\x03\x88\x02\x01\x12\x99\x01\n" +
 	"\x1cSubmitAndWaitForReassignment\x12;.com.daml.ledger.api.v2.SubmitAndWaitForReassignmentRequest\x1a<.com.daml.ledger.api.v2.SubmitAndWaitForReassignmentResponseB\x89\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x13CommandServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x13CommandServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_command_service_proto_rawDescOnce sync.Once

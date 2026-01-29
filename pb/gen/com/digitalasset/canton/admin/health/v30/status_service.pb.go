@@ -912,7 +912,7 @@ const file_com_digitalasset_canton_admin_health_v30_status_service_proto_rawDesc
 	"\vSetLogLevel\x12<.com.digitalasset.canton.admin.health.v30.SetLogLevelRequest\x1a=.com.digitalasset.canton.admin.health.v30.SetLogLevelResponse\x12\x90\x01\n" +
 	"\rGetLastErrors\x12>.com.digitalasset.canton.admin.health.v30.GetLastErrorsRequest\x1a?.com.digitalasset.canton.admin.health.v30.GetLastErrorsResponse\x12\x9c\x01\n" +
 	"\x11GetLastErrorTrace\x12B.com.digitalasset.canton.admin.health.v30.GetLastErrorTraceRequest\x1aC.com.digitalasset.canton.admin.health.v30.GetLastErrorTraceResponseB\xfa\x02\n" +
-	",com.com.digitalasset.canton.admin.health.v30B\x12StatusServiceProtoP\x01Zogithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/health/v30;healthv30\xa2\x02\x05CDCAH\xaa\x02(Com.Digitalasset.Canton.Admin.Health.V30\xca\x02(Com\\Digitalasset\\Canton\\Admin\\Health\\V30\xe2\x024Com\\Digitalasset\\Canton\\Admin\\Health\\V30\\GPBMetadata\xea\x02-Com::Digitalasset::Canton::Admin::Health::V30b\x06proto3"
+	",com.com.digitalasset.canton.admin.health.v30B\x12StatusServiceProtoP\x01Zogithub.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/health/v30;healthv30\xa2\x02\x05CDCAH\xaa\x02(Com.Digitalasset.Canton.Admin.Health.V30\xca\x02(Com\\Digitalasset\\Canton\\Admin\\Health\\V30\xe2\x024Com\\Digitalasset\\Canton\\Admin\\Health\\V30\\GPBMetadata\xea\x02-Com::Digitalasset::Canton::Admin::Health::V30b\x06proto3"
 
 var (
 	file_com_digitalasset_canton_admin_health_v30_status_service_proto_rawDescOnce sync.Once

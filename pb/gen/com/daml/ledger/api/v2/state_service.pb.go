@@ -891,7 +891,7 @@ const file_com_daml_ledger_api_v2_state_service_proto_rawDesc = "" +
 	"\x19GetConnectedSynchronizers\x128.com.daml.ledger.api.v2.GetConnectedSynchronizersRequest\x1a9.com.daml.ledger.api.v2.GetConnectedSynchronizersResponse\x12i\n" +
 	"\fGetLedgerEnd\x12+.com.daml.ledger.api.v2.GetLedgerEndRequest\x1a,.com.daml.ledger.api.v2.GetLedgerEndResponse\x12\x87\x01\n" +
 	"\x16GetLatestPrunedOffsets\x125.com.daml.ledger.api.v2.GetLatestPrunedOffsetsRequest\x1a6.com.daml.ledger.api.v2.GetLatestPrunedOffsetsResponseB\x87\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x11StateServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x11StateServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_state_service_proto_rawDescOnce sync.Once

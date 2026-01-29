@@ -257,7 +257,7 @@ const file_com_daml_ledger_api_v2_completion_proto_rawDesc = "" +
 	" \x01(\x03R\x06offset\x12U\n" +
 	"\x11synchronizer_time\x18\v \x01(\v2(.com.daml.ledger.api.v2.SynchronizerTimeR\x10synchronizerTimeB\x16\n" +
 	"\x14deduplication_periodB\x85\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x0fCompletionProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x0fCompletionProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_completion_proto_rawDescOnce sync.Once

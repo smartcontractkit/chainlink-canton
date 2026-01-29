@@ -879,7 +879,7 @@ const file_com_daml_ledger_api_v2_update_service_proto_rawDesc = "" +
 	"\x12GetTransactionById\x121.com.daml.ledger.api.v2.GetTransactionByIdRequest\x1a..com.daml.ledger.api.v2.GetTransactionResponse\"\x03\x88\x02\x01\x12p\n" +
 	"\x11GetUpdateByOffset\x120.com.daml.ledger.api.v2.GetUpdateByOffsetRequest\x1a).com.daml.ledger.api.v2.GetUpdateResponse\x12h\n" +
 	"\rGetUpdateById\x12,.com.daml.ledger.api.v2.GetUpdateByIdRequest\x1a).com.daml.ledger.api.v2.GetUpdateResponseB\x88\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x12UpdateServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x12UpdateServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_update_service_proto_rawDescOnce sync.Once

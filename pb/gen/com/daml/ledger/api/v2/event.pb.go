@@ -819,7 +819,7 @@ const file_com_daml_ledger_api_v2_event_proto_rawDesc = "" +
 	"\fpackage_name\x18\r \x01(\tR\vpackageName\x12Y\n" +
 	"\x16implemented_interfaces\x18\x0e \x03(\v2\".com.daml.ledger.api.v2.IdentifierR\x15implementedInterfacesB\x80\x02\n" +
 	"\x1acom.com.daml.ledger.api.v2B\n" +
-	"EventProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"EventProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_event_proto_rawDescOnce sync.Once

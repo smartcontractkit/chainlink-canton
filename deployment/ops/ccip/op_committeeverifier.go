@@ -12,7 +12,7 @@ import (
 	"github.com/noders-team/go-daml/pkg/types"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 )
 
 // ============================================================================

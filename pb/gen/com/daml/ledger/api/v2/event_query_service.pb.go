@@ -293,7 +293,7 @@ const file_com_daml_ledger_api_v2_event_query_service_proto_rawDesc = "" +
 	"\x0fsynchronizer_id\x18\x02 \x01(\tR\x0esynchronizerId2\x9a\x01\n" +
 	"\x11EventQueryService\x12\x84\x01\n" +
 	"\x15GetEventsByContractId\x124.com.daml.ledger.api.v2.GetEventsByContractIdRequest\x1a5.com.daml.ledger.api.v2.GetEventsByContractIdResponseB\x8c\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x16EventQueryServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x16EventQueryServiceProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_event_query_service_proto_rawDescOnce sync.Once

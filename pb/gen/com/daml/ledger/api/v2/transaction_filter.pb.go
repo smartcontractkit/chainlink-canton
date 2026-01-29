@@ -856,7 +856,7 @@ const file_com_daml_ledger_api_v2_transaction_filter_proto_rawDesc = "" +
 	"\x1dTRANSACTION_SHAPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
 	"\x1bTRANSACTION_SHAPE_ACS_DELTA\x10\x01\x12$\n" +
 	" TRANSACTION_SHAPE_LEDGER_EFFECTS\x10\x02B\x8c\x02\n" +
-	"\x1acom.com.daml.ledger.api.v2B\x16TransactionFilterProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
+	"\x1acom.com.daml.ledger.api.v2B\x16TransactionFilterProtoP\x01ZYgithub.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2;apiv2\xa2\x02\x04CDLA\xaa\x02\x16Com.Daml.Ledger.Api.V2\xca\x02\x16Com\\Daml\\Ledger\\Api\\V2\xe2\x02\"Com\\Daml\\Ledger\\Api\\V2\\GPBMetadata\xea\x02\x1aCom::Daml::Ledger::Api::V2b\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_transaction_filter_proto_rawDescOnce sync.Once

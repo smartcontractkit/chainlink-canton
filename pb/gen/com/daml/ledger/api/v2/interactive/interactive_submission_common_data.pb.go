@@ -10,7 +10,7 @@
 package interactive
 
 import (
-	v2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	v2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -105,7 +105,7 @@ const file_com_daml_ledger_api_v2_interactive_interactive_submission_common_data
 	"\fpackage_name\x18\x02 \x01(\tR\vpackageName\x12/\n" +
 	"\x03key\x18\x03 \x01(\v2\x1d.com.daml.ledger.api.v2.ValueR\x03key\x12\x12\n" +
 	"\x04hash\x18\x04 \x01(\fR\x04hashB\xdf\x02\n" +
-	"&com.com.daml.ledger.api.v2.interactiveB$InteractiveSubmissionCommonDataProtoP\x01Z_github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/interactive\xa2\x02\x06CDLAVI\xaa\x02\"Com.Daml.Ledger.Api.V2.Interactive\xca\x02\"Com\\Daml\\Ledger\\Api\\V2\\Interactive\xe2\x02.Com\\Daml\\Ledger\\Api\\V2\\Interactive\\GPBMetadata\xea\x02'Com::Daml::Ledger::Api::V2::Interactiveb\x06proto3"
+	"&com.com.daml.ledger.api.v2.interactiveB$InteractiveSubmissionCommonDataProtoP\x01Z_github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/interactive\xa2\x02\x06CDLAVI\xaa\x02\"Com.Daml.Ledger.Api.V2.Interactive\xca\x02\"Com\\Daml\\Ledger\\Api\\V2\\Interactive\xe2\x02.Com\\Daml\\Ledger\\Api\\V2\\Interactive\\GPBMetadata\xea\x02'Com::Daml::Ledger::Api::V2::Interactiveb\x06proto3"
 
 var (
 	file_com_daml_ledger_api_v2_interactive_interactive_submission_common_data_proto_rawDescOnce sync.Once
