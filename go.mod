@@ -15,7 +15,7 @@ replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-c
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/ethereum/go-ethereum v1.16.8
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260114190811-74301cd99dc3
