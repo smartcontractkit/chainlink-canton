@@ -3,6 +3,7 @@ package mcms
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +13,7 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/mcms"
+	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
 
@@ -44,6 +46,23 @@ func TestDeployMCMS(t *testing.T) {
 		logger.Test(t),
 		reporter,
 	)
+
+	// Get and upload MCMS package
+	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
+	if err != nil {
+		t.Fatalf("failed to get DAR for package %s: %v", contracts.MCMS, err)
+	}
+
+	submissionID := "validate-" + time.Now().Format("20060102150405")
+	err = deps.BindingClient.PackageMng.ValidateDarFile(ctx, mcmsDar, submissionID)
+	if err != nil {
+		t.Fatalf("failed to validate DAR file: %v", err)
+	}
+	uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
+	err = deps.BindingClient.PackageMng.UploadDarFile(ctx, mcmsDar, uploadSubmissionID)
+	if err != nil {
+		t.Fatalf("failed to upload DAR file: %v", err)
+	}
 
 	instanceID := "local-mcms"
 	chainID := int64(1)

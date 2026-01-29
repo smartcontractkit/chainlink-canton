@@ -14,7 +14,6 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/mcms"
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
 
@@ -59,23 +58,6 @@ type DeployMCMSOutput struct {
 
 var deployMCMSHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input DeployMCMSInput) (output CantonOpResult[DeployMCMSOutput], err error) {
 	ctx := b.GetContext()
-
-	// Get and upload MCMS package
-	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
-	if err != nil {
-		return CantonOpResult[DeployMCMSOutput]{}, fmt.Errorf("failed to get DAR for package %s: %w", contracts.MCMS, err)
-	}
-
-	submissionID := "validate-" + time.Now().Format("20060102150405")
-	err = deps.BindingClient.PackageMng.ValidateDarFile(ctx, mcmsDar, submissionID)
-	if err != nil {
-		return CantonOpResult[DeployMCMSOutput]{}, fmt.Errorf("failed to validate DAR file: %w", err)
-	}
-	uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
-	err = deps.BindingClient.PackageMng.UploadDarFile(ctx, mcmsDar, uploadSubmissionID)
-	if err != nil {
-		return CantonOpResult[DeployMCMSOutput]{}, fmt.Errorf("failed to upload DAR file: %w", err)
-	}
 
 	// Parse role
 	var role mcms.Role
