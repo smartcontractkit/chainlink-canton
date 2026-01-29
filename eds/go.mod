@@ -3,7 +3,7 @@ module github.com/smartcontractkit/chainlink-canton-internal/eds
 go 1.25.6
 
 require (
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/mux v1.8.1
 	github.com/smartcontractkit/chainlink-canton-internal v0.0.0
 	github.com/stretchr/testify v1.11.1
