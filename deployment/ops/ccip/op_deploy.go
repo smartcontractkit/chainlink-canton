@@ -35,8 +35,8 @@ type CantonOpDeps = compileClient.CantonOpDeps
 
 // CantonOpResult wraps the output for Canton operations
 type CantonOpResult[T any] struct {
-	TransactionID string
-	Output        T
+	UpdateID string
+	Output   T
 }
 
 // normalizeTemplateKey normalizes template ID to match the pattern used in tests
@@ -113,7 +113,6 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 	// Create GlobalConfig contract
 	// Note: We manually construct the command to ensure empty GENMAP fields are included
 	// as DAML requires all non-optional fields to be present
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	createCmd := &model.CreateCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", common.PackageID, "CCIP.GlobalConfig", "GlobalConfig"),
 		Arguments:  args,
@@ -121,11 +120,9 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-common-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: createCmd}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: createCmd}},
 		},
 	}
 
@@ -158,7 +155,7 @@ var deployCCIPCommonHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input De
 	fmt.Printf("Deployed GlobalConfig contract   id=%s\n", globalConfigContractID)
 
 	return CantonOpResult[DeployCCIPCommonOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployCCIPCommonOutput{
 			GlobalConfigContractID: globalConfigContractID,
 			GlobalConfigTemplateID: globalConfigTemplateID,
@@ -209,14 +206,11 @@ var deployTokenAdminRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, 
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-tokenadminregistry-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: tokenAdminRegistry.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: tokenAdminRegistry.CreateCommand()}},
 		},
 	}
 
@@ -249,7 +243,7 @@ var deployTokenAdminRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, 
 	fmt.Printf("Deployed TokenAdminRegistry contract   id=%s\n", tokenAdminRegistryContractID)
 
 	return CantonOpResult[DeployTokenAdminRegistryOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployTokenAdminRegistryOutput{
 			TokenAdminRegistryContractID: tokenAdminRegistryContractID,
 			TokenAdminRegistryTemplateID: tokenAdminRegistryTemplateID,
@@ -299,14 +293,11 @@ var deployCCVRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input D
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-ccv-registry-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: ccvRegistry.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: ccvRegistry.CreateCommand()}},
 		},
 	}
 
@@ -339,7 +330,7 @@ var deployCCVRegistryHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input D
 	fmt.Printf("Deployed CCVRegistry contract   id=%s\n", ccvRegistryContractID)
 
 	return CantonOpResult[DeployCCVRegistryOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployCCVRegistryOutput{
 			CCVRegistryContractID: ccvRegistryContractID,
 			CCVRegistryTemplateID: ccvRegistryTemplateID,
@@ -412,14 +403,11 @@ var deployCommitteeVerifierHandler = func(b cld_ops.Bundle, deps CantonOpDeps, i
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-committeeverifier-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: committeeVerifier.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: committeeVerifier.CreateCommand()}},
 		},
 	}
 
@@ -452,7 +440,7 @@ var deployCommitteeVerifierHandler = func(b cld_ops.Bundle, deps CantonOpDeps, i
 	fmt.Printf("Deployed CommitteeVerifier contract   id=%s\n", committeeVerifierContractID)
 
 	return CantonOpResult[DeployCommitteeVerifierOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployCommitteeVerifierOutput{
 			CommitteeVerifierContractID: committeeVerifierContractID,
 			CommitteeVerifierTemplateID: committeeVerifierTemplateID,
@@ -508,14 +496,11 @@ var deployFeeQuoterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Dep
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-feequoter-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: feeQuoter.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: feeQuoter.CreateCommand()}},
 		},
 	}
 
@@ -548,7 +533,7 @@ var deployFeeQuoterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Dep
 	fmt.Printf("Deployed FeeQuoter contract   id=%s\n", feeQuoterContractID)
 
 	return CantonOpResult[DeployFeeQuoterOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployFeeQuoterOutput{
 			FeeQuoterContractID: feeQuoterContractID,
 			FeeQuoterTemplateID: feeQuoterTemplateID,
@@ -598,14 +583,11 @@ var deployOffRampHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Deplo
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-offramp-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: offRamp.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: offRamp.CreateCommand()}},
 		},
 	}
 
@@ -638,7 +620,7 @@ var deployOffRampHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Deplo
 	fmt.Printf("Deployed OffRamp contract   id=%s\n", offRampContractID)
 
 	return CantonOpResult[DeployOffRampOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployOffRampOutput{
 			OffRampContractID: offRampContractID,
 			OffRampTemplateID: offRampTemplateID,
@@ -691,14 +673,11 @@ var deployPerPartyRouterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inpu
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-perpartyrouter-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: perPartyRouter.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: perPartyRouter.CreateCommand()}},
 		},
 	}
 
@@ -731,7 +710,7 @@ var deployPerPartyRouterHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inpu
 	fmt.Printf("Deployed PerPartyRouter contract   id=%s\n", perPartyRouterContractID)
 
 	return CantonOpResult[DeployPerPartyRouterOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployPerPartyRouterOutput{
 			PerPartyRouterContractID: perPartyRouterContractID,
 			PerPartyRouterTemplateID: perPartyRouterTemplateID,
@@ -783,14 +762,11 @@ var deployOnRampHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Deploy
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "ccip-onramp-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: onRamp.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: onRamp.CreateCommand()}},
 		},
 	}
 
@@ -823,7 +799,7 @@ var deployOnRampHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Deploy
 	fmt.Printf("Deployed OnRamp contract   id=%s\n", onRampContractID)
 
 	return CantonOpResult[DeployOnRampOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployOnRampOutput{
 			OnRampContractID: onRampContractID,
 			OnRampTemplateID: onRampTemplateID,

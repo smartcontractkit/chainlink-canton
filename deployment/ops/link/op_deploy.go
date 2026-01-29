@@ -4,19 +4,16 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/google/uuid"
-
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
-	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	// "github.com/smartcontractkit/chainlink-canton-internal/bindings/compile"
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/coin"
 	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 // CantonOpDeps is an alias for the shared type in the client package
@@ -25,14 +22,14 @@ type CantonOpDeps = compileClient.CantonOpDeps
 
 // DeployLinkTokenOutput contains the deployed LINK token registry contract ID
 type DeployLinkTokenOutput struct {
+	RegistryInstanceID contracts.InstanceID
 	RegistryContractID string
-	RegistryTemplateID string
 }
 
 // CantonOpResult wraps the output for Canton operations
 type CantonOpResult[T any] struct {
-	TransactionID string
-	Output        T
+	UpdateID string
+	Output   T
 }
 
 // normalizeTemplateKey normalizes template ID to match the pattern used in tests
@@ -49,21 +46,9 @@ func normalizeTemplateKey(tid string) string {
 var handler = func(b cld_ops.Bundle, deps CantonOpDeps, input cld_ops.EmptyInput) (output CantonOpResult[DeployLinkTokenOutput], err error) {
 	ctx := b.GetContext()
 
-	// Compile and upload coin package (required for LINK token deployment)
-	compiledCoinBytes, err := contracts.GetDar(contracts.Coin, contracts.CurrentVersion)
+	instanceID, err := contracts.NewInstanceID("LINK", deps.Party)
 	if err != nil {
-		return CantonOpResult[DeployLinkTokenOutput]{}, fmt.Errorf("failed to compile package %s: %w", contracts.Coin, err)
-	}
-
-	submissionID := "validate-" + time.Now().Format("20060102150405")
-	err = deps.BindingClient.PackageMng.ValidateDarFile(ctx, compiledCoinBytes, submissionID)
-	if err != nil {
-		return CantonOpResult[DeployLinkTokenOutput]{}, fmt.Errorf("failed to validate DAR file: %w", err)
-	}
-	uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
-	err = deps.BindingClient.PackageMng.UploadDarFile(ctx, compiledCoinBytes, uploadSubmissionID)
-	if err != nil {
-		return CantonOpResult[DeployLinkTokenOutput]{}, fmt.Errorf("failed to upload DAR file: %w", err)
+		return CantonOpResult[DeployLinkTokenOutput]{}, fmt.Errorf("failed to create instance ID: %w", err)
 	}
 
 	// Create CoinRegistry contract for LINK token (following TestCoin pattern)
@@ -73,20 +58,18 @@ var handler = func(b cld_ops.Bundle, deps CantonOpDeps, input cld_ops.EmptyInput
 			Admin: types.PARTY(deps.Party),
 			Id:    "LINK",
 		},
+		InstanceId: types.TEXT(instanceID.String()),
 		Meta: coin.Metadata{
 			Values: types.TEXTMAP{},
 		},
 	}
 
 	// Submit via binding client's CommandService
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "link-token-deploy",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
-			Commands:   []*model.Command{{Command: reg.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
+			Commands:  []*model.Command{{Command: reg.CreateCommand()}},
 		},
 	}
 
@@ -97,18 +80,14 @@ var handler = func(b cld_ops.Bundle, deps CantonOpDeps, input cld_ops.EmptyInput
 
 	// Retrieve the contract ID and template ID from the create event
 	registryContractID := ""
-	registryTemplateID := ""
 	for _, event := range submitResp.Transaction.Events {
 		if event.Created == nil {
 			continue
 		}
 
-		// Normalize template ID to match the pattern used in TestCoin
-		normalizedTemplateID := normalizeTemplateKey(event.Created.TemplateID)
-		if normalizedTemplateID == "Coin.Registry:CoinRegistry" {
+		// TODO: add template name to bindings
+		if contracts.ReplacePackageIdWithNameInTemplateID(reg.GetTemplateID(), string(contracts.Coin)) == contracts.ReplacePackageIdWithNameInTemplateID(event.Created.TemplateID, event.Created.PackageName) {
 			registryContractID = event.Created.ContractID
-			registryTemplateID = event.Created.TemplateID
-
 			break
 		}
 	}
@@ -120,10 +99,10 @@ var handler = func(b cld_ops.Bundle, deps CantonOpDeps, input cld_ops.EmptyInput
 	fmt.Printf("Deployed LINK token registry contract   id=%s\n", registryContractID)
 
 	return CantonOpResult[DeployLinkTokenOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: DeployLinkTokenOutput{
 			RegistryContractID: registryContractID,
-			RegistryTemplateID: registryTemplateID,
+			RegistryInstanceID: instanceID,
 		},
 	}, nil
 }
@@ -155,11 +134,9 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "link-token-mint",
-			UserID:     deps.UserID,
-			CommandID:  uuid.Must(uuid.NewUUID()).String(),
-			ActAs:      []string{input.ReceiverParty},
-			Commands:   []*model.Command{{Command: mintPreapproval.CreateCommand()}},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{input.ReceiverParty},
+			Commands:  []*model.Command{{Command: mintPreapproval.CreateCommand()}},
 		},
 	}
 
@@ -176,7 +153,9 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 		if event.Created == nil {
 			continue
 		}
-		if normalizeTemplateKey(event.Created.TemplateID) == "Coin.Registry:MintPreapproval" {
+
+		// TODO: add template name to bindings
+		if contracts.ReplacePackageIdWithNameInTemplateID(mintPreapproval.GetTemplateID(), string(contracts.Coin)) == contracts.ReplacePackageIdWithNameInTemplateID(event.Created.TemplateID, event.Created.PackageName) {
 			mintPreapprovalCID = event.Created.ContractID
 			break
 		}
@@ -237,10 +216,8 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 
 	cmds = &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "link-token-mint",
-			UserID:     deps.UserID,
-			CommandID:  uuid.Must(uuid.NewUUID()).String(),
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
 				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", burnMintPkgID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory"),
@@ -279,7 +256,7 @@ var handlerMint = func(b cld_ops.Bundle, deps CantonOpDeps, input MintLinkTokenI
 	fmt.Printf("Minted token to tokenHoldingCID   id=%s\n", tokenHoldingCID)
 
 	return CantonOpResult[MintLinkTokenOutput]{
-		TransactionID: mintCommandID,
+		UpdateID: submitResp.UpdateID,
 		Output: MintLinkTokenOutput{
 			TokenHoldingContractID: tokenHoldingCID,
 		},

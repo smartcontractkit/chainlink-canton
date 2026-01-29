@@ -17,6 +17,7 @@ template CoinRegistry
     with 
         issuer : Party
         instrumentId : InstrumentId
+        instanceId : Text
         meta : Metadata
     where
         signatory issuer

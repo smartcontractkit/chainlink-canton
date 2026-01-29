@@ -36,7 +36,6 @@ type SetupResult struct {
 type CantonOpDeps struct {
 	BindingClient *client.DamlBindingClient
 	Party         string
-	UserID        string
 }
 
 func GetJWT() (string, error) {

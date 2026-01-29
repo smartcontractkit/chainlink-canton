@@ -83,10 +83,8 @@ var committeeVerifierForwardToVerifierHandler = func(b cld_ops.Bundle, deps Cant
 	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "committee-verifier-forward-to-verifier",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: commandID,
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{
 				Command: &model.ExerciseCommand{
 					TemplateID: fmt.Sprintf("%s:%s:%s", ccipCommitteeVerifierPkgID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
@@ -187,10 +185,8 @@ var committeeVerifierVerifyMessageHandler = func(b cld_ops.Bundle, deps CantonOp
 	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "committee-verifier-verify-message",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: commandID,
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{
 				Command: &model.ExerciseCommand{
 					TemplateID: fmt.Sprintf("%s:%s:%s", ccipCommitteeVerifierPkgID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),

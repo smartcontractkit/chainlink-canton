@@ -31,7 +31,7 @@ func TestRouterOperations(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to setup Canton client")
 
-	t.Cleanup(func() { setupResult.BindingClient.Close() })
+	t.Cleanup(setupResult.BindingClient.Close)
 
 	deps := CantonOpDeps{
 		BindingClient: setupResult.BindingClient,

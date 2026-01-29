@@ -16,6 +16,10 @@ import (
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
 
+func TestMain(m *testing.M) {
+	m.Run()
+}
+
 func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 	t.Parallel()
 
@@ -30,7 +34,7 @@ func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to setup Canton client")
 
-	t.Cleanup(func() { setupResult.BindingClient.Close() })
+	t.Cleanup(setupResult.BindingClient.Close)
 
 	deps := CantonOpDeps{
 		BindingClient: setupResult.BindingClient,

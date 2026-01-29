@@ -74,6 +74,9 @@ func TestCoin(t *testing.T) {
 									Label: "instrumentId",
 									Value: instrumentId,
 								}, {
+									Label: "instanceId",
+									Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: contracts.MustNewInstanceID("coinr", partyAlice).String()}},
+								}, {
 									Label: "meta",
 									Value: emptyMetadata,
 								},
