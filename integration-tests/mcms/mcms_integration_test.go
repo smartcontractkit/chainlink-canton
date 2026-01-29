@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -254,9 +255,11 @@ func testExecuteOpFlow(
 	t.Log("Building proposal...")
 
 	// Build proposal with one "increment" operation
-	// Note: targetInstanceId is the instanceId, not the contract ID
+	// Note: targetInstanceId must match Counter's MCMSReceiver view:
+	//   instanceId <> "@" <> partyToText owner
+	// In Go, `ccipOwnerParty` is already the ledger party-id string.
 	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
-	proposal.AddOperation(instanceId, "increment", "")
+	proposal.AddOperation(fmt.Sprintf("%s@%s", instanceId, ccipOwnerParty), "increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -1493,7 +1496,7 @@ func testSignatoryCheck(
 
 	// Build proposal with "increment" operation targeting the counter's instanceId
 	proposal := NewMCMSProposal(int(chainId), mcmsId, 0, false)
-	proposal.AddOperation(instanceId, "increment", "")
+	proposal.AddOperation(fmt.Sprintf("%s@%s", instanceId, ccipOwnerParty), "increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -1732,8 +1735,11 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("")
 
 	// Build proposal with one operation
+	// targetInstanceId must match Counter view: instanceId <> "@" <> partyToText owner
+	// In Daml sandbox (daml test), allocateParty "ccip_owner" → partyToText = "ccip_owner-9cefe94d"
+	// The suffix is deterministic in the sandbox based on the hint string.
 	proposal := NewMCMSProposal(chainId, mcmsId, 0, false)
-	proposal.AddOperation("counter", "increment", "")
+	proposal.AddOperation("counter@ccip_owner-9cefe94d", "increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()

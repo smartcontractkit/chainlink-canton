@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "6ba5bb3a281c00a5d2784368ff43bb0ab2af24d85ac6ccf429f93788a7353947"
+const PackageID = "80397927127bdf23fed1bb64dbc9e40f4fe4472171320eccf928d25629df0714"
 const SDKVersion = "3.4.9"
 
 type Template interface {
