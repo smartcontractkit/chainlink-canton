@@ -150,7 +150,6 @@ func (c ConfigureEVMChain) Apply(e cldf.Environment, config ConfigureEVMChainCon
 	deps := ccipops.CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	// --------------------------

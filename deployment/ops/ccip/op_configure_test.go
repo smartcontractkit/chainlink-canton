@@ -36,7 +36,6 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	deps := CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -103,14 +102,14 @@ func TestConfigureCCIPContracts(t *testing.T) {
 			Config:                 destChainConfig,
 		})
 		require.NoError(t, err, "failed to update GlobalConfig dest chain config")
-		require.NotEmpty(t, result.Output.Output.TransactionID, "Transaction ID should not be empty")
+		require.NotEmpty(t, result.Output.UpdateID, "Update ID should not be empty")
 
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, result.Output.Output.NewGlobalConfigContractID, "new GlobalConfig contract ID should not be empty")
 		globalConfigContractID = result.Output.Output.NewGlobalConfigContractID
 
 		t.Logf("Updated GlobalConfig dest chain config, tx=%s newCID=%s",
-			result.Output.Output.TransactionID,
+			result.Output.UpdateID,
 			result.Output.Output.NewGlobalConfigContractID,
 		)
 	})
@@ -131,7 +130,7 @@ func TestConfigureCCIPContracts(t *testing.T) {
 			Config:                 sourceChainConfig,
 		})
 		require.NoError(t, err, "failed to update GlobalConfig source chain config")
-		require.NotEmpty(t, result.Output.Output.TransactionID, "Transaction ID should not be empty")
+		require.NotEmpty(t, result.Output.UpdateID, "Update ID should not be empty")
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, result.Output.Output.NewGlobalConfigContractID, "new GlobalConfig contract ID should not be empty")
 		globalConfigContractID = result.Output.Output.NewGlobalConfigContractID
@@ -184,7 +183,7 @@ func TestConfigureCCIPContracts(t *testing.T) {
 			PriceUpdates:        priceUpdates,
 		})
 		require.NoError(t, err, "failed to update FeeQuoter prices")
-		require.NotEmpty(t, result.Output.Output.TransactionID, "Transaction ID should not be empty")
+		require.NotEmpty(t, result.Output.UpdateID, "Update ID should not be empty")
 
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, result.Output.Output.NewFeeQuoterContractID, "new FeeQuoter contract ID should not be empty")
@@ -228,7 +227,7 @@ func TestConfigureCCIPContracts(t *testing.T) {
 			FeeTokensToAdd:      feeTokensToAdd,
 		})
 		require.NoError(t, err, "failed to apply FeeQuoter fee token updates")
-		require.NotEmpty(t, result.Output.Output.TransactionID, "Transaction ID should not be empty")
+		require.NotEmpty(t, result.Output.UpdateID, "Update ID should not be empty")
 
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, result.Output.Output.NewFeeQuoterContractID, "new FeeQuoter contract ID should not be empty")
@@ -275,7 +274,7 @@ func TestConfigureCCIPContracts(t *testing.T) {
 			DestChainConfigArgs: destChainConfigArgs,
 		})
 		require.NoError(t, err, "failed to apply FeeQuoter dest chain config updates")
-		require.NotEmpty(t, result.Output.Output.TransactionID, "Transaction ID should not be empty")
+		require.NotEmpty(t, result.Output.UpdateID, "Transaction ID should not be empty")
 
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, result.Output.Output.NewFeeQuoterContractID, "new FeeQuoter contract ID should not be empty")

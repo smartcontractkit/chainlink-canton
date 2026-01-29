@@ -101,7 +101,6 @@ func (c CommitteeVerifierForward) Apply(e cldf.Environment, config CommitteeVeri
 	deps := ccipops.CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	// Convert MessageV1Input to ccvs.MessageV1

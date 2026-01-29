@@ -84,7 +84,6 @@ func (r RouterOperations) Apply(e cldf.Environment, config RouterOperationsConfi
 	deps := ccipops.CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	// --------------------------

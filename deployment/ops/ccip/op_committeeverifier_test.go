@@ -39,7 +39,6 @@ func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 	deps := CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	reporter := cld_ops.NewMemoryReporter()

@@ -10,10 +10,11 @@ import (
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
 
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
 	"github.com/smartcontractkit/chainlink-canton-internal/bindings/coin"
 	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
-	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
 
 // CantonOpDeps is an alias for the shared type in the client package

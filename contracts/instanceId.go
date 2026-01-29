@@ -75,7 +75,9 @@ func generateRandomComponent() string {
 	const charset = "abcdefghijklmnopqrstuvwxyz"
 	s := make([]rune, InstanceIDRandomPartLength)
 	for i := range s {
+		//nolint:gosec // Not used for cryptographic purposes
 		s[i] = rune(charset[rand.IntN(len(charset))])
 	}
+
 	return string(s)
 }

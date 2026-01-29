@@ -10,11 +10,12 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
 
 	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
 )
@@ -43,6 +44,7 @@ func TestDeployAndMintLink(t *testing.T) {
 
 	// Upload Dar
 	coinDar, err := contracts.GetDar(contracts.Coin, contracts.CurrentVersion)
+	require.NoError(t, err, "failed to get coin dar file")
 	err = bindingClient.PackageMng.UploadDarFile(ctx, coinDar, "")
 	require.NoError(t, err, "failed to upload coin dar file")
 

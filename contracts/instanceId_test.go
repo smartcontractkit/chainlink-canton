@@ -79,5 +79,4 @@ func TestInstanceId(t *testing.T) {
 		_, err = invalidID.Prefix()
 		require.Error(t, err)
 	})
-
 }

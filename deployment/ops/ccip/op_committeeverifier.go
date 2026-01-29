@@ -122,7 +122,7 @@ var committeeVerifierForwardToVerifierHandler = func(b cld_ops.Bundle, deps Cant
 	}
 
 	return CantonOpResult[CommitteeVerifierForwardToVerifierOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: CommitteeVerifierForwardToVerifierOutput{
 			TransactionID:       commandID,
 			CCVTicketContractID: ccvTicketContractID,
@@ -224,7 +224,7 @@ var committeeVerifierVerifyMessageHandler = func(b cld_ops.Bundle, deps CantonOp
 	}
 
 	return CantonOpResult[CommitteeVerifierVerifyMessageOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: CommitteeVerifierVerifyMessageOutput{
 			TransactionID:             commandID,
 			CCVVerifyTicketContractID: ccvVerifyTicketContractID,

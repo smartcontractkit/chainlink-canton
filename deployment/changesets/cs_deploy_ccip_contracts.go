@@ -69,7 +69,6 @@ func (d DeployCCIPContracts) Apply(e cldf.Environment, config DeployCCIPContract
 	deps := ccipops.CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	// --------------------------

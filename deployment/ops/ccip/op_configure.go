@@ -30,7 +30,6 @@ type UpdateGlobalConfigDestChainConfigInput struct {
 }
 
 type UpdateGlobalConfigDestChainConfigOutput struct {
-	TransactionID             string
 	NewGlobalConfigContractID string
 	NewGlobalConfigTemplateID string
 }
@@ -80,13 +79,10 @@ var updateGlobalConfigDestChainConfigHandler = func(
 		return CantonOpResult[UpdateGlobalConfigDestChainConfigOutput]{}, fmt.Errorf("failed to find ccip-common package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "update-global-config-dest-chain",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{
 				Command: &model.ExerciseCommand{
 					TemplateID: fmt.Sprintf("%s:%s:%s", ccipCommonPkgID, "CCIP.GlobalConfig", "GlobalConfig"),
@@ -129,9 +125,8 @@ var updateGlobalConfigDestChainConfigHandler = func(
 	}
 
 	return CantonOpResult[UpdateGlobalConfigDestChainConfigOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: UpdateGlobalConfigDestChainConfigOutput{
-			TransactionID:             commandID,
 			NewGlobalConfigContractID: newGlobalConfigContractID,
 			NewGlobalConfigTemplateID: newGlobalConfigTemplateID,
 		},
@@ -148,7 +143,6 @@ type UpdateGlobalConfigSourceChainConfigInput struct {
 
 // UpdateGlobalConfigSourceChainConfigOutput contains the transaction ID
 type UpdateGlobalConfigSourceChainConfigOutput struct {
-	TransactionID             string
 	NewGlobalConfigContractID string
 	NewGlobalConfigTemplateID string
 }
@@ -192,13 +186,10 @@ var updateGlobalConfigSourceChainConfigHandler = func(b cld_ops.Bundle, deps Can
 		return CantonOpResult[UpdateGlobalConfigSourceChainConfigOutput]{}, fmt.Errorf("failed to find ccip-common package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "update-global-config-source-chain",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
 				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipCommonPkgID, "CCIP.GlobalConfig", "GlobalConfig"),
@@ -233,9 +224,8 @@ var updateGlobalConfigSourceChainConfigHandler = func(b cld_ops.Bundle, deps Can
 	}
 
 	return CantonOpResult[UpdateGlobalConfigSourceChainConfigOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: UpdateGlobalConfigSourceChainConfigOutput{
-			TransactionID:             commandID,
 			NewGlobalConfigContractID: newGlobalConfigContractID,
 			NewGlobalConfigTemplateID: newGlobalConfigTemplateID,
 		},
@@ -255,7 +245,6 @@ type UpdateFeeQuoterPricesInput struct {
 
 // UpdateFeeQuoterPricesOutput contains the transaction ID
 type UpdateFeeQuoterPricesOutput struct {
-	TransactionID          string
 	NewFeeQuoterContractID string
 	NewFeeQuoterTemplateID string
 }
@@ -289,13 +278,10 @@ var updateFeeQuoterPricesHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inp
 		return CantonOpResult[UpdateFeeQuoterPricesOutput]{}, fmt.Errorf("failed to find ccip-feequoter package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "update-fee-quoter-prices",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
 				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipFeeQuoterPkgID, "CCIP.FeeQuoter", "FeeQuoter"),
@@ -330,9 +316,8 @@ var updateFeeQuoterPricesHandler = func(b cld_ops.Bundle, deps CantonOpDeps, inp
 	}
 
 	return CantonOpResult[UpdateFeeQuoterPricesOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: UpdateFeeQuoterPricesOutput{
-			TransactionID:          commandID,
 			NewFeeQuoterContractID: newFeeQuoterContractID,
 			NewFeeQuoterTemplateID: newFeeQuoterTemplateID,
 		},
@@ -349,7 +334,6 @@ type ApplyFeeQuoterFeeTokenUpdatesInput struct {
 
 // ApplyFeeQuoterFeeTokenUpdatesOutput contains the transaction ID
 type ApplyFeeQuoterFeeTokenUpdatesOutput struct {
-	TransactionID          string
 	NewFeeQuoterContractID string
 	NewFeeQuoterTemplateID string
 }
@@ -384,13 +368,10 @@ var applyFeeQuoterFeeTokenUpdatesHandler = func(b cld_ops.Bundle, deps CantonOpD
 		return CantonOpResult[ApplyFeeQuoterFeeTokenUpdatesOutput]{}, fmt.Errorf("failed to find ccip-feequoter package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "apply-fee-quoter-fee-token-updates",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
 				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipFeeQuoterPkgID, "CCIP.FeeQuoter", "FeeQuoter"),
@@ -425,9 +406,8 @@ var applyFeeQuoterFeeTokenUpdatesHandler = func(b cld_ops.Bundle, deps CantonOpD
 	}
 
 	return CantonOpResult[ApplyFeeQuoterFeeTokenUpdatesOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: ApplyFeeQuoterFeeTokenUpdatesOutput{
-			TransactionID:          commandID,
 			NewFeeQuoterContractID: newFeeQuoterContractID,
 			NewFeeQuoterTemplateID: newFeeQuoterTemplateID,
 		},
@@ -443,7 +423,6 @@ type ApplyFeeQuoterDestChainConfigUpdatesInput struct {
 
 // ApplyFeeQuoterDestChainConfigUpdatesOutput contains the transaction ID
 type ApplyFeeQuoterDestChainConfigUpdatesOutput struct {
-	TransactionID          string
 	NewFeeQuoterContractID string
 	NewFeeQuoterTemplateID string
 }
@@ -476,13 +455,10 @@ var applyFeeQuoterDestChainConfigUpdatesHandler = func(b cld_ops.Bundle, deps Ca
 		return CantonOpResult[ApplyFeeQuoterDestChainConfigUpdatesOutput]{}, fmt.Errorf("failed to find ccip-feequoter package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "apply-fee-quoter-dest-chain-config-updates",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{Command: &model.ExerciseCommand{
 				// TODO find a better way rather than this templateID override hack which exposes PackageID to the client
 				TemplateID: fmt.Sprintf("%s:%s:%s", ccipFeeQuoterPkgID, "CCIP.FeeQuoter", "FeeQuoter"),
@@ -517,9 +493,8 @@ var applyFeeQuoterDestChainConfigUpdatesHandler = func(b cld_ops.Bundle, deps Ca
 	}
 
 	return CantonOpResult[ApplyFeeQuoterDestChainConfigUpdatesOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: ApplyFeeQuoterDestChainConfigUpdatesOutput{
-			TransactionID:          commandID,
 			NewFeeQuoterContractID: newFeeQuoterContractID,
 			NewFeeQuoterTemplateID: newFeeQuoterTemplateID,
 		},

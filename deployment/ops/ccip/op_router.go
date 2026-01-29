@@ -37,7 +37,6 @@ type RouterCCIPSendInput struct {
 
 // RouterCCIPSendOutput contains the transaction ID and result
 type RouterCCIPSendOutput struct {
-	TransactionID      string
 	RouterContractID   string
 	CcipMessageSentCID string
 	MessageId          string
@@ -101,13 +100,10 @@ var routerCCIPSendHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Rout
 		return CantonOpResult[RouterCCIPSendOutput]{}, fmt.Errorf("failed to find ccip-perpartyrouter package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "router-ccip-send",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{
 				Command: &model.ExerciseCommand{
 					TemplateID: fmt.Sprintf("%s:%s:%s", ccipPerPartyRouterPkgID, "CCIP.PerPartyRouter", "PerPartyRouter"),
@@ -148,9 +144,8 @@ var routerCCIPSendHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Rout
 	}
 
 	return CantonOpResult[RouterCCIPSendOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: RouterCCIPSendOutput{
-			TransactionID:      commandID,
 			RouterContractID:   routerContractID,
 			CcipMessageSentCID: ccipMessageSentCID,
 			MessageId:          messageId, // May be empty if not extractable from events
@@ -173,7 +168,6 @@ type RouterExecuteInput struct {
 
 // RouterExecuteOutput contains the transaction ID and result
 type RouterExecuteOutput struct {
-	TransactionID        string
 	RouterContractID     string
 	TokenReceiveTicketID *string // Optional
 	MessageId            string
@@ -234,13 +228,10 @@ var routerExecuteHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Route
 		return CantonOpResult[RouterExecuteOutput]{}, fmt.Errorf("failed to find ccip-perpartyrouter package")
 	}
 
-	commandID := uuid.Must(uuid.NewUUID()).String()
 	cmds := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
-			WorkflowID: "router-execute",
-			UserID:     deps.UserID,
-			CommandID:  commandID,
-			ActAs:      []string{deps.Party},
+			CommandID: uuid.Must(uuid.NewUUID()).String(),
+			ActAs:     []string{deps.Party},
 			Commands: []*model.Command{{
 				Command: &model.ExerciseCommand{
 					TemplateID: fmt.Sprintf("%s:%s:%s", ccipPerPartyRouterPkgID, "CCIP.PerPartyRouter", "PerPartyRouter"),
@@ -279,9 +270,8 @@ var routerExecuteHandler = func(b cld_ops.Bundle, deps CantonOpDeps, input Route
 	}
 
 	return CantonOpResult[RouterExecuteOutput]{
-		TransactionID: commandID,
+		UpdateID: submitResp.UpdateID,
 		Output: RouterExecuteOutput{
-			TransactionID:        commandID,
 			RouterContractID:     routerContractID,
 			TokenReceiveTicketID: tokenReceiveTicketID,
 			MessageId:            messageId,                                     // May need to be extracted differently

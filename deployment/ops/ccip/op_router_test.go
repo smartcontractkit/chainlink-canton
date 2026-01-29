@@ -36,7 +36,6 @@ func TestRouterOperations(t *testing.T) {
 	deps := CantonOpDeps{
 		BindingClient: setupResult.BindingClient,
 		Party:         setupResult.Party,
-		UserID:        setupResult.UserID,
 	}
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -172,8 +171,8 @@ func TestRouterOperations(t *testing.T) {
 			},
 		})
 		require.NoError(t, err, "failed to update GlobalConfig dest chain config")
-		require.NotEmpty(t, destChainConfigResult.Output.Output.TransactionID, "Transaction ID should not be empty")
-		t.Logf("Updated GlobalConfig dest chain config, transaction ID: %s", destChainConfigResult.Output.Output.TransactionID)
+		require.NotEmpty(t, destChainConfigResult.Output.UpdateID, "Update ID should not be empty")
+		t.Logf("Updated GlobalConfig dest chain config, update ID: %s", destChainConfigResult.Output.UpdateID)
 
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, destChainConfigResult.Output.Output.NewGlobalConfigContractID, "new GlobalConfig contract ID should not be empty")
@@ -194,8 +193,8 @@ func TestRouterOperations(t *testing.T) {
 			},
 		})
 		require.NoError(t, err, "failed to update GlobalConfig source chain config")
-		require.NotEmpty(t, sourceChainConfigResult.Output.Output.TransactionID, "Transaction ID should not be empty")
-		t.Logf("Updated GlobalConfig source chain config, transaction ID: %s", sourceChainConfigResult.Output.Output.TransactionID)
+		require.NotEmpty(t, sourceChainConfigResult.Output.UpdateID, "Update ID should not be empty")
+		t.Logf("Updated GlobalConfig source chain config, update ID: %s", sourceChainConfigResult.Output.UpdateID)
 
 		// carry forward the new CID returned by the update op
 		require.NotEmpty(t, sourceChainConfigResult.Output.Output.NewGlobalConfigContractID, "new GlobalConfig contract ID should not be empty")
@@ -288,9 +287,9 @@ func TestRouterOperations(t *testing.T) {
 			CcvTickets: ccvTickets,
 		})
 		require.NoError(t, err, "failed to execute RouterCCIPSend")
-		require.NotEmpty(t, result.Output.Output.TransactionID, "Transaction ID should not be empty")
+		require.NotEmpty(t, result.Output.UpdateID, "Update ID should not be empty")
 		require.NotEmpty(t, result.Output.Output.CcipMessageSentCID, "CCIPMessageSent contract ID should not be empty")
-		t.Logf("RouterCCIPSend completed, transaction ID: %s", result.Output.Output.TransactionID)
+		t.Logf("RouterCCIPSend completed, update ID: %s", result.Output.UpdateID)
 		t.Logf("Created CCIPMessageSent contract ID: %s", result.Output.Output.CcipMessageSentCID)
 	})
 
