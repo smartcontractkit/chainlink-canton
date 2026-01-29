@@ -14,15 +14,15 @@ import (
 
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/feequoter"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/offramp"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/onramp"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/perpartyrouter"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/offramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 const (

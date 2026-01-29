@@ -15,9 +15,9 @@ import (
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestDeployAndMintLink(t *testing.T) {

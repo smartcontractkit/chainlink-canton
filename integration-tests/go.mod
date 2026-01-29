@@ -1,8 +1,8 @@
-module github.com/smartcontractkit/chainlink-canton-internal/integration-tests
+module github.com/smartcontractkit/chainlink-canton/integration-tests
 
 go 1.25.6
 
-replace github.com/smartcontractkit/chainlink-canton-internal => ../
+replace github.com/smartcontractkit/chainlink-canton => ../
 
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
@@ -15,7 +15,7 @@ require (
 	github.com/noders-team/go-daml v0.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.91
-	github.com/smartcontractkit/chainlink-canton-internal v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-deployments-framework v0.78.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0

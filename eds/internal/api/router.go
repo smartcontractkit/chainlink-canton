@@ -5,8 +5,8 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/disclosure"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
 )
 
 func NewRouter(disclosureSvc *disclosure.Service, envConfig *config.EnvironmentsConfig) http.Handler {

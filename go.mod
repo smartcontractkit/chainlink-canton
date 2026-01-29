@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/chainlink-canton-internal
+module github.com/smartcontractkit/chainlink-canton
 
 go 1.25.6
 

@@ -6,9 +6,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/disclosure"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/types"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/types"
 )
 
 type Handlers struct {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	cantonclient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
-	ccipops "github.com/smartcontractkit/chainlink-canton-internal/deployment/ops/ccip"
+	cantonclient "github.com/smartcontractkit/chainlink-canton/deployment/client"
+	ccipops "github.com/smartcontractkit/chainlink-canton/deployment/ops/ccip"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"

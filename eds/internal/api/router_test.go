@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/disclosure"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/ledger"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/types"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/ledger"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/types"
 )
 
 type mockQuerier struct {

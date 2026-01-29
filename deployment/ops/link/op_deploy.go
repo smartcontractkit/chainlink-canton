@@ -12,9 +12,9 @@ import (
 
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/coin"
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/coin"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 // CantonOpDeps is an alias for the shared type in the client package

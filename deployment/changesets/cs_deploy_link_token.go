@@ -6,8 +6,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 
-	cantonclient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
-	linkops "github.com/smartcontractkit/chainlink-canton-internal/deployment/ops/link"
+	cantonclient "github.com/smartcontractkit/chainlink-canton/deployment/client"
+	linkops "github.com/smartcontractkit/chainlink-canton/deployment/ops/link"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"

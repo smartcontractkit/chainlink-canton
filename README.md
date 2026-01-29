@@ -1,1 +1,1 @@
-# chainlink-canton-internal
+# Chainlink Canton
