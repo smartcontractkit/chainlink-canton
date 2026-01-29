@@ -4,21 +4,10 @@
 version: 2
 updates:
   - package-ecosystem: "gomod"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - 'dependencies'
-  - package-ecosystem: "gomod"
-    directory: "/eds"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - 'dependencies'
-  - package-ecosystem: "gomod"
-    directory: "/integration-tests"
+    directories:
+      - "/"
+      - "/eds"
+      - "/integration-tests"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
