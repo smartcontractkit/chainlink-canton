@@ -158,7 +158,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, 
 }
 
 // TokenAdminRegistrySetPool exercises the TokenAdminRegistry_SetPool choice on this TokenAdminRegistry contract
-func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args SET) *model.ExerciseCommand {
+func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args TokenAdminRegistrySetPool) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
