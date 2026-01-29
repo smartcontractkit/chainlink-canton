@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestDeployAndMintLink(t *testing.T) {
@@ -51,5 +51,4 @@ func TestDeployAndMintLink(t *testing.T) {
 		Amount:             "100000",
 	})
 	require.NoError(t, err, "failed to mint LINK token")
-
 }

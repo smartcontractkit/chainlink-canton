@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestRouterOperations(t *testing.T) {
@@ -70,6 +70,8 @@ func TestRouterOperations(t *testing.T) {
 	// Get CCIPSend tickets from CCV
 	var ccvTickets []string
 	t.Run("DeployContracts", func(t *testing.T) {
+		t.Parallel()
+
 		// Deploy GlobalConfig
 		commonResult, err := cld_ops.ExecuteOperation(bundle, DeployCCIPCommonOp, deps, DeployCCIPCommonInput{
 			InstanceID:         instanceID,
@@ -265,6 +267,8 @@ func TestRouterOperations(t *testing.T) {
 	// Test Router CCIPSend
 	// --------------------------
 	t.Run("RouterCCIPSend", func(t *testing.T) {
+		t.Parallel()
+
 		// Create test payload
 		testPayload := "48656c6c6f2043434950" // "Hello CCIP" in hex
 

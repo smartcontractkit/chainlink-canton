@@ -19,14 +19,15 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/tokenMetadataV1"
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/transferInstructionV1"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin"
-	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
+
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
@@ -200,6 +201,7 @@ func dialParticipant(t *testing.T, config ParticipantConfig) Participant {
 	authProvider, err := securityprovider.NewSecurityProviderBearerToken(config.JWT)
 	require.NoError(t, err, "Failed to create security provider")
 	scanProxyClient, err := scanProxy.NewClientWithResponses(config.ValidatorAPIURL, scanProxy.WithRequestEditorFn(authProvider.Intercept))
+	require.NoError(t, err, "Failed to create scan proxy client")
 
 	p := Participant{
 		Name: config.Name,

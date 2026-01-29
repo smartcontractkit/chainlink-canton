@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	cantonclient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
-	linkops "github.com/smartcontractkit/chainlink-canton-internal/deployment/ops/link"
+	"github.com/Masterminds/semver/v3"
 
+	cantonclient "github.com/smartcontractkit/chainlink-canton/deployment/client"
+	linkops "github.com/smartcontractkit/chainlink-canton/deployment/ops/link"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -19,6 +22,8 @@ type DeployLinkTokenConfig struct {
 	JWTSecret         string `yaml:"jwtSecret"`         // Optional, defaults to "unsafe"
 	DeployerParty     string `yaml:"deployerParty"`     // Optional, will allocate if not provided
 	DeployerPartyHint string `yaml:"deployerPartyHint"` // Optional hint for party allocation
+
+	InstanceID string `yaml:"instanceId"` // Instance ID for LINK token registry
 }
 
 var _ cldf.ChangeSetV2[DeployLinkTokenConfig] = DeployLinkToken{}
@@ -29,7 +34,10 @@ type DeployLinkToken struct{}
 // Apply implements deployment.ChangeSetV2.
 func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig) (cldf.ChangesetOutput, error) {
 	ctx := context.Background()
-	ab := cldf.NewMemoryAddressBook()
+
+	// Create datastore and populate it with the deployed contract information
+	ds := datastore.NewMemoryDataStore()
+
 	seqReports := make([]cld_ops.Report[any, any], 0)
 
 	// TODO; This will be abstracted to CLD / CLDF
@@ -59,25 +67,22 @@ func (d DeployLinkToken) Apply(e cldf.Environment, config DeployLinkTokenConfig)
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to deploy LinkToken for Canton chain %d: %w", config.ChainSelector, err)
 	}
 
-	// Extract output
-	// deployResult, ok := result.Output.(linkops.CantonOpResult[linkops.DeployLinkTokenOutput])
-	// if !ok {
-	// 	return cldf.ChangesetOutput{}, fmt.Errorf("unexpected output type from DeployLINKOp")
-	// }
-
-	// Save LinkToken registry contract ID to the addressbook
-	// TODO: Define proper type and version constants
-	// typeAndVersionLinkToken := cldf.NewTypeAndVersion("CantonLinkTokenRegistry", "1.0.0")
-	// err = ab.Save(config.ChainSelector, deployResult.Output.RegistryContractID, typeAndVersionLinkToken)
-	// if err != nil {
-	// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken registry contract ID %s for Canton chain %d: %w", deployResult.Output.RegistryContractID, config.ChainSelector, err)
-	// }
-
-	// Add report
+	// Add report to datastore
+	err = ds.AddressRefStore.Add(
+		datastore.AddressRef{
+			ChainSelector: config.ChainSelector,
+			Address:       fmt.Sprintf("%s-linktokenregistry@%s", config.InstanceID, deps.Party),
+			Type:          datastore.ContractType("linktokenregistry"),
+			Version:       semver.MustParse("1.0.0"),
+		},
+	)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save LinkToken registry contract ID: %w", err)
+	}
 
 	return cldf.ChangesetOutput{
-		AddressBook: ab,
-		Reports:     seqReports,
+		DataStore: ds,
+		Reports:   seqReports,
 	}, nil
 }
 
@@ -89,5 +94,6 @@ func (d DeployLinkToken) VerifyPreconditions(e cldf.Environment, config DeployLi
 	if config.AdminAPIURL == "" {
 		return fmt.Errorf("adminApiUrl is required")
 	}
+
 	return nil
 }

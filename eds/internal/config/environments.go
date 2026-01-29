@@ -53,6 +53,7 @@ func (c *EnvironmentsConfig) EnvironmentNames() []string {
 	for name := range c.Environments {
 		names = append(names, name)
 	}
+
 	return names
 }
 

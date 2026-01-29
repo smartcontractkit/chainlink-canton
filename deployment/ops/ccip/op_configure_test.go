@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/feequoter"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/feequoter"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestConfigureCCIPContracts(t *testing.T) {
@@ -59,6 +59,8 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	var feeQuoterContractID string
 
 	t.Run("DeployContracts", func(t *testing.T) {
+		t.Parallel()
+
 		// Deploy GlobalConfig
 		commonResult, err := cld_ops.ExecuteOperation(bundle, DeployCCIPCommonOp, deps, DeployCCIPCommonInput{
 			InstanceID:         instanceID,
@@ -85,6 +87,8 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	// --------------------------
 
 	t.Run("UpdateGlobalConfigDestChainConfig", func(t *testing.T) {
+		t.Parallel()
+
 		destChainConfig := common.DestChainConfig{
 			IsEnabled:        types.BOOL(true),
 			DefaultExecutor:  types.TEXT("executor-party"),
@@ -112,6 +116,8 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	})
 
 	t.Run("UpdateGlobalConfigSourceChainConfig", func(t *testing.T) {
+		t.Parallel()
+
 		sourceChainConfig := common.SourceChainConfig{
 			IsEnabled:        types.BOOL(true),
 			OnRampAddress:    types.TEXT(onRampAddress),
@@ -137,6 +143,8 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	// --------------------------
 
 	t.Run("UpdateFeeQuoterPrices", func(t *testing.T) {
+		t.Parallel()
+
 		// Create test instrument ID
 		instrumentId := feequoter.InstrumentId{
 			Admin: types.PARTY(deps.Party),
@@ -185,6 +193,8 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	})
 
 	t.Run("ApplyFeeQuoterFeeTokenUpdates", func(t *testing.T) {
+		t.Parallel()
+
 		// Create test instrument IDs
 		instrumentId1 := feequoter.InstrumentId{
 			Admin: types.PARTY(deps.Party),
@@ -227,6 +237,8 @@ func TestConfigureCCIPContracts(t *testing.T) {
 	})
 
 	t.Run("ApplyFeeQuoterDestChainConfigUpdates", func(t *testing.T) {
+		t.Parallel()
+
 		// Scale dest chain selector to NUMERIC(10) mantissa
 		scale10 := new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil)
 		destChainSelector, _ := new(big.Int).SetString(evmChainSelector, 10)

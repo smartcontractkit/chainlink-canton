@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/disclosure"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/ledger"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/types"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/ledger"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/types"
 )
 
 type mockQuerier struct {
@@ -79,13 +79,16 @@ func setupTestRouter() http.Handler {
 	}
 
 	svc := disclosure.NewService(mockQ, envConfig)
+
 	return NewRouter(svc, envConfig)
 }
 
 func TestRouter_HealthEndpoint(t *testing.T) {
+	t.Parallel()
+
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/api/v1/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -99,9 +102,11 @@ func TestRouter_HealthEndpoint(t *testing.T) {
 }
 
 func TestRouter_EnvironmentsEndpoint(t *testing.T) {
+	t.Parallel()
+
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/api/v1/ccip/environments", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/environments", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -115,9 +120,11 @@ func TestRouter_EnvironmentsEndpoint(t *testing.T) {
 }
 
 func TestRouter_CCIPSendDisclosuresEndpoint(t *testing.T) {
+	t.Parallel()
+
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/api/v1/ccip/mainnet-v1/disclosures/send", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/mainnet-v1/disclosures/send", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -131,9 +138,11 @@ func TestRouter_CCIPSendDisclosuresEndpoint(t *testing.T) {
 }
 
 func TestRouter_CCIPExecuteDisclosuresEndpoint(t *testing.T) {
+	t.Parallel()
+
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/api/v1/ccip/mainnet-v1/disclosures/execute", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/mainnet-v1/disclosures/execute", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -147,9 +156,11 @@ func TestRouter_CCIPExecuteDisclosuresEndpoint(t *testing.T) {
 }
 
 func TestRouter_CORSHeaders(t *testing.T) {
+	t.Parallel()
+
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/api/v1/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
@@ -161,9 +172,11 @@ func TestRouter_CORSHeaders(t *testing.T) {
 // options preflight handling is typically done by a reverse proxy in production
 
 func TestRouter_NotFound(t *testing.T) {
+	t.Parallel()
+
 	router := setupTestRouter()
 
-	req := httptest.NewRequest("GET", "/api/v1/nonexistent", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/nonexistent", nil)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)

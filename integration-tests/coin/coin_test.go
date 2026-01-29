@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -9,9 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 func TestCoin(t *testing.T) {
@@ -484,13 +485,17 @@ func TestCoin(t *testing.T) {
 	require.NoError(t, err)
 	defer updateStream.CloseSend()
 	erinHoldingCid := ""
+	var erinHoldingErr error
 	go func() {
 		for {
 			update, err := updateStream.Recv()
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return
 			}
-			require.NoError(t, err)
+			if err != nil {
+				erinHoldingErr = err
+				return
+			}
 			fmt.Printf("Received update on Participant 5: %v\n", update.GetTransaction())
 			for _, event := range update.GetTransaction().GetEvents() {
 				if c, ok := event.GetEvent().(*apiv2.Event_Created); ok {
@@ -578,6 +583,7 @@ func TestCoin(t *testing.T) {
 
 	// Wait for a couple of seconds, to receive the update on participant 5
 	time.Sleep(time.Second * 3)
+	require.NoError(t, erinHoldingErr)
 	fmt.Printf("Received CoinHolding creation update on Participant 5, CID: %v\n", erinHoldingCid)
 	require.NotEmpty(t, erinHoldingCid)
 }

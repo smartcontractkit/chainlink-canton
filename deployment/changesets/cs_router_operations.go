@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	cantonclient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
-	ccipops "github.com/smartcontractkit/chainlink-canton-internal/deployment/ops/ccip"
+	cantonclient "github.com/smartcontractkit/chainlink-canton/deployment/client"
+	ccipops "github.com/smartcontractkit/chainlink-canton/deployment/ops/ccip"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -113,13 +113,6 @@ func (r RouterOperations) Apply(e cldf.Environment, config RouterOperationsConfi
 			Input:  any(result.Input),
 			Output: any(result.Output),
 		})
-
-		// Save CCIPMessageSent contract ID to address book if needed
-		// typeAndVersionCCIPMessageSent := cldf.NewTypeAndVersion("CantonCCIPMessageSent", "1.0.0")
-		// err = ab.Save(config.ChainSelector, result.Output.Output.CcipMessageSentCID, typeAndVersionCCIPMessageSent)
-		// if err != nil {
-		// 	return cldf.ChangesetOutput{}, fmt.Errorf("failed to save CCIPMessageSent contract ID: %w", err)
-		// }
 	}
 
 	// --------------------------

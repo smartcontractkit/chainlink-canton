@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/tokenMetadataV1"
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/transferInstructionV1"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
@@ -66,6 +66,7 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 			}}},
 		})
 	}
+
 	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{
 			Label: "values",
@@ -82,6 +83,7 @@ func GetRegistryAdmin(ctx context.Context, metadataClient tokenMetadataV1.Client
 	if registryInfoResponse.StatusCode() != http.StatusOK {
 		return "", fmt.Errorf("unexpected status code: %d: %v", registryInfoResponse.StatusCode(), registryInfoResponse.Body)
 	}
+
 	return registryInfoResponse.JSON200.AdminId, nil
 }
 
@@ -225,5 +227,6 @@ func MintAMT(
 			tokenHoldingCid = e.Created.ContractId
 		}
 	}
+
 	return tokenHoldingCid, nil
 }

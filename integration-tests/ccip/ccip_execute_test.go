@@ -23,9 +23,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 // MessageV1 matches the Daml CCIP.MessageCodecV1.MessageV1 structure.
@@ -61,37 +61,37 @@ func EncodeMessageV1(msg *MessageV1) ([]byte, error) {
 	var buf bytes.Buffer
 
 	buf.WriteByte(0x01) // Version
-	binary.Write(&buf, binary.BigEndian, msg.SourceChainSelector)
-	binary.Write(&buf, binary.BigEndian, msg.DestChainSelector)
-	binary.Write(&buf, binary.BigEndian, msg.SequenceNumber)
-	binary.Write(&buf, binary.BigEndian, msg.ExecutionGasLimit)
-	binary.Write(&buf, binary.BigEndian, msg.CCIPReceiveGasLimit)
-	binary.Write(&buf, binary.BigEndian, msg.Finality)
+	_ = binary.Write(&buf, binary.BigEndian, msg.SourceChainSelector)
+	_ = binary.Write(&buf, binary.BigEndian, msg.DestChainSelector)
+	_ = binary.Write(&buf, binary.BigEndian, msg.SequenceNumber)
+	_ = binary.Write(&buf, binary.BigEndian, msg.ExecutionGasLimit)
+	_ = binary.Write(&buf, binary.BigEndian, msg.CCIPReceiveGasLimit)
+	_ = binary.Write(&buf, binary.BigEndian, msg.Finality)
 	buf.Write(msg.CCVAndExecutorHash[:])
 
 	// Length-prefixed fields (1-byte length)
-	buf.WriteByte(uint8(len(msg.OnRampAddress)))
+	buf.WriteByte(uint8(len(msg.OnRampAddress))) //nolint:gosec
 	buf.Write(msg.OnRampAddress)
-	buf.WriteByte(uint8(len(msg.OffRampAddress)))
+	buf.WriteByte(uint8(len(msg.OffRampAddress))) //nolint:gosec
 	buf.Write(msg.OffRampAddress)
-	buf.WriteByte(uint8(len(msg.Sender)))
+	buf.WriteByte(uint8(len(msg.Sender))) //nolint:gosec
 	buf.Write(msg.Sender)
-	buf.WriteByte(uint8(len(msg.Receiver)))
+	buf.WriteByte(uint8(len(msg.Receiver))) //nolint:gosec
 	buf.Write(msg.Receiver)
 
 	// 2-byte length prefixed fields
-	binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob)))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.DestBlob))) //nolint:gosec
 	buf.Write(msg.DestBlob)
 
 	if msg.TokenTransfer != nil {
 		tokenBytes := encodeTokenTransferV1(msg.TokenTransfer)
-		binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes)))
+		_ = binary.Write(&buf, binary.BigEndian, uint16(len(tokenBytes))) //nolint:gosec
 		buf.Write(tokenBytes)
 	} else {
-		binary.Write(&buf, binary.BigEndian, uint16(0))
+		_ = binary.Write(&buf, binary.BigEndian, uint16(0))
 	}
 
-	binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData)))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(msg.MessageData))) //nolint:gosec
 	buf.Write(msg.MessageData)
 
 	return buf.Bytes(), nil
@@ -108,16 +108,16 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 	}
 	buf.Write(amountBytes)
 
-	buf.WriteByte(uint8(len(tt.SourcePoolAddress)))
+	buf.WriteByte(uint8(len(tt.SourcePoolAddress))) //nolint:gosec
 	buf.Write(tt.SourcePoolAddress)
-	buf.WriteByte(uint8(len(tt.SourceTokenAddress)))
+	buf.WriteByte(uint8(len(tt.SourceTokenAddress))) //nolint:gosec
 	buf.Write(tt.SourceTokenAddress)
-	buf.WriteByte(uint8(len(tt.DestTokenAddress)))
+	buf.WriteByte(uint8(len(tt.DestTokenAddress))) //nolint:gosec
 	buf.Write(tt.DestTokenAddress)
-	buf.WriteByte(uint8(len(tt.TokenReceiver)))
+	buf.WriteByte(uint8(len(tt.TokenReceiver))) //nolint:gosec
 	buf.Write(tt.TokenReceiver)
 
-	binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData)))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(len(tt.ExtraData))) //nolint:gosec
 	buf.Write(tt.ExtraData)
 
 	return buf.Bytes()
@@ -142,7 +142,7 @@ func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.Private
 
 	var result bytes.Buffer
 	result.Write(versionTag)
-	binary.Write(&result, binary.BigEndian, uint16(len(signatures)))
+	_ = binary.Write(&result, binary.BigEndian, uint16(len(signatures))) //nolint:gosec
 	result.Write(signatures)
 
 	return result.Bytes(), nil
@@ -177,6 +177,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
+	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
@@ -185,9 +186,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Parties: CCIP=%s, Receiver=%s", partyCCIP, partyReceiver)
 
 	// Generate signer keys for CommitteeVerifier (3 signers, threshold 2)
-	var ccvSignerKeys []*ecdsa.PrivateKey
-	var ccvSignerPubKeys []*apiv2.Value
-	for i := 0; i < 3; i++ {
+	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
+	ccvSignerPubKeys := make([]*apiv2.Value, 0, 3)
+	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
@@ -219,7 +220,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Deploy CommitteeVerifier
 	versionTag := "49ff34ed"
 	ccvId := versionTag + "@" + partyCCIP
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -534,9 +535,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "ExecutionStateChanged" {
 				// ExecutionStateChanged has: ccipOwner, receiver, event
-				// event is ExecutionStateChangedEvent with: sourceChainSelector, sequenceNumber, messageId, state, returnData
+				// is ExecutionStateChangedEvent with: sourceChainSelector, sequenceNumber, messageId, state, returnData
 				eventRecord := e.Created.GetCreateArguments().GetFields()[2].GetValue().GetRecord()
 				returnedMessageId = eventRecord.GetFields()[2].GetValue().GetText()
+
 				break
 			}
 		}

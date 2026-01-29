@@ -12,7 +12,7 @@ import (
 	"github.com/noders-team/go-daml/pkg/types"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 )
 
 // ============================================================================
@@ -114,6 +114,7 @@ var committeeVerifierForwardToVerifierHandler = func(b cld_ops.Bundle, deps Cant
 		if normalized == "CCIP.Tickets:CCVTicket" {
 			ccvTicketContractID = ev.Created.ContractID
 			ccvTicketTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}
@@ -217,6 +218,7 @@ var committeeVerifierVerifyMessageHandler = func(b cld_ops.Bundle, deps CantonOp
 		if normalized == "CCIP.Tickets:CCVVerifyTicket" {
 			ccvVerifyTicketContractID = ev.Created.ContractID
 			ccvVerifyTicketTemplateID = ev.Created.TemplateID
+
 			break
 		}
 	}

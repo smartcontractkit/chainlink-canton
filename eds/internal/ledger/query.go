@@ -2,10 +2,11 @@ package ledger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 type ActiveContract struct {
@@ -51,7 +52,7 @@ func (c *Client) GetAllContractsForParty(ctx context.Context, party string) ([]*
 	var contracts []*ActiveContract
 	for {
 		resp, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

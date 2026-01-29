@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 type Client struct {
@@ -38,6 +38,7 @@ func (c *Client) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
 	}
+
 	return nil
 }
 
@@ -48,6 +49,7 @@ func (c *Client) AuthContext(ctx context.Context) (context.Context, error) {
 	}
 
 	md := metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", token))
+
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
 
@@ -58,6 +60,7 @@ func (c *Client) generateJWT() (string, error) {
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 24)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	})
+
 	return t.SignedString([]byte(c.jwtSecret))
 }
 
@@ -66,6 +69,7 @@ func (c *Client) GetCurrentOffset(ctx context.Context) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ledger end: %w", err)
 	}
+
 	return resp.GetOffset(), nil
 }
 

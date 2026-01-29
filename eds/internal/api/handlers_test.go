@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/disclosure"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/ledger"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/types"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/ledger"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/types"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 // MockContractQuerier for testing
@@ -29,6 +29,7 @@ func (m *MockContractQuerier) GetAllContractsForParty(ctx context.Context, party
 	if m.Error != nil {
 		return nil, m.Error
 	}
+
 	return m.Contracts, nil
 }
 
@@ -55,6 +56,7 @@ func createMockContract(moduleName, entityName, environmentID, contractID string
 	}
 }
 
+//nolint:unparam // This is temporary
 func setupTestHandlers() (*Handlers, *config.EnvironmentsConfig, *MockContractQuerier) {
 	envConfig := &config.EnvironmentsConfig{
 		Environments: map[string]config.EnvironmentConfig{
@@ -100,10 +102,14 @@ func setupTestHandlers() (*Handlers, *config.EnvironmentsConfig, *MockContractQu
 }
 
 func TestHandlers_GetCCIPSendDisclosures(t *testing.T) {
+	t.Parallel()
+
 	handlers, _, _ := setupTestHandlers()
 
 	t.Run("returns disclosures for valid environment", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/ccip/mainnet-v1/disclosures/send", nil)
+		t.Parallel()
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/mainnet-v1/disclosures/send", nil)
 		req = mux.SetURLVars(req, map[string]string{"environmentId": "mainnet-v1"})
 		w := httptest.NewRecorder()
 
@@ -123,7 +129,9 @@ func TestHandlers_GetCCIPSendDisclosures(t *testing.T) {
 	})
 
 	t.Run("returns 404 for unknown environment", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/ccip/unknown/disclosures/send", nil)
+		t.Parallel()
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/unknown/disclosures/send", nil)
 		req = mux.SetURLVars(req, map[string]string{"environmentId": "unknown"})
 		w := httptest.NewRecorder()
 
@@ -139,10 +147,14 @@ func TestHandlers_GetCCIPSendDisclosures(t *testing.T) {
 }
 
 func TestHandlers_GetCCIPExecuteDisclosures(t *testing.T) {
+	t.Parallel()
+
 	handlers, _, _ := setupTestHandlers()
 
 	t.Run("returns disclosures for valid environment", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/ccip/mainnet-v1/disclosures/execute", nil)
+		t.Parallel()
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/mainnet-v1/disclosures/execute", nil)
 		req = mux.SetURLVars(req, map[string]string{"environmentId": "mainnet-v1"})
 		w := httptest.NewRecorder()
 
@@ -162,9 +174,11 @@ func TestHandlers_GetCCIPExecuteDisclosures(t *testing.T) {
 }
 
 func TestHandlers_ListEnvironments(t *testing.T) {
+	t.Parallel()
+
 	handlers, _, _ := setupTestHandlers()
 
-	req := httptest.NewRequest("GET", "/api/v1/ccip/environments", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ccip/environments", nil)
 	w := httptest.NewRecorder()
 
 	handlers.ListEnvironments(w, req)
@@ -195,9 +209,11 @@ func TestHandlers_ListEnvironments(t *testing.T) {
 }
 
 func TestHandlers_Health(t *testing.T) {
+	t.Parallel()
+
 	handlers, _, _ := setupTestHandlers()
 
-	req := httptest.NewRequest("GET", "/api/v1/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	w := httptest.NewRecorder()
 
 	handlers.Health(w, req)
@@ -216,6 +232,8 @@ func TestHandlers_Health(t *testing.T) {
 }
 
 func TestWriteJSON(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 
 	data := map[string]string{"key": "value"}
@@ -231,6 +249,8 @@ func TestWriteJSON(t *testing.T) {
 }
 
 func TestWriteError(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 
 	WriteError(w, http.StatusBadRequest, "BAD_REQUEST", "Something went wrong")

@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 // ===========================================================================
@@ -608,7 +608,7 @@ func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, own
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -658,7 +658,6 @@ func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, own
 
 func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner string, mcmsCid string,
 	root string, validUntil time.Time, metadata *MCMSRootMetadata, metadataProof []string, signatures []RawSignature) (string, error) {
-
 	validUntilMicros := validUntil.UnixMicro()
 
 	signatureValues := make([]*apiv2.Value, len(signatures))
@@ -734,9 +733,10 @@ func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner
 
 func makeInt64List(count int, value int64) []*apiv2.Value {
 	result := make([]*apiv2.Value, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		result[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: value}}
 	}
+
 	return result
 }
 
@@ -827,7 +827,7 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 			require.NoError(t, err, "failed to decode")
 
 			// Verify roundtrip
-			require.Equal(t, len(tc.params.Signers), len(decoded.Signers), "signer count mismatch")
+			require.Len(t, decoded.Signers, len(tc.params.Signers), "signer count mismatch")
 			for i, signer := range tc.params.Signers {
 				require.Equal(t, signer.SignerAddress, decoded.Signers[i].SignerAddress,
 					"signer %d address mismatch", i)
@@ -928,5 +928,6 @@ func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
+
 	return s[:maxLen] + "..."
 }

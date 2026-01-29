@@ -2,14 +2,15 @@ package testhelpers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin"
-	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30"
 )
 
 type Participant struct {
@@ -42,6 +43,7 @@ func GetCurrentOffset(ctx context.Context, participant Participant) (int64, erro
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ledger end: %w", err)
 	}
+
 	return ledgerEndResp.GetOffset(), nil
 }
 
@@ -75,7 +77,7 @@ func GetDisclosedContractById(ctx context.Context, participant Participant, cont
 	defer activeContractsResponse.CloseSend()
 	for {
 		activeContract, err := activeContractsResponse.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -92,6 +94,7 @@ func GetDisclosedContractById(ctx context.Context, participant Participant, cont
 			}
 		}
 	}
+
 	return nil, fmt.Errorf("failed to find active contract with id %s", contractId)
 }
 
@@ -105,6 +108,7 @@ func GetDisclosedContractByTemplateId(ctx context.Context, participant Participa
 	}
 
 	contract := activeContracts[len(activeContracts)-1]
+
 	return &apiv2.DisclosedContract{
 		TemplateId:       contract.GetCreatedEvent().GetTemplateId(),
 		ContractId:       contract.GetCreatedEvent().GetContractId(),
@@ -143,7 +147,7 @@ func ListActiveContractsByTemplateId(ctx context.Context, participant Participan
 	defer activeContractsResponse.CloseSend()
 	for {
 		activeContract, err := activeContractsResponse.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -156,6 +160,7 @@ func ListActiveContractsByTemplateId(ctx context.Context, participant Participan
 	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
 		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
 	})
+
 	return activeContracts, nil
 }
 
@@ -190,7 +195,7 @@ func ListActiveContractsByInterfaceId(ctx context.Context, participant Participa
 	defer activeContractsResponse.CloseSend()
 	for {
 		activeContract, err := activeContractsResponse.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -203,5 +208,6 @@ func ListActiveContractsByInterfaceId(ctx context.Context, participant Participa
 	slices.SortFunc(activeContracts, func(a, b *apiv2.ActiveContract) int {
 		return a.GetCreatedEvent().GetCreatedAt().AsTime().Compare(b.GetCreatedEvent().GetCreatedAt().AsTime())
 	})
+
 	return activeContracts, nil
 }

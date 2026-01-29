@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton-internal/eds/internal/ledger"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/ledger"
 )
 
 // MockContractQuerier implements ContractQuerier for testing
@@ -23,6 +23,7 @@ func (m *MockContractQuerier) GetAllContractsForParty(ctx context.Context, party
 	if m.Error != nil {
 		return nil, m.Error
 	}
+
 	return m.Contracts, nil
 }
 
@@ -52,6 +53,8 @@ func createMockContract(moduleName, entityName, environmentID, contractID string
 }
 
 func TestService_GetCCIPSendDisclosures(t *testing.T) {
+	t.Parallel()
+
 	envConfig := &config.EnvironmentsConfig{
 		Environments: map[string]config.EnvironmentConfig{
 			"mainnet-v1": {
@@ -67,6 +70,8 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 	}
 
 	t.Run("returns disclosures when all contracts found", func(t *testing.T) {
+		t.Parallel()
+
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
 				createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-id-123", []byte("router-blob")),
@@ -90,15 +95,19 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 	})
 
 	t.Run("returns error for unknown environment", func(t *testing.T) {
+		t.Parallel()
+
 		mockQuerier := &MockContractQuerier{}
 		svc := NewService(mockQuerier, envConfig)
 
 		_, err := svc.GetCCIPSendDisclosures(context.Background(), "unknown-env")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unknown environment")
 	})
 
 	t.Run("returns error when router not found", func(t *testing.T) {
+		t.Parallel()
+
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
 				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-id", []byte("onramp-blob")),
@@ -108,15 +117,17 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 
 		svc := NewService(mockQuerier, envConfig)
 		_, err := svc.GetCCIPSendDisclosures(context.Background(), "mainnet-v1")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "router not found")
 	})
 
 	t.Run("filters by instanceId correctly", func(t *testing.T) {
+		t.Parallel()
+
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
-				createMockContract("CCIP.Router", "Router", "testnet-router", "router-testnet", []byte("blob")),         // Wrong env
-				createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-mainnet", []byte("blob")),      // Correct env
+				createMockContract("CCIP.Router", "Router", "testnet-router", "router-testnet", []byte("blob")),    // Wrong env
+				createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-mainnet", []byte("blob")), // Correct env
 				createMockContract("CCIP.OnRamp", "OnRamp", "mainnet-v1-onramp", "onramp-mainnet", []byte("blob")),
 				createMockContract("CCIP.FeeQuoter", "FeeQuoter", "mainnet-v1-feequoter", "feequoter-mainnet", []byte("blob")),
 			},
@@ -130,6 +141,8 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 	})
 
 	t.Run("ignores package ID for upgrade resilience", func(t *testing.T) {
+		t.Parallel()
+
 		contract := createMockContract("CCIP.Router", "Router", "mainnet-v1-router", "router-id", []byte("blob"))
 		contract.CreatedEvent.TemplateId.PackageId = "different-package-id-after-upgrade"
 
@@ -151,6 +164,8 @@ func TestService_GetCCIPSendDisclosures(t *testing.T) {
 }
 
 func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
+	t.Parallel()
+
 	envConfig := &config.EnvironmentsConfig{
 		Environments: map[string]config.EnvironmentConfig{
 			"mainnet-v1": {
@@ -166,6 +181,8 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 	}
 
 	t.Run("returns disclosures when all contracts found", func(t *testing.T) {
+		t.Parallel()
+
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
 				createMockContract("CCIP.OffRamp", "OffRamp", "mainnet-v1-offramp", "offramp-id", []byte("offramp-blob")),
@@ -189,6 +206,8 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 	})
 
 	t.Run("returns error when offRamp not found", func(t *testing.T) {
+		t.Parallel()
+
 		mockQuerier := &MockContractQuerier{
 			Contracts: []*ledger.ActiveContract{
 				createMockContract("CCIP.CommitteeVerifier", "CommitteeVerifier", "mainnet-v1-ccv", "ccv-id", []byte("ccv-blob")),
@@ -198,13 +217,17 @@ func TestService_GetCCIPExecuteDisclosures(t *testing.T) {
 
 		svc := NewService(mockQuerier, envConfig)
 		_, err := svc.GetCCIPExecuteDisclosures(context.Background(), "mainnet-v1")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "offRamp not found")
 	})
 }
 
 func TestExtractInstanceID(t *testing.T) {
+	t.Parallel()
+
 	t.Run("extracts instanceId from record", func(t *testing.T) {
+		t.Parallel()
+
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -223,6 +246,8 @@ func TestExtractInstanceID(t *testing.T) {
 	})
 
 	t.Run("returns empty string when instanceId not found", func(t *testing.T) {
+		t.Parallel()
+
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -233,15 +258,19 @@ func TestExtractInstanceID(t *testing.T) {
 		}
 
 		envID := ExtractInstanceID(record)
-		assert.Equal(t, "", envID)
+		assert.Empty(t, envID)
 	})
 
 	t.Run("returns empty string for nil record", func(t *testing.T) {
+		t.Parallel()
+
 		envID := ExtractInstanceID(nil)
-		assert.Equal(t, "", envID)
+		assert.Empty(t, envID)
 	})
 
 	t.Run("returns empty string when instanceId is not text", func(t *testing.T) {
+		t.Parallel()
+
 		record := &apiv2.Record{
 			Fields: []*apiv2.RecordField{
 				{
@@ -252,11 +281,13 @@ func TestExtractInstanceID(t *testing.T) {
 		}
 
 		envID := ExtractInstanceID(record)
-		assert.Equal(t, "", envID)
+		assert.Empty(t, envID)
 	})
 }
 
 func TestContractTypeToModule(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		contractType ContractType
 		moduleName   string
@@ -273,6 +304,8 @@ func TestContractTypeToModule(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(string(tc.contractType), func(t *testing.T) {
+			t.Parallel()
+
 			info, ok := ContractTypeToModule[tc.contractType]
 			assert.True(t, ok)
 			assert.Equal(t, tc.moduleName, info.ModuleName)

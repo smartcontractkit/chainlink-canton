@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
@@ -56,6 +56,8 @@ func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 	var ccvRegistryContractID string
 
 	t.Run("DeployContracts", func(t *testing.T) {
+		t.Parallel()
+
 		// Deploy CommitteeVerifier
 		committeeVerifierResult, err := cld_ops.ExecuteOperation(bundle, DeployCommitteeVerifierOp, deps, DeployCommitteeVerifierInput{
 			InstanceID:          instanceID,
@@ -86,6 +88,8 @@ func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 	// Test CommitteeVerifier ForwardToVerifier
 	// --------------------------
 	t.Run("ForwardToVerifier", func(t *testing.T) {
+		t.Parallel()
+
 		// Scale chain selectors to NUMERIC(10) mantissa
 		scale10 := new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil)
 		sourceChainSelector := new(big.Int).SetInt64(1111111111)
@@ -144,6 +148,8 @@ func TestCommitteeVerifierForwardToVerifier(t *testing.T) {
 	// Test CommitteeVerifier VerifyMessage
 	// --------------------------
 	t.Run("VerifyMessage", func(t *testing.T) {
+		t.Parallel()
+
 		// Scale chain selectors to NUMERIC(10) mantissa
 		scale10 := new(big.Int).Exp(big.NewInt(10), big.NewInt(10), nil)
 		sourceChainSelector := new(big.Int).SetInt64(1111111111)

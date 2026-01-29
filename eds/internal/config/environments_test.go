@@ -10,7 +10,11 @@ import (
 )
 
 func TestLoadEnvironments(t *testing.T) {
+	t.Parallel()
+
 	t.Run("loads valid environments config", func(t *testing.T) {
+		t.Parallel()
+
 		// Create temp file
 		content := `
 environments:
@@ -39,7 +43,7 @@ environments:
 `
 		tmpDir := t.TempDir()
 		tmpFile := filepath.Join(tmpDir, "environments.yaml")
-		err := os.WriteFile(tmpFile, []byte(content), 0644)
+		err := os.WriteFile(tmpFile, []byte(content), 0600)
 		require.NoError(t, err)
 
 		config, err := LoadEnvironments(tmpFile)
@@ -60,35 +64,43 @@ environments:
 	})
 
 	t.Run("returns error for non-existent file", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := LoadEnvironments("/non/existent/path.yaml")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read")
 	})
 
 	t.Run("returns error for invalid YAML", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		tmpFile := filepath.Join(tmpDir, "invalid.yaml")
-		err := os.WriteFile(tmpFile, []byte("not: valid: yaml: content:"), 0644)
+		err := os.WriteFile(tmpFile, []byte("not: valid: yaml: content:"), 0600)
 		require.NoError(t, err)
 
 		_, err = LoadEnvironments(tmpFile)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse")
 	})
 
 	t.Run("returns error for empty environments", func(t *testing.T) {
+		t.Parallel()
+
 		tmpDir := t.TempDir()
 		tmpFile := filepath.Join(tmpDir, "empty.yaml")
-		err := os.WriteFile(tmpFile, []byte("environments: {}"), 0644)
+		err := os.WriteFile(tmpFile, []byte("environments: {}"), 0600)
 		require.NoError(t, err)
 
 		_, err = LoadEnvironments(tmpFile)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no environments defined")
 	})
 }
 
 func TestEnvironmentsConfig_EnvironmentNames(t *testing.T) {
+	t.Parallel()
+
 	config := &EnvironmentsConfig{
 		Environments: map[string]EnvironmentConfig{
 			"mainnet": {},
@@ -105,6 +117,8 @@ func TestEnvironmentsConfig_EnvironmentNames(t *testing.T) {
 }
 
 func TestEnvironmentsConfig_GetEnvironment(t *testing.T) {
+	t.Parallel()
+
 	config := &EnvironmentsConfig{
 		Environments: map[string]EnvironmentConfig{
 			"mainnet": {
@@ -115,6 +129,8 @@ func TestEnvironmentsConfig_GetEnvironment(t *testing.T) {
 	}
 
 	t.Run("returns environment when exists", func(t *testing.T) {
+		t.Parallel()
+
 		env, ok := config.GetEnvironment("mainnet")
 		assert.True(t, ok)
 		assert.Equal(t, "party-123", env.Party)
@@ -122,6 +138,8 @@ func TestEnvironmentsConfig_GetEnvironment(t *testing.T) {
 	})
 
 	t.Run("returns false when environment does not exist", func(t *testing.T) {
+		t.Parallel()
+
 		_, ok := config.GetEnvironment("nonexistent")
 		assert.False(t, ok)
 	})
