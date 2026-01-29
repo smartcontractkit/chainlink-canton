@@ -7,10 +7,10 @@ import (
 	"io"
 	"slices"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2/admin"
-	participantv30 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/digitalasset/canton/admin/participant/v30"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30"
 )
 
 type Participant struct {

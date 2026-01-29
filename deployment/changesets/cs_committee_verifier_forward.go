@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"math/big"
 
-	cantonclient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
-	ccipops "github.com/smartcontractkit/chainlink-canton-internal/deployment/ops/ccip"
+	cantonclient "github.com/smartcontractkit/chainlink-canton/deployment/client"
+	ccipops "github.com/smartcontractkit/chainlink-canton/deployment/ops/ccip"
 
 	"github.com/noders-team/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"

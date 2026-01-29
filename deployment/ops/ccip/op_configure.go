@@ -13,8 +13,8 @@ import (
 
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/feequoter"
 )
 
 // ============================================================================

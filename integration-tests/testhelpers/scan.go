@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
-	apiv2 "github.com/smartcontractkit/chainlink-canton-internal/pb/gen/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
 )
 
 func TemplateIdFromString(s string) (*apiv2.Identifier, error) {

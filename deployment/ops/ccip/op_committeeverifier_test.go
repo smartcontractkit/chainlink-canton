@@ -12,8 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/ccip/ccvs"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestCommitteeVerifierForwardToVerifier(t *testing.T) {

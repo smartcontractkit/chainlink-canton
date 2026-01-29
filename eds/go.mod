@@ -1,11 +1,11 @@
-module github.com/smartcontractkit/chainlink-canton-internal/eds
+module github.com/smartcontractkit/chainlink-canton/eds
 
 go 1.25.6
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/mux v1.8.1
-	github.com/smartcontractkit/chainlink-canton-internal v0.0.0
+	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -21,4 +21,4 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/smartcontractkit/chainlink-canton-internal => ..
+replace github.com/smartcontractkit/chainlink-canton => ..
