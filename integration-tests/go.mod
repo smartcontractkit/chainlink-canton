@@ -12,7 +12,7 @@ require (
 	github.com/deepmap/oapi-codegen v1.6.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
-	github.com/noders-team/go-daml v0.3.0
+	github.com/noders-team/go-daml v0.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.91
 	github.com/smartcontractkit/chainlink-canton-internal v0.0.0-00010101000000-000000000000
