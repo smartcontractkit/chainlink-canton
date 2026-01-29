@@ -14,6 +14,8 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
@@ -450,31 +452,26 @@ func testExecuteOpFlow(
 			// Check for Counter contract
 			if entityName == "Counter" {
 				newCounterCid = created.GetContractId()
-				for _, field := range created.GetCreateArguments().GetFields() {
-					if field.GetLabel() == "value" {
-						counterValue = field.GetValue().GetInt64()
-						break
-					}
+				counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](created)
+				if err != nil {
+					t.Logf("Failed to unmarshal Counter: %v", err)
+				} else {
+					counterValue = int64(counter.Value)
 				}
 			}
 
 			// Check for MCMSEntrypointEvent (emitted by Counter.mcmsEntrypoint)
 			if entityName == "MCMSEntrypointEvent" {
 				eventFound = true
-				for _, field := range created.GetCreateArguments().GetFields() {
-					switch field.GetLabel() {
-					case "instanceId":
-						eventInstanceId = field.GetValue().GetText()
-					case "functionName":
-						eventFunctionName = field.GetValue().GetText()
-					case "operationData":
-						eventOperationData = field.GetValue().GetText()
-					case "contractIdsAsText":
-						if listValue := field.GetValue().GetList(); listValue != nil {
-							for _, elem := range listValue.GetElements() {
-								eventContractIdsAsText = append(eventContractIdsAsText, elem.GetText())
-							}
-						}
+				event, err := bindings.UnmarshalCreatedEvent[mcms.MCMSEntrypointEvent](created)
+				if err != nil {
+					t.Logf("Failed to unmarshal MCMSEntrypointEvent: %v", err)
+				} else {
+					eventInstanceId = string(event.InstanceId)
+					eventFunctionName = string(event.FunctionName)
+					eventOperationData = string(event.OperationData)
+					for _, cid := range event.ContractIdsAsText {
+						eventContractIdsAsText = append(eventContractIdsAsText, string(cid))
 					}
 				}
 			}
@@ -512,11 +509,11 @@ func testExecuteOpFlow(
 	var queriedValue int64 = -1
 	for _, contract := range counterContracts {
 		if contract.GetCreatedEvent().GetContractId() == newCounterCid {
-			for _, field := range contract.GetCreatedEvent().GetCreateArguments().GetFields() {
-				if field.GetLabel() == "value" {
-					queriedValue = field.GetValue().GetInt64()
-					break
-				}
+			counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](contract.GetCreatedEvent())
+			if err != nil {
+				t.Logf("Failed to unmarshal Counter from ACS: %v", err)
+			} else {
+				queriedValue = int64(counter.Value)
 			}
 		}
 	}
@@ -1293,29 +1290,21 @@ func testExecuteMCMSOp(
 		require.NoError(t, err)
 		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
 			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMS" {
-				// Check if this is our MCMS by matching mcmsId
-				for _, field := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
-					if field.GetLabel() == "mcmsId" && field.GetValue().GetText() == mcmsId {
-						newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
-						for _, f := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
-							if f.GetLabel() == "config" {
-								configRecord := f.GetValue().GetRecord()
-								for _, configField := range configRecord.GetFields() {
-									if configField.GetLabel() == "signers" {
-										newNumSigners = int64(len(configField.GetValue().GetList().GetElements()))
-									}
-									if configField.GetLabel() == "groupQuorums" {
-										quorums := configField.GetValue().GetList().GetElements()
-										if len(quorums) > 0 {
-											newQuorum = quorums[0].GetInt64()
-										}
-									}
-								}
-							}
-						}
+				// Unmarshal the MCMS contract for type-safe access
+				mcmsContract, err := bindings.UnmarshalActiveContract[mcms.MCMS](c)
+				if err != nil {
+					t.Logf("Failed to unmarshal MCMS: %v", err)
+					continue
+				}
 
-						break
+				// Check if this is our MCMS by matching mcmsId
+				if string(mcmsContract.McmsId) == mcmsId {
+					newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
+					newNumSigners = int64(len(mcmsContract.Config.Signers))
+					if len(mcmsContract.Config.GroupQuorums) > 0 {
+						newQuorum = int64(mcmsContract.Config.GroupQuorums[0])
 					}
+					break
 				}
 			}
 		}
