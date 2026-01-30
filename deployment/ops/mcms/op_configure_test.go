@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/mcms"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 //nolint:paralleltest // Cannot run in parallel due to shared state (mcmsContractID, mcmsTemplateID)

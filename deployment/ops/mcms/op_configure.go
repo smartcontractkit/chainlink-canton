@@ -13,7 +13,7 @@ import (
 
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 )
 
 // ============================================================================

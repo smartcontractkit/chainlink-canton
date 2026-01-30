@@ -12,9 +12,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton-internal/bindings/mcms"
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	compileClient "github.com/smartcontractkit/chainlink-canton-internal/deployment/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	compileClient "github.com/smartcontractkit/chainlink-canton/deployment/client"
 )
 
 func TestDeployMCMS(t *testing.T) {
