@@ -721,7 +721,7 @@ func (t *MCMS) UnmarshalJSON(data []byte) error {
 // Choice methods for MCMS
 
 // SetRoot exercises the SetRoot choice on this MCMS contract
-func (t MCMS) SetRoot(contractID string, args SET) *model.ExerciseCommand {
+func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
@@ -760,7 +760,7 @@ func (t MCMS) ExecuteMcmsOp(contractID string, args ExecuteMcmsOp) *model.Exerci
 }
 
 // SetConfig exercises the SetConfig choice on this MCMS contract
-func (t MCMS) SetConfig(contractID string, args SET) *model.ExerciseCommand {
+func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
