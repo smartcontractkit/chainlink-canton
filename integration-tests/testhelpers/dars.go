@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	participantv30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30"
+	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 )
 
 func UploadDARstoMultipleParticipants(ctx context.Context, dars [][]byte, participants ...Participant) ([]string, error) {

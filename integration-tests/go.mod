@@ -4,12 +4,17 @@ go 1.25.6
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
+replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
+
+replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260129035354-bee9c994446f
+
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/deepmap/oapi-codegen v1.6.0
+	github.com/digital-asset/dazl-client/v8 v8.7.1
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
 	github.com/noders-team/go-daml v0.6.0

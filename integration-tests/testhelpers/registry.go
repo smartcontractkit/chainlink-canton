@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
-	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/transferInstructionV1"
 )
 
 func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, error) {
