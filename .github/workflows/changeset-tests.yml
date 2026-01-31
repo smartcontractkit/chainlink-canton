@@ -20,7 +20,7 @@ jobs:
           go-version-file: go.mod
       - name: Run Go tests
         run: |
-          cd deployment/changeset
+          cd deployment/changesets
           go test -v -count 1 -timeout 20m -run TestConfigureChainForLanes ./...
   test-deploy-chain-contracts:
     name: TestDeployChainContracts
@@ -34,7 +34,7 @@ jobs:
           go-version-file: go.mod
       - name: Run Go tests
         run: |
-          cd deployment/changeset
+          cd deployment/changesets
           go test -v -count 1 -timeout 20m -run TestDeployChainContracts ./...
   test-deploy-coin:
     name: TestDeployCoin
@@ -48,5 +48,5 @@ jobs:
           go-version-file: go.mod
       - name: Run Go tests
         run: |
-          cd deployment/changeset
+          cd deployment/changesets
           go test -v -count 1 -timeout 20m -run TestDeployCoin ./...
