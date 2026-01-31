@@ -1,0 +1,99 @@
+package sequences
+
+import (
+	"fmt"
+	"math/big"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/noders-team/go-daml/pkg/types"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+)
+
+// TODO should align this with the EVM changesets if possible? Currently, these field are hardcoded
+type ConfigureChainForLanesInput struct {
+	// The selector of the chain being configured.
+	ChainSelector uint64
+	// The GlobalConfig address on the chain being configured.
+	GlobalConfig contracts.InstanceID
+	// The FeeQuoter address on the chain being configured.
+	FeeQuoter contracts.InstanceID
+	// The OnRamp address on the chain being configured.
+	// Similarly, we assume that all connections will use the same OnRamp.
+	OnRamp contracts.InstanceID
+	// The OffRamp address on the chain being configured
+	OffRamp contracts.InstanceID
+
+	// The CommitteeVerifiers on the chain being configured.
+	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
+	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	// The configuration for each remote chain that we want to connect to.
+	RemoteChains map[uint64]adapters.RemoteChainConfig[[]byte, string]
+}
+
+var ConfigureChainForLanes = operations.NewSequence(
+	"canton/ccip/configure_chain_for_lanes",
+	semver.MustParse("1.7.0"),
+	"Configures a Canton chain as a source & destination for multiple remote chains",
+	// TODO change deps to cldf_chain.BlockChains once clients are added
+	func(b operations.Bundle, deps dependencies.CantonDeps, input ConfigureChainForLanesInput) (sequences.OnChainOutput, error) {
+
+		// Create inputs for each operation
+		globalConfigSourceChainConfigArgs := make([]common.UpdateSourceChainConfig, 0, len(input.RemoteChains))
+
+		for remoteSelector, remoteConfig := range input.RemoteChains {
+			// TODO: the bindings force a big.Int to be scaled by 10
+			remoteSelectorScaled := big.NewInt(0).Mul(big.NewInt(0).SetUint64(remoteSelector), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(10), nil))
+
+			// Inbound / OffRamp
+			defaultInboundCCVs := make([]types.TEXT, 0, len(remoteConfig.DefaultInboundCCVs))
+			for _, ccv := range remoteConfig.DefaultInboundCCVs {
+				defaultInboundCCVs = append(defaultInboundCCVs, types.TEXT(ccv))
+			}
+			laneMandatedInboundCCVs := make([]types.TEXT, 0, len(remoteConfig.LaneMandatedInboundCCVs))
+			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
+				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, types.TEXT(ccv))
+			}
+			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
+			for _, onRamp := range remoteConfig.OnRamps {
+				onRamps = append(onRamps, types.TEXT(onRamp))
+			}
+			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.UpdateSourceChainConfig{
+				SourceChainSelector: remoteSelectorScaled,
+				Config: common.SourceChainConfig{
+					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
+					OnRampAddress:    onRamps[0], // TODO: currently only support one onRamp
+					LaneMandatedCCVs: laneMandatedInboundCCVs,
+					DefaultCCVs:      defaultInboundCCVs,
+				},
+			})
+
+			// Outbound / OnRamp
+
+			// TODO: Other configs once the contracts are ready
+		}
+
+		// Apply SourceChainConfigs to GlobalConfig
+		for i, arg := range globalConfigSourceChainConfigArgs {
+			_, err := operations.ExecuteOperation(b, global_config.UpdateSourceChainConfig, deps, contract.ChoiceInput[common.UpdateSourceChainConfig]{
+				ChainSelector: deps.Chain.Selector,
+				InstanceID:    input.GlobalConfig,
+				ActAs:         []string{deps.Party},
+				Args:          arg,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, (*big.Int)(arg.SourceChainSelector).String(), err)
+			}
+		}
+
+		return sequences.OnChainOutput{}, nil
+	},
+)

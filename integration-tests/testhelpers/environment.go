@@ -104,6 +104,7 @@ func LoadParticipantsWithCLDF(t *testing.T, numberOfValidators int) (Participant
 			Name:             participant.Name,
 			JWT:              jwt,
 			UserName:         fmt.Sprintf("user-participant%v", i+1),
+			Party:            "", // TODO populate from CLDF
 			JSONLedgerAPIURL: participant.Endpoints.JSONLedgerAPIURL,
 			GRPCLedgerAPIURL: participant.Endpoints.GRPCLedgerAPIURL,
 			AdminAPIURL:      participant.Endpoints.AdminAPIURL,

@@ -18,7 +18,7 @@ func TestInstanceId(t *testing.T) {
 
 		instanceID, err := NewInstanceID(prefix, party)
 		require.NoError(t, err)
-		require.Len(t, instanceID, InstanceIDPrefixMaxLength+1+InstanceIDRandomPartLength+1+len(party))
+		require.Len(t, instanceID, InstanceIDPrefixHintMaxLength+1+InstanceIDRandomPartLength+1+len(party))
 
 		require.True(t, instanceID.Valid())
 
@@ -38,7 +38,7 @@ func TestInstanceId(t *testing.T) {
 
 		instanceID, err := NewInstanceID(prefix, party)
 		require.NoError(t, err)
-		require.Len(t, instanceID, InstanceIDPrefixMaxLength+1+InstanceIDRandomPartLength+1+len(party))
+		require.Len(t, instanceID, InstanceIDPrefixHintMaxLength+1+InstanceIDRandomPartLength+1+len(party))
 
 		require.True(t, instanceID.Valid())
 
@@ -48,7 +48,7 @@ func TestInstanceId(t *testing.T) {
 
 		gotPrefix, gotErr := instanceID.Prefix()
 		require.NoError(t, gotErr)
-		expectedPrefix := prefix + strings.Repeat("0", InstanceIDPrefixMaxLength-len(prefix))
+		expectedPrefix := prefix + strings.Repeat("0", InstanceIDPrefixHintMaxLength-len(prefix))
 		require.Truef(t, strings.HasPrefix(gotPrefix, expectedPrefix), "expected prefix to start with %s, got %s", expectedPrefix, gotPrefix)
 	})
 	t.Run("invalid prefix", func(t *testing.T) {

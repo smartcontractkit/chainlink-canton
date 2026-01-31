@@ -133,6 +133,9 @@ linters:
       - linters:
           - revive
         text: "avoid meaningless package names"
+      - linters:
+          - revive
+        text: "don't use an underscore in package name"
     paths:
       - bindings
 formatters:

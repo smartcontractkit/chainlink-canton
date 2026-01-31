@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	InstanceIDPrefixMaxLength  = 6
-	InstanceIDRandomPartLength = 5
+	// InstanceIDPrefixHintMaxLength defines the maximum length for the prefix hint in an InstanceID.
+	InstanceIDPrefixHintMaxLength = 50
+	InstanceIDRandomPartLength    = 5
 )
 
 type InstanceID string
@@ -18,15 +19,16 @@ func NewInstanceID(prefixHint string, party string) (InstanceID, error) {
 	if prefixHint == "" {
 		return "", fmt.Errorf("instance ID prefixHint cannot be empty")
 	}
-	if len(prefixHint) > InstanceIDPrefixMaxLength {
-		return "", fmt.Errorf("instance ID prefixHint cannot be longer than %d characters", InstanceIDPrefixMaxLength)
+	if len(prefixHint) > InstanceIDPrefixHintMaxLength {
+		// This is an arbitrary restriction to prevent overly long instance IDs.
+		return "", fmt.Errorf("instance ID prefix hint cannot be longer than %d characters", InstanceIDPrefixHintMaxLength)
 	}
 	if party == "" {
 		return "", errors.New("party cannot be empty")
 	}
 
 	randomPrefix := generateRandomComponent()
-	instanceId := InstanceID(fmt.Sprintf("%s%s-%s@%s", strings.ToLower(prefixHint), strings.Repeat("0", InstanceIDPrefixMaxLength-len(prefixHint)), randomPrefix, party))
+	instanceId := InstanceID(fmt.Sprintf("%s-%s@%s", strings.ToLower(prefixHint), randomPrefix, party))
 
 	return instanceId, nil
 }
@@ -50,7 +52,7 @@ func (i InstanceID) Valid() bool {
 		return false
 	}
 
-	return len(parts[0]) == InstanceIDPrefixMaxLength+1+InstanceIDRandomPartLength
+	return len(parts[0]) == InstanceIDPrefixHintMaxLength+1+InstanceIDRandomPartLength
 }
 
 func (i InstanceID) Party() (string, error) {
