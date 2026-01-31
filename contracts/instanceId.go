@@ -25,7 +25,7 @@ func NewInstanceID(prefixHint string, party string) (InstanceID, error) {
 	}
 	// Check that prefixHint contains only valid characters (alphanumeric and hyphens/underscores)
 	for i, char := range prefixHint {
-		if !(char >= 'a' && char <= 'z') && !(char >= 'A' && char <= 'Z') && !(char >= '0' && char <= '9') && char != '-' && char != '_' {
+		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') && (char < '0' || char > '9') && char != '-' && char != '_' {
 			return "", fmt.Errorf("instance ID prefix hint contains invalid character '%c' at position %d", char, i)
 		}
 	}
