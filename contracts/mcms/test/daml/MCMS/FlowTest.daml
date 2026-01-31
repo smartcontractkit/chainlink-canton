@@ -107,6 +107,7 @@ testFullFlow = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId
       mcmsId
@@ -116,7 +117,7 @@ testFullFlow = script do
       rootMetadata = emptyRootMetadata
 
   -- Step 2: Create Counter with instanceId (stable identifier)
-  let counterId = "counter-v1"
+  let counterId = "counter-v1"<>show ccipOwner
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
@@ -149,6 +150,7 @@ testFullFlowWithRealSignatures = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -158,7 +160,7 @@ testFullFlowWithRealSignatures = script do
       rootMetadata = emptyRootMetadata
 
   -- Step 2: Create Counter with instanceId (stable identifier)
-  let counterId = realTestOp.targetInstanceId
+  let counterId = realTestOp.targetInstanceId<>show ccipOwner
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
@@ -188,6 +190,7 @@ testReplayProtection = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -228,6 +231,7 @@ testNonceOrdering = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -270,6 +274,7 @@ testRootExpiry = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -348,6 +353,7 @@ testExecuteMcmsOp = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = testChainId
       mcmsId = testMcmsId

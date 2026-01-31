@@ -40,6 +40,11 @@ type DeployParams[ARGS any] struct {
 	Prefix string `json:"prefix"`
 }
 
+// NewDeploy creates a new deploy operation for the given contract template.
+//
+// InstanceId:
+// The template *must* have an InstanceId field of type types.TEXT.
+// The instance ID is generated using the provided prefix and the owner party, it should not be set by the caller.
 func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, dependencies.CantonDeps] {
 	return operations.NewOperation(
 		params.Name,

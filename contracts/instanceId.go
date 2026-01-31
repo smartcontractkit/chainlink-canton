@@ -23,6 +23,12 @@ func NewInstanceID(prefixHint string, party string) (InstanceID, error) {
 		// This is an arbitrary restriction to prevent overly long instance IDs.
 		return "", fmt.Errorf("instance ID prefix hint cannot be longer than %d characters", InstanceIDPrefixHintMaxLength)
 	}
+	// Check that prefixHint contains only valid characters (alphanumeric and hyphens/underscores)
+	for i, char := range prefixHint {
+		if !(char >= 'a' && char <= 'z') && !(char >= 'A' && char <= 'Z') && !(char >= '0' && char <= '9') && char != '-' && char != '_' {
+			return "", fmt.Errorf("instance ID prefix hint contains invalid character '%c' at position %d", char, i)
+		}
+	}
 	if party == "" {
 		return "", errors.New("party cannot be empty")
 	}
@@ -52,7 +58,7 @@ func (i InstanceID) Valid() bool {
 		return false
 	}
 
-	return len(parts[0]) == InstanceIDPrefixHintMaxLength+1+InstanceIDRandomPartLength
+	return len(parts[0]) > 0 && len(parts[1]) > 0
 }
 
 func (i InstanceID) Party() (string, error) {
