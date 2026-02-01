@@ -19,9 +19,13 @@ import MCMS.FlowTest
 -- MASTER TEST RUNNER
 -- ===========================================================================
 
--- | Run all tests across all modules
-testAll : Script ()
-testAll = script do
+-- | Convenience runner for local/manual use.
+-- Like `MCMS.FlowTest.runFlowTests`, we make this a *function* (not a top-level
+-- `Script ()` value) so `daml test` doesn't execute it as part of the suite.
+-- Aggregating multiple tests in one script shares a single ledger and can
+-- introduce collisions (e.g. party allocation / contract keys).
+testAll : () -> Script ()
+testAll () = script do
   debug "=========================================="
   debug "MCMS POC - Running All Tests"
   debug "=========================================="
@@ -47,6 +51,12 @@ testAll = script do
   testReplayProtection
   testNonceOrdering
   testRootExpiry
+
+  -- Signatory check tests (security)
+  debug ""
+  debug "--- Signatory Check Tests ---"
+  testSignatoryCheckRejectsWrongOwner
+  testSignatoryCheckAcceptsCorrectOwner
 
   debug ""
   debug "=========================================="

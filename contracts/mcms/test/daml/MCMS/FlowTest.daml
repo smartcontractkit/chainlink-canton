@@ -4,12 +4,15 @@ import DA.Map qualified as Map
 import DA.List ((!!))
 import DA.Time (seconds, addRelTime)
 import DA.Date (datetime, Month(..))
+import DA.Optional (fromSome)
 import Daml.Script
 import MCMS.Types
 import MCMS.Main
 import MCMS.Counter
+import MCMS.MCMSReceiver (MCMSReceiver)
 import MCMS.Crypto (RawSignature(..))
 import MCMS.TestHelpers
+import MCMS.Mock.ForgedReceiver qualified as MockForgedReceiver
 import MCMS.Codec (encodeSetConfigParams, decodeSetConfigParams, SetConfigParams(..))
 
 -- ===========================================================================
@@ -21,9 +24,9 @@ import MCMS.Codec (encodeSetConfigParams, decodeSetConfigParams, SetConfigParams
 -- Signers sorted by address
 realTestSigners : [SignerInfo]
 realTestSigners =
-  [ SignerInfo "361e567a4653bf7b96d84bf795d85d2ab42f2a41" 0 0
-  , SignerInfo "4bb6cd199ff6627b0b0ee5815fc6e247187edc85" 1 0
-  , SignerInfo "b7fdff0aa3a465871aadd68aa2436f281253f654" 2 0
+  [ SignerInfo "7ccb6074fc4af0fa83b0c44ae4a92f1e29de7834" 0 0
+  , SignerInfo "dc693c276e00c18c5a8195acf61e3b22daf51615" 1 0
+  , SignerInfo "fbeab62d4a909aa866f835ee2f23fd48bf5bdac0" 2 0
   ]
 
 realTestConfig : MultisigConfig
@@ -39,12 +42,15 @@ realTestChainId = 1
 realTestMcmsId : Text
 realTestMcmsId = "mcms-daml-test-proposer"
 
+-- targetInstanceId includes @partyId matching Daml sandbox partyToText
+-- We allocate the party by a fixed PartyIdHint so the real signature vectors stay valid.
+-- (These test vectors include partyToText in targetInstanceId via "baseId@partyId".)
 realTestOp : Op
 realTestOp = Op
   { chainId = 1
   , multisigId = "mcms-daml-test-proposer"
   , nonce = 0
-  , targetInstanceId = "counter"
+  , targetInstanceId = "counter@ccip_owner-9cefe94d"
   , functionName = "increment"
   , operationData = ""
   }
@@ -59,11 +65,11 @@ realTestMetadata = RootMetadata
   }
 
 realTestRoot : Text
-realTestRoot = "d07c267978076ad0948d37907f0304e172702a327a432a0fd3de03b5b3c36b1d"
+realTestRoot = "bec480e4cc02d63ec5a3eee318270b04bdb3b40deed14661e4215926aad14769"
 
 realTestMetadataProof : [Text]
 realTestMetadataProof =
-  [ "9137fc7f249e6524c6798a8d1ef5845e375c274aaaa42523b57b73e02604cc93"
+  [ "0920fb47410ac1673c5ed2ac4969bab56c69c10fcbcd1b626b8d5ec55fb4eeea"
   ]
 
 realTestOpProof : [Text]
@@ -76,14 +82,14 @@ realTestOpProof =
 realTestSignatures : [RawSignature]
 realTestSignatures =
   [ RawSignature
-      { publicKey = "042d6a5fbe49d9ef354d23a06486adfca4cda81132d57aa81ad24f0266368d5db4c41c5a885e22332338a0c95ede5e3d13230f2aee13943767725b762f42479253"
-      , r = "dbbd80bf38b1adcb5c6219fdd2341f926550cbd5fd6567e228c4dfa176d6acf2"
-      , s = "765db0d9075b21a7ad7b05cd0542e7eca0e5b480d2f1bdcc9867e986d80fe4a8"
+      { publicKey = "0426204e5d04b798f001990d299743b95dd65641e69883a6ffaa20625b8bbf9998eba5bb83471bf04a404f7b2ee9290cc7d9cbccd0a2d7e3a17a8c4fd5f3955504"
+      , r = "7a90b5e2fb37c8fd089ff0352bac9ac3a74ea4ebe48889bab7f1d7e42f43ad10"
+      , s = "0ff023f7cb8d2f8bcbdeb4361654a8809be1e8bf6d1d82f607bf06c5aa449b40"
       }
   , RawSignature
-      { publicKey = "04323ff0f00e3a5819736e271cf4a2aaeb26115dbf7d3a4ee5a5ab5ea5d3c5f3aa382f5e4e7466cc517d19c539a76e19360f353bf1f366a6b6141b5329357c4718"
-      , r = "68ac7f2aebf43cb065e8d18ace9f6bdbb4f066fb5ef444238de32174aa187e21"
-      , s = "3d5fa99ff9a03a118feef6b9cc9257201977b0af4a81d1f312645131cd86f036"
+      { publicKey = "04097ed4b4f894ecdd4d1dc3af4bc42f8275cccfa93c55d2e377e73c88f0bbd6eb037606580c361e890f74e2db71a591500f90d254a9ac7c5d7f2a79f8499b882f"
+      , r = "010189cb778667302ee3929d089e116cc65523bb531d90581d718f5493fd0878"
+      , s = "0d7848a3a745384fdc00a458e313d545efeca03821a2631d6cde9aac52482a86"
       }
   ]
 
@@ -98,7 +104,7 @@ realTestValidUntil = datetime 2030 Jan 1 0 0 0
 testFullFlow : Script ()
 testFullFlow = script do
   -- Setup
-  ccipOwner <- allocateParty "ccip_owner"
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
   let 
     chainId = 1
     mcmsId = "test-mcms-proposer"
@@ -143,7 +149,7 @@ testFullFlow = script do
 testFullFlowWithRealSignatures : Script ()
 testFullFlowWithRealSignatures = script do
   -- Setup
-  ccipOwner <- allocateParty "ccip_owner"
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
   -- Step 1: Create MCMS with real config
   mcmsCid <- submit ccipOwner do
@@ -157,12 +163,11 @@ testFullFlowWithRealSignatures = script do
       expiringRoot = emptyExpiringRoot
       rootMetadata = emptyRootMetadata
 
-  -- Step 2: Create Counter with instanceId (stable identifier)
-  let counterId = realTestOp.targetInstanceId
+  -- Step 2: Create Counter (view returns "counter@ccip_owner")
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterId
+      instanceId = "counter"
       value = 0
 
   -- Step 3: SetRoot with REAL signatures
@@ -182,7 +187,7 @@ testFullFlowWithRealSignatures = script do
 -- | Test replay protection - same signed hash should be rejected
 testReplayProtection : Script ()
 testReplayProtection = script do
-  ccipOwner <- allocateParty "ccip_owner"
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
   -- Create MCMS
   mcmsCid <- submit ccipOwner do
@@ -222,7 +227,7 @@ testReplayProtection = script do
 -- | Test nonce ordering - operations must be executed in order
 testNonceOrdering : Script ()
 testNonceOrdering = script do
-  ccipOwner <- allocateParty "ccip_owner"
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
   -- Create MCMS with initial opCount = 0
   mcmsCid <- submit ccipOwner do
@@ -264,7 +269,7 @@ testNonceOrdering = script do
 -- | Test root expiry - verify CanExecuteOp returns false for expired roots
 testRootExpiry : Script ()
 testRootExpiry = script do
-  ccipOwner <- allocateParty "ccip_owner"
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
   -- Create MCMS
   mcmsCid <- submit ccipOwner do
@@ -287,6 +292,213 @@ testRootExpiry = script do
   assertMsg "Should not be able to execute op with empty root" $ not canExec
 
   debug "Root expiry test PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- SIGNATORY CHECK TESTS
+-- ===========================================================================
+
+-- | Test that ExecuteOp rejects targets whose instanceId doesn't match the approved op.
+-- The attacker's Counter has owner=attacker, so its view returns
+-- "counter@attacker" which doesn't match realTestOp.targetInstanceId ("counter@ccip_owner").
+-- Fails at step 6 (E_WRONG_TARGET: instanceId mismatch).
+testSignatoryCheckRejectsWrongOwner : Script ()
+testSignatoryCheckRejectsWrongOwner = script do
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  attacker <- allocateParty "attacker"
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  -- Attacker's Counter view returns "counter@attacker" ≠ "counter@ccip_owner"
+  attackerCounterCid <- submit attacker do
+    createCmd Counter with
+      owner = attacker
+      instanceId = "counter"
+      value = 999
+
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  -- ExecuteOp fails: Counter view returns "counter@attacker" ≠ op.targetInstanceId "counter@ccip_owner"
+  let attackerCounterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver attackerCounterCid
+
+  submitMustFail ccipOwner do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = ccipOwner
+      targetCid = attackerCounterAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  debug "Signatory check test PASSED - correctly rejected target with mismatched instanceId!"
+  pure ()
+
+-- | Test that ExecuteOp succeeds when target's instanceId@partyId matches the op
+-- and the parsed partyId is a signatory of the target.
+testSignatoryCheckAcceptsCorrectOwner : Script ()
+testSignatoryCheckAcceptsCorrectOwner = script do
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  -- Counter instanceId = "counter", view returns "counter@ccip_owner"
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = "counter"
+      value = 0
+
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = ccipOwner
+      targetCid = counterAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  debug "Signatory check test PASSED - correctly accepted target with matching instanceId@partyId!"
+  pure ()
+
+-- | Test that ExecuteOp rejects a target that forges its view.instanceId to
+-- match "counter@ccip_owner-..." even though ccip_owner is NOT a signatory of
+-- the target contract. This should fail at step 7 with
+-- E_TARGET_SIGNATORY_MISMATCH.
+testSignatoryCheckRejectsForgedPartyId : Script ()
+testSignatoryCheckRejectsForgedPartyId = script do
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  attacker <- allocateParty "attacker"
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  -- Create a target signed only by attacker, but whose view.instanceId is forged
+  -- to claim it is controlled by ccip_owner.
+  forgedCid <- submit attacker do
+    createCmd MockForgedReceiver.ForgedReceiver with
+      owner = attacker
+      baseId = "counter"
+      forgedPartyIdText = partyToText ccipOwner
+
+  -- Disclose the forged contract to ccipOwner so MCMS can fetch it in ExecuteOp.
+  forgedDisclosure <- fromSome <$> queryDisclosure attacker forgedCid
+
+  let forgedAsMcmsReceiver = toInterfaceContractId @MCMSReceiver forgedCid
+
+  submitMustFail (actAs ccipOwner <> discloseMany [forgedDisclosure]) do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = ccipOwner
+      targetCid = forgedAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  debug "Forged partyId test PASSED - correctly rejected target with mismatched signatory!"
+  pure ()
+
+-- | Test that a non-stakeholder CAN call ExecuteOp when disclosures are provided.
+-- Security model:
+--   - Disclosures provide visibility (contract data for interpretation)
+--   - MCMS owner's signatory authority propagates into the ExecuteOp choice body
+--     (authorizers = actingParties ∪ signatories = {randomParty} ∪ {ccipOwner})
+--   - fetch targetCid authorized: stakeholders ∩ authorizers ≠ ∅
+--   - The partyId parsed from instanceId@partyId must be a signatory of the target
+testNonStakeholderCanExecuteWithDisclosures : Script ()
+testNonStakeholderCanExecuteWithDisclosures = script do
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  randomParty <- allocateParty "random_party"
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      role = Proposer
+      chainId = realTestChainId
+      mcmsId = realTestMcmsId
+      config = realTestConfig
+      seenHashes = Map.empty
+      expiringRoot = emptyExpiringRoot
+      rootMetadata = emptyRootMetadata
+
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = "counter"
+      value = 0
+
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetRoot with
+      submitter = ccipOwner
+      newRoot = realTestRoot
+      validUntil = realTestValidUntil
+      metadata = realTestMetadata
+      metadataProof = realTestMetadataProof
+      signatures = realTestSignatures
+
+  mcmsDisclosure <- fromSome <$> queryDisclosure ccipOwner mcmsCid
+  counterDisclosure <- fromSome <$> queryDisclosure ccipOwner counterCid
+
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  submit (actAs randomParty <> discloseMany [mcmsDisclosure, counterDisclosure]) do
+    exerciseCmd mcmsCid ExecuteOp with
+      submitter = randomParty
+      targetCid = counterAsMcmsReceiver
+      op = realTestOp
+      opProof = realTestOpProof
+      contractIds = []
+
+  debug "Non-stakeholder with disclosures test PASSED!"
   pure ()
 
 -- ===========================================================================
@@ -337,7 +549,7 @@ testCodecRoundtrip = script do
 -- This tests the codec decoding path (like Aptos BCS deserialization)
 testExecuteMcmsOp : Script ()
 testExecuteMcmsOp = script do
-  ccipOwner <- allocateParty "ccip_owner"
+  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
   -- Create MCMS with test config
   let testChainId = 1
@@ -419,14 +631,24 @@ testMcmsOpClearRoot = script do
 -- RUN ALL TESTS
 -- ===========================================================================
 
-runFlowTests : Script ()
-runFlowTests = script do
+-- NOTE: This is a convenience runner for local/manual use.
+-- We intentionally make it a *function* (not a top-level `Script ()` value),
+-- so `daml test` doesn't execute it. Running multiple flow tests in one
+-- script shares a single ledger, which can cause collisions (e.g. fixed party
+-- ids used by real-signature vectors).
+runFlowTests : () -> Script ()
+runFlowTests () = script do
   debug "Running MCMS flow tests..."
   testFullFlow
   testFullFlowWithRealSignatures
   testReplayProtection
   testNonceOrdering
   testRootExpiry
+  -- Signatory check tests (security)
+  testSignatoryCheckRejectsWrongOwner
+  testSignatoryCheckAcceptsCorrectOwner
+  testSignatoryCheckRejectsForgedPartyId
+  testNonStakeholderCanExecuteWithDisclosures
   -- Codec tests
   testCodecRoundtrip
   testExecuteMcmsOp

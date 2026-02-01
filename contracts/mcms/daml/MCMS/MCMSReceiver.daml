@@ -3,6 +3,7 @@
 module MCMS.MCMSReceiver where
 
 import DA.Map qualified as Map
+import DA.Text qualified as T
 
 -- ===========================================================================
 -- ARGUMENT VALUE TYPE
@@ -77,6 +78,14 @@ interface MCMSReceiver where
 -- ===========================================================================
 -- HELPER FUNCTIONS
 -- ===========================================================================
+
+-- | Parse partyId from instanceId format "baseId@partyId"
+-- Returns the partyId text after the @ separator
+parsePartyIdText : Text -> Optional Text
+parsePartyIdText instanceId =
+  case T.splitOn "@" instanceId of
+    [_baseId, partyId] -> Some partyId
+    _ -> None
 
 -- | Parse Int from hex string (simple implementation)
 parseIntFromHex : Text -> Optional Int
