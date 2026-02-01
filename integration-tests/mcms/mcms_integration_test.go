@@ -546,8 +546,6 @@ func testSignatureVerificationFails(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// Build config values
 	baseMcmsId := "mcms-sig-fail-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
