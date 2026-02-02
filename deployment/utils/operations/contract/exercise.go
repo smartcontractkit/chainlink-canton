@@ -1,10 +1,10 @@
 package contract
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
@@ -17,26 +17,28 @@ import (
 )
 
 type ExecInfo struct {
+	// The ID of the update that was confirmed as the result of this execution.
 	UpdateID string `json:"update_id"`
 }
 
-type WriteOutput struct {
+type ExerciseOutput struct {
 	ChainSelector uint64    `json:"chainSelector"`
 	ExecInfo      *ExecInfo `json:"exec_info"`
 }
 
-func (o WriteOutput) Executed() bool {
+func (o ExerciseOutput) Executed() bool {
 	return o.ExecInfo != nil
 }
 
 type ChoiceInput[ARGS any] struct {
-	ChainSelector uint64               `json:"chainSelector"`
-	InstanceID    contracts.InstanceID `json:"instanceId"`
-	ActAs         []string             `json:"act_as"`
-	Args          ARGS                 `json:"args"`
+	ChainSelector uint64 `json:"chainSelector"`
+	// The InstanceID this operation is targeting. Will be resolved to an active contract.
+	InstanceID contracts.InstanceID `json:"instanceId"`
+	ActAs      []string             `json:"act_as"`
+	Args       ARGS                 `json:"args"`
 }
 
-type WriteParams[ARGS any] struct {
+type ExerciseParams[ARGS any] struct {
 	// Name is the name of the operation.
 	Name string
 	// Version is the version of the operation.
@@ -48,27 +50,28 @@ type WriteParams[ARGS any] struct {
 	// Validate is an optional function to validate the input arguments.
 	Validate func(input ARGS) error
 
+	// Template is the binding struct of the target contract.
 	Template common.Template
 	// Method is the bindings method to call the choice.
 	Method func(contractID string, args ARGS) *model.ExerciseCommand
 }
 
-func NewWrite[ARGS any](params WriteParams[ARGS]) *operations.Operation[ChoiceInput[ARGS], WriteOutput, cantonOps.CantonDeps] {
+func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[ChoiceInput[ARGS], ExerciseOutput, cantonOps.CantonDeps] {
 	return operations.NewOperation(
 		params.Name,
 		params.Version,
 		params.Description,
-		func(b operations.Bundle, deps cantonOps.CantonDeps, input ChoiceInput[ARGS]) (WriteOutput, error) {
+		func(b operations.Bundle, deps cantonOps.CantonDeps, input ChoiceInput[ARGS]) (ExerciseOutput, error) {
 			if params.Validate != nil {
 				if err := params.Validate(input.Args); err != nil {
-					return WriteOutput{}, fmt.Errorf("validate input: %w", err)
+					return ExerciseOutput{}, fmt.Errorf("validate input: %w", err)
 				}
 			}
 
 			// Find contract by InstanceID
-			contractID, err := findContractByInstanceID(b.GetContext(), deps.BindingClient, deps.Party, params.Template.GetTemplateID(), input.InstanceID)
+			contractID, err := findContractByInstanceID(b, deps.BindingClient, deps.Party, params.Template.GetTemplateID(), input.InstanceID)
 			if err != nil {
-				return WriteOutput{}, fmt.Errorf("failed to find contract by InstanceID: %w", err)
+				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceID: %w", err)
 			}
 			exerciseCommand := params.Method(contractID, input.Args)
 
@@ -80,10 +83,10 @@ func NewWrite[ARGS any](params WriteParams[ARGS]) *operations.Operation[ChoiceIn
 				}},
 			)
 			if err != nil {
-				return WriteOutput{}, fmt.Errorf("failed to submit exercise command: %w", err)
+				return ExerciseOutput{}, fmt.Errorf("failed to submit exercise command: %w", err)
 			}
 
-			return WriteOutput{
+			return ExerciseOutput{
 				ChainSelector: input.ChainSelector,
 				ExecInfo: &ExecInfo{
 					UpdateID: submitResp.UpdateID,
@@ -93,12 +96,12 @@ func NewWrite[ARGS any](params WriteParams[ARGS]) *operations.Operation[ChoiceIn
 	)
 }
 
-func findContractByInstanceID(ctx context.Context, bindingClient *client.DamlBindingClient, party, templateId string, instanceID contracts.InstanceID) (contractId string, err error) {
-	currentOffset, err := bindingClient.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
+func findContractByInstanceID(b operations.Bundle, bindingClient *client.DamlBindingClient, party, templateId string, instanceID contracts.InstanceID) (contractId string, err error) {
+	currentOffset, err := bindingClient.StateService.GetLedgerEnd(b.GetContext(), &model.GetLedgerEndRequest{})
 	if err != nil {
 		return "", fmt.Errorf("failed to get ledger end: %w", err)
 	}
-	responseChan, errChan := bindingClient.StateService.GetActiveContracts(ctx, &model.GetActiveContractsRequest{
+	responseChan, errChan := bindingClient.StateService.GetActiveContracts(b.GetContext(), &model.GetActiveContractsRequest{
 		ActiveAtOffset: currentOffset.Offset,
 		EventFormat: &model.EventFormat{
 			FiltersByParty: map[string]*model.Filters{
@@ -113,7 +116,8 @@ func findContractByInstanceID(ctx context.Context, bindingClient *client.DamlBin
 					},
 				},
 			},
-			Verbose: false,
+			// Verbose is needed for the record labels to be returned
+			Verbose: true,
 		},
 	})
 
@@ -130,6 +134,30 @@ func findContractByInstanceID(ctx context.Context, bindingClient *client.DamlBin
 			}
 			if resp != nil && resp.ContractEntry != nil {
 				if entry, ok := resp.ContractEntry.(*model.ActiveContractEntry); ok {
+					// Compare the instanceId field
+
+					createArguments, ok := entry.ActiveContract.CreatedEvent.CreateArguments.(*v2.Record)
+					if !ok {
+						b.Logger.Debugw("Skipping contract with unexpected create arguments type", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
+						continue
+					}
+					var contractInstanceId string
+					for _, field := range createArguments.GetFields() {
+						if field.GetLabel() == "instanceId" {
+							contractInstanceId = field.GetValue().GetText()
+							break
+						}
+					}
+					if contractInstanceId == "" {
+						b.Logger.Debugw("Skipping contract with missing instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
+						continue
+					}
+					if instanceID.String() != contractInstanceId {
+						// Not the contract we're looking for
+						b.Logger.Debugw("Skipping contract with different instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID, "instanceId", contractInstanceId)
+						continue
+					}
+
 					if contractId != "" {
 						// ContractID was already found. This is an error, InstanceID must be unique
 						return "", fmt.Errorf("multiple active contracts found for InstanceID %s", instanceID.String())
@@ -141,8 +169,8 @@ func findContractByInstanceID(ctx context.Context, bindingClient *client.DamlBin
 			if err != nil {
 				return "", fmt.Errorf("failed to get active contracts: %w", err)
 			}
-		case <-ctx.Done():
-			return "", ctx.Err()
+		case <-b.GetContext().Done():
+			return "", b.GetContext().Err()
 		}
 	}
 }

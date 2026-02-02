@@ -36,7 +36,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[mcms.MCMS]{
 	Prefix:      "mcms",
 })
 
-var SetRoot = contract.NewWrite(contract.WriteParams[mcms.SetRoot]{
+var SetRoot = contract.NewExercise(contract.ExerciseParams[mcms.SetRoot]{
 	Name:         "canton/mcms/set_root",
 	Version:      Version,
 	Description:  "Sets a merkle root for MCMS",
@@ -50,7 +50,7 @@ var SetRoot = contract.NewWrite(contract.WriteParams[mcms.SetRoot]{
 	Method:   mcms.MCMS{}.SetRoot,
 })
 
-var SetConfig = contract.NewWrite(contract.WriteParams[mcms.SetConfig]{
+var SetConfig = contract.NewExercise(contract.ExerciseParams[mcms.SetConfig]{
 	Name:         "canton/mcms/set_config",
 	Version:      Version,
 	Description:  "Sets configuration for MCMS",

@@ -30,7 +30,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[feequoter.FeeQuoter]{
 	Prefix:      "feequoter",
 })
 
-var UpdatePrices = contract.NewWrite(contract.WriteParams[feequoter.UpdatePrices]{
+var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.UpdatePrices]{
 	Name:         "canton/ccip/fee_quoter/update_prices",
 	Version:      Version,
 	Description:  "Updates the FeeQuoter's prices",
@@ -43,7 +43,7 @@ var UpdatePrices = contract.NewWrite(contract.WriteParams[feequoter.UpdatePrices
 	Method:   feequoter.FeeQuoter{}.UpdatePrices,
 })
 
-var ApplyFeeTokenUpdates = contract.NewWrite(contract.WriteParams[feequoter.ApplyFeeTokenUpdates]{
+var ApplyFeeTokenUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyFeeTokenUpdates]{
 	Name:         "canton/ccip/fee_quoter/apply_fee_token_updates",
 	Version:      Version,
 	Description:  "Applies fee token updates to the FeeQuoter",
@@ -56,7 +56,7 @@ var ApplyFeeTokenUpdates = contract.NewWrite(contract.WriteParams[feequoter.Appl
 	Method:   feequoter.FeeQuoter{}.ApplyFeeTokenUpdates,
 })
 
-var ApplyDestChainConfigUpdates = contract.NewWrite(contract.WriteParams[feequoter.ApplyDestChainConfigUpdates]{
+var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates]{
 	Name:         "canton/ccip/fee_quoter/apply_dest_chain_config_updates",
 	Version:      Version,
 	Description:  "Applies destination chain configuration updates to the FeeQuoter",

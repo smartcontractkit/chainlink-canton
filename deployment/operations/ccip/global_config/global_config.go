@@ -38,7 +38,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 	Prefix:      "globalconfig",
 })
 
-var UpdateDestChainConfig = contract.NewWrite(contract.WriteParams[common.UpdateDestChainConfig]{
+var UpdateDestChainConfig = contract.NewExercise(contract.ExerciseParams[common.UpdateDestChainConfig]{
 	Name:         "canton/ccip/global_config/update_dest_chain_config",
 	Version:      Version,
 	Description:  "Updates the GlobalConfig's destination chain configuration",
@@ -51,7 +51,7 @@ var UpdateDestChainConfig = contract.NewWrite(contract.WriteParams[common.Update
 	Method:   common.GlobalConfig{}.UpdateDestChainConfig,
 })
 
-var UpdateSourceChainConfig = contract.NewWrite(contract.WriteParams[common.UpdateSourceChainConfig]{
+var UpdateSourceChainConfig = contract.NewExercise(contract.ExerciseParams[common.UpdateSourceChainConfig]{
 	Name:         "canton/ccip/global_config/update_source_chain_config",
 	Version:      Version,
 	Description:  "Updates the GlobalConfig's source chain configuration",
