@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "87b93cba9fd8f6e36f110ef1860a1de4ef0a48771e489c52dac2049c2e34c6f8"
+const PackageID = "831563cda769e12eaf47360bd4a44d63b108619af4c0965b0d917b7ebdab4599"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -126,6 +126,8 @@ type CoinRegistry struct {
 
 	InstrumentId InstrumentId `json:"instrumentId"`
 
+	InstanceId TEXT `json:"instanceId"`
+
 	Meta Metadata `json:"meta"`
 }
 
@@ -149,6 +151,9 @@ func (t CoinRegistry) CreateCommand() *model.CreateCommand {
 		}
 		return t.InstrumentId
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["meta"] = func() interface{} {

@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,6 +40,8 @@ type TestEnvironment struct {
 	Selector     uint64
 	Participants []Participant
 	Splice       Splice
+
+	Chain chain.BlockChain
 }
 
 type Splice struct {
@@ -105,6 +108,7 @@ func LoadParticipantsWithCLDF(t *testing.T, numberOfValidators int) (Participant
 			Name:             participant.Name,
 			JWT:              jwt,
 			UserName:         fmt.Sprintf("user-participant%v", i+1),
+			Party:            "", // TODO populate from CLDF
 			JSONLedgerAPIURL: participant.Endpoints.JSONLedgerAPIURL,
 			GRPCLedgerAPIURL: participant.Endpoints.GRPCLedgerAPIURL,
 			AdminAPIURL:      participant.Endpoints.AdminAPIURL,
@@ -188,6 +192,25 @@ func NewTestEnvironment(t *testing.T, options ...TestOption) TestEnvironment {
 	for i, participantConfig := range participantInput.Participants {
 		env.Participants[i] = dialParticipant(t, participantConfig)
 	}
+
+	// Create CLDF chain instance
+	cldfConfig := cantonProvider.RPCChainProviderConfig{
+		Endpoints:    make([]canton.ParticipantEndpoints, len(participantInput.Participants)),
+		JWTProviders: make([]canton.JWTProvider, len(participantInput.Participants)),
+	}
+	for i, participantConfig := range participantInput.Participants {
+		cldfConfig.Endpoints[i] = canton.ParticipantEndpoints{
+			AdminAPIURL:      participantConfig.AdminAPIURL,
+			GRPCLedgerAPIURL: participantConfig.GRPCLedgerAPIURL,
+			JSONLedgerAPIURL: participantConfig.JSONLedgerAPIURL,
+			ValidatorAPIURL:  participantConfig.ValidatorAPIURL,
+		}
+		cldfConfig.JWTProviders[i] = canton.NewStaticJWTProvider(participantConfig.JWT)
+	}
+	chainProvider := cantonProvider.NewRPCChainProvider(env.Selector, cldfConfig)
+	chainInstance, err := chainProvider.Initialize(t.Context())
+	require.NoError(t, err, "Failed to initialize CLDF chain provider")
+	env.Chain = chainInstance
 
 	return env
 }

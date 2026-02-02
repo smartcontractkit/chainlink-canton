@@ -1,0 +1,70 @@
+package fee_quoter
+
+import (
+	"errors"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+)
+
+var ContractType = deployment.ContractType("FeeQuoter")
+
+var Version = semver.MustParse("0.1.0")
+
+var Deploy = contract.NewDeploy(contract.DeployParams[feequoter.FeeQuoter]{
+	Name:           "canton/ccip/fee_quoter/deploy",
+	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
+	Description:    "Deploys the CCIP FeeQuoter contract on Canton",
+	Validate: func(template feequoter.FeeQuoter) error {
+		if template.Owner == "" {
+			return errors.New("owner cannot be empty")
+		}
+
+		return nil
+	},
+	PackageName: string(contracts.CCIPFeeQuoter),
+	Prefix:      "feequoter",
+})
+
+var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.UpdatePrices]{
+	Name:         "canton/ccip/fee_quoter/update_prices",
+	Version:      Version,
+	Description:  "Updates the FeeQuoter's prices",
+	ContractType: ContractType,
+	Validate: func(input feequoter.UpdatePrices) error {
+		// TODO add validation
+		return nil
+	},
+	Template: feequoter.FeeQuoter{},
+	Method:   feequoter.FeeQuoter{}.UpdatePrices,
+})
+
+var ApplyFeeTokenUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyFeeTokenUpdates]{
+	Name:         "canton/ccip/fee_quoter/apply_fee_token_updates",
+	Version:      Version,
+	Description:  "Applies fee token updates to the FeeQuoter",
+	ContractType: ContractType,
+	Validate: func(input feequoter.ApplyFeeTokenUpdates) error {
+		// TODO add validation
+		return nil
+	},
+	Template: feequoter.FeeQuoter{},
+	Method:   feequoter.FeeQuoter{}.ApplyFeeTokenUpdates,
+})
+
+var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates]{
+	Name:         "canton/ccip/fee_quoter/apply_dest_chain_config_updates",
+	Version:      Version,
+	Description:  "Applies destination chain configuration updates to the FeeQuoter",
+	ContractType: ContractType,
+	Validate: func(input feequoter.ApplyDestChainConfigUpdates) error {
+		// TODO add validation
+		return nil
+	},
+	Template: feequoter.FeeQuoter{},
+	Method:   feequoter.FeeQuoter{}.ApplyDestChainConfigUpdates,
+})

@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "f311e016f3365fd322f125958b15d76e522a1f938c5cab475624fcbce99a06f9"
+const PackageID = "975c3f3a09eba8538d4a288a6dd31758b9b4806e1b5763eac2c8b1045ed13274"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -624,6 +624,8 @@ func (t *GetValue) UnmarshalJSON(data []byte) error {
 type MCMS struct {
 	Owner PARTY `json:"owner"`
 
+	InstanceId TEXT `json:"instanceId"`
+
 	Role Role `json:"role"`
 
 	ChainId INT64 `json:"chainId"`
@@ -650,6 +652,9 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
 
 	if t.Role != "" {
 		args["role"] = func() interface{} {

@@ -26,6 +26,7 @@ import MCMS.Codec (decodeSetConfigParams)
 template MCMS
   with
     owner : Party                              -- ccip_owner party
+    instanceId : Text                          -- Stable identifier that doesn't change on updates
     role : Role                                -- Proposer (simplified to single role)
     chainId : Int                              -- Chain ID for validation
     mcmsId : Text                              -- MCMS instance identifier

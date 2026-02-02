@@ -30,6 +30,7 @@ setup = script do
         createCmd CoinRegistry with
             issuer = issuer
             instrumentId = instrumentId
+            instanceId = "main-registry"
             meta = emptyMetadata
 
     -- query the contract disclosure to allow parties to interact with the registry without being observers

@@ -16,16 +16,32 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/noders-team/go-daml/pkg/types"
+	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
@@ -169,6 +185,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err)
 	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
 	require.NoError(t, err)
+	onRampDar, err := contracts.GetDar(contracts.CCIPOnRamp, contracts.CurrentVersion)
+	require.NoError(t, err)
+	feeQuoterDar, err := contracts.GetDar(contracts.CCIPFeeQuoter, contracts.CurrentVersion)
+	require.NoError(t, err)
 	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
 	require.NoError(t, err)
 	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
@@ -176,7 +196,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar}
+	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -188,162 +208,124 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Generate signer keys for CommitteeVerifier (3 signers, threshold 2)
 	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
-	ccvSignerPubKeys := make([]*apiv2.Value, 0, 3)
+	ccvSignerPubKeys := make([]types.TEXT, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
-		ccvSignerPubKeys = append(ccvSignerPubKeys, &apiv2.Value{Sum: &apiv2.Value_Text{Text: pubKeyHex}})
+		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
-
-	// Deploy CCVRegistry
-	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.CCVRegistry", EntityName: "CCVRegistry"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccvregistry-e2e"}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	ccvRegistryCid := extractCreatedContractId(res)
-	t.Logf("Deployed CCVRegistry: %s", ccvRegistryCid)
-
-	// Deploy CommitteeVerifier
 	versionTag := "49ff34ed"
-	ccvId := versionTag + "@" + partyCCIP
-	_, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccv-e2e"}}},
-						{Label: "versionTag", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: versionTag}}},
-						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "messageSentObserver", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "storageLocation", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "ipfs://test-e2e"}}},
-						{Label: "threshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2}}},
-						{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: ccvSignerPubKeys}}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	t.Logf("Deployed CommitteeVerifier (ccvId: %s)", ccvId)
+	ccvID := versionTag + "@" + partyCCIP
 
-	// Deploy GlobalConfig with source chain config including the CCV
-	sourceChainSelector := "123"
-	destChainSelector := "456"
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.GlobalConfig", EntityName: "GlobalConfig"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-globalconfig-e2e"}}},
-						{Label: "chainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: destChainSelector}}},
-						{Label: "onRampAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-						{Label: "destChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-						{Label: "sourceChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
-							{
-								Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
-								Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-									{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
-									{Label: "onRampAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "0000000000000000000000000000000000000001"}}},
-									{Label: "laneMandatedCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-										{Sum: &apiv2.Value_Text{Text: ccvId}},
-									}}}}},
-									{Label: "defaultCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-								}}}},
-							},
-						}}}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	globalConfigCid := extractCreatedContractId(res)
-	t.Logf("Deployed GlobalConfig: %s", globalConfigCid)
+	chainSelectorBig := big.NewInt(0).SetUint64(chainsel.CANTON_LOCALNET.Selector)
+	reporter := cld_ops.NewMemoryReporter()
+	bundle := cld_ops.NewBundle(
+		t.Context,
+		logger.Test(t),
+		reporter,
+	)
+	cldfEnv := cldf.Environment{
+		Logger:           logger.Test(t),
+		GetContext:       t.Context,
+		DataStore:        datastore.NewMemoryDataStore().Seal(),
+		BlockChains:      chain.NewBlockChainsFromSlice([]chain.BlockChain{env.Chain}),
+		OperationsBundle: bundle,
+	}
 
-	// Deploy TokenAdminRegistry (required by OffRamp even without token transfers)
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-tar-e2e"}}},
-						{Label: "tokenConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
+	// Deploy Chain contracts
+	out, err := changesets.DeployChainContracts{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployChainContractsConfig]{
+		ChainSelector: env.Selector,
+		Participant:   0,
+		Party:         partyCCIP,
+		Config: changesets.DeployChainContractsConfig{
+			Params: sequences.DeployChainContractsParams{
+				CCIPOwnerParty: partyCCIP,
+				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
+					{
+						Template: ccvs.CommitteeVerifier{
+							Owner:               types.PARTY(partyCCIP),
+							CcipOwner:           types.PARTY(partyCCIP),
+							VersionTag:          types.TEXT(versionTag),
+							MessageSentObserver: types.PARTY(partyCCIP),
+							StorageLocation:     "ipfs://test-receive",
+							Threshold:           2,
+							Signers:             ccvSignerPubKeys,
+						},
+					},
+				},
+				GlobalConfig: sequences.GlobalConfigParams{
+					Template: common.GlobalConfig{
+						CcipOwner:     "", // Populated by the sequence
+						ChainSelector: chainSelectorBig,
+						OnRampAddress: "", // TODO ?
+					},
+				},
+			},
 		},
 	})
-	require.NoError(t, err)
-	tokenAdminRegistryCid := extractCreatedContractId(res)
-	t.Logf("Deployed TokenAdminRegistry: %s", tokenAdminRegistryCid)
+	require.NoErrorf(t, err, "Failed to deploy CCIP contracts: %v", err)
 
-	// Deploy OffRamp
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-offramp", ModuleName: "CCIP.OffRamp", EntityName: "OffRamp"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-offramp-e2e"}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
+	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
-	offRampCid := extractCreatedContractId(res)
-	t.Logf("Deployed OffRamp: %s", offRampCid)
+	cldfEnv.DataStore = out.DataStore.Seal()
 
-	// Deploy PerPartyRouterFactory
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-factory-e2e"}}},
-						{Label: "registeredRouters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
+	t.Log("Deployed CCIP chain contracts:")
+	addresses := cldfEnv.DataStore.Addresses().Filter()
+	for i, address := range addresses {
+		t.Logf("Deployed Address %d: ChainSelector=%d, Type=%s, Version=%s, Address=%s, Qualifier=%s\n", i, address.ChainSelector, address.Type, address.Version, address.Address, address.Qualifier)
+	}
+
+	// Resolve contracts
+	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	require.NoError(t, err, "failed to get GlobalConfig address")
+	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	require.NoError(t, err, "failed to get FeeQuoter address")
+	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(onramp.ContractType), onramp.Version, ""))
+	require.NoError(t, err, "failed to get OnRamp address")
+	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(offramp.ContractType), offramp.Version, ""))
+	require.NoError(t, err, "failed to get OffRamp address")
+
+	// Deploy and configure lane
+	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
+	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
+		ChainSelector: env.Selector,
+		Participant:   0,
+		Party:         partyCCIP,
+		Config: changesets.ConfigureChainForLanesConfig{
+			Input: sequences.ConfigureChainForLanesInput{
+				ChainSelector:      env.Selector,
+				GlobalConfig:       contracts.InstanceID(globalConfig.Address),
+				FeeQuoter:          contracts.InstanceID(feeQuoter.Address),
+				OnRamp:             contracts.InstanceID(onRamp.Address),
+				OffRamp:            contracts.InstanceID(offRamp.Address),
+				CommitteeVerifiers: nil,
+				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+					remoteSelector: {
+						AllowTrafficFrom:         true,
+						OnRamps:                  [][]byte{[]byte("0000000000000000000000000000000000000001")},
+						OffRamp:                  nil,
+						DefaultInboundCCVs:       nil,
+						LaneMandatedInboundCCVs:  []string{ccvID},
+						DefaultOutboundCCVs:      nil,
+						LaneMandatedOutboundCCVs: nil,
+						DefaultExecutor:          "",
+						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{},
+						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
+						AddressBytesLength:       0,
+						BaseExecutionGasCost:     0,
+					},
+				},
+			},
 		},
 	})
+	require.NoErrorf(t, err, "Failed to configure chain for lanes")
+	err = out.DataStore.Merge(cldfEnv.DataStore)
 	require.NoError(t, err)
-	factoryCid := extractCreatedContractId(res)
-	t.Logf("Deployed PerPartyRouterFactory: %s", factoryCid)
+	cldfEnv.DataStore = out.DataStore.Seal()
+	t.Log("Configured chain for lanes")
 
 	// Create PerPartyRouter for receiver
 	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
@@ -351,7 +333,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -385,8 +367,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := &MessageV1{
-		SourceChainSelector: 123,
-		DestChainSelector:   456,
+		SourceChainSelector: remoteSelector,
+		DestChainSelector:   env.Selector,
 		SequenceNumber:      1,
 		ExecutionGasLimit:   200000,
 		CCIPReceiveGasLimit: 100000,
@@ -425,8 +407,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Build MessageV1 Daml record (no token transfer)
 	messageV1Record := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "sourceChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "123"}}},
-		{Label: "destChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "456"}}},
+		{Label: "sourceChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(remoteSelector, 10)}}},
+		{Label: "destChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(env.Selector, 10)}}},
 		{Label: "sequenceNumber", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "1"}}},
 		{Label: "executionGasLimit", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 200000}}},
 		{Label: "ccipReceiveGasLimit", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 100000}}},
