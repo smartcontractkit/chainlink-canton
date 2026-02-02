@@ -112,8 +112,6 @@ func testExecuteOpFlow(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// ========================
 	// |   Contract Constants |
 	// ========================
@@ -728,8 +726,6 @@ func testReplayProtection(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// Build config values
 	baseMcmsId := "mcms-replay-test-" + uuid.New().String()[:8]
 	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
@@ -949,8 +945,6 @@ func testExecuteMCMSOp(
 	ccipParticipant, userParticipant testhelpers.Participant,
 	ccipOwnerParty, userParty string,
 ) {
-	t.Parallel()
-
 	// ========================
 	// |   Contract Constants |
 	// ========================
@@ -1359,8 +1353,6 @@ func testSignatoryCheck(
 	ccipParticipant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
-	t.Parallel()
-
 	// ========================
 	// |   Contract Constants |
 	// ========================
