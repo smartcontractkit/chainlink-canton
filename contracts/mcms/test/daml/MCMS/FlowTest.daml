@@ -316,6 +316,7 @@ testSignatoryCheckRejectsWrongOwner = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -363,6 +364,7 @@ testSignatoryCheckAcceptsCorrectOwner = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -412,6 +414,7 @@ testSignatoryCheckRejectsForgedPartyId = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
@@ -468,6 +471,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
+      instanceId = "mcms-1@"<>show ccipOwner
       role = Proposer
       chainId = realTestChainId
       mcmsId = realTestMcmsId
