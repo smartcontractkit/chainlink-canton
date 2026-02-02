@@ -10,7 +10,8 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
-	"github.com/smartcontractkit/chainlink-canton-internal/openapi/gen/scanProxy"
+
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 )
 
 type Participant struct {

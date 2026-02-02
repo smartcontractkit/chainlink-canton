@@ -24,8 +24,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton-internal/contracts"
-	"github.com/smartcontractkit/chainlink-canton-internal/integration-tests/testhelpers"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
 // MessageV1 matches the Daml CCIP.MessageCodecV1.MessageV1 structure.
