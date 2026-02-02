@@ -7,18 +7,21 @@ import (
 	"io"
 	"slices"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
-	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin"
-	participantv30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30"
 )
 
 type Participant struct {
 	Name string
 	// GetToken returns a JWT token to authenticate API calls against this participant
 	GetToken func(ctx context.Context) (string, error)
-	UserName string
-	Party    string
+	// GetConfig returns the participant's configuration
+	GetConfig func() ParticipantConfig
+	UserName  string
+	Party     string
 
 	// API Clients
 

@@ -2,10 +2,12 @@ module github.com/smartcontractkit/chainlink-canton/eds
 
 go 1.25.6
 
+replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
+
 require (
+	github.com/digital-asset/dazl-client/v8 v8.7.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/mux v1.8.1
-	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 	gopkg.in/yaml.v3 v3.0.1

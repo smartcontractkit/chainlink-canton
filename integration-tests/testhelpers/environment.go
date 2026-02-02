@@ -22,12 +22,13 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
-	apiv2 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton/pb/gen/com/daml/ledger/api/v2/admin"
-	participantv30 "github.com/smartcontractkit/chainlink-canton/pb/gen/com/digitalasset/canton/admin/participant/v30"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
@@ -207,6 +208,9 @@ func dialParticipant(t *testing.T, config ParticipantConfig) Participant {
 		Name: config.Name,
 		GetToken: func(ctx context.Context) (string, error) {
 			return config.JWT, nil
+		},
+		GetConfig: func() ParticipantConfig {
+			return config
 		},
 		UserName:                     config.UserName,
 		Party:                        config.Party,
