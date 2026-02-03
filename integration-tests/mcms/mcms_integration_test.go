@@ -1318,6 +1318,7 @@ func testExecuteMCMSOp(
 			newQuorum = int64(mcmsContract.Config.GroupQuorums[0])
 		}
 		foundContract = true
+
 		break
 	}
 	require.True(t, foundContract, "Should find MCMS contract with mcmsId=%s in ACS", mcmsId)
