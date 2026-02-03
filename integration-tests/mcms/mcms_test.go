@@ -14,6 +14,8 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
@@ -650,7 +652,7 @@ func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, own
 
 	// Find the new MCMS contract ID
 	for _, event := range exerciseRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			return created.GetContractId(), nil
 		}
 	}
@@ -725,7 +727,7 @@ func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner
 
 	// Find the new MCMS contract ID
 	for _, event := range exerciseRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			return created.GetContractId(), nil
 		}
 	}

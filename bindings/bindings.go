@@ -3,6 +3,7 @@ package bindings
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/noders-team/go-daml/pkg/service/ledger"
@@ -51,4 +52,14 @@ func UnmarshalCreatedEvent[T any](event *apiv2.CreatedEvent) (*T, error) {
 	}
 
 	return &result, nil
+}
+
+// GetEntityName extracts the entity name from a template ID.
+// Template IDs are in the format "#packageID:moduleName:entityName" or "moduleName:entityName".
+func GetEntityName(templateID string) string {
+	parts := strings.Split(templateID, ":")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
 }

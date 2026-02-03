@@ -370,7 +370,7 @@ func testExecuteOpFlow(
 
 	// Get new MCMS contract ID from exercise result
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -889,7 +889,7 @@ func testReplayProtection(
 
 	// Get new MCMS contract ID
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1153,7 +1153,7 @@ func testExecuteMCMSOp(
 
 	// Get new contract ID from SetRoot result
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1289,7 +1289,7 @@ func testExecuteMCMSOp(
 		}
 		require.NoError(t, err)
 		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMS" {
+			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 				// Unmarshal the MCMS contract for type-safe access
 				mcmsContract, err := bindings.UnmarshalActiveContract[mcms.MCMS](c)
 				if err != nil {
@@ -1580,7 +1580,7 @@ func testSignatoryCheck(
 
 	// Get new MCMS contract ID
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1653,7 +1653,7 @@ func testSignatoryCheck(
 	// Verify counter was incremented
 	var counterValue int64 = -1
 	for _, event := range executeOpRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "Counter" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.Counter{}.GetTemplateID()) {
 			for _, field := range created.GetCreateArguments().GetFields() {
 				if field.GetLabel() == "value" {
 					counterValue = field.GetValue().GetInt64()
