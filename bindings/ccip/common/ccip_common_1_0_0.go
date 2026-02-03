@@ -89,7 +89,7 @@ func (t Any2CantonMessage) ToMap() map[string]interface{} {
 
 	m["messageId"] = string(t.MessageId)
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["sender"] = string(t.Sender)
 
@@ -186,7 +186,7 @@ type Any2CantonMessageReceiverGetCCVs struct {
 func (t Any2CantonMessageReceiverGetCCVs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -359,9 +359,9 @@ func (t CCVRegistryIssueVerifyTicket) ToMap() map[string]interface{} {
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["sequenceNumber"] = string(t.SequenceNumber)
+	m["sequenceNumber"] = t.SequenceNumber
 
 	m["receiver"] = t.Receiver.ToMap()
 
@@ -544,11 +544,11 @@ func (t CCVVerifyTicket) CreateCommand() *model.CreateCommand {
 	args["messageHash"] = string(t.MessageHash)
 
 	if t.SourceChainSelector != "" {
-		args["sourceChainSelector"] = string(t.SourceChainSelector)
+		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
 	if t.SequenceNumber != "" {
-		args["sequenceNumber"] = string(t.SequenceNumber)
+		args["sequenceNumber"] = t.SequenceNumber
 	}
 
 	return &model.CreateCommand{
@@ -748,7 +748,7 @@ func (t CrossChainVerifierForwardToVerifier) ToMap() map[string]interface{} {
 		return t.FeeToken
 	}()
 
-	m["feeTokenAmount"] = string(t.FeeTokenAmount)
+	m["feeTokenAmount"] = t.FeeTokenAmount
 
 	m["verifierArgs"] = string(t.VerifierArgs)
 
@@ -886,7 +886,7 @@ type GetDestChainConfig struct {
 func (t GetDestChainConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -914,7 +914,7 @@ type GetSourceChainConfig struct {
 func (t GetSourceChainConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -962,7 +962,7 @@ func (t GlobalConfig) CreateCommand() *model.CreateCommand {
 	args["instanceId"] = string(t.InstanceId)
 
 	if t.ChainSelector != "" {
-		args["chainSelector"] = string(t.ChainSelector)
+		args["chainSelector"] = t.ChainSelector
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -1133,11 +1133,11 @@ type MessageV1 struct {
 func (t MessageV1) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
-	m["sequenceNumber"] = string(t.SequenceNumber)
+	m["sequenceNumber"] = t.SequenceNumber
 
 	m["executionGasLimit"] = int64(t.ExecutionGasLimit)
 
@@ -1206,7 +1206,7 @@ func (t Receipt) ToMap() map[string]interface{} {
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
 
-	m["feeTokenAmount"] = string(t.FeeTokenAmount)
+	m["feeTokenAmount"] = t.FeeTokenAmount
 
 	m["extraArgs"] = string(t.ExtraArgs)
 
@@ -1290,7 +1290,7 @@ func (t TokenAmount) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	return m
 }
@@ -1342,7 +1342,7 @@ func (t TokenPoolCCVVerifiedTicket) CreateCommand() *model.CreateCommand {
 	args["messageHash"] = string(t.MessageHash)
 
 	if t.SourceChainSelector != "" {
-		args["sourceChainSelector"] = string(t.SourceChainSelector)
+		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -1469,14 +1469,14 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	}()
 
 	if t.Amount != "" {
-		args["amount"] = string(t.Amount)
+		args["amount"] = t.Amount
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["messageHash"] = string(t.MessageHash)
 
 	if t.SourceChainSelector != "" {
-		args["sourceChainSelector"] = string(t.SourceChainSelector)
+		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
 	return &model.CreateCommand{
@@ -1598,7 +1598,7 @@ func (t TokenSendTicket) CreateCommand() *model.CreateCommand {
 	args["sourceTokenAddress"] = string(t.SourceTokenAddress)
 
 	if t.Amount != "" {
-		args["amount"] = string(t.Amount)
+		args["amount"] = t.Amount
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -1703,7 +1703,7 @@ type TokenTransferV1 struct {
 func (t TokenTransferV1) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["sourcePoolAddress"] = string(t.SourcePoolAddress)
 
@@ -1739,7 +1739,7 @@ type UpdateDestChainConfig struct {
 func (t UpdateDestChainConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["config"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -1773,7 +1773,7 @@ type UpdateSourceChainConfig struct {
 func (t UpdateSourceChainConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["config"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }

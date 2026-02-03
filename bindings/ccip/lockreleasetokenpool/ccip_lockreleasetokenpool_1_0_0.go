@@ -330,9 +330,9 @@ type LockReleaseTokenPoolGetRequiredCCVs struct {
 func (t LockReleaseTokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["remoteChainSelector"] = string(t.RemoteChainSelector)
+	m["remoteChainSelector"] = t.RemoteChainSelector
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["finality"] = int64(t.Finality)
 
@@ -386,7 +386,7 @@ type LockReleaseTokenPoolLockOrBurn struct {
 func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["message"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -571,9 +571,9 @@ func (t LockReleaseTokenPoolVerifyCCVs) ToMap() map[string]interface{} {
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["receiver"] = t.Receiver.ToMap()
 

@@ -174,9 +174,9 @@ func (t DestChainConfig2) ToMap() map[string]interface{} {
 
 	m["defaultTxGasLimit"] = int64(t.DefaultTxGasLimit)
 
-	m["networkFeeUSD"] = string(t.NetworkFeeUSD)
+	m["networkFeeUSD"] = t.NetworkFeeUSD
 
-	m["defaultTokenFeeUSD"] = string(t.DefaultTokenFeeUSD)
+	m["defaultTokenFeeUSD"] = t.DefaultTokenFeeUSD
 
 	m["defaultTokenDestGasOverhead"] = int64(t.DefaultTokenDestGasOverhead)
 
@@ -204,7 +204,7 @@ type DestChainConfigArgs struct {
 func (t DestChainConfigArgs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["destChainConfig"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -497,7 +497,7 @@ type FeeQuoterGetTokenTransferFee struct {
 func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["token"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -539,7 +539,7 @@ type FeeQuoterQuoteGasForExec struct {
 func (t FeeQuoterQuoteGasForExec) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["nonCalldataGas"] = int64(t.NonCalldataGas)
 
@@ -587,7 +587,7 @@ func (t FeeTokenArgs) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["premiumMultiplier"] = string(t.PremiumMultiplier)
+	m["premiumMultiplier"] = t.PremiumMultiplier
 
 	return m
 }
@@ -613,9 +613,9 @@ type GasPriceUpdate struct {
 func (t GasPriceUpdate) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
-	m["usdPerUnitGas"] = string(t.UsdPerUnitGas)
+	m["usdPerUnitGas"] = t.UsdPerUnitGas
 
 	return m
 }
@@ -641,7 +641,7 @@ type GetDestChainConfig2 struct {
 func (t GetDestChainConfig2) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -669,7 +669,7 @@ type GetDestinationChainGasPrice struct {
 func (t GetDestinationChainGasPrice) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -791,7 +791,7 @@ type GetValidatedFee struct {
 func (t GetValidatedFee) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["message"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -877,7 +877,7 @@ type TimestampedPrice struct {
 func (t TimestampedPrice) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["price"] = string(t.Price)
+	m["price"] = t.Price
 
 	m["timestamp"] = t.Timestamp
 
@@ -913,7 +913,7 @@ func (t TokenPriceUpdate) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["usdPerToken"] = string(t.UsdPerToken)
+	m["usdPerToken"] = t.UsdPerToken
 
 	return m
 }
@@ -941,7 +941,7 @@ type TokenTransferFeeConfig struct {
 func (t TokenTransferFeeConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["feeUSD"] = string(t.FeeUSD)
+	m["feeUSD"] = t.FeeUSD
 
 	m["destGasOverhead"] = int64(t.DestGasOverhead)
 

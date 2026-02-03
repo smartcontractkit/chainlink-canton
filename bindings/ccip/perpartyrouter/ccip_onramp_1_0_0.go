@@ -64,7 +64,7 @@ func (t CCIPSendFromRouter) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["receiver"] = string(t.Receiver)
 
@@ -74,7 +74,7 @@ func (t CCIPSendFromRouter) ToMap() map[string]interface{} {
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
 
-	m["currentSequenceNumber"] = string(t.CurrentSequenceNumber)
+	m["currentSequenceNumber"] = t.CurrentSequenceNumber
 
 	if t.TokenSendTicket != nil {
 		m["tokenSendTicket"] = map[string]interface{}{
@@ -133,9 +133,9 @@ func (t CCIPSendFromRouterResult) ToMap() map[string]interface{} {
 
 	m["encodedMessage"] = string(t.EncodedMessage)
 
-	m["newSequenceNumber"] = string(t.NewSequenceNumber)
+	m["newSequenceNumber"] = t.NewSequenceNumber
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["verifierBlobs"] = func() []interface{} {
 		res := make([]interface{}, 0, len(t.VerifierBlobs))
@@ -212,7 +212,7 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["destChainSelector"] = string(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
 

@@ -125,9 +125,9 @@ func (t ExecuteFromRouterResult) ToMap() map[string]interface{} {
 		return t.Message
 	}()
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["sequenceNumber"] = string(t.SequenceNumber)
+	m["sequenceNumber"] = t.SequenceNumber
 
 	if t.TokenReceiveTicket != nil {
 		m["tokenReceiveTicket"] = map[string]interface{}{
@@ -196,7 +196,7 @@ func (t GetRequiredCCVsForExecute) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
 

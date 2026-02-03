@@ -236,7 +236,7 @@ func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]interface{} {
 		return t.FeeToken
 	}()
 
-	m["feeTokenAmount"] = string(t.FeeTokenAmount)
+	m["feeTokenAmount"] = t.FeeTokenAmount
 
 	m["verifierArgs"] = string(t.VerifierArgs)
 

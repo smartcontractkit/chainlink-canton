@@ -44,7 +44,7 @@ func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["receiver"] = t.Receiver.ToMap()
 
@@ -52,7 +52,7 @@ func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	return m
 }
@@ -434,11 +434,11 @@ func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]interface{} {
 
 	m["tokenReceiver"] = t.TokenReceiver.ToMap()
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = string(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -490,7 +490,7 @@ func (t TokenAdminRegistryIssueSendTicket) ToMap() map[string]interface{} {
 
 	m["sender"] = t.Sender.ToMap()
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["sourceTokenAddress"] = string(t.SourceTokenAddress)
 

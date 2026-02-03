@@ -76,7 +76,7 @@ func (t Transfer) ToMap() map[string]interface{} {
 
 	m["receiver"] = t.Receiver.ToMap()
 
-	m["amount"] = string(t.Amount)
+	m["amount"] = t.Amount
 
 	m["instrumentId"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
