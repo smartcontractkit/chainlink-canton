@@ -51,7 +51,7 @@ func (t HoldingView) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	if t.Lock != nil {
 		m["lock"] = map[string]interface{}{

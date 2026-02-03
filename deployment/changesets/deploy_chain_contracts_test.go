@@ -3,7 +3,7 @@ package changesets
 import (
 	"encoding/hex"
 	"fmt"
-	"math/big"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -104,7 +104,7 @@ func TestDeployChainContracts(t *testing.T) {
 	versionTag := "49ff34ed"
 	// ccvID := versionTag + "@" + user.PrimaryParty
 
-	chainSelector := big.NewInt(0).SetUint64(chainsel.CANTON_LOCALNET.Selector)
+	chainSelector := types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10))
 	config := CantonCSDeps[DeployChainContractsConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,

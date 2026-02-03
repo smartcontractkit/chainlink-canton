@@ -3,7 +3,7 @@ package changesets
 import (
 	"encoding/hex"
 	"fmt"
-	"math/big"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -135,7 +135,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 				GlobalConfig: sequences.GlobalConfigParams{
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
-						ChainSelector: big.NewInt(0).SetUint64(chainSelector),
+						ChainSelector: types.NUMERIC(strconv.FormatUint(chainSelector, 10)),
 						OnRampAddress: "", // TODO ?
 					},
 				},

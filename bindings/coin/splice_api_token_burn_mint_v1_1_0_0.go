@@ -216,7 +216,7 @@ func (t BurnMintOutput) ToMap() map[string]interface{} {
 
 	m["owner"] = t.Owner.ToMap()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["context"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
