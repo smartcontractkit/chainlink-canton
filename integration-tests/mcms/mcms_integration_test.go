@@ -490,8 +490,9 @@ func testExecuteOpFlow(
 	require.Len(t, eventContractIdsAsText, 1, "Should have 1 contractId passed through")
 	t.Logf("MCMSEntrypointEvent verified: instanceId=%s, functionName=%s, contractIdsAsText=%v",
 		eventInstanceId, eventFunctionName, eventContractIdsAsText)
-	// Note: The show representation in Daml may wrap the CID, so we just check it's not empty
-	assert.NotEmpty(t, eventContractIdsAsText[0], "contractIdsAsText[0] should contain the serialized Counter CID")
+	// Verify the contractId in the event contains the counter CID
+	// Note: Daml's show representation may wrap it, but it should contain the CID
+	assert.Contains(t, eventContractIdsAsText[0], "<contract-id>", "contractIdsAsText[0] should contain the Counter CID")
 
 	// ========================
 	// |   7. Verify Counter  |
@@ -1241,6 +1242,9 @@ func testExecuteMCMSOp(
 	t.Log("ExecuteMcmsOp succeeded (bob executed with disclosed contract)")
 	time.Sleep(5 * time.Second) // Wait for ACS to update on ccip participant
 
+	// Store old contract ID to verify it changed
+	oldMcmsCid := mcmsCid
+
 	// Bob can't see the created event (not an observer), so query from alice's participant
 	// The old contract should be archived, so find the active one
 	t.Log("Querying ACS from alice's participant to find the new contract...")
@@ -1282,38 +1286,44 @@ func testExecuteMCMSOp(
 	require.NoError(t, err)
 	defer acsRes.CloseSend()
 
+	foundContract := false
 	for {
 		ac, err := acsRes.Recv()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		require.NoError(t, err)
-		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
-				// Unmarshal the MCMS contract for type-safe access
-				mcmsContract, err := bindings.UnmarshalActiveContract[mcms.MCMS](c)
-				if err != nil {
-					t.Logf("Failed to unmarshal MCMS: %v", err)
-					continue
-				}
 
-				// Check if this is our MCMS by matching mcmsId
-				if string(mcmsContract.McmsId) == mcmsId {
-					newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
-					newNumSigners = int64(len(mcmsContract.Config.Signers))
-					if len(mcmsContract.Config.GroupQuorums) > 0 {
-						newQuorum = int64(mcmsContract.Config.GroupQuorums[0])
-					}
-					break
-				}
-			}
+		c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
+		if !ok {
+			continue
 		}
-		if newMcmsCid != "" {
-			break
+
+		if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() != bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
+			continue
 		}
+
+		// Unmarshal the MCMS contract for type-safe access
+		mcmsContract, err := bindings.UnmarshalActiveContract[mcms.MCMS](c)
+		require.NoError(t, err, "Failed to unmarshal MCMS contract")
+
+		// Check if this is our MCMS by matching mcmsId
+		if string(mcmsContract.McmsId) != mcmsId {
+			continue
+		}
+
+		newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
+		newNumSigners = int64(len(mcmsContract.Config.Signers))
+		if len(mcmsContract.Config.GroupQuorums) > 0 {
+			newQuorum = int64(mcmsContract.Config.GroupQuorums[0])
+		}
+		foundContract = true
+		break
 	}
-	require.NotEmpty(t, newMcmsCid, "Should find new MCMS contract in ACS")
-	t.Logf("Found new MCMS contract: %s", newMcmsCid)
+	require.True(t, foundContract, "Should find MCMS contract with mcmsId=%s in ACS", mcmsId)
+	require.NotEmpty(t, newMcmsCid, "Should have new MCMS contract ID")
+	require.NotEqual(t, oldMcmsCid, newMcmsCid, "MCMS contract ID should change after ExecuteMcmsOp (old contract archived, new created)")
+	t.Logf("Found new MCMS contract: %s (changed from %s)", newMcmsCid, oldMcmsCid)
 	t.Logf("Verified config from ACS: numSigners=%d, quorum=%d", newNumSigners, newQuorum)
 
 	require.Equal(t, int64(3), newNumSigners, "Should still have 3 signers")
