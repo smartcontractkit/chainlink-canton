@@ -33,6 +33,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 		if chainSelector <= 0 {
 			return errors.New("chain selector must be greater than zero")
 		}
+
 		return nil
 	},
 	PackageName: string(contracts.CCIPCommon),
