@@ -226,7 +226,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260129035354-bee9c994446f
+replace github.com/noders-team/go-daml => ../go-daml
 
 require (
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect

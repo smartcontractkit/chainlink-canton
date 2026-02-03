@@ -138,9 +138,9 @@ type CCIPMessageSentEvent struct {
 func (t CCIPMessageSentEvent) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+	m["destChainSelector"] = string(t.DestChainSelector)
 
-	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+	m["sequenceNumber"] = string(t.SequenceNumber)
 
 	m["messageId"] = string(t.MessageId)
 
@@ -231,7 +231,7 @@ func (t CCIPSend) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+	m["destChainSelector"] = string(t.DestChainSelector)
 
 	m["receiver"] = string(t.Receiver)
 
@@ -620,9 +620,9 @@ type ExecutionStateChangedEvent struct {
 func (t ExecutionStateChangedEvent) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = string(t.SourceChainSelector)
 
-	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+	m["sequenceNumber"] = string(t.SequenceNumber)
 
 	m["messageId"] = string(t.MessageId)
 
@@ -726,7 +726,7 @@ func (t GetRequiredCCVsForExecute2) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = string(t.SourceChainSelector)
 
 	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
 
@@ -797,7 +797,7 @@ func (t GetRequiredCCVsForSend2) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+	m["destChainSelector"] = string(t.DestChainSelector)
 
 	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
 
@@ -834,7 +834,7 @@ type GetSequenceNumber struct {
 func (t GetSequenceNumber) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+	m["destChainSelector"] = string(t.DestChainSelector)
 
 	return m
 }

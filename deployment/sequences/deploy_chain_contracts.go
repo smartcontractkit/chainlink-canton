@@ -2,7 +2,6 @@ package sequences
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/noders-team/go-daml/pkg/types"
@@ -152,8 +151,6 @@ var DeployChainContracts = operations.NewSequence(
 
 		// Deploy Global Config
 		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
-		// TODO: the bindings force a big.Int to be scaled by 10
-		(*big.Int)(input.GlobalConfig.Template.ChainSelector).Mul((*big.Int)(input.GlobalConfig.Template.ChainSelector), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(10), nil))
 		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[common.GlobalConfig]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{deps.Party},

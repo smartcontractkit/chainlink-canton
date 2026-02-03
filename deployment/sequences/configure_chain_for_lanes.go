@@ -3,6 +3,7 @@ package sequences
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/noders-team/go-daml/pkg/types"
@@ -50,8 +51,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 		globalConfigSourceChainConfigArgs := make([]common.UpdateSourceChainConfig, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
-			// TODO: the bindings force a big.Int to be scaled by 10
-			remoteSelectorScaled := big.NewInt(0).Mul(big.NewInt(0).SetUint64(remoteSelector), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(10), nil))
+			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
 
 			// Inbound / OffRamp
 			defaultInboundCCVs := make([]types.TEXT, 0, len(remoteConfig.DefaultInboundCCVs))
@@ -67,7 +67,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				onRamps = append(onRamps, types.TEXT(onRamp))
 			}
 			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.UpdateSourceChainConfig{
-				SourceChainSelector: remoteSelectorScaled,
+				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
 				Config: common.SourceChainConfig{
 					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
 					OnRampAddress:    onRamps[0], // TODO: currently only support one onRamp
