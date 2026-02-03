@@ -1,20 +1,25 @@
 module MCMS.Types where
 
+import DA.Map qualified as Map
 import DA.Time (time)
 import DA.Date (date, Month(..))
+import DA.Crypto.Text (BytesHex)
 
 -- ===========================================================================
 -- ROLES
 -- ===========================================================================
 
--- | MCMS Roles (matches EVM/Aptos architecture)
 -- Each role has its own signer config and merkle root
--- - Proposer: Can propose and execute operations
-data Role = Proposer
+-- - Bypasser: Can execute immediately without delay (high quorum)
+-- - Canceller: Can cancel pending timelock operations
+-- - Proposer: Can schedule operations with timelock delay
+data Role = Bypasser | Canceller | Proposer
   deriving (Show, Eq, Ord)
 
 -- | Convert role to text for identifiers
 roleToText : Role -> Text
+roleToText Bypasser = "bypasser"
+roleToText Canceller = "canceller"
 roleToText Proposer = "proposer"
 
 -- ===========================================================================
@@ -32,6 +37,11 @@ maxNumSigners = 200
 -- | Zero hash for empty values
 zeroHash : Text
 zeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+-- | Sentinel value for completed timelock operations
+-- Epoch + 1 second (cannot be a valid readyTime since delays are always positive)
+doneTimestamp : Time
+doneTimestamp = time (date 1970 Jan 1) 0 0 1
 
 -- ===========================================================================
 -- SIGNER CONFIGURATION
@@ -119,6 +129,22 @@ emptyExpiringRoot = ExpiringRoot
   where
     epoch = time (date 1970 Jan 1) 0 0 0
 
+data RoleState = RoleState
+  with
+    config : MultisigConfig
+    seenHashes : Map.Map BytesHex Bool
+    expiringRoot : ExpiringRoot
+    rootMetadata : RootMetadata
+  deriving (Show, Eq)
+
+emptyRoleState : RoleState
+emptyRoleState = RoleState
+  { config = emptyConfig
+  , seenHashes = Map.empty
+  , expiringRoot = emptyExpiringRoot
+  , rootMetadata = emptyRootMetadata
+  }
+
 -- ===========================================================================
 -- HELPER FUNCTIONS
 -- ===========================================================================
@@ -166,3 +192,25 @@ data AdminParams
       }
   | AP_ClearRoot                       -- No parameters needed
   deriving (Show, Eq)
+
+-- | A single call to be executed by the timelock
+-- Represents one operation in a scheduled batch
+data TimelockCall = TimelockCall
+  with
+    targetInstanceId : Text    -- Target contract's stable identifier (MCMS instanceId for self-dispatch)
+    functionName : Text        -- Function to call on target
+    operationData : Text       -- Hex-encoded parameters
+  deriving (Show, Eq, Ord)
+
+data BlockedFunction = BlockedFunction
+  with
+    targetInstanceId : Text
+    functionName : Text
+  deriving (Show, Eq, Ord)
+
+-- | Convert integer to Role (for codec deserialization)
+intToRole : Int -> Optional Role
+intToRole 0 = Some Proposer
+intToRole 1 = Some Canceller
+intToRole 2 = Some Bypasser
+intToRole _ = None

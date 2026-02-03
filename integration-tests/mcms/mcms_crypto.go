@@ -64,6 +64,22 @@ type MCMSOp struct {
 	OperationData    string // hex encoded
 }
 
+// TimelockCall matches Canton TimelockCall
+type TimelockCall struct {
+	TargetInstanceId string
+	FunctionName     string
+	OperationData    string // hex encoded
+}
+
+// BlockedFunction matches Canton BlockedFunction (per-target blocked function)
+type BlockedFunction struct {
+	TargetInstanceId string
+	FunctionName     string
+}
+
+// ZeroHash represents "no predecessor" in timelock operations
+const ZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
 // MCMSRootMetadata matches Canton RootMetadata
 type MCMSRootMetadata struct {
 	ChainId              int
@@ -80,9 +96,9 @@ type RawSignature struct {
 	S         string // Signature s component (64 hex chars)
 }
 
-// MakeMcmsId creates mcmsId from base ID and role (e.g., "mcms-001-proposer")
-func MakeMcmsId(baseId string, role MCMSRole) string {
-	return baseId + "-" + role.String()
+// MakeMcmsId creates multisigId from MCMS instanceId and role (e.g., "mcms-001@partyId-proposer")
+func MakeMcmsId(instanceId string, role MCMSRole) string {
+	return instanceId + "-" + role.String()
 }
 
 // MCMSSigner wraps a private key with MCMS-specific functionality
@@ -214,6 +230,53 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 	data, _ := hex.DecodeString(encoded)
 
 	return hex.EncodeToString(crypto.Keccak256(data))
+}
+
+// HashTimelockOpId computes the operation ID for timelock operations
+// Matches Canton's hashTimelockOpId: keccak256(encodedCalls || predecessor || salt)
+func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
+	// Encode calls
+	var encodedCalls string
+	for _, call := range calls {
+		encodedCalls += AsciiToHex(call.TargetInstanceId) +
+			AsciiToHex(call.FunctionName) +
+			EncodeOperationDataForHash(call.OperationData)
+	}
+
+	// Combine with predecessor and salt
+	encoded := encodedCalls + AsciiToHex(predecessor) + AsciiToHex(salt)
+
+	data, err := hex.DecodeString(encoded)
+	if err != nil {
+		panic(fmt.Sprintf("HashTimelockOpId: invalid hex encoding: %v", err))
+	}
+	return hex.EncodeToString(crypto.Keccak256(data))
+}
+
+// EncodeOperationDataForHash matches the on-chain MCMS.Crypto.encodeOperationData:
+// - If operationData is valid hex (even length, hex digits only), treat it as raw bytes (already hex)
+// - Otherwise, treat it as ASCII and hex-encode it
+func EncodeOperationDataForHash(operationData string) string {
+	if isValidHex(operationData) {
+		return operationData
+	}
+	return AsciiToHex(operationData)
+}
+
+func isValidHex(s string) bool {
+	if len(s)%2 != 0 {
+		return false
+	}
+	for _, c := range s {
+		switch {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'f':
+		case c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // ===========================================================================
@@ -804,4 +867,32 @@ func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 	}
 
 	return result, nil
+}
+
+// EncodeBlockedFunction encodes a BlockedFunction to hex bytes
+// Format matches Canton MCMS.Codec.encodeBlockedFunction:
+//
+//	encodeText(targetInstanceId) <> encodeText(functionName)
+//
+// where encodeText = uint8(len) <> asciiBytes
+func EncodeBlockedFunction(bf BlockedFunction) string {
+	var buf []byte
+	// targetInstanceId
+	targetBytes := []byte(bf.TargetInstanceId)
+	buf = append(buf, byte(len(targetBytes)))
+	buf = append(buf, targetBytes...)
+	// functionName
+	fnBytes := []byte(bf.FunctionName)
+	buf = append(buf, byte(len(fnBytes)))
+	buf = append(buf, fnBytes...)
+	return hex.EncodeToString(buf)
+}
+
+// EncodeSelfDispatchSetConfig encodes role + SetConfigParams for self-dispatch set_config
+// Format matches Canton MCMS.Codec.encodeSelfDispatchSetConfig:
+//
+//	uint8(roleToInt(role)) <> encodeSetConfigParams(params)
+func EncodeSelfDispatchSetConfig(role MCMSRole, params SetConfigParams) string {
+	roleByte := hex.EncodeToString([]byte{byte(role)})
+	return roleByte + EncodeSetConfigParams(params)
 }

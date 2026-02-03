@@ -82,9 +82,10 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 
 	chainId := 1
 	baseMcmsId := "mcms-test-001"
-	mcmsId := MakeMcmsId(baseMcmsId, MCMSRoleProposer)
+	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, mcmsOwner)
+	proposerMultisigId := MakeMcmsId(mcmsInstanceId, MCMSRoleProposer)
 
-	mcmsCid, err := createMCMS(t.Context(), participant, mcmsOwner, chainId, mcmsId)
+	mcmsCid, err := createMCMS(t.Context(), participant, mcmsOwner, chainId, baseMcmsId)
 	require.NoError(t, err)
 	fmt.Printf("Created MCMS: %s\n", mcmsCid)
 
@@ -103,8 +104,8 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	// ===========================================================================
 	fmt.Println("\n=== Step 4: Build Proposal ===")
 
-	proposal := NewMCMSProposal(chainId, mcmsId, 0, false).
-		AddOperation("counter", "increment", "").
+	proposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
+		AddOperation("counter@owner", "increment", "").
 		Build()
 
 	fmt.Printf("Merkle Root: %s\n", proposal.GetRoot())
@@ -319,7 +320,7 @@ func TestMCMSCrypto_ProposalBuilder(t *testing.T) {
 	preOpCount := 0
 
 	proposal := NewMCMSProposal(chainId, multisigId, preOpCount, false).
-		AddOperation("counter", "increment", "").
+		AddOperation("counter@owner", "increment", "").
 		Build()
 
 	fmt.Println("\n-- Metadata --")
@@ -461,7 +462,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 	multisigId := "mcms-test-001-proposer"
 
 	proposal := NewMCMSProposal(chainId, multisigId, 0, false).
-		AddOperation("counter", "increment", "").
+		AddOperation("counter@owner", "increment", "").
 		Build()
 
 	fmt.Println("\n-- Metadata --")
@@ -536,7 +537,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 // HELPER FUNCTIONS
 // ===========================================================================
 
-func createMCMS(ctx context.Context, participant testhelpers.Participant, owner string, chainId int, mcmsId string) (string, error) {
+func createMCMS(ctx context.Context, participant testhelpers.Participant, owner string, chainId int, baseMcmsId string) (string, error) {
 	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
 	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
 	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -546,6 +547,34 @@ func createMCMS(ctx context.Context, participant testhelpers.Participant, owner 
 			{Label: "opCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 		},
 	}}}
+	emptyRootMetadata := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+		{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+		{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
+		{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+		{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+		{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+	}}}}
+	configValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
+			{Label: "groupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: makeInt64List(NumGroups, 0)}}}},
+			{Label: "groupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: makeInt64List(NumGroups, 0)}}}},
+		},
+	}}}
+	roleStateValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "config", Value: configValue},
+			{Label: "seenHashes", Value: emptyMap},
+			{Label: "expiringRoot", Value: emptyExpiringRoot},
+			{Label: "rootMetadata", Value: emptyRootMetadata},
+		},
+	}}}
+	minDelayValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
+		Fields: []*apiv2.RecordField{
+			{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+		},
+	}}}
+	emptyBlockedFunctions := &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}
 
 	createRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -561,26 +590,14 @@ func createMCMS(ctx context.Context, participant testhelpers.Participant, owner 
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: contracts.MustNewInstanceID("mcms", owner).String()}}},
-								{Label: "role", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
+								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: fmt.Sprintf("%s@%s", baseMcmsId, owner)}}},
 								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(chainId)}}},
-								{Label: "mcmsId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: mcmsId}}},
-								{Label: "config", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-									Fields: []*apiv2.RecordField{
-										{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
-										{Label: "groupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: makeInt64List(NumGroups, 0)}}}},
-										{Label: "groupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: makeInt64List(NumGroups, 0)}}}},
-									},
-								}}}},
-								{Label: "seenHashes", Value: emptyMap},
-								{Label: "expiringRoot", Value: emptyExpiringRoot},
-								{Label: "rootMetadata", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-									{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-									{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-									{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-									{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-									{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-								}}}}},
+								{Label: "proposer", Value: roleStateValue},
+								{Label: "canceller", Value: roleStateValue},
+								{Label: "bypasser", Value: roleStateValue},
+								{Label: "minDelay", Value: minDelayValue},
+								{Label: "blockedFunctions", Value: emptyBlockedFunctions},
+								{Label: "timelockTimestamps", Value: emptyMap},
 							}},
 						},
 					},
@@ -631,6 +648,7 @@ func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, own
 							Choice:     "SetConfig",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
+									{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 									{Label: "newSigners", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signerInfoValues}}}},
 									{Label: "newGroupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupQuorumValues}}}},
 									{Label: "newGroupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupParentValues}}}},
@@ -704,6 +722,7 @@ func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner
 							Choice:     "SetRoot",
 							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 								Fields: []*apiv2.RecordField{
+									{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
 									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
 									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},

@@ -4,7 +4,7 @@ import DA.Crypto.Text (BytesHex, keccak256, secp256k1WithEcdsaOnly)
 import DA.Text qualified as T
 import DA.Time (subTime)
 import DA.Date (Month(..), datetime)
-import MCMS.Types
+import MCMS.Types (Op(..), RootMetadata(..), TimelockCall(..))
 
 -- ===========================================================================
 -- RAW SIGNATURE TYPE
@@ -148,6 +148,55 @@ hashMetadataLeafNative meta =
            <> (if meta.overridePreviousRoot then "01" else "00")
   in
     keccak256 encoded
+
+-- ===========================================================================
+-- TIMELOCK HASH FUNCTIONS
+-- ===========================================================================
+
+-- opId = keccak256(abi.encode(calls, predecessor, salt))
+hashTimelockOpId : [TimelockCall] -> Text -> Text -> BytesHex
+hashTimelockOpId calls predecessor salt =
+  let
+    -- Encode each call
+    encodedCalls = foldl (<>) "" (map encodeTimelockCall calls)
+    -- Combine with predecessor and salt
+    encoded = encodedCalls <> asciiToHex predecessor <> asciiToHex salt
+  in
+    keccak256 encoded
+
+-- | Encode a single timelock call for hashing
+encodeTimelockCall : TimelockCall -> BytesHex
+encodeTimelockCall call =
+  asciiToHex call.targetInstanceId
+  <> asciiToHex call.functionName
+  <> encodeOperationData call.operationData
+
+-- | Encode operationData for hashing.
+-- If it's valid hex (even length, hex digits only), treat it as raw bytes (already hex).
+-- Otherwise, treat it as ASCII text and hex-encode it.
+encodeOperationData : Text -> BytesHex
+encodeOperationData t =
+  if isValidHex t then t else asciiToHex t
+
+isValidHex : Text -> Bool
+isValidHex t =
+  (T.length t % 2 == 0) && allHexDigits t
+
+allHexDigits : Text -> Bool
+allHexDigits t =
+  if T.length t == 0
+    then True
+    else
+      let c = T.take 1 t
+          rest = T.drop 1 t
+      in isHexDigit c && allHexDigits rest
+
+isHexDigit : Text -> Bool
+isHexDigit c =
+  c == "0" || c == "1" || c == "2" || c == "3" || c == "4" ||
+  c == "5" || c == "6" || c == "7" || c == "8" || c == "9" ||
+  c == "a" || c == "b" || c == "c" || c == "d" || c == "e" || c == "f" ||
+  c == "A" || c == "B" || c == "C" || c == "D" || c == "E" || c == "F"
 
 -- ===========================================================================
 -- MERKLE PROOF VERIFICATION
