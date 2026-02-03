@@ -220,7 +220,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	versionTag := "49ff34ed"
 	ccvID := versionTag + "@" + partyCCIP
 
-	chainSelectorBig := big.NewInt(0).SetUint64(chainsel.CANTON_LOCALNET.Selector)
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
 		t.Context,
@@ -259,7 +258,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				GlobalConfig: sequences.GlobalConfigParams{
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
-						ChainSelector: chainSelectorBig,
+						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
 						OnRampAddress: "", // TODO ?
 					},
 				},
