@@ -2,7 +2,7 @@ package global_config
 
 import (
 	"errors"
-	"math/big"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -24,14 +24,15 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 		if template.CcipOwner == "" {
 			return errors.New("ccip owner cannot be empty")
 		}
-		if (*big.Int)(template.ChainSelector).Cmp(big.NewInt(0)) <= 0 {
+
+		chainSelector, err := strconv.ParseInt(string(template.ChainSelector), 10, 64)
+		if err != nil {
+			return err
+		}
+
+		if chainSelector <= 0 {
 			return errors.New("chain selector must be greater than zero")
 		}
-		// TODO - what's this field?
-		// if template.OnRampAddress == "" {
-		// 	return errors.New("on ramp address cannot be empty")
-		// }
-
 		return nil
 	},
 	PackageName: string(contracts.CCIPCommon),

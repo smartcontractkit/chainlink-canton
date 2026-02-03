@@ -2,7 +2,6 @@ package sequences
 
 import (
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/Masterminds/semver/v3"
@@ -90,7 +89,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				Args:          arg,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, (*big.Int)(arg.SourceChainSelector).String(), err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.SourceChainSelector), err)
 			}
 		}
 
