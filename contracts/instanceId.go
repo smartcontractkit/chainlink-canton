@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
+
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -46,6 +48,13 @@ func MustNewInstanceID(prefixHint string, party string) InstanceID {
 	}
 
 	return instanceID
+}
+
+func (i InstanceID) InstanceAddress() InstanceAddress {
+	h := sha3.NewLegacyKeccak256()
+	h.Write([]byte(i))
+
+	return InstanceAddress(h.Sum(nil))
 }
 
 func (i InstanceID) String() string {

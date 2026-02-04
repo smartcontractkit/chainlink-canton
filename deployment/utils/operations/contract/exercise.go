@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
@@ -32,10 +34,10 @@ func (o ExerciseOutput) Executed() bool {
 
 type ChoiceInput[ARGS any] struct {
 	ChainSelector uint64 `json:"chainSelector"`
-	// The InstanceID this operation is targeting. Will be resolved to an active contract.
-	InstanceID contracts.InstanceID `json:"instanceId"`
-	ActAs      []string             `json:"act_as"`
-	Args       ARGS                 `json:"args"`
+	// The InstanceAddress this operation is targeting. Will be resolved to an active contract.
+	InstanceAddress contracts.InstanceAddress `json:"instanceAddress"`
+	ActAs           []string                  `json:"act_as"`
+	Args            ARGS                      `json:"args"`
 }
 
 type ExerciseParams[ARGS any] struct {
@@ -68,12 +70,12 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				}
 			}
 
-			// Find contract by InstanceID
-			contractID, err := findContractByInstanceID(b, deps.BindingClient, deps.Party, params.Template.GetTemplateID(), input.InstanceID)
+			// Find contract by InstanceAddress
+			createEvent, err := FindCreateEventByInstanceAddress(b.GetContext(), b.Logger, deps.BindingClient, deps.Party, params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
-				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceID: %w", err)
+				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
-			exerciseCommand := params.Method(contractID, input.Args)
+			exerciseCommand := params.Method(createEvent.ContractID, input.Args)
 
 			submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(b.GetContext(), &model.SubmitAndWaitRequest{
 				Commands: &model.Commands{
@@ -96,12 +98,12 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 	)
 }
 
-func findContractByInstanceID(b operations.Bundle, bindingClient *client.DamlBindingClient, party, templateId string, instanceID contracts.InstanceID) (contractId string, err error) {
-	currentOffset, err := bindingClient.StateService.GetLedgerEnd(b.GetContext(), &model.GetLedgerEndRequest{})
+func FindCreateEventByInstanceAddress(ctx context.Context, logger logger.Logger, bindingClient *client.DamlBindingClient, party, templateId string, instanceAddress contracts.InstanceAddress) (*model.CreatedEvent, error) {
+	currentOffset, err := bindingClient.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
 	if err != nil {
-		return "", fmt.Errorf("failed to get ledger end: %w", err)
+		return nil, fmt.Errorf("failed to get ledger end: %w", err)
 	}
-	responseChan, errChan := bindingClient.StateService.GetActiveContracts(b.GetContext(), &model.GetActiveContractsRequest{
+	responseChan, errChan := bindingClient.StateService.GetActiveContracts(ctx, &model.GetActiveContractsRequest{
 		ActiveAtOffset: currentOffset.Offset,
 		EventFormat: &model.EventFormat{
 			FiltersByParty: map[string]*model.Filters{
@@ -121,16 +123,18 @@ func findContractByInstanceID(b operations.Bundle, bindingClient *client.DamlBin
 		},
 	})
 
+	var createEvent *model.CreatedEvent
+
 	for {
 		select {
 		case resp, ok := <-responseChan:
 			if !ok {
 				// Channel closed, stream ended
-				if contractId == "" {
-					return "", fmt.Errorf("no active contract found for InstanceID %s", instanceID.String())
+				if createEvent == nil {
+					return nil, fmt.Errorf("no active contract found for InstanceAddress %s", instanceAddress.String())
 				}
 
-				return contractId, nil
+				return createEvent, nil
 			}
 			if resp != nil && resp.ContractEntry != nil {
 				if entry, ok := resp.ContractEntry.(*model.ActiveContractEntry); ok {
@@ -138,7 +142,7 @@ func findContractByInstanceID(b operations.Bundle, bindingClient *client.DamlBin
 
 					createArguments, ok := entry.ActiveContract.CreatedEvent.CreateArguments.(*v2.Record)
 					if !ok {
-						b.Logger.Debugw("Skipping contract with unexpected create arguments type", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
+						logger.Debugw("Skipping contract with unexpected create arguments type", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
 						continue
 					}
 					var contractInstanceId string
@@ -149,28 +153,33 @@ func findContractByInstanceID(b operations.Bundle, bindingClient *client.DamlBin
 						}
 					}
 					if contractInstanceId == "" {
-						b.Logger.Debugw("Skipping contract with missing instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
+						logger.Debugw("Skipping contract with missing instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
 						continue
 					}
-					if instanceID.String() != contractInstanceId {
+					instanceID := contracts.InstanceID(contractInstanceId)
+					if !instanceID.Valid() {
+						logger.Debugw("Skipping contract with invalid instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID, "instanceId", contractInstanceId)
+						continue
+					}
+					if instanceAddress != instanceID.InstanceAddress() {
 						// Not the contract we're looking for
-						b.Logger.Debugw("Skipping contract with different instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID, "instanceId", contractInstanceId)
+						logger.Debugw("Skipping contract with different instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID, "instanceId", contractInstanceId)
 						continue
 					}
 
-					if contractId != "" {
-						// ContractID was already found. This is an error, InstanceID must be unique
-						return "", fmt.Errorf("multiple active contracts found for InstanceID %s", instanceID.String())
+					if createEvent != nil {
+						// contract was already found. This is an error, InstanceID must be unique
+						return nil, fmt.Errorf("multiple active contracts found for InstanceID %s", instanceID.String())
 					}
-					contractId = entry.ActiveContract.CreatedEvent.ContractID
+					createEvent = entry.ActiveContract.CreatedEvent
 				}
 			}
 		case err := <-errChan:
 			if err != nil {
-				return "", fmt.Errorf("failed to get active contracts: %w", err)
+				return nil, fmt.Errorf("failed to get active contracts: %w", err)
 			}
-		case <-b.GetContext().Done():
-			return "", b.GetContext().Err()
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
 	}
 }
