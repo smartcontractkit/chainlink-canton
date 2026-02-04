@@ -9,7 +9,9 @@ module CCIP.MessageCodecV1
   , encodeUint64
   , encodeUint256
   , encodeInstrumentId
-  , encodePartyId
+  , encodePartyAddress
+  , encodeInstanceAddress
+  , computeCCVAndExecutorHash
   , extractBytes
   , decodeMessageV1
   , decodeTokenTransfer
@@ -19,7 +21,6 @@ module CCIP.MessageCodecV1
   , decodeUint64
   , decodeUint256
   , decodeInstrumentId
-  , decodePartyId
   , messageId
   ) where
 
@@ -141,14 +142,8 @@ encodeTokenTransferV1 tokenTransfer =
 
 encodeInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
 encodeInstrumentId instrumentId =
-    let
-        partyId = encodePartyId instrumentId.admin
-        id = DA.Crypto.Text.toHex instrumentId.id
-    in
-        (fromSome (encodeUint8 (byteCount partyId)))
-        <> partyId
-        <> (fromSome (encodeUint8 (byteCount id)))
-        <> id
+    let combined = instrumentId.id <> "@" <> partyToText instrumentId.admin
+    in DA.Crypto.Text.toHex combined
 
 encodeUint8 : Int -> Optional BytesHex
 encodeUint8 n =
@@ -232,11 +227,47 @@ encodeUint256 n =
         in
             Some paddedHex
 
-encodePartyId : Party -> BytesHex
-encodePartyId party =
-    let partyText = partyToText party
+-- Compute 32-byte party address from Party.
+-- Returns keccak256(partyToText(party)) for privacy-preserving cross-chain addressing.
+encodePartyAddress : Party -> BytesHex
+encodePartyAddress party =
+    let partyHex = DA.Crypto.Text.toHex (partyToText party)
+    in keccak256 partyHex
+
+-- Compute 32-byte instance address from instanceId and owner.
+-- Returns keccak256(instanceId + "@" + partyId) for privacy-preserving contract addressing.
+-- The "@" separator ensures uniqueness and prevents ambiguity between different (instanceId, owner) pairs.
+encodeInstanceAddress : Text -> Party -> BytesHex
+encodeInstanceAddress instId owner =
+    let combined = instId <> "@" <> partyToText owner
+        combinedHex = DA.Crypto.Text.toHex combined
+    in keccak256 combinedHex
+
+-- Compute ccvAndExecutorHash using chain-agnostic format.
+-- Format: keccak256(addressLength || ccv1 || ccv2 || ... || executor)
+-- For Canton: addressLength = 32 (1 byte), each address is 32 bytes.
+-- This matches the offchain ComputeCCVAndExecutorHash which derives length from executor.
+computeCCVAndExecutorHash : [BytesHex] -> BytesHex -> BytesHex
+computeCCVAndExecutorHash ccvAddresses executorAddress =
+    let
+        -- Validate executor is 32 bytes
+        _ = if byteCount executorAddress /= 32
+            then error ("computeCCVAndExecutorHash: executor must be 32 bytes, got " <> show (byteCount executorAddress))
+            else ()
+
+        -- Validate all CCV addresses are 32 bytes
+        validateAddr addr =
+            if byteCount addr /= 32
+            then error ("computeCCVAndExecutorHash: CCV address must be 32 bytes, got " <> show (byteCount addr))
+            else addr
+        validCCVs = map validateAddr ccvAddresses
+
+        -- Encode: 1 byte length prefix (32) + all CCVs + executor
+        lengthPrefix = fromSome (encodeUint8 32)
+        encodedCCVs = foldl (<>) "" validCCVs
+        encoded = lengthPrefix <> encodedCCVs <> executorAddress
     in
-        DA.Crypto.Text.toHex partyText
+        keccak256 encoded
 
 -- Helpers
 
@@ -412,36 +443,18 @@ decodeUint256 hex =
 decodeInstrumentId : BytesHex -> Optional Splice.Api.Token.HoldingV1.InstrumentId
 decodeInstrumentId encoded =
     do
-        -- Extract partyId length (1 byte)
-        partyIdLenHex <- extractBytes encoded 0 1
-        partyIdLen <- decodeUint8 partyIdLenHex
-        
-        -- Extract partyId hex
-        partyIdHex <- extractBytes encoded 1 partyIdLen
-        
-        -- Decode partyId
-        admin <- decodePartyId partyIdHex
-        
-        -- Extract id length (1 byte)
-        idLenHex <- extractBytes encoded (1 + partyIdLen) 1
-        idLen <- decodeUint8 idLenHex
-        
-        -- Extract id hex
-        idHex <- extractBytes encoded (2 + partyIdLen) idLen
-        
-        -- Decode id from hex to Int
-        id <- DA.Crypto.Text.fromHex idHex
-        
-        return Splice.Api.Token.HoldingV1.InstrumentId
-            { admin = admin
-            , id = id
-            }
-
-decodePartyId : BytesHex -> Optional Party
-decodePartyId hex =
-    let partyText = fromSome(DA.Crypto.Text.fromHex hex)
-    in
-        partyFromText partyText
+        -- Decode hex to text (format: id@party)
+        combined <- DA.Crypto.Text.fromHex encoded
+        -- Find the "@" separator
+        let parts = Text.splitOn "@" combined
+        case parts of
+            [idText, partyText] -> do
+                admin <- partyFromText partyText
+                return Splice.Api.Token.HoldingV1.InstrumentId
+                    { admin = admin
+                    , id = idText
+                    }
+            _ -> None
 
 -- Helpers
 
