@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "be4d1c285939233567242a2682dbeb54cdc6cc5fe57ef3b592a814eec39885db"
+const PackageName = "ccip-onramp"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -46,27 +46,17 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // CCIPSendFromRouter is a Record type
 type CCIPSendFromRouter struct {
-	RouterPartyOwner PARTY `json:"routerPartyOwner"`
-
-	GlobalConfigCid CONTRACT_ID `json:"globalConfigCid"`
-
-	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-
-	DestChainSelector NUMERIC `json:"destChainSelector"`
-
-	Receiver TEXT `json:"receiver"`
-
-	Payload TEXT `json:"payload"`
-
-	ExecutionGasLimit INT64 `json:"executionGasLimit"`
-
-	CcipReceiveGasLimit INT64 `json:"ccipReceiveGasLimit"`
-
-	CurrentSequenceNumber NUMERIC `json:"currentSequenceNumber"`
-
-	TokenSendTicket *CONTRACT_ID `json:"tokenSendTicket"`
-
-	CcvTickets []CONTRACT_ID `json:"ccvTickets"`
+	RouterPartyOwner      PARTY         `json:"routerPartyOwner"`
+	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
+	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	DestChainSelector     NUMERIC       `json:"destChainSelector"`
+	Receiver              TEXT          `json:"receiver"`
+	Payload               TEXT          `json:"payload"`
+	ExecutionGasLimit     INT64         `json:"executionGasLimit"`
+	CcipReceiveGasLimit   INT64         `json:"ccipReceiveGasLimit"`
+	CurrentSequenceNumber NUMERIC       `json:"currentSequenceNumber"`
+	TokenSendTicket       *CONTRACT_ID  `json:"tokenSendTicket"`
+	CcvTickets            []CONTRACT_ID `json:"ccvTickets"`
 }
 
 // ToMap converts CCIPSendFromRouter to a map for DAML arguments
@@ -137,19 +127,13 @@ func (t *CCIPSendFromRouter) UnmarshalJSON(data []byte) error {
 
 // CCIPSendFromRouterResult is a Record type
 type CCIPSendFromRouterResult struct {
-	MessageId TEXT `json:"messageId"`
-
-	EncodedMessage TEXT `json:"encodedMessage"`
-
-	NewSequenceNumber NUMERIC `json:"newSequenceNumber"`
-
-	DestChainSelector NUMERIC `json:"destChainSelector"`
-
-	VerifierBlobs []TEXT `json:"verifierBlobs"`
-
-	MessageSentObservers []PARTY `json:"messageSentObservers"`
-
-	Receipts []Receipt `json:"receipts"`
+	MessageId            TEXT      `json:"messageId"`
+	EncodedMessage       TEXT      `json:"encodedMessage"`
+	NewSequenceNumber    NUMERIC   `json:"newSequenceNumber"`
+	DestChainSelector    NUMERIC   `json:"destChainSelector"`
+	VerifierBlobs        []TEXT    `json:"verifierBlobs"`
+	MessageSentObservers []PARTY   `json:"messageSentObservers"`
+	Receipts             []Receipt `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
@@ -208,15 +192,11 @@ func (t *CCIPSendFromRouterResult) UnmarshalJSON(data []byte) error {
 
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
-	GlobalConfigCid CONTRACT_ID `json:"globalConfigCid"`
-
-	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-
-	DestChainSelector NUMERIC `json:"destChainSelector"`
-
-	HasTokenTransfer BOOL `json:"hasTokenTransfer"`
-
-	InstrumentId *InstrumentId `json:"instrumentId"`
+	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
+	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	DestChainSelector     NUMERIC       `json:"destChainSelector"`
+	HasTokenTransfer      BOOL          `json:"hasTokenTransfer"`
+	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
 // ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
@@ -269,17 +249,21 @@ func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
 
 // OnRamp is a Template type
 type OnRamp struct {
-	CcipOwner PARTY `json:"ccipOwner"`
-
-	InstanceId TEXT `json:"instanceId"`
+	CcipOwner  PARTY `json:"ccipOwner"`
+	InstanceId TEXT  `json:"instanceId"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t OnRamp) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t OnRamp) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t OnRamp) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
@@ -291,6 +275,22 @@ func (t OnRamp) CreateCommand() *model.CreateCommand {
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t OnRamp) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
 		Arguments:  args,
 	}
 }
@@ -308,40 +308,64 @@ func (t *OnRamp) UnmarshalJSON(data []byte) error {
 // Choice methods for OnRamp
 
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this OnRamp contract
+// This method uses the package name in the template ID
 func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
 		Choice:     "GetRequiredCCVsForSend",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetRequiredCCVsForSendWithPackageID exercises the GetRequiredCCVsForSend choice using the provided package ID instead of package name
+func (t OnRamp) GetRequiredCCVsForSendWithPackageID(contractID string, packageID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForSend",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this OnRamp contract
+// This method uses the package name in the template ID
 func (t OnRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
 		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
 
-		Arguments: map[string]interface{}{},
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // CCIPSendFromRouter exercises the CCIPSendFromRouter choice on this OnRamp contract
+// This method uses the package name in the template ID
 func (t OnRamp) CCIPSendFromRouter(contractID string, args CCIPSendFromRouter) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OnRamp", "OnRamp"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
 		Choice:     "CCIPSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// CCIPSendFromRouterWithPackageID exercises the CCIPSendFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) CCIPSendFromRouterWithPackageID(contractID string, packageID string, args CCIPSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "CCIPSendFromRouter",
+		Arguments:  argsToMap(args),
 	}
 }
