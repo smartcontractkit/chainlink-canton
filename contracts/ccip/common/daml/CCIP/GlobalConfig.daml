@@ -1,26 +1,29 @@
--- | global configuration for ccip, shared across all perpartyrouters.
+-- | Global configuration for CCIP, shared across all PerPartyRouters.
 module CCIP.GlobalConfig where
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.CCVId
+import CCIP.RawInstanceAddress (RawInstanceAddress)
 
+
+-- | Configuration for a destination chain.
 data DestChainConfig = DestChainConfig
     with
         isEnabled : Bool
-        defaultExecutor : BytesHex
+        defaultExecutor : RawInstanceAddress
         offRampAddress : BytesHex
-        laneMandatedCCVs : [CCIP.CCVId.CCVId]
-        defaultCCVs : [CCIP.CCVId.CCVId]
+        laneMandatedCCVs : [RawInstanceAddress]
+        defaultCCVs : [RawInstanceAddress]
     deriving (Eq, Show)
 
+-- | Configuration for a source chain.
 data SourceChainConfig = SourceChainConfig
     with
         isEnabled : Bool
         onRampAddress : BytesHex
-        laneMandatedCCVs : [CCIP.CCVId.CCVId]
-        defaultCCVs : [CCIP.CCVId.CCVId]
+        laneMandatedCCVs : [RawInstanceAddress]
+        defaultCCVs : [RawInstanceAddress]
     deriving (Eq, Show)
 
 template GlobalConfig
