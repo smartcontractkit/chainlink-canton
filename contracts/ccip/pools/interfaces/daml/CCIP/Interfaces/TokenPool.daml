@@ -6,13 +6,13 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
-import qualified CCIP.CCVId
 import qualified CCIP.Client
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OffRamp
 import qualified CCIP.OnRamp
+import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -25,13 +25,13 @@ data TransferDirection = Outbound | Inbound
 interface ITokenPool where
     viewtype TokenPoolView
 
-    tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [CCIP.CCVId.CCVId]
+    tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [RawInstanceAddress]
     tokenPool_verifyCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyCCVs -> Update (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
 
-    -- Get required CCVs for a transfer based on direction, amount, finality, etc.
-    nonconsuming choice TokenPool_GetRequiredCCVs : [CCIP.CCVId.CCVId]
+    -- Get required CCV raw instance addresses for a transfer based on direction, amount, finality, etc.
+    nonconsuming choice TokenPool_GetRequiredCCVs : [RawInstanceAddress]
         with
             remoteChainSelector : Numeric 0
             amount : Numeric 0
