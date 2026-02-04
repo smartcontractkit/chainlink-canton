@@ -53,7 +53,6 @@ setup = script do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults = verifierResults1
             receiver = owner
             caller = owner
@@ -78,7 +77,6 @@ setup = script do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults = verifierResults2
             receiver = owner
             caller = owner
@@ -119,7 +117,6 @@ setup = script do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults = verifierResults4
             receiver = owner
             caller = owner
@@ -143,7 +140,6 @@ setup = script do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults = verifierResults5
             receiver = owner
             caller = owner
@@ -167,7 +163,6 @@ setup = script do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults = verifierResults6
             receiver = owner
             caller = owner
@@ -218,7 +213,6 @@ setup = script do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults =
                 "01234567" <> -- invalid version tag
                 "0004" <>     -- signature length too long
@@ -229,7 +223,6 @@ setup = script do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "ffff" <>     -- signature length too long
@@ -240,7 +233,6 @@ setup = script do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             message = msg
-            messageId = hashedMsg
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "0001" <>     -- signature length too short
