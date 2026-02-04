@@ -149,6 +149,7 @@ template TokenAdminRegistry
         nonconsuming choice TokenAdminRegistry_IssueSendTicket : ContractId CCIP.Tickets.TokenSendTicket
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                poolInstanceId : Text  -- Pool's instanceId for address computation
                 sender : Party
                 amount : Numeric 0
                 sourceTokenAddress : BytesHex
@@ -172,6 +173,7 @@ template TokenAdminRegistry
                                     abort "TokenAdminRegistry_IssueSendTicket: Caller is not the registered pool"
                                 else
                                     create CCIP.Tickets.TokenSendTicket with
+                                        poolInstanceId = poolInstanceId
                                         poolOwner = poolOwner
                                         ccipOwner = owner
                                         sender = sender
