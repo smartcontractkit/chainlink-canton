@@ -1,30 +1,38 @@
--- | ticket contracts for cross-participant ccip communication.
+-- | Ticket contracts for cross-participant CCIP communication.
 module CCIP.Tickets where
 
 import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.CCVId
 import qualified CCIP.MessageCodecV1
 
 
+-- | Issuer type for receipts.
+data IssuerType
+    = IssuerType_CCV      -- Cross-chain verifier
+    | IssuerType_Pool     -- Token pool
+    | IssuerType_Network  -- Network/protocol fee
+    deriving (Eq, Show)
+
 -- | Fee/gas accounting for a single entity (CCV, pool, executor, or network).
--- Matches EVM Receipt structure for cross-chain fee transparency.
 data Receipt = Receipt
     with
-        issuer : Text              -- CCV ID (e.g., "49ff34ed@party"), pool ID, or "network"
-        destGasLimit : Int         -- Gas allocated for dest chain execution
-        destBytesOverhead : Int    -- Data availability overhead in bytes
-        feeTokenAmount : Numeric 0 -- Fee amount in fee token units
-        extraArgs : BytesHex       -- Entity-specific arguments
+        issuerType : IssuerType        -- Type of issuer
+        issuerAddress : BytesHex       -- 32-byte instance address
+        versionTag : Optional BytesHex -- 4-byte version tag for CCVs, None for pools/network
+        destGasLimit : Int             -- Gas allocated for dest chain execution
+        destBytesOverhead : Int        -- Data availability overhead in bytes
+        feeTokenAmount : Numeric 0     -- Fee amount in fee token units
+        extraArgs : BytesHex           -- Entity-specific arguments
     deriving (Eq, Show)
 
 
--- | ticket issued by tokenpool (via TokenAdminRegistry) after locking tokens for outbound transfer.
+-- | Ticket issued by tokenpool (via TokenAdminRegistry) after locking tokens for outbound transfer.
 template TokenSendTicket
     with
         poolOwner : Party
+        poolInstanceId : Text          -- Pool's instanceId for address computation
         ccipOwner : Party
         sender : Party
 
@@ -35,7 +43,7 @@ template TokenSendTicket
         destTokenAddress : BytesHex
         tokenReceiver : BytesHex
         extraData : BytesHex
-        receipt : Receipt  -- Fee/gas contribution from pool
+        receipt : Receipt              -- Fee/gas contribution from pool
     where
         signatory poolOwner
         observer ccipOwner, sender
@@ -43,9 +51,10 @@ template TokenSendTicket
         choice TokenSendTicket_Consume : (CCIP.MessageCodecV1.TokenTransferV1, Receipt)
             controller ccipOwner
             do
+                let poolAddr = CCIP.MessageCodecV1.instanceAddress poolInstanceId poolOwner
                 let tokenTransfer = CCIP.MessageCodecV1.TokenTransferV1 with
                         amount = amount
-                        sourcePoolAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
+                        sourcePoolAddress = poolAddr
                         sourceTokenAddress = sourceTokenAddress
                         destTokenAddress = destTokenAddress
                         tokenReceiver = tokenReceiver
@@ -53,30 +62,33 @@ template TokenSendTicket
                 pure (tokenTransfer, receipt)
 
 
--- | ticket issued by the ccv (via CCVRegistry) for outbound attestation.
+-- | Ticket issued by the CCV (via CCVRegistry) for outbound attestation.
 template CCVTicket
     with
-        ccvId : CCIP.CCVId.CCVId         -- Full CCV identifier (versionTag@partyId)
+        ccvInstanceAddress : BytesHex
+        versionTag : BytesHex          -- 4-byte version tag (e.g., "49ff34ed")
         ccvOwner : Party
         ccipOwner : Party
         sender : Party
 
         verifierBlob : BytesHex
         messageSentObservers : [Party]
-        receipt : Receipt  -- Fee/gas contribution from this CCV
+        receipt : Receipt              -- Fee/gas contribution from this CCV
     where
         signatory ccvOwner
         observer ccipOwner, sender
 
-        choice CCVTicket_Consume : (CCIP.CCVId.CCVId, BytesHex, [Party], Receipt)
+        -- Returns: (instanceAddress, versionTag, verifierBlob, observers, receipt)
+        choice CCVTicket_Consume : (BytesHex, BytesHex, BytesHex, [Party], Receipt)
             controller ccipOwner
-            do pure (ccvId, verifierBlob, messageSentObservers, receipt)
+            do pure (ccvInstanceAddress, versionTag, verifierBlob, messageSentObservers, receipt)
 
 
--- | ticket issued by ccv (via CCVRegistry) after verifying an inbound message.
+-- | Ticket issued by CCV (via CCVRegistry) after verifying an inbound message.
 template CCVVerifyTicket
     with
-        ccvId : CCIP.CCVId.CCVId         -- Full CCV identifier (versionTag@partyId)
+        ccvInstanceAddress : BytesHex
+        versionTag : BytesHex          -- 4-byte version tag
         ccvOwner : Party
         ccipOwner : Party
         caller : Party
@@ -89,12 +101,13 @@ template CCVVerifyTicket
         signatory ccvOwner
         observer ccipOwner, caller
 
-        choice CCVVerifyTicket_Consume : CCIP.CCVId.CCVId
+        -- Returns instance address for validation
+        choice CCVVerifyTicket_Consume : BytesHex
             controller ccipOwner
-            do pure ccvId
+            do pure ccvInstanceAddress
 
 
--- | ticket issued by tokenpool after verifying its required CCVs for inbound transfer.
+-- | Ticket issued by tokenpool after verifying its required CCVs for inbound transfer.
 -- Passed to PerPartyRouter.Execute to prove pool's CCV requirements are satisfied.
 template TokenPoolCCVVerifiedTicket
     with
@@ -103,17 +116,17 @@ template TokenPoolCCVVerifiedTicket
         receiver : Party
         messageHash : BytesHex
         sourceChainSelector : Numeric 0
-        verifiedCCVIds : [CCIP.CCVId.CCVId]
+        verifiedCCVAddresses : [BytesHex]  -- List of 32-byte instance addresses
     where
         signatory poolOwner
         observer ccipOwner, receiver
 
-        choice TokenPoolCCVVerifiedTicket_Consume : [CCIP.CCVId.CCVId]
+        choice TokenPoolCCVVerifiedTicket_Consume : [BytesHex]
             controller ccipOwner
-            do pure verifiedCCVIds
+            do pure verifiedCCVAddresses
 
 
--- | ticket issued by OffRamp after successful message verification.
+-- | Ticket issued by OffRamp after successful message verification.
 -- Consumed by tokenpool to authorize token release.
 template TokenReceiveTicket
     with
