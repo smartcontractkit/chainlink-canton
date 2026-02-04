@@ -5,8 +5,6 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.MessageCodecV1
-
 
 -- | Issuer type for receipts.
 data IssuerType
@@ -29,10 +27,11 @@ data Receipt = Receipt
 
 
 -- | Ticket issued by tokenpool (via TokenAdminRegistry) after locking tokens for outbound transfer.
+-- Stakeholders can read all fields directly; pool address computed by OnRamp.
 template TokenSendTicket
     with
-        poolOwner : Party
         poolInstanceId : Text          -- Pool's instanceId for address computation
+        poolOwner : Party
         ccipOwner : Party
         sender : Party
 
@@ -48,18 +47,9 @@ template TokenSendTicket
         signatory poolOwner
         observer ccipOwner, sender
 
-        choice TokenSendTicket_Consume : (CCIP.MessageCodecV1.TokenTransferV1, Receipt)
+        choice TokenSendTicket_Archive : ()
             controller ccipOwner
-            do
-                let poolAddr = CCIP.MessageCodecV1.instanceAddress poolInstanceId poolOwner
-                let tokenTransfer = CCIP.MessageCodecV1.TokenTransferV1 with
-                        amount = amount
-                        sourcePoolAddress = poolAddr
-                        sourceTokenAddress = sourceTokenAddress
-                        destTokenAddress = destTokenAddress
-                        tokenReceiver = tokenReceiver
-                        extraData = extraData
-                pure (tokenTransfer, receipt)
+            do pure ()
 
 
 -- | Ticket issued by the CCV (via CCVRegistry) for outbound attestation.
