@@ -117,7 +117,7 @@ template CommitteeVerifier
             controller caller
             do
                 -- Compute instance address for receipt (registry will compute independently for validation)
-                let ccvAddr = CCIP.MessageCodecV1.instanceAddress instanceId owner
+                let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId owner
 
                 -- Build verifierBlob with version tag as first 4 bytes
                 let verifierBlob = versionTag
