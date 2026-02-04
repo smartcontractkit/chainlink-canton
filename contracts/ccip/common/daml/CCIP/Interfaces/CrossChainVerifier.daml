@@ -19,7 +19,6 @@ interface ICrossChainVerifier where
         with
             ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
             message : MessageCodecV1.MessageV1
-            messageId : BytesHex
             verifierResults : BytesHex
             receiver : Party
             caller : Party
@@ -31,7 +30,6 @@ interface ICrossChainVerifier where
         with
             ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
             message : MessageCodecV1.MessageV1
-            messageId : BytesHex
             feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             feeTokenAmount : Decimal
             verifierArgs : BytesHex
