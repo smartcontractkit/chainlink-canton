@@ -172,10 +172,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 		Config: ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
 				ChainSelector:      chainSelector,
-				GlobalConfig:       contracts.InstanceID(globalConfig.Address),
-				FeeQuoter:          contracts.InstanceID(feeQuoter.Address),
-				OnRamp:             contracts.InstanceID(onRamp.Address),
-				OffRamp:            contracts.InstanceID(offRamp.Address),
+				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
 				CommitteeVerifiers: nil,
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
 					chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {

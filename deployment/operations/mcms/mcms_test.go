@@ -154,9 +154,9 @@ func TestMCMSOps(t *testing.T) {
 		newGroupQuorums[0] = types.INT64(3) // 3-of-4 for group 0
 
 		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, deps, contract.ChoiceInput[mcms.SetConfig]{
-			ChainSelector: cantonChain.Selector,
-			InstanceID:    mcmsInstanceID,
-			ActAs:         []string{user.PrimaryParty},
+			ChainSelector:   cantonChain.Selector,
+			InstanceAddress: mcmsInstanceID.InstanceAddress(),
+			ActAs:           []string{user.PrimaryParty},
 			Args: mcms.SetConfig{
 				NewSigners:      newSigners,
 				NewGroupQuorums: newGroupQuorums,

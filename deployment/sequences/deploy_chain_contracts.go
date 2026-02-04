@@ -29,7 +29,9 @@ import (
 )
 
 type CommitteeVerifierParams struct {
-	Template ccvs.CommitteeVerifier
+	// Qualifier distinguishes between multiple deployments of the committee verifier on the same chain.
+	Qualifier string
+	Template  ccvs.CommitteeVerifier
 }
 
 type GlobalConfigParams struct {
@@ -142,6 +144,7 @@ var DeployChainContracts = operations.NewSequence(
 				ActAs:         []string{deps.Party},
 				Template:      committeeVerifier.Template,
 				OwnerParty:    committeeVerifier.Template.Owner,
+				Qualifier:     &committeeVerifier.Qualifier,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier #%v: %w", i, err)

@@ -13,7 +13,7 @@ import (
 
 var ContractType = deployment.ContractType("OnRamp")
 
-var Version = semver.MustParse("0.1.0")
+var Version = semver.MustParse("1.7.0")
 
 var Deploy = contract.NewDeploy(contract.DeployParams[onramp.OnRamp]{
 	Name:           "canton/ccip/onramp/deploy",
