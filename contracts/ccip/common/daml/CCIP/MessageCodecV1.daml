@@ -248,11 +248,11 @@ encodeInstanceAddress instId owner =
 -- For Canton: addressLength = 32 (1 byte), each address is 32 bytes.
 -- This matches the offchain ComputeCCVAndExecutorHash which derives length from executor.
 computeCCVAndExecutorHash : [BytesHex] -> BytesHex -> BytesHex
-computeCCVAndExecutorHash ccvAddresses executorAddress =
+computeCCVAndExecutorHash ccvInstanceAddresses executorInstanceAddress =
     let
         -- Validate executor is 32 bytes
-        _ = if byteCount executorAddress /= 32
-            then error ("computeCCVAndExecutorHash: executor must be 32 bytes, got " <> show (byteCount executorAddress))
+        _ = if byteCount executorInstanceAddress /= 32
+            then error ("computeCCVAndExecutorHash: executor must be 32 bytes, got " <> show (byteCount executorInstanceAddress))
             else ()
 
         -- Validate all CCV addresses are 32 bytes
@@ -260,12 +260,12 @@ computeCCVAndExecutorHash ccvAddresses executorAddress =
             if byteCount addr /= 32
             then error ("computeCCVAndExecutorHash: CCV address must be 32 bytes, got " <> show (byteCount addr))
             else addr
-        validCCVs = map validateAddr ccvAddresses
+        validCCVs = map validateAddr ccvInstanceAddresses
 
         -- Encode: 1 byte length prefix (32) + all CCVs + executor
         lengthPrefix = fromSome (encodeUint8 32)
         encodedCCVs = foldl (<>) "" validCCVs
-        encoded = lengthPrefix <> encodedCCVs <> executorAddress
+        encoded = lengthPrefix <> encodedCCVs <> executorInstanceAddress
     in
         keccak256 encoded
 
