@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	mrand "math/rand"
 	"sort"
 	"strings"
 	"time"
@@ -115,6 +116,24 @@ func NewMCMSSigner() (*MCMSSigner, error) {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}
 
+	return NewMCMSSignerFromKey(privateKey), nil
+}
+
+// NewMCMSSignerFromSeed creates a signer with deterministically generated key from a seed.
+// This is useful for generating consistent test vectors across multiple test runs.
+func NewMCMSSignerFromSeed(seed int64) (*MCMSSigner, error) {
+	src := mrand.NewSource(seed)
+	rng := mrand.New(src) //nolint:gosec // Deterministic key for testing
+
+	keyBytes := make([]byte, 32)
+	for i := range keyBytes {
+		keyBytes[i] = byte(rng.Intn(256))
+	}
+
+	privateKey, err := crypto.ToECDSA(keyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create key from seed: %w", err)
+	}
 	return NewMCMSSignerFromKey(privateKey), nil
 }
 
@@ -895,4 +914,96 @@ func EncodeBlockedFunction(bf BlockedFunction) string {
 func EncodeSelfDispatchSetConfig(role MCMSRole, params SetConfigParams) string {
 	roleByte := hex.EncodeToString([]byte{byte(role)})
 	return roleByte + EncodeSetConfigParams(params)
+}
+
+// ===========================================================================
+// TIMELOCK OPERATION DATA ENCODING
+// ===========================================================================
+
+// ScheduleBatchParams matches Canton MCMS.Codec.ScheduleBatchParams
+type ScheduleBatchParams struct {
+	Calls       []TimelockCall
+	Predecessor string // hex hash (64 chars) or empty for no predecessor
+	Salt        string // arbitrary text for uniqueness
+	DelaySecs   int    // additional delay in seconds
+}
+
+// BypasserExecuteParams matches Canton MCMS.Codec.BypasserExecuteParams
+type BypasserExecuteParams struct {
+	Calls []TimelockCall
+}
+
+// CancelBatchParams matches Canton MCMS.Codec.CancelBatchParams
+type CancelBatchParams struct {
+	OpId string // operation ID to cancel (hex hash)
+}
+
+// encodeText encodes a string as length-prefixed bytes
+// Format: uint8(len) + asciiBytes
+// Matches Canton MCMS.Codec.encodeText
+func encodeText(s string) []byte {
+	textBytes := []byte(s)
+	buf := make([]byte, 0, 1+len(textBytes))
+	buf = append(buf, byte(len(textBytes)))
+	buf = append(buf, textBytes...)
+	return buf
+}
+
+// encodeTimelockCall encodes a TimelockCall
+// Format: encodeText(targetInstanceId) + encodeText(functionName) + encodeText(operationData)
+// Matches Canton MCMS.Codec.encodeTimelockCall
+func encodeTimelockCall(call TimelockCall) []byte {
+	var buf []byte
+	buf = append(buf, encodeText(call.TargetInstanceId)...)
+	buf = append(buf, encodeText(call.FunctionName)...)
+	buf = append(buf, encodeText(call.OperationData)...)
+	return buf
+}
+
+// EncodeScheduleBatchParams encodes ScheduleBatchParams to hex bytes
+// Format: numCalls (1 byte) + calls + encodeText(predecessor) + encodeText(salt) + uint32(delaySecs)
+// Matches Canton MCMS.Codec.encodeScheduleBatchParams
+func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
+	var buf []byte
+
+	// Encode calls list: uint8(numCalls) + encoded calls
+	buf = append(buf, byte(len(params.Calls)))
+	for _, call := range params.Calls {
+		buf = append(buf, encodeTimelockCall(call)...)
+	}
+
+	// Encode predecessor (text)
+	buf = append(buf, encodeText(params.Predecessor)...)
+
+	// Encode salt (text)
+	buf = append(buf, encodeText(params.Salt)...)
+
+	// Encode delaySecs (4 bytes, big-endian)
+	delayBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(delayBytes, uint32(params.DelaySecs)) //nolint:gosec
+	buf = append(buf, delayBytes...)
+
+	return hex.EncodeToString(buf)
+}
+
+// EncodeBypasserExecuteParams encodes BypasserExecuteParams to hex bytes
+// Format: numCalls (1 byte) + encoded calls
+// Matches Canton MCMS.Codec.encodeBypasserExecuteParams
+func EncodeBypasserExecuteParams(params BypasserExecuteParams) string {
+	var buf []byte
+
+	// Encode calls list: uint8(numCalls) + encoded calls
+	buf = append(buf, byte(len(params.Calls)))
+	for _, call := range params.Calls {
+		buf = append(buf, encodeTimelockCall(call)...)
+	}
+
+	return hex.EncodeToString(buf)
+}
+
+// EncodeCancelBatchParams encodes CancelBatchParams to hex bytes
+// Format: encodeText(opId)
+// Matches Canton MCMS.Codec.encodeCancelBatchParams
+func EncodeCancelBatchParams(params CancelBatchParams) string {
+	return hex.EncodeToString(encodeText(params.OpId))
 }

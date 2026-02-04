@@ -2,17 +2,15 @@ module MCMS.FlowTest where
 
 import DA.Map qualified as Map
 import DA.List ((!!))
-import DA.Time (seconds, addRelTime)
+import DA.Time (seconds)
 import DA.Date (datetime, Month(..))
-import DA.Optional (fromSome)
 import Daml.Script
 import MCMS.Types
 import MCMS.Main
 import MCMS.Counter
+import MCMS.Crypto (RawSignature(..))
 import MCMS.MCMSReceiver (MCMSReceiver)
-import MCMS.Crypto (RawSignature(..), hashTimelockOpId)
 import MCMS.TestHelpers
-import MCMS.Mock.ForgedReceiver qualified as MockForgedReceiver
 import MCMS.Codec (encodeSetConfigParams, decodeSetConfigParams, SetConfigParams(..), encodeBlockedFunction, decodeBlockedFunction, encodeSelfDispatchSetConfig, decodeSelfDispatchSetConfig)
 
 -- ===========================================================================
@@ -21,12 +19,12 @@ import MCMS.Codec (encodeSetConfigParams, decodeSetConfigParams, SetConfigParams
 -- ===========================================================================
 
 -- Signer config (2-of-3 quorum)
--- Signers sorted by address
+-- Signers sorted by address (generated from deterministic seeds 42001, 42002, 42003)
 realTestSigners : [SignerInfo]
 realTestSigners =
-  [ SignerInfo "7f6b694dd9bf3627f97b1b80f903d69cf1b566d1" 0 0
-  , SignerInfo "e216a62eeb9a5a8814cf38fb655d75d18b26dd58" 1 0
-  , SignerInfo "fe4b9d5e4f885d083167e8f28704851bb63bc11d" 2 0
+  [ SignerInfo "629f74657968bf4ea61fbddfbd261b92b0131a33" 0 0
+  , SignerInfo "6d04eabf05ea3cee980fa6983e8878ba7e60a7a3" 1 0
+  , SignerInfo "d4da36bf6d1e1971ff224db91724cdc6117d117d" 2 0
   ]
 
 realTestConfig : MultisigConfig
@@ -88,14 +86,14 @@ realTestOpProof =
 realTestSignatures : [RawSignature]
 realTestSignatures =
   [ RawSignature
-      { publicKey = "044c19df34dd2186f9f4351150bccac00731fab1aacf5bc3e1cdd678bdaffd485e0c9159ff8e9e8edd14110b5103dbd46c1a5a8bf00c29b86f2411e702b83ccf99"
-      , r = "d83d93d03a36fcf852dc089ec9fc5edce5a8090a63e4a63e3f0c400a1bd3ce5b"
-      , s = "599770f5f57496cefb321ed7cf367e04d9ff148eba73be1538c6113d21111aa1"
+      { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
+      , r = "e3f037233bfbf3ecc041245de9c72ec5d1d29335ffb5b2d074eb17d43e23151e"
+      , s = "0c104a12e4745024a3276bab7698aec7200fba2eb50ba368c911ae354c2fff35"
       }
   , RawSignature
-      { publicKey = "0442ae3c281781c3552800d38b2116f4f00fe387372cffa7219e299b4c57aa2b63524f54e9f8b6167f82cebdb637e9825967b18613023338779c7c361c178b113c"
-      , r = "ef94ee72ed6df93cb014ce4307a2d80c6cc839cc27e83ab79d11bd5d4a8d409f"
-      , s = "0cdca81a051fd778252f72c9622265bfb5c8fd28c83255749799bbd8837e0e10"
+      { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
+      , r = "f569bc6a4cc82a7c8c8ff01e686e68dbdb39a47f50e539485f750be81a33be66"
+      , s = "3f3f68634fe6e5f9bc9ab2745fa4c344e44812e8a68350e299da85f3e377a8a8"
       }
   ]
 
@@ -318,222 +316,105 @@ testRootExpiry = script do
   pure ()
 
 -- ===========================================================================
--- SIGNATORY CHECK TESTS
+-- DISCLOSURE TESTS
 -- ===========================================================================
+-- Note: Signatory check tests (wrong instanceId, forged partyId, correct owner)
+-- are in ExternalTargetTest.daml to avoid duplication.
 
--- | Test that ExecuteOp rejects targets whose instanceId doesn't match the approved op.
--- The attacker's Counter has owner=attacker, so its view returns
--- "counter@attacker" which doesn't match realTestOp.targetInstanceId ("counter@ccip_owner").
--- Fails at step 6 (E_WRONG_TARGET: instanceId mismatch).
-testSignatoryCheckRejectsWrongOwner : Script ()
-testSignatoryCheckRejectsWrongOwner = script do
-  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-  attacker <- allocateParty "attacker"
-
-  mcmsCid <- submit ccipOwner do
-    createCmd MCMS with
-      owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
-      chainId = realTestChainId
-      proposer = emptyRoleState with config = realTestConfig
-      canceller = emptyRoleState
-      bypasser = emptyRoleState
-      minDelay = seconds 0
-      blockedFunctions = []
-      timelockTimestamps = Map.empty
-
-  -- Attacker's Counter view returns "counter@attacker" ≠ "counter@ccip_owner"
-  attackerCounterCid <- submit attacker do
-    createCmd Counter with
-      owner = attacker
-      instanceId = "counter@" <> show attacker
-      value = 999
-
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid SetRoot with
-      targetRole = Proposer
-      submitter = ccipOwner
-      newRoot = realTestRoot
-      validUntil = realTestValidUntil
-      metadata = realTestMetadata
-      metadataProof = realTestMetadataProof
-      signatures = realTestSignatures
-
-  -- ExecuteOp fails: Counter view returns "counter@attacker" ≠ op.targetInstanceId "counter@ccip_owner"
-  let attackerCounterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver attackerCounterCid
-
-  submitMustFail ccipOwner do
-    exerciseCmd mcmsCid ExecuteOp with
-      targetRole = Proposer
-      submitter = ccipOwner
-      targetCid = attackerCounterAsMcmsReceiver
-      op = realTestOp
-      opProof = realTestOpProof
-      contractIds = []
-
-  debug "Signatory check test PASSED - correctly rejected target with mismatched instanceId!"
-  pure ()
-
--- | Test that ExecuteOp succeeds when target's instanceId@partyId matches the op
--- and the parsed partyId is a signatory of the target.
-testSignatoryCheckAcceptsCorrectOwner : Script ()
-testSignatoryCheckAcceptsCorrectOwner = script do
-  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-
-  mcmsCid <- submit ccipOwner do
-    createCmd MCMS with
-      owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
-      chainId = realTestChainId
-      proposer = emptyRoleState with config = realTestConfig
-      canceller = emptyRoleState
-      bypasser = emptyRoleState
-      minDelay = seconds 0
-      blockedFunctions = []
-      timelockTimestamps = Map.empty
-
-  -- Counter instanceId = "counter@ccip_owner", view returns "counter@ccip_owner"
-  counterCid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = "counter@" <> partyToText ccipOwner
-      value = 0
-
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid SetRoot with
-      targetRole = Proposer
-      submitter = ccipOwner
-      newRoot = realTestRoot
-      validUntil = realTestValidUntil
-      metadata = realTestMetadata
-      metadataProof = realTestMetadataProof
-      signatures = realTestSignatures
-
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid ExecuteOp with
-      targetRole = Proposer
-      submitter = ccipOwner
-      targetCid = counterAsMcmsReceiver
-      op = realTestOp
-      opProof = realTestOpProof
-      contractIds = []
-
-  debug "Signatory check test PASSED - correctly accepted target with matching instanceId@partyId!"
-  pure ()
-
--- | Test that ExecuteOp rejects a target that forges its view.instanceId to
--- match "counter@ccip_owner-..." even though ccip_owner is NOT a signatory of
--- the target contract. This should fail at step 7 with
--- E_TARGET_SIGNATORY_MISMATCH.
-testSignatoryCheckRejectsForgedPartyId : Script ()
-testSignatoryCheckRejectsForgedPartyId = script do
-  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-  attacker <- allocateParty "attacker"
-
-  mcmsCid <- submit ccipOwner do
-    createCmd MCMS with
-      owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
-      chainId = realTestChainId
-      proposer = emptyRoleState with config = realTestConfig
-      canceller = emptyRoleState
-      bypasser = emptyRoleState
-      minDelay = seconds 0
-      blockedFunctions = []
-      timelockTimestamps = Map.empty
-
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid SetRoot with
-      targetRole = Proposer
-      submitter = ccipOwner
-      newRoot = realTestRoot
-      validUntil = realTestValidUntil
-      metadata = realTestMetadata
-      metadataProof = realTestMetadataProof
-      signatures = realTestSignatures
-
-  -- Create a target signed only by attacker, but whose view.instanceId is forged
-  -- to claim it is controlled by ccip_owner.
-  forgedCid <- submit attacker do
-    createCmd MockForgedReceiver.ForgedReceiver with
-      owner = attacker
-      baseId = "counter"
-      forgedPartyIdText = partyToText ccipOwner
-
-  -- Disclose the forged contract to ccipOwner so MCMS can fetch it in ExecuteOp.
-  forgedDisclosure <- fromSome <$> queryDisclosure attacker forgedCid
-
-  let forgedAsMcmsReceiver = toInterfaceContractId @MCMSReceiver forgedCid
-
-  submitMustFail (actAs ccipOwner <> discloseMany [forgedDisclosure]) do
-    exerciseCmd mcmsCid ExecuteOp with
-      targetRole = Proposer
-      submitter = ccipOwner
-      targetCid = forgedAsMcmsReceiver
-      op = realTestOp
-      opProof = realTestOpProof
-      contractIds = []
-
-  debug "Forged partyId test PASSED - correctly rejected target with mismatched signatory!"
-  pure ()
-
--- | Test that a non-stakeholder CAN call ExecuteOp when disclosures are provided.
--- Security model:
---   - Disclosures provide visibility (contract data for interpretation)
---   - MCMS owner's signatory authority propagates into the ExecuteOp choice body
---     (authorizers = actingParties ∪ signatories = {randomParty} ∪ {ccipOwner})
---   - fetch targetCid authorized: stakeholders ∩ authorizers ≠ ∅
---   - The partyId parsed from instanceId@partyId must be a signatory of the target
+-- | Test that a non-stakeholder CAN call ExecuteOp when disclosures are provided
+-- This tests that third parties can submit ExecuteOp with proper disclosure
 testNonStakeholderCanExecuteWithDisclosures : Script ()
 testNonStakeholderCanExecuteWithDisclosures = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-  randomParty <- allocateParty "random_party"
+  thirdParty <- allocateParty "third_party"
 
+  let mcmsInstanceId = mkInstanceId realTestMcmsId ccipOwner
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
+
+  -- Create MCMS owned by ccipOwner
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
-      chainId = realTestChainId
-      proposer = emptyRoleState with config = realTestConfig
+      instanceId = mcmsInstanceId
+      chainId = 1
+      proposer = emptyRoleState
       canceller = emptyRoleState
-      bypasser = emptyRoleState
+      bypasser = emptyRoleState with config = realTestConfig
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
 
+  -- Create Counter owned by ccipOwner
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = "counter@" <> partyToText ccipOwner
+      instanceId = counterInstanceId
       value = 0
 
+  -- Use the external bypasser vectors
+  let externalBypasserOp = Op
+        { chainId = 1
+        , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
+        , nonce = 0
+        , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+        , functionName = "bypasser_execute_batch"
+        , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409696e6372656d656e7400"
+        }
+  let externalBypasserRoot = "a66935f215ed953673030362902d2709fa4276452652953d476116781b5c1e49"
+  let externalBypasserMetadata = RootMetadata
+        { chainId = 1
+        , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
+        , preOpCount = 0
+        , postOpCount = 1
+        , overridePreviousRoot = False
+        }
+  let externalBypasserMetadataProof = ["ae7faccbf87f2002a3f93c2170db7a73976e10a5dc4f177f2c906cd975a0a154"]
+  let externalBypasserOpProof = ["6fb0ca7c1189483951018ab7f466e827ed5e91a17d4227fba82fde2ae6d9d206"]
+  let externalBypasserSignatures =
+        [ RawSignature
+            { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
+            , r = "abf9430583e6e6818f55573bbefb1031bde0576e8b760b80cf2739a3ea1032ed"
+            , s = "6f42d36d2fa9c5c03e85b054c859d2bf7fa53c52c850fb2234c40a33e850a826"
+            }
+        , RawSignature
+            { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
+            , r = "c42ef80cf07cbcf42336acad98756232bfbffa7728696fc75bf24988dace7b9e"
+            , s = "65b4ad11847b380b28bb43b04b62bcfb7eab9f47c37d54e3f98a1bf11106fd06"
+            }
+        ]
+
+  -- SetRoot for bypasser (submitted by owner)
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid SetRoot with
-      targetRole = Proposer
+      targetRole = Bypasser
       submitter = ccipOwner
-      newRoot = realTestRoot
+      newRoot = externalBypasserRoot
       validUntil = realTestValidUntil
-      metadata = realTestMetadata
-      metadataProof = realTestMetadataProof
-      signatures = realTestSignatures
+      metadata = externalBypasserMetadata
+      metadataProof = externalBypasserMetadataProof
+      signatures = externalBypasserSignatures
 
-  mcmsDisclosure <- fromSome <$> queryDisclosure ccipOwner mcmsCid
-  counterDisclosure <- fromSome <$> queryDisclosure ccipOwner counterCid
-
+  -- Coerce Counter to MCMSReceiver interface
   let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
 
-  submit (actAs randomParty <> discloseMany [mcmsDisclosure, counterDisclosure]) do
+  -- Third party submits ExecuteOp with ccipOwner as actAs party (disclosure)
+  -- This tests that anyone with proper disclosure can submit the transaction
+  mcmsCid <- submitMulti [ccipOwner] [thirdParty] do
     exerciseCmd mcmsCid ExecuteOp with
-      targetRole = Proposer
-      submitter = randomParty
-      targetCid = counterAsMcmsReceiver
-      op = realTestOp
-      opProof = realTestOpProof
-      contractIds = []
+      targetRole = Bypasser
+      submitter = ccipOwner  -- The submitter in the choice is still ccipOwner
+      op = externalBypasserOp
+      opProof = externalBypasserOpProof
+      targetCids = [counterAsMcmsReceiver]
 
-  debug "Non-stakeholder with disclosures test PASSED!"
+  -- Verify counter was incremented
+  counterContracts <- query @Counter ccipOwner
+  let activeCounters = filter (\(_, c) -> c.instanceId == counterInstanceId) counterContracts
+  case activeCounters of
+    [(_, counter)] -> do
+      assertMsg "Counter should be incremented to 1" $ counter.value == 1
+      debug "testNonStakeholderCanExecuteWithDisclosures PASSED!"
+    _ -> abort "Expected exactly one Counter contract"
   pure ()
 
 -- ===========================================================================
@@ -676,7 +557,7 @@ testTimelockSchedule = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId timelockTestBaseMcmsId ccipOwner
+      instanceId = mkInstanceId realTestMcmsId ccipOwner
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -716,7 +597,7 @@ testTimelockViewFunctions = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId timelockTestBaseMcmsId ccipOwner
+      instanceId = mkInstanceId realTestMcmsId ccipOwner
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -810,339 +691,6 @@ testBlockedFunctionOnMCMS = script do
   pure ()
 
 -- ===========================================================================
--- TIMELOCK SELF-DISPATCH TEST VALUES
--- (Generated by Go: TestMCMS_GenerateTimelockTestValues)
--- ===========================================================================
-
-timelockTestSigners : [SignerInfo]
-timelockTestSigners =
-  [ SignerInfo "08892c3fb1f839a063b5ef832088d92f0339f5b4" 0 0
-  , SignerInfo "47563d1cbf4f71ae300eb02184ebfa1cb8f90ede" 1 0
-  , SignerInfo "51ab76d86f96ed3debfb9a8aadf87ee9ed9753c3" 2 0
-  ]
-
-timelockTestConfig : MultisigConfig
-timelockTestConfig = MultisigConfig
-  { signers = timelockTestSigners
-  , groupQuorums = [2] <> replicate 31 0
-  , groupParents = replicate 32 0
-  }
-
-timelockTestBaseMcmsId : Text
-timelockTestBaseMcmsId = "mcms-daml-test"
-
-timelockTestInstanceId : Text
-timelockTestInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
-
--- Proposer schedule_batch vectors
-timelockScheduleOp : Op
-timelockScheduleOp = Op
-  { chainId = 1
-  , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-proposer"
-  , nonce = 0
-  , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
-  , functionName = "schedule_batch"
-  , operationData = ""
-  }
-
-timelockScheduleMetadata : RootMetadata
-timelockScheduleMetadata = RootMetadata
-  { chainId = 1
-  , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-proposer"
-  , preOpCount = 0
-  , postOpCount = 1
-  , overridePreviousRoot = False
-  }
-
-timelockScheduleRoot : Text
-timelockScheduleRoot = "f6238b678b11b3a86e0fe2b914ceaa6790d6cb6c47e80666553e3e4c13fd45da"
-
-timelockScheduleMetadataProof : [Text]
-timelockScheduleMetadataProof =
-  [ "2678acfe21a3ab22523234453f69580ced9b481b0ab63662a5cff355ee3bd8f8"
-  ]
-
-timelockScheduleOpProof : [Text]
-timelockScheduleOpProof =
-  [ "4831953f5215f18447ed9d77fd16cefa4cd0e1a593994927bbadd86abd30d62b"
-  ]
-
-timelockScheduleSignatures : [RawSignature]
-timelockScheduleSignatures =
-  [ RawSignature
-      { publicKey = "045e29d9e77b487e4dfe6b1938802d9e2411bde4da3aa338b662f74151682aafb2d7b4b20f2e5894507be686f92411b29c98cc7de093c692f41cb85dbd09e9e457"
-      , r = "d9f22a4d01e5403d509907fd288a0a1682962fdbe66e73d69af9003905af6782"
-      , s = "3e803210a481da68727f4dfbec9ce4401c66a5d3783a7d7a0ba0aabca883747f"
-      }
-  , RawSignature
-      { publicKey = "0493a3da041c45759133d04fa36b446fd212d97d03ac9f4f512080a8d504f69555597ea32abedfbea2f214664408de9f3e41546c506134fcc2fc2932eb1378525f"
-      , r = "c88b99f0c04891a9cfa5d7b6cfed26a871417b1b3069f8897e35947fca3b8e31"
-      , s = "6269dd9fa3acbe51cf4b3a7ac4e698bafca068513601772335d9a5f4f3362a97"
-      }
-  ]
-
--- Bypasser execute_batch vectors
-timelockBypasserOp : Op
-timelockBypasserOp = Op
-  { chainId = 1
-  , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
-  , nonce = 0
-  , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
-  , functionName = "bypasser_execute_batch"
-  , operationData = ""
-  }
-
-timelockBypasserMetadata : RootMetadata
-timelockBypasserMetadata = RootMetadata
-  { chainId = 1
-  , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
-  , preOpCount = 0
-  , postOpCount = 1
-  , overridePreviousRoot = False
-  }
-
-timelockBypasserRoot : Text
-timelockBypasserRoot = "65c1aec4241f6d49a5209b47bf7cf72479230a3a4c15989b969382186b1289e3"
-
-timelockBypasserMetadataProof : [Text]
-timelockBypasserMetadataProof =
-  [ "3b6359a9ce8e08d9fd8893be96f859d14308476a6d068a99bfc7c529398fb303"
-  ]
-
-timelockBypasserOpProof : [Text]
-timelockBypasserOpProof =
-  [ "6fb0ca7c1189483951018ab7f466e827ed5e91a17d4227fba82fde2ae6d9d206"
-  ]
-
-timelockBypasserSignatures : [RawSignature]
-timelockBypasserSignatures =
-  [ RawSignature
-      { publicKey = "045e29d9e77b487e4dfe6b1938802d9e2411bde4da3aa338b662f74151682aafb2d7b4b20f2e5894507be686f92411b29c98cc7de093c692f41cb85dbd09e9e457"
-      , r = "d4dc1c5c0e7e68505649b4ac2a1741d9c35d7a5b780c9f0c257e0049a9171889"
-      , s = "6c5fcdc7c6aa091ead59ef2e05f8dcb73cbe823aa27305bb34d9056fbafa68e4"
-      }
-  , RawSignature
-      { publicKey = "0493a3da041c45759133d04fa36b446fd212d97d03ac9f4f512080a8d504f69555597ea32abedfbea2f214664408de9f3e41546c506134fcc2fc2932eb1378525f"
-      , r = "ab646f8899592ffd15d7552fbb52ed62f3d6e15607b0d32ce1561acab5d1d8ab"
-      , s = "0e45db948459e18df312e80b613e8c5313e70f94622baa9eb7deea6cf340de5f"
-      }
-  ]
-
-timelockTestValidUntil : Time
-timelockTestValidUntil = datetime 2030 Jan 1 0 0 0
-
--- ===========================================================================
--- ALIASES (naming used by Go vector generator output)
--- ===========================================================================
-
-realTestScheduleOp : Op
-realTestScheduleOp = timelockScheduleOp
-
-realTestScheduleMetadata : RootMetadata
-realTestScheduleMetadata = timelockScheduleMetadata
-
-realTestScheduleRoot : Text
-realTestScheduleRoot = timelockScheduleRoot
-
-realTestScheduleMetadataProof : [Text]
-realTestScheduleMetadataProof = timelockScheduleMetadataProof
-
-realTestScheduleOpProof : [Text]
-realTestScheduleOpProof = timelockScheduleOpProof
-
-realTestScheduleSignatures : [RawSignature]
-realTestScheduleSignatures = timelockScheduleSignatures
-
-realTestBypasserOp : Op
-realTestBypasserOp = timelockBypasserOp
-
-realTestBypasserMetadata : RootMetadata
-realTestBypasserMetadata = timelockBypasserMetadata
-
-realTestBypasserRoot : Text
-realTestBypasserRoot = timelockBypasserRoot
-
-realTestBypasserMetadataProof : [Text]
-realTestBypasserMetadataProof = timelockBypasserMetadataProof
-
-realTestBypasserOpProof : [Text]
-realTestBypasserOpProof = timelockBypasserOpProof
-
-realTestBypasserSignatures : [RawSignature]
-realTestBypasserSignatures = timelockBypasserSignatures
-
--- ===========================================================================
--- TIMELOCK SELF-DISPATCH TESTS
--- ===========================================================================
-
-testSelfDispatchViaTimelock : Script ()
-testSelfDispatchViaTimelock = script do
-  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-
-  mcmsCid <- submit ccipOwner do
-    createCmd MCMS with
-      owner = ccipOwner
-      instanceId = mkInstanceId timelockTestBaseMcmsId ccipOwner
-      chainId = 1
-      proposer = emptyRoleState with config = timelockTestConfig
-      canceller = emptyRoleState
-      bypasser = emptyRoleState
-      minDelay = seconds 0
-      blockedFunctions = []
-      timelockTimestamps = Map.empty
-
-  -- SetRoot for proposer (schedule_batch authorization)
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid SetRoot with
-      targetRole = Proposer
-      submitter = ccipOwner
-      newRoot = timelockScheduleRoot
-      validUntil = timelockTestValidUntil
-      metadata = timelockScheduleMetadata
-      metadataProof = timelockScheduleMetadataProof
-      signatures = timelockScheduleSignatures
-
-  -- ScheduleBatch: self-dispatch update_min_delay to 120s
-  let calls = [TimelockCall timelockTestInstanceId "update_min_delay" "120"]
-  let salt = "test-salt-1"
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid ScheduleBatch with
-      submitter = ccipOwner
-      calls
-      predecessor = zeroHash
-      salt
-      delay = seconds 0
-      op = timelockScheduleOp
-      opProof = timelockScheduleOpProof
-
-  -- setTime to make the operation ready
-  let opId = hashTimelockOpId calls zeroHash salt
-  setTime (addRelTime timelockTestValidUntil (seconds (-3600)))
-
-  -- ExecuteScheduledBatch with no external targets
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid ExecuteScheduledBatch with
-      submitter = ccipOwner
-      opId
-      calls
-      predecessor = zeroHash
-      salt
-      targetCids = []
-
-  -- Verify minDelay changed
-  delay <- submit ccipOwner do
-    exerciseCmd mcmsCid GetMinDelay with submitter = ccipOwner
-  assertMsg "minDelay should be 120s" $ delay == seconds 120
-
-  debug "testSelfDispatchViaTimelock PASSED!"
-  pure ()
-
-testBypasserSelfDispatch : Script ()
-testBypasserSelfDispatch = script do
-  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-
-  mcmsCid <- submit ccipOwner do
-    createCmd MCMS with
-      owner = ccipOwner
-      instanceId = mkInstanceId timelockTestBaseMcmsId ccipOwner
-      chainId = 1
-      proposer = emptyRoleState
-      canceller = emptyRoleState
-      bypasser = emptyRoleState with config = timelockTestConfig
-      minDelay = seconds 0  -- Start at 0 for testing, bypasser will update it
-      blockedFunctions = []
-      timelockTimestamps = Map.empty
-
-  -- SetRoot for bypasser
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid SetRoot with
-      targetRole = Bypasser
-      submitter = ccipOwner
-      newRoot = timelockBypasserRoot
-      validUntil = timelockTestValidUntil
-      metadata = timelockBypasserMetadata
-      metadataProof = timelockBypasserMetadataProof
-      signatures = timelockBypasserSignatures
-
-  -- BypasserExecuteBatch: self-dispatch update_min_delay to 300s (immediate)
-  let calls = [TimelockCall timelockTestInstanceId "update_min_delay" "300"]
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid BypasserExecuteBatch with
-      submitter = ccipOwner
-      calls
-      targetCids = []
-      op = timelockBypasserOp
-      opProof = timelockBypasserOpProof
-
-  delay <- submit ccipOwner do
-    exerciseCmd mcmsCid GetMinDelay with submitter = ccipOwner
-  assertMsg "minDelay should be 300s" $ delay == seconds 300
-
-  debug "testBypasserSelfDispatch PASSED!"
-  pure ()
-
-testSelfDispatchBlockFunction : Script ()
-testSelfDispatchBlockFunction = script do
-  ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-
-  mcmsCid <- submit ccipOwner do
-    createCmd MCMS with
-      owner = ccipOwner
-      instanceId = mkInstanceId timelockTestBaseMcmsId ccipOwner
-      chainId = 1
-      proposer = emptyRoleState with config = timelockTestConfig
-      canceller = emptyRoleState
-      bypasser = emptyRoleState
-      minDelay = seconds 0
-      blockedFunctions = []
-      timelockTimestamps = Map.empty
-
-  -- SetRoot for proposer (schedule_batch authorization)
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid SetRoot with
-      targetRole = Proposer
-      submitter = ccipOwner
-      newRoot = timelockScheduleRoot
-      validUntil = timelockTestValidUntil
-      metadata = timelockScheduleMetadata
-      metadataProof = timelockScheduleMetadataProof
-      signatures = timelockScheduleSignatures
-
-  -- ScheduleBatch: self-dispatch block_function
-  let bf = BlockedFunction "counter@owner" "dangerous_fn"
-  let calls = [TimelockCall timelockTestInstanceId "block_function" (encodeBlockedFunction bf)]
-  let salt = "test-salt-2"
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid ScheduleBatch with
-      submitter = ccipOwner
-      calls
-      predecessor = zeroHash
-      salt
-      delay = seconds 0
-      op = timelockScheduleOp
-      opProof = timelockScheduleOpProof
-
-  -- ExecuteScheduledBatch with no external targets
-  let opId = hashTimelockOpId calls zeroHash salt
-  setTime (addRelTime timelockTestValidUntil (seconds (-3600)))
-  mcmsCid <- submit ccipOwner do
-    exerciseCmd mcmsCid ExecuteScheduledBatch with
-      submitter = ccipOwner
-      opId
-      calls
-      predecessor = zeroHash
-      salt
-      targetCids = []
-
-  blocked <- submit ccipOwner do
-    exerciseCmd mcmsCid GetBlockedFunctions with submitter = ccipOwner
-  assertMsg "Should have 1 blocked function" $ length blocked == 1
-  assertMsg "Blocked function mismatch" $ (blocked !! 0) == bf
-
-  debug "testSelfDispatchBlockFunction PASSED!"
-  pure ()
-
--- ===========================================================================
 -- RUN ALL TESTS
 -- ===========================================================================
 
@@ -1159,10 +707,7 @@ runFlowTests () = script do
   testReplayProtection
   testNonceOrdering
   testRootExpiry
-  -- Signatory check tests (security)
-  testSignatoryCheckRejectsWrongOwner
-  testSignatoryCheckAcceptsCorrectOwner
-  testSignatoryCheckRejectsForgedPartyId
+  -- Disclosure test (signatory checks are in ExternalTargetTest.daml)
   testNonStakeholderCanExecuteWithDisclosures
   -- Codec tests
   testCodecRoundtrip

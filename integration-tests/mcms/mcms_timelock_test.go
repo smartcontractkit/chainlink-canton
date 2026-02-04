@@ -51,10 +51,28 @@ func TestMCMS_Timelock(t *testing.T) {
 	t.Run("ScheduleAndExecute", func(t *testing.T) {
 		t.Parallel()
 
-		// 1) Set proposer root authorizing schedule_batch
+		// Define calls and salt first so we can encode them
+		calls := []TimelockCall{{
+			TargetInstanceId: counterTargetInstanceID,
+			FunctionName:     "increment",
+			OperationData:    "",
+		}}
+		salt := uuid.New().String()[:8]
+		delaySecs := 1
+
+		// Encode schedule params for operationData
+		scheduleParams := ScheduleBatchParams{
+			Calls:       calls,
+			Predecessor: ZeroHash,
+			Salt:        salt,
+			DelaySecs:   delaySecs,
+		}
+		encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+
+		// 1) Set proposer root authorizing schedule_batch with encoded operationData
 		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "schedule_batch", "").
+			AddOperation(mcmsInstanceID, "schedule_batch", encodedScheduleParams).
 			Build()
 
 		validUntil := time.Now().Add(1 * time.Hour)
@@ -64,18 +82,12 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, signatures)
 
 		// 2) Schedule a batch to increment counter after 1s
-		calls := []TimelockCall{{
-			TargetInstanceId: counterTargetInstanceID,
-			FunctionName:     "increment",
-			OperationData:    "",
-		}}
-		salt := uuid.New().String()[:8]
 		opID := HashTimelockOpId(calls, ZeroHash, salt)
 
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, calls, ZeroHash, salt, 1_000_000, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		// 3) Not ready yet
 		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, []string{counterCid})
@@ -99,16 +111,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcms := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
-		// Counter is shared; ok.
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
-		scheduleProposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "schedule_batch", "").
-			Build()
-		validUntil := time.Now().Add(1 * time.Hour)
-		sigs, err := scheduleProposal.Sign(validUntil, sortedSigners[:2])
-		require.NoError(t, err)
-		mcms = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcms, "Proposer", scheduleProposal, validUntil, sigs)
-
+		// Define calls and salt first so we can encode them
 		calls := []TimelockCall{{
 			TargetInstanceId: counterTargetInstanceID,
 			FunctionName:     "increment",
@@ -116,14 +119,38 @@ func TestMCMS_Timelock(t *testing.T) {
 		}}
 		salt := uuid.New().String()[:8]
 		opID := HashTimelockOpId(calls, ZeroHash, salt)
+
+		// Encode schedule params for operationData
+		scheduleParams := ScheduleBatchParams{
+			Calls:       calls,
+			Predecessor: ZeroHash,
+			Salt:        salt,
+			DelaySecs:   0,
+		}
+		encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+
+		// Counter is shared; ok.
+		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		scheduleProposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
+			AddOperation(mcmsInstanceID, "schedule_batch", encodedScheduleParams).
+			Build()
+		validUntil := time.Now().Add(1 * time.Hour)
+		sigs, err := scheduleProposal.Sign(validUntil, sortedSigners[:2])
+		require.NoError(t, err)
+		mcms = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcms, "Proposer", scheduleProposal, validUntil, sigs)
+
 		opProof, err := scheduleProposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcms = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcms, calls, ZeroHash, salt, 0, scheduleProposal.Operations[0], opProof)
+		mcms = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcms, scheduleProposal.Operations[0], opProof)
+
+		// Encode cancel params for operationData
+		cancelParams := CancelBatchParams{OpId: opID}
+		encodedCancelParams := EncodeCancelBatchParams(cancelParams)
 
 		// Set canceller root authorizing cancel
 		cancellerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleCanceller)
 		cancelProposal := NewMCMSProposal(int(chainID), cancellerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "cancel_batch", "").
+			AddOperation(mcmsInstanceID, "cancel_batch", encodedCancelParams).
 			Build()
 		cancelSigs, err := cancelProposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
@@ -148,25 +175,37 @@ func TestMCMS_Timelock(t *testing.T) {
 			{TargetInstanceId: counterTargetInstanceID, FunctionName: "dangerous_function"},
 		})
 
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
-		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "schedule_batch", "").
-			Build()
-		validUntil := time.Now().Add(1 * time.Hour)
-		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
-		require.NoError(t, err)
-		mcms = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcms, "Proposer", proposal, validUntil, sigs)
-
+		// Define calls and salt first so we can encode them
 		calls := []TimelockCall{{
 			TargetInstanceId: counterTargetInstanceID,
 			FunctionName:     "dangerous_function",
 			OperationData:    "",
 		}}
 		salt := uuid.New().String()[:8]
+		delaySecs := 1
+
+		// Encode schedule params for operationData
+		scheduleParams := ScheduleBatchParams{
+			Calls:       calls,
+			Predecessor: ZeroHash,
+			Salt:        salt,
+			DelaySecs:   delaySecs,
+		}
+		encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+
+		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
+			AddOperation(mcmsInstanceID, "schedule_batch", encodedScheduleParams).
+			Build()
+		validUntil := time.Now().Add(1 * time.Hour)
+		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
+		require.NoError(t, err)
+		mcms = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcms, "Proposer", proposal, validUntil, sigs)
+
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 
-		err = scheduleBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcms, calls, ZeroHash, salt, 1_000_000, proposal.Operations[0], opProof)
+		err = scheduleBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcms, proposal.Operations[0], opProof)
 		require.Error(t, err)
 		require.True(t, strings.Contains(err.Error(), "E_FUNCTION_BLOCKED"), "expected E_FUNCTION_BLOCKED, got: %v", err)
 	})
@@ -415,25 +454,10 @@ func scheduleBatch(
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
-	calls []TimelockCall,
-	predecessor string,
-	salt string,
-	delayMicros int64,
 	op MCMSOp,
 	opProof []string,
 ) string {
 	t.Helper()
-
-	callValues := make([]*apiv2.Value, len(calls))
-	for i, call := range calls {
-		callValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.TargetInstanceId}}},
-				{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.FunctionName}}},
-				{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.OperationData}}},
-			},
-		}}}
-	}
 
 	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 		Fields: []*apiv2.RecordField{
@@ -451,12 +475,6 @@ func scheduleBatch(
 		proofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
 	}
 
-	delayValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: delayMicros}}},
-		},
-	}}}
-
 	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
@@ -469,16 +487,14 @@ func scheduleBatch(
 							EntityName: "MCMS",
 						},
 						ContractId: mcmsCid,
-						Choice:     "ScheduleBatch",
+						Choice:     "ExecuteOp",
 						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 							Fields: []*apiv2.RecordField{
+								{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 								{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-								{Label: "calls", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: callValues}}}},
-								{Label: "predecessor", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: predecessor}}},
-								{Label: "salt", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: salt}}},
-								{Label: "delay", Value: delayValue},
 								{Label: "op", Value: opValue},
 								{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: proofValues}}}},
+								{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
 							},
 						}}},
 					},
@@ -493,7 +509,7 @@ func scheduleBatch(
 			return created.GetContractId()
 		}
 	}
-	t.Fatal("no MCMS contract created after ScheduleBatch")
+	t.Fatal("no MCMS contract created after ExecuteOp(schedule_batch)")
 	return ""
 }
 
@@ -503,24 +519,11 @@ func scheduleBatchExpectError(
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
-	calls []TimelockCall,
-	predecessor string,
-	salt string,
-	delayMicros int64,
 	op MCMSOp,
 	opProof []string,
 ) error {
 	t.Helper()
-	callValues := make([]*apiv2.Value, len(calls))
-	for i, call := range calls {
-		callValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.TargetInstanceId}}},
-				{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.FunctionName}}},
-				{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.OperationData}}},
-			},
-		}}}
-	}
+
 	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 		Fields: []*apiv2.RecordField{
 			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
@@ -535,11 +538,6 @@ func scheduleBatchExpectError(
 	for i, p := range opProof {
 		proofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
 	}
-	delayValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: delayMicros}}},
-		},
-	}}}
 	_, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
@@ -552,16 +550,14 @@ func scheduleBatchExpectError(
 							EntityName: "MCMS",
 						},
 						ContractId: mcmsCid,
-						Choice:     "ScheduleBatch",
+						Choice:     "ExecuteOp",
 						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 							Fields: []*apiv2.RecordField{
+								{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
 								{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-								{Label: "calls", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: callValues}}}},
-								{Label: "predecessor", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: predecessor}}},
-								{Label: "salt", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: salt}}},
-								{Label: "delay", Value: delayValue},
 								{Label: "op", Value: opValue},
 								{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: proofValues}}}},
+								{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
 							},
 						}}},
 					},
@@ -1057,10 +1053,28 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
-		// 1) Set proposer root authorizing schedule_batch
+		// Define calls and salt first so we can encode them
+		calls := []TimelockCall{{
+			TargetInstanceId: mcmsInstanceID,
+			FunctionName:     "update_min_delay",
+			OperationData:    "1",
+		}}
+		salt := uuid.New().String()[:8]
+		delaySecs := 1
+
+		// Encode schedule params for operationData
+		scheduleParams := ScheduleBatchParams{
+			Calls:       calls,
+			Predecessor: ZeroHash,
+			Salt:        salt,
+			DelaySecs:   delaySecs,
+		}
+		encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+
+		// 1) Set proposer root authorizing schedule_batch with encoded operationData
 		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "schedule_batch", "").
+			AddOperation(mcmsInstanceID, "schedule_batch", encodedScheduleParams).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -1068,16 +1082,10 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
 		// 2) Schedule batch: self-dispatch update_min_delay to 1s
-		calls := []TimelockCall{{
-			TargetInstanceId: mcmsInstanceID,
-			FunctionName:     "update_min_delay",
-			OperationData:    "1",
-		}}
-		salt := uuid.New().String()[:8]
 		opID := HashTimelockOpId(calls, ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, calls, ZeroHash, salt, 1_000_000, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		// 3) Wait for delay
 		time.Sleep(1500 * time.Millisecond)
@@ -1097,15 +1105,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
-		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "schedule_batch", "").
-			Build()
-		validUntil := time.Now().Add(1 * time.Hour)
-		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
-		require.NoError(t, err)
-		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
-
+		// Define calls and salt first so we can encode them
 		bf := BlockedFunction{TargetInstanceId: "some-target@owner", FunctionName: "dangerous_op"}
 		calls := []TimelockCall{{
 			TargetInstanceId: mcmsInstanceID,
@@ -1113,10 +1113,30 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 			OperationData:    EncodeBlockedFunction(bf),
 		}}
 		salt := uuid.New().String()[:8]
+		delaySecs := 1
+
+		// Encode schedule params for operationData
+		scheduleParams := ScheduleBatchParams{
+			Calls:       calls,
+			Predecessor: ZeroHash,
+			Salt:        salt,
+			DelaySecs:   delaySecs,
+		}
+		encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+
+		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
+			AddOperation(mcmsInstanceID, "schedule_batch", encodedScheduleParams).
+			Build()
+		validUntil := time.Now().Add(1 * time.Hour)
+		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
+		require.NoError(t, err)
+		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
+
 		opID := HashTimelockOpId(calls, ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, calls, ZeroHash, salt, 1_000_000, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		time.Sleep(1500 * time.Millisecond)
 		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, nil)
@@ -1132,10 +1152,21 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
-		// Set bypasser root
+		// Define calls first so we can encode them
+		calls := []TimelockCall{{
+			TargetInstanceId: mcmsInstanceID,
+			FunctionName:     "update_min_delay",
+			OperationData:    "2",
+		}}
+
+		// Encode bypasser execute params for operationData
+		bypasserParams := BypasserExecuteParams{Calls: calls}
+		encodedBypasserParams := EncodeBypasserExecuteParams(bypasserParams)
+
+		// Set bypasser root with encoded operationData
 		bypasserMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleBypasser)
 		proposal := NewMCMSProposal(int(chainID), bypasserMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "bypasser_execute_batch", "").
+			AddOperation(mcmsInstanceID, "bypasser_execute_batch", encodedBypasserParams).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -1143,11 +1174,6 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Bypasser", proposal, validUntil, sigs)
 
 		// Execute immediately (no delay)
-		calls := []TimelockCall{{
-			TargetInstanceId: mcmsInstanceID,
-			FunctionName:     "update_min_delay",
-			OperationData:    "2",
-		}}
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 		mcmsCid = bypasserExecuteBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, calls, nil, proposal.Operations[0], opProof)
@@ -1167,25 +1193,36 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterInstanceID)
 		counterTargetInstanceID := counterInstanceID
 
+		// Define mixed calls and salt first so we can encode them
+		calls := []TimelockCall{
+			{TargetInstanceId: mcmsInstanceID, FunctionName: "update_min_delay", OperationData: "1"},
+			{TargetInstanceId: counterTargetInstanceID, FunctionName: "increment", OperationData: ""},
+		}
+		salt := uuid.New().String()[:8]
+		delaySecs := 0
+
+		// Encode schedule params for operationData
+		scheduleParams := ScheduleBatchParams{
+			Calls:       calls,
+			Predecessor: ZeroHash,
+			Salt:        salt,
+			DelaySecs:   delaySecs,
+		}
+		encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+
 		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, "schedule_batch", "").
+			AddOperation(mcmsInstanceID, "schedule_batch", encodedScheduleParams).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
-		// Mixed: self-dispatch + external
-		calls := []TimelockCall{
-			{TargetInstanceId: mcmsInstanceID, FunctionName: "update_min_delay", OperationData: "1"},
-			{TargetInstanceId: counterTargetInstanceID, FunctionName: "increment", OperationData: ""},
-		}
-		salt := uuid.New().String()[:8]
 		opID := HashTimelockOpId(calls, ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, calls, ZeroHash, salt, 0, proposal.Operations[0], opProof)
+		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		time.Sleep(1500 * time.Millisecond)
 

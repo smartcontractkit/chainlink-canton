@@ -18,13 +18,24 @@ module MCMS.Codec
   , decodeList
   , encodeBool
   , decodeBool
+  , ScheduleBatchParams(..)
+  , encodeScheduleBatchParams
+  , decodeScheduleBatchParams
+  , BypasserExecuteParams(..)
+  , encodeBypasserExecuteParams
+  , decodeBypasserExecuteParams
+  , CancelBatchParams(..)
+  , encodeCancelBatchParams
+  , decodeCancelBatchParams
+  , encodeTimelockCall
+  , decodeTimelockCall
   ) where
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 import DA.Foldable ()
-import MCMS.Types (SignerInfo(..), Role(..), BlockedFunction(..), intToRole)
+import MCMS.Types (SignerInfo(..), Role(..), BlockedFunction(..), TimelockCall(..), intToRole)
 
 -- ===========================================================================
 -- SET CONFIG PARAMETERS
@@ -185,9 +196,12 @@ decodeText : BytesHex -> Int -> Optional (Text, Int)
 decodeText encoded offset = do
   lenHex <- extractBytes encoded offset 1
   len <- decodeUint8 lenHex
-  textHex <- extractBytes encoded (offset + 1) len
-  text <- fromHex textHex
-  return (text, offset + 1 + len)
+  if len == 0
+    then return ("", offset + 1)
+    else do
+      textHex <- extractBytes encoded (offset + 1) len
+      text <- fromHex textHex
+      return (text, offset + 1 + len)
 
 -- | Encode bool (1 byte: 0 = False, 1 = True)
 encodeBool : Bool -> BytesHex
@@ -292,4 +306,93 @@ decodeSelfDispatchSetConfig encoded = do
   role <- intToRole roleInt
   params <- decodeSetConfigParamsAtOffset encoded 1
   Some (role, params)
+
+-- ===========================================================================
+-- TIMELOCK CALL ENCODING (for schedule_batch self-dispatch)
+-- ===========================================================================
+
+encodeTimelockCall : TimelockCall -> BytesHex
+encodeTimelockCall tc =
+  encodeText tc.targetInstanceId <> encodeText tc.functionName <> encodeText tc.operationData
+
+decodeTimelockCall : BytesHex -> Int -> Optional (TimelockCall, Int)
+decodeTimelockCall encoded offset = do
+  (targetInstanceId, offset1) <- decodeText encoded offset
+  (functionName, offset2) <- decodeText encoded offset1
+  (operationData, offset3) <- decodeText encoded offset2
+  Some (TimelockCall targetInstanceId functionName operationData, offset3)
+
+-- ===========================================================================
+-- SCHEDULE BATCH PARAMS (for schedule_batch self-dispatch)
+-- Format: numCalls (1 byte) + calls + predecessor (text) + salt (text) + delay (4 bytes)
+-- ===========================================================================
+
+data ScheduleBatchParams = ScheduleBatchParams
+  with
+    calls : [TimelockCall]
+    predecessor : Text
+    salt : Text
+    delaySecs : Int
+  deriving (Show, Eq)
+
+encodeScheduleBatchParams : ScheduleBatchParams -> BytesHex
+encodeScheduleBatchParams params =
+  let
+    callsEncoded = encodeList params.calls encodeTimelockCall
+    predecessorEncoded = encodeText params.predecessor
+    saltEncoded = encodeText params.salt
+    delayEncoded = fromSome (encodeUint32 params.delaySecs)
+  in
+    callsEncoded <> predecessorEncoded <> saltEncoded <> delayEncoded
+
+decodeScheduleBatchParams : BytesHex -> Optional ScheduleBatchParams
+decodeScheduleBatchParams encoded = do
+  (calls, offset1) <- decodeList encoded 0 decodeTimelockCall
+  (predecessor, offset2) <- decodeText encoded offset1
+  (salt, offset3) <- decodeText encoded offset2
+  delayHex <- extractBytes encoded offset3 4
+  delaySecs <- decodeUint32 delayHex
+  Some ScheduleBatchParams
+    { calls = calls
+    , predecessor = predecessor
+    , salt = salt
+    , delaySecs = delaySecs
+    }
+
+-- ===========================================================================
+-- BYPASSER EXECUTE PARAMS (for bypasser_execute_batch)
+-- Format: numCalls (1 byte) + calls
+-- Note: targetCids are provided externally, not in operationData
+-- ===========================================================================
+
+data BypasserExecuteParams = BypasserExecuteParams
+  with
+    calls : [TimelockCall]
+  deriving (Show, Eq)
+
+encodeBypasserExecuteParams : BypasserExecuteParams -> BytesHex
+encodeBypasserExecuteParams params = encodeList params.calls encodeTimelockCall
+
+decodeBypasserExecuteParams : BytesHex -> Optional BypasserExecuteParams
+decodeBypasserExecuteParams encoded = do
+  (calls, _) <- decodeList encoded 0 decodeTimelockCall
+  Some BypasserExecuteParams { calls = calls }
+
+-- ===========================================================================
+-- CANCEL BATCH PARAMS (for cancel_batch self-dispatch)
+-- Format: opId (text)
+-- ===========================================================================
+
+data CancelBatchParams = CancelBatchParams
+  with
+    opId : Text
+  deriving (Show, Eq)
+
+encodeCancelBatchParams : CancelBatchParams -> BytesHex
+encodeCancelBatchParams params = encodeText params.opId
+
+decodeCancelBatchParams : BytesHex -> Optional CancelBatchParams
+decodeCancelBatchParams encoded = do
+  (opId, _) <- decodeText encoded 0
+  Some CancelBatchParams { opId = opId }
 

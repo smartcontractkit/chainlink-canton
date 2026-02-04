@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "66b300512e790ad78a01e002e6b77489c28fa614888e120352b7f5c3e8774f3c"
+const PackageID = "a1ce9f83bb4d8df813b23e9cb3116949c5a06b6a120059e2c81088d453ccaf60"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -288,24 +288,14 @@ func (t *BlockedFunction) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// BypasserExecuteBatch is a Record type
-type BypasserExecuteBatch struct {
-	Submitter PARTY `json:"submitter"`
-
+// BypasserExecuteParams is a Record type
+type BypasserExecuteParams struct {
 	Calls []TimelockCall `json:"calls"`
-
-	TargetCids []CONTRACT_ID `json:"targetCids"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
 }
 
-// ToMap converts BypasserExecuteBatch to a map for DAML arguments
-func (t BypasserExecuteBatch) ToMap() map[string]interface{} {
+// ToMap converts BypasserExecuteParams to a map for DAML arguments
+func (t BypasserExecuteParams) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
-
-	m["submitter"] = t.Submitter.ToMap()
 
 	m["calls"] = func() []interface{} {
 		res := make([]interface{}, 0, len(t.Calls))
@@ -320,39 +310,15 @@ func (t BypasserExecuteBatch) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["targetCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.TargetCids))
-		for _, e := range t.TargetCids {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
-
-	m["opProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OpProof))
-		for _, e := range t.OpProof {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
 	return m
 }
 
-func (t BypasserExecuteBatch) MarshalJSON() ([]byte, error) {
+func (t BypasserExecuteParams) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-func (t *BypasserExecuteBatch) UnmarshalJSON(data []byte) error {
+func (t *BypasserExecuteParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -401,50 +367,26 @@ func (t *CanExecuteOp) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// CancelBatch is a Record type
-type CancelBatch struct {
-	Submitter PARTY `json:"submitter"`
-
+// CancelBatchParams is a Record type
+type CancelBatchParams struct {
 	OpId TEXT `json:"opId"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
 }
 
-// ToMap converts CancelBatch to a map for DAML arguments
-func (t CancelBatch) ToMap() map[string]interface{} {
+// ToMap converts CancelBatchParams to a map for DAML arguments
+func (t CancelBatchParams) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["submitter"] = t.Submitter.ToMap()
-
 	m["opId"] = string(t.OpId)
-
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
-
-	m["opProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OpProof))
-		for _, e := range t.OpProof {
-			res = append(res, string(e))
-		}
-		return res
-	}()
 
 	return m
 }
 
-func (t CancelBatch) MarshalJSON() ([]byte, error) {
+func (t CancelBatchParams) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-func (t *CancelBatch) UnmarshalJSON(data []byte) error {
+func (t *CancelBatchParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -563,73 +505,17 @@ func (t Counter) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntr
 
 var _ IMCMSReceiver = (*Counter)(nil)
 
-// ExecuteMcmsOp is a Record type
-type ExecuteMcmsOp struct {
-	TargetRole Role `json:"targetRole"`
-
-	Submitter PARTY `json:"submitter"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
-}
-
-// ToMap converts ExecuteMcmsOp to a map for DAML arguments
-func (t ExecuteMcmsOp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["targetRole"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TargetRole).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetRole
-	}()
-
-	m["submitter"] = t.Submitter.ToMap()
-
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
-
-	m["opProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OpProof))
-		for _, e := range t.OpProof {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t ExecuteMcmsOp) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
-}
-
-func (t *ExecuteMcmsOp) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
-}
-
 // ExecuteOp is a Record type
 type ExecuteOp struct {
 	TargetRole Role `json:"targetRole"`
 
 	Submitter PARTY `json:"submitter"`
 
-	TargetCid CONTRACT_ID `json:"targetCid"`
-
 	Op Op `json:"op"`
 
 	OpProof []TEXT `json:"opProof"`
 
-	ContractIds []CONTRACT_ID `json:"contractIds"`
+	TargetCids []CONTRACT_ID `json:"targetCids"`
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
@@ -646,14 +532,6 @@ func (t ExecuteOp) ToMap() map[string]interface{} {
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["targetCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TargetCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TargetCid
-	}()
-
 	m["op"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
 		if m, ok := any(t.Op).(mapper); ok {
@@ -670,9 +548,9 @@ func (t ExecuteOp) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["contractIds"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ContractIds))
-		for _, e := range t.ContractIds {
+	m["targetCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TargetCids))
+		for _, e := range t.TargetCids {
 			res = append(res, e)
 		}
 		return res
@@ -1232,58 +1110,6 @@ func (t MCMS) ExecuteOp(contractID string, args ExecuteOp) *model.ExerciseComman
 	}
 }
 
-// ExecuteMcmsOp exercises the ExecuteMcmsOp choice on this MCMS contract
-func (t MCMS) ExecuteMcmsOp(contractID string, args ExecuteMcmsOp) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
-		ContractID: contractID,
-		Choice:     "ExecuteMcmsOp",
-
-		Arguments: argsToMap(args),
-	}
-}
-
-// ScheduleBatch exercises the ScheduleBatch choice on this MCMS contract
-func (t MCMS) ScheduleBatch(contractID string, args ScheduleBatch) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
-		ContractID: contractID,
-		Choice:     "ScheduleBatch",
-
-		Arguments: argsToMap(args),
-	}
-}
-
-// BypasserExecuteBatch exercises the BypasserExecuteBatch choice on this MCMS contract
-func (t MCMS) BypasserExecuteBatch(contractID string, args BypasserExecuteBatch) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
-		ContractID: contractID,
-		Choice:     "BypasserExecuteBatch",
-
-		Arguments: argsToMap(args),
-	}
-}
-
-// CancelBatch exercises the CancelBatch choice on this MCMS contract
-func (t MCMS) CancelBatch(contractID string, args CancelBatch) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
-		ContractID: contractID,
-		Choice:     "CancelBatch",
-
-		Arguments: argsToMap(args),
-	}
-}
-
 // ExecuteScheduledBatch exercises the ExecuteScheduledBatch choice on this MCMS contract
 func (t MCMS) ExecuteScheduledBatch(contractID string, args ExecuteScheduledBatch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -1310,14 +1136,14 @@ func (t MCMS) CanExecuteOp(contractID string, args CanExecuteOp) *model.Exercise
 	}
 }
 
-// GetState exercises the GetState choice on this MCMS contract
-func (t MCMS) GetState(contractID string, args GetState) *model.ExerciseCommand {
+// IsOperationReady exercises the IsOperationReady choice on this MCMS contract
+func (t MCMS) IsOperationReady(contractID string, args IsOperationReady) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
 
 		ContractID: contractID,
-		Choice:     "GetState",
+		Choice:     "IsOperationReady",
 
 		Arguments: argsToMap(args),
 	}
@@ -1333,6 +1159,19 @@ func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
 		Choice:     "Archive",
 
 		Arguments: map[string]interface{}{},
+	}
+}
+
+// GetState exercises the GetState choice on this MCMS contract
+func (t MCMS) GetState(contractID string, args GetState) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
+
+		ContractID: contractID,
+		Choice:     "GetState",
+
+		Arguments: argsToMap(args),
 	}
 }
 
@@ -1357,19 +1196,6 @@ func (t MCMS) IsOperationPending(contractID string, args IsOperationPending) *mo
 
 		ContractID: contractID,
 		Choice:     "IsOperationPending",
-
-		Arguments: argsToMap(args),
-	}
-}
-
-// IsOperationReady exercises the IsOperationReady choice on this MCMS contract
-func (t MCMS) IsOperationReady(contractID string, args IsOperationReady) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
-		ContractID: contractID,
-		Choice:     "IsOperationReady",
 
 		Arguments: argsToMap(args),
 	}
@@ -1930,28 +1756,20 @@ func (t *RootMetadata) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// ScheduleBatch is a Record type
-type ScheduleBatch struct {
-	Submitter PARTY `json:"submitter"`
-
+// ScheduleBatchParams is a Record type
+type ScheduleBatchParams struct {
 	Calls []TimelockCall `json:"calls"`
 
 	Predecessor TEXT `json:"predecessor"`
 
 	Salt TEXT `json:"salt"`
 
-	Delay RELTIME `json:"delay"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
+	DelaySecs INT64 `json:"delaySecs"`
 }
 
-// ToMap converts ScheduleBatch to a map for DAML arguments
-func (t ScheduleBatch) ToMap() map[string]interface{} {
+// ToMap converts ScheduleBatchParams to a map for DAML arguments
+func (t ScheduleBatchParams) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
-
-	m["submitter"] = t.Submitter.ToMap()
 
 	m["calls"] = func() []interface{} {
 		res := make([]interface{}, 0, len(t.Calls))
@@ -1970,39 +1788,17 @@ func (t ScheduleBatch) ToMap() map[string]interface{} {
 
 	m["salt"] = string(t.Salt)
 
-	m["delay"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Delay).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Delay
-	}()
-
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
-
-	m["opProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OpProof))
-		for _, e := range t.OpProof {
-			res = append(res, string(e))
-		}
-		return res
-	}()
+	m["delaySecs"] = int64(t.DelaySecs)
 
 	return m
 }
 
-func (t ScheduleBatch) MarshalJSON() ([]byte, error) {
+func (t ScheduleBatchParams) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-func (t *ScheduleBatch) UnmarshalJSON(data []byte) error {
+func (t *ScheduleBatchParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
