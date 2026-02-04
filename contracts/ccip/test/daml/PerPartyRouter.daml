@@ -13,7 +13,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
-import qualified CCIP.Tickets
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.TokenAdminRegistry
 
 
@@ -30,15 +30,16 @@ testCCIPSend = script do
     let destChainSelector : Numeric 0 = 2222222222.0
 
     -- deploy global config
+    let defaultExecutor = RawInstanceAddress ("default-executor@" <> partyToText ccipOwner)
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
-            ccipOwner = ccipOwner
             instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
             chainSelector = sourceChainSelector
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
-                defaultExecutor = "0000000000000000000000000000000000000002"
+                defaultExecutor = defaultExecutor
                 offRampAddress = "0000000000000000000000000000000000000003"
                 laneMandatedCCVs = []
                 defaultCCVs = [])]
@@ -47,21 +48,21 @@ testCCIPSend = script do
     -- deploy token admin registry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
-            owner = ccipOwner
             instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
             tokenConfigs = Map.empty
 
     -- deploy onramp
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
-            ccipOwner = ccipOwner
             instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
 
     -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
-            ccipOwner = ccipOwner
             instanceId = factoryInstanceId
+            ccipOwner = ccipOwner
             registeredRouters = Map.empty
 
     -- disclose factory to user
@@ -82,7 +83,7 @@ testCCIPSend = script do
 
     -- user sends ccip message (ccipOwner acts via PerPartyRouter signatory)
     -- user passes globalConfigCid via explicit disclosure
-    let receiver = CCIP.MessageCodecV1.encodePartyId user
+    let receiver = CCIP.MessageCodecV1.encodePartyAddress user
     sendResult <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
         exerciseCmd router CCIP.PerPartyRouter.CCIPSend with
             onRampCid = onRamp
@@ -142,8 +143,8 @@ testCCIPExecute = script do
     -- deploy global config
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
-            ccipOwner = ccipOwner
             instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
             chainSelector = destChainSelector
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.empty
@@ -156,21 +157,21 @@ testCCIPExecute = script do
     -- deploy token admin registry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
-            owner = ccipOwner
             instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
             tokenConfigs = Map.empty
 
     -- deploy offramp
     offRamp <- submit ccipOwner do
         createCmd CCIP.OffRamp.OffRamp with
-            ccipOwner = ccipOwner
             instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
 
     -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
-            ccipOwner = ccipOwner
             instanceId = factoryInstanceId
+            ccipOwner = ccipOwner
             registeredRouters = Map.empty
 
     -- disclose factory to receiver
@@ -195,7 +196,7 @@ testCCIPExecute = script do
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000003"
-            receiver = CCIP.MessageCodecV1.encodePartyId receiver
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
             tokenTransfer = None
             messageData = "48656c6c6f20576f726c64"
@@ -218,7 +219,8 @@ testCCIPExecute = script do
             encodedMessage = encodedMessage
             ccvVerifyTickets = []
             tokenPoolCCVTicket = None
-            receiverRequiredCCVIds = []
+            receiverRequiredCCVs = []
+            tokenReceiverParty = None
 
     -- verify execution succeeded
     executeResult.state === CCIP.Internal.SUCCESS
