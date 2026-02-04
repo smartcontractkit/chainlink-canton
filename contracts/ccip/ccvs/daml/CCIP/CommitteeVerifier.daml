@@ -43,7 +43,6 @@ template CommitteeVerifier
                     with
                         ccvRegistryCid = arg.ccvRegistryCid
                         message = arg.message
-                        messageId = arg.messageId
                         verifierResults = arg.verifierResults
                         receiver = arg.receiver
                         caller = arg.caller
@@ -53,7 +52,6 @@ template CommitteeVerifier
                     with
                         ccvRegistryCid = arg.ccvRegistryCid
                         message = arg.message
-                        messageId = arg.messageId
                         feeToken = arg.feeToken
                         feeTokenAmount = arg.feeTokenAmount
                         verifierArgs = arg.verifierArgs
@@ -64,7 +62,6 @@ template CommitteeVerifier
             with
                 ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 message : CCIP.MessageCodecV1.MessageV1
-                messageId : BytesHex
                 verifierResults : BytesHex
                 receiver : Party
                 caller : Party
@@ -101,8 +98,8 @@ template CommitteeVerifier
                 -- Issue verify ticket via CCVRegistry (registry computes instance address)
                 exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
                     ccvInstanceId = instanceId
-                    versionTag = versionTag
                     ccvOwner = owner
+                    versionTag = versionTag
                     messageHash = messageHash
                     sourceChainSelector = message.sourceChainSelector
                     sequenceNumber = message.sequenceNumber
@@ -113,14 +110,13 @@ template CommitteeVerifier
             with
                 ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 message : CCIP.MessageCodecV1.MessageV1
-                messageId : BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
                 feeTokenAmount : Decimal
                 verifierArgs : BytesHex
                 caller : Party
             controller caller
             do
-                -- Compute instance address for this CCV
+                -- Compute instance address for receipt (registry will compute independently for validation)
                 let ccvAddr = CCIP.MessageCodecV1.instanceAddress instanceId owner
 
                 -- Build verifierBlob with version tag as first 4 bytes
@@ -136,11 +132,11 @@ template CommitteeVerifier
                         feeTokenAmount = 0.0
                         extraArgs = ""
 
-                -- Issue CCV ticket via CCVRegistry with pre-computed instance address
+                -- Issue CCV ticket via CCVRegistry (registry computes instance address)
                 exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
-                    ccvInstanceAddress = ccvAddr
-                    versionTag = versionTag
+                    ccvInstanceId = instanceId
                     ccvOwner = owner
+                    versionTag = versionTag
                     verifierBlob = verifierBlob
                     messageSentObservers = [messageSentObserver]
                     sender = caller
