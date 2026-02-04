@@ -28,8 +28,8 @@ data SourceChainConfig = SourceChainConfig
 
 template GlobalConfig
     with
-        ccipOwner : Party
         instanceId : Text
+        ccipOwner : Party
 
         chainSelector : Numeric 0
         onRampAddress : BytesHex

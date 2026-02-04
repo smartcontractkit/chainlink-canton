@@ -2,7 +2,6 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex, keccak256)
 
-import qualified CCIP.CCVId
 import qualified CCIP.CCVRegistry
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
@@ -14,6 +13,7 @@ dummyVersionTag = "deadbeef"
 
 template DummyCommitteeVerifier
     with
+        instanceId : Text
         owner : Party
         ccipOwner : Party
         versionTag : BytesHex
@@ -26,7 +26,6 @@ template DummyCommitteeVerifier
                 storageLocation = "ipfs://dummy"
 
             crossChainVerifier_verifyMessageImpl self arg = do
-                debug ("DummyCommitteeVerifier: verifyMessage called with messageId: " <> show arg.messageId)
                 -- verifierResults should start with version tag (first 4 bytes)
                 -- For testing, we use "01" as a failure trigger
                 case arg.verifierResults of
@@ -35,36 +34,39 @@ template DummyCommitteeVerifier
                         debug ("DummyCommitteeVerifier: Simulated successful verification")
                         -- Calculate message hash
                         let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 arg.message)
-                        -- Issue verify ticket via CCVRegistry
-                        -- CCVRegistry extracts version tag from first 4 bytes of verifierResults
+                        -- Issue verify ticket via CCVRegistry (registry computes instance address)
                         exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
+                            ccvInstanceId = instanceId
                             ccvOwner = owner
-                            verifierResults = arg.verifierResults  -- Must start with version tag
+                            versionTag = versionTag
                             messageHash = messageHash
                             sourceChainSelector = arg.message.sourceChainSelector
                             sequenceNumber = arg.message.sequenceNumber
                             receiver = arg.receiver
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
-                debug ("DummyCommitteeVerifier: forwardToVerifier called with messageId: " <> show arg.messageId)
+                -- Compute instance address for receipt
+                let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId owner
+
                 -- Build verifierBlob with version tag as first 4 bytes
-                -- For dummy verifier, the blob is just the version tag itself
                 let verifierBlob = versionTag
 
-                -- Build stub Receipt
-                let ccvId = CCIP.CCVId.makeCCVId versionTag owner
+                -- Build Receipt with instance address
                 let receipt = CCIP.Tickets.Receipt with
-                        issuer = ccvId
+                        issuerType = CCIP.Tickets.IssuerType_CCV
+                        issuerAddress = ccvAddr
+                        versionTag = Some versionTag
                         destGasLimit = 0
                         destBytesOverhead = 0
                         feeTokenAmount = 0.0
                         extraArgs = ""
 
-                -- Issue CCV ticket via CCVRegistry
-                -- CCVRegistry extracts version tag from first 4 bytes of verifierBlob
+                -- Issue CCV ticket via CCVRegistry (registry computes instance address)
                 exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
+                    ccvInstanceId = instanceId
                     ccvOwner = owner
-                    verifierBlob = verifierBlob  -- Must start with version tag
+                    versionTag = versionTag
+                    verifierBlob = verifierBlob
                     messageSentObservers = [owner]
                     sender = arg.caller
                     receipt = receipt

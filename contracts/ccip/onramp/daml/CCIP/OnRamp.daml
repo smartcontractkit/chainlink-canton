@@ -18,8 +18,8 @@ import qualified Splice.Api.Token.HoldingV1
 
 template OnRamp
     with
-        ccipOwner : Party
         instanceId : Text
+        ccipOwner : Party
     where
         signatory ccipOwner
 

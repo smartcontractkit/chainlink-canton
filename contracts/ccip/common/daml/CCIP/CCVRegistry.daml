@@ -10,8 +10,8 @@ import qualified CCIP.Tickets
 
 template CCVRegistry
     with
-        ccipOwner : Party
         instanceId : Text
+        ccipOwner : Party
     where
         signatory ccipOwner
 

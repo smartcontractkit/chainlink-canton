@@ -55,9 +55,9 @@ data ChainCCVConfig = ChainCCVConfig
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
     with
+        instanceId : Text  -- Unique identifier for this pool instance
         ccipOwner : Party
         poolOwner : Party
-        instanceId : Text  -- Unique identifier for this pool instance
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
         -- CCV requirements per remote chain selector

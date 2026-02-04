@@ -1,36 +1,38 @@
--- | offramp for ccip message execution, called by perpartyrouter.
+-- | OffRamp for CCIP message execution, called by PerPartyRouter.
 module CCIP.OffRamp where
 
 import DA.Foldable qualified as Foldable
 import DA.Crypto.Text (BytesHex, keccak256)
+import DA.List (dedup)
 import DA.Optional (fromSomeNote)
 
-import qualified CCIP.CCVId
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RawInstanceAddress
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
 
 
--- | offramp contract for perpartyrouter architecture.
+-- | OffRamp contract for PerPartyRouter architecture.
 template OffRamp
     with
-        ccipOwner : Party
         instanceId : Text
+        ccipOwner : Party
     where
         signatory ccipOwner
 
-        -- | Get required CCVs for inbound message execution.
+        -- | Get required CCV raw instance addresses for inbound message execution.
         -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
         -- Includes receiver's required CCVs since they're executing the message.
         -- Note: pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs.
-        nonconsuming choice GetRequiredCCVsForExecute : [CCIP.CCVId.CCVId]
+        nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                receiverRequiredCCVs : [CCIP.CCVId.CCVId]  -- Passed from PerPartyRouter
+                receiverRequiredCCVs : [RawInstanceAddress]
                 sourceChainSelector : Numeric 0
                 hasTokenTransfer : Bool
                 instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
@@ -45,25 +47,22 @@ template OffRamp
                         None -> []
                         Some config -> config.laneMandatedCCVs
 
-                -- Receiver's required CCVs (passed from PerPartyRouter)
-                let receiverCCVs = receiverRequiredCCVs
-
                 -- Get default CCVs (if no other CCVs specified)
                 let defaultCCVs = case sourceConfigOpt of
                         None -> []
                         Some config ->
-                            if null laneMandatedCCVs && null receiverCCVs
+                            if null laneMandatedCCVs && null receiverRequiredCCVs
                             then config.defaultCCVs
                             else []
 
                 -- Combine and dedupe
-                pure (CCIP.CCVId.dedupCCVIds (laneMandatedCCVs ++ receiverCCVs ++ defaultCCVs))
+                pure (dedup (laneMandatedCCVs ++ receiverRequiredCCVs ++ defaultCCVs))
 
-        -- | Process a ccip execute request from a perpartyrouter.
+        -- | Process a CCIP execute request from a PerPartyRouter.
         nonconsuming choice ExecuteFromRouter : ExecuteFromRouterResult
             with
                 routerPartyOwner : Party
-                receiverRequiredCCVs : [CCIP.CCVId.CCVId]
+                receiverRequiredCCVs : [RawInstanceAddress]
 
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -72,21 +71,23 @@ template OffRamp
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
                 tokenPoolCCVTicket : Optional (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
 
+                -- Token receiver party must be provided since we can't decode from address
+                tokenReceiverParty : Optional Party
+
             controller ccipOwner
             do
 
-                -- decode message
+                -- Decode message
                 let message = fromSomeNote "offramp: failed to decode message"
                         (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
                 let messageHash = keccak256 encodedMessage
 
-                -- verify receiver is this party
-                let receiverParty = fromSomeNote "offramp: failed to decode receiver"
-                        (CCIP.MessageCodecV1.decodePartyId message.receiver)
+                -- Verify receiver address matches this party
+                let expectedReceiverAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 assertMsg "offramp: message not for this party"
-                    (receiverParty == routerPartyOwner)
+                    (message.receiver == expectedReceiverAddr)
 
-                -- fetch and verify global config
+                -- Fetch and verify global config
                 globalConfig <- fetch globalConfigCid
                 assertMsg "offramp: globalconfig ccipowner mismatch"
                     (globalConfig.ccipOwner == ccipOwner)
@@ -101,17 +102,26 @@ template OffRamp
                         assertMsg "offramp: source chain disabled" c.isEnabled
                         pure c
 
-                -- extract token transfer info
-                let (hasTokenTransfer, tokenAmount, destTokenAddr, tokenReceiverParty, instrumentId) =
+                -- Extract token transfer info
+                let (hasTokenTransfer, tokenAmount, instrumentId) =
                         case message.tokenTransfer of
-                            None -> (False, None, None, None, None)
+                            None -> (False, None, None)
                             Some tt ->
-                                let trParty = CCIP.MessageCodecV1.decodePartyId tt.tokenReceiver
-                                    instId = CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress
-                                in (True, Some tt.amount, Some tt.destTokenAddress, trParty, instId)
+                                let instId = CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress
+                                in (True, Some tt.amount, instId)
 
-                -- Consume tokenPoolCCVTicket if provided to get pool's verified CCVs
-                poolVerifiedCCVIds <- case tokenPoolCCVTicket of
+                -- Validate tokenReceiverParty matches message if token transfer present
+                case (message.tokenTransfer, tokenReceiverParty) of
+                    (Some tt, Some trParty) ->
+                        let expectedTokenReceiverAddr = CCIP.MessageCodecV1.encodePartyAddress trParty
+                        in assertMsg "offramp: tokenReceiver address mismatch"
+                            (tt.tokenReceiver == expectedTokenReceiverAddr)
+                    (Some _, None) ->
+                        abort "offramp: tokenReceiverParty required for token transfer"
+                    _ -> pure ()
+
+                -- Consume tokenPoolCCVTicket if provided to get pool's verified CCV addresses
+                poolVerifiedCCVAddresses <- case tokenPoolCCVTicket of
                     None -> pure []
                     Some ticketCid -> do
                         ticket <- fetch ticketCid
@@ -123,36 +133,39 @@ template OffRamp
                             (ticket.sourceChainSelector == message.sourceChainSelector)
                         exercise ticketCid CCIP.Tickets.TokenPoolCCVVerifiedTicket_Consume
 
-                -- Get lane-mandated CCVs
-                let laneMandatedCCVs = sourceConfig.laneMandatedCCVs
-
-                -- Determine if defaults should apply
+                -- Determine if defaults should apply (check raw addresses before conversion)
                 let hasSpecificRequirements =
-                        not (null laneMandatedCCVs) ||
+                        not (null sourceConfig.laneMandatedCCVs) ||
                         not (null receiverRequiredCCVs) ||
-                        not (null poolVerifiedCCVIds)
+                        not (null poolVerifiedCCVAddresses)
 
+                -- Get default CCVs if no specific requirements
                 let defaultCCVs = if hasSpecificRequirements
                         then []
                         else sourceConfig.defaultCCVs
 
-                -- Combine all required CCVs
-                let requiredCCVIds = CCIP.CCVId.dedupCCVIds $
-                        laneMandatedCCVs ++ receiverRequiredCCVs ++ poolVerifiedCCVIds ++ defaultCCVs
+                -- Combine all raw addresses and convert to hashed addresses
+                let allRawAddrs = sourceConfig.laneMandatedCCVs ++ receiverRequiredCCVs ++ defaultCCVs
+                let requiredCCVAddresses = dedup $
+                        map CCIP.RawInstanceAddress.toInstanceAddress allRawAddrs ++ poolVerifiedCCVAddresses
 
-                -- consume ccv verification tickets and collect CCVIds
-                providedCCVIds <- forA ccvVerifyTickets $ \ticketCid -> do
+                -- Process CCV verification tickets: read fields directly, compute addresses, archive
+                providedCCVAddresses <- forA ccvVerifyTickets $ \ticketCid -> do
                     ticket <- fetch ticketCid
                     assertMsg "offramp: ccvverifyticket ccipowner mismatch"
                         (ticket.ccipOwner == ccipOwner)
                     assertMsg "offramp: ccvverifyticket messagehash mismatch"
                         (ticket.messageHash == messageHash)
-                    exercise ticketCid CCIP.Tickets.CCVVerifyTicket_Consume
+                    -- Compute instance address from (instanceId, owner)
+                    let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress ticket.ccvInstanceId ticket.ccvOwner
+                    -- Archive the ticket
+                    exercise ticketCid CCIP.Tickets.CCVVerifyTicket_Archive with caller = ccipOwner
+                    pure ccvAddr
 
-                -- validate all required CCVs are covered
-                Foldable.forA_ requiredCCVIds $ \requiredId ->
-                    assertMsg ("offramp: missing required CCV " <> requiredId)
-                        (requiredId `elem` providedCCVIds)
+                -- Validate all required CCVs are covered
+                Foldable.forA_ requiredCCVAddresses $ \requiredAddr ->
+                    assertMsg ("offramp: missing required CCV address " <> requiredAddr)
+                        (requiredAddr `elem` providedCCVAddresses)
 
                 -- Issue token receive ticket only if there's a token transfer
                 tokenReceiveTicketCid <- case (hasTokenTransfer, instrumentId, tokenAmount, tokenReceiverParty) of

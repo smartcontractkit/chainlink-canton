@@ -5,11 +5,11 @@ import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Optional (fromOptional)
 
-import qualified CCIP.CCVId
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
+import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
@@ -21,8 +21,8 @@ import qualified Splice.Api.Token.HoldingV1
 -- tracks (party, instanceId) combinations to prevent duplicate instanceIds.
 template PerPartyRouterFactory
     with
-        ccipOwner : Party
         instanceId : Text
+        ccipOwner : Party
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
@@ -76,9 +76,9 @@ data CreateRouterResult = CreateRouterResult
 -- note: no stored cids - users pass all cids via explicit disclosure
 template PerPartyRouter
     with
+        instanceId : Text
         ccipOwner : Party
         partyOwner : Party
-        instanceId : Text
         -- only per-party state, no stored cids
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
@@ -161,7 +161,8 @@ template PerPartyRouter
                 encodedMessage : BytesHex
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
                 tokenPoolCCVTicket : Optional (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
-                receiverRequiredCCVIds : [CCIP.CCVId.CCVId]  -- Receiver declares their own requirements
+                receiverRequiredCCVs : [RawInstanceAddress]
+                tokenReceiverParty : Optional Party  -- Required if message has token transfer
             controller partyOwner
             do
                 -- validate offramp belongs to same deployment
@@ -184,12 +185,13 @@ template PerPartyRouter
                 -- pass receiver's required CCVs and tokenPoolCCVTicket
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
-                    receiverRequiredCCVs = receiverRequiredCCVIds
+                    receiverRequiredCCVs = receiverRequiredCCVs
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
                     encodedMessage = encodedMessage
                     ccvVerifyTickets = ccvVerifyTickets
                     tokenPoolCCVTicket = tokenPoolCCVTicket
+                    tokenReceiverParty = tokenReceiverParty
 
                 -- update state
                 let newStates = Map.insert result.messageHash CCIP.Internal.SUCCESS executionStates
@@ -227,9 +229,9 @@ template PerPartyRouter
             do
                 pure (fromOptional 0.0 (Map.lookup destChainSelector outboundSequenceNumbers))
 
-        -- | Get all required CCVs for sending a message (combined from all sources).
+        -- | Get all required CCV raw instance addresses for sending a message.
         -- Thin wrapper that calls OnRamp. Does NOT pass receiver CCVs (sender doesn't know receiver's requirements).
-        nonconsuming choice GetRequiredCCVsForSend : [CCIP.CCVId.CCVId]
+        nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress]
             with
                 onRampCid : ContractId CCIP.OnRamp.OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
@@ -246,14 +248,14 @@ template PerPartyRouter
                     hasTokenTransfer = hasTokenTransfer
                     instrumentId = instrumentId
 
-        -- | Get all required CCVs for executing a message (combined from all sources).
+        -- | Get all required CCV raw instance addresses for executing a message.
         -- Thin wrapper that calls OffRamp with receiver's required CCVs passed as parameter.
-        nonconsuming choice GetRequiredCCVsForExecute : [CCIP.CCVId.CCVId]
+        nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
             with
                 offRampCid : ContractId CCIP.OffRamp.OffRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                receiverRequiredCCVs : [CCIP.CCVId.CCVId]
+                receiverRequiredCCVs : [RawInstanceAddress]
                 sourceChainSelector : Numeric 0
                 hasTokenTransfer : Bool
                 instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId

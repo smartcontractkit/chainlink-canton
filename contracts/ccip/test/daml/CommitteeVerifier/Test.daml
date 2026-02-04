@@ -41,8 +41,8 @@ setup = script do
     let verifierResults1 = PayloadBuilder.getVerifierResultsForIndices indices1
     ccv1 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv1"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -65,8 +65,8 @@ setup = script do
     let verifierResults2 = PayloadBuilder.getVerifierResultsForIndices indices2
     ccv2 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv2"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -89,8 +89,8 @@ setup = script do
     let verifierResults3 = PayloadBuilder.getVerifierResultsForIndices indices3
     ccv3 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv3"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -105,8 +105,8 @@ setup = script do
     let verifierResults4 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
     ccv4 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv4"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -128,8 +128,8 @@ setup = script do
     let verifierResults5 = PayloadBuilder.getVerifierResultsForIndices [5, 6, 7, 8, 9]
     ccv5 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv5"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -151,8 +151,8 @@ setup = script do
     let verifierResults6 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 0]
     ccv6 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv6"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -172,8 +172,8 @@ setup = script do
     -- try to create without any signers, should fail
     ccv7 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv7"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -186,8 +186,8 @@ setup = script do
     -- try to create without a storage location, should fail
     ccv8 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv8"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
@@ -201,8 +201,8 @@ setup = script do
     let pubKeys9 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
     ccv9 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv9"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
