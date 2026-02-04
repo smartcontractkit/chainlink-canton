@@ -5,7 +5,6 @@ module CCIP.CCVRegistry where
 
 import DA.Crypto.Text (BytesHex, byteCount)
 
-import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
 
 
@@ -18,12 +17,12 @@ template CCVRegistry
 
         -- | Issue a CCV ticket for outbound message (forwardToVerifier equivalent).
         -- Called by CCV after processing send request.
-        -- Computes instance address from instanceId and owner for validation.
+        -- Stores instanceId; address computed at consumption time by OnRamp.
         nonconsuming choice CCVRegistry_IssueCCVTicket : ContractId CCIP.Tickets.CCVTicket
             with
                 ccvInstanceId : Text           -- CCV's instanceId
+                ccvOwner : Party               -- Controller
                 versionTag : BytesHex          -- 4-byte version tag
-                ccvOwner : Party               -- Controller (also used for address computation)
                 verifierBlob : BytesHex
                 messageSentObservers : [Party]
                 sender : Party
@@ -33,13 +32,10 @@ template CCVRegistry
                 assertMsg "CCVRegistry: version tag must be 4 bytes"
                     (byteCount versionTag == 4)
 
-                -- Compute instance address from instanceId and owner
-                let ccvInstanceAddress = CCIP.MessageCodecV1.instanceAddress ccvInstanceId ccvOwner
-
                 create CCIP.Tickets.CCVTicket with
-                    ccvInstanceAddress = ccvInstanceAddress
-                    versionTag = versionTag
+                    ccvInstanceId = ccvInstanceId
                     ccvOwner = ccvOwner
+                    versionTag = versionTag
                     ccipOwner = ccipOwner
                     sender = sender
                     verifierBlob = verifierBlob
@@ -48,11 +44,12 @@ template CCVRegistry
 
         -- | Issue a CCV verify ticket for inbound message verification.
         -- Called by CCV after successful verification.
+        -- Stores instanceId; address computed at consumption time by OffRamp.
         nonconsuming choice CCVRegistry_IssueVerifyTicket : ContractId CCIP.Tickets.CCVVerifyTicket
             with
-                ccvInstanceId : Text
+                ccvInstanceId : Text           -- CCV's instanceId
+                ccvOwner : Party               -- Controller
                 versionTag : BytesHex          -- 4-byte version tag
-                ccvOwner : Party               -- Controller (also used for address computation)
                 messageHash : BytesHex
                 sourceChainSelector : Numeric 0
                 sequenceNumber : Numeric 0
@@ -62,14 +59,12 @@ template CCVRegistry
                 assertMsg "CCVRegistry: version tag must be 4 bytes"
                     (byteCount versionTag == 4)
 
-                let ccvInstanceAddress = CCIP.MessageCodecV1.instanceAddress ccvInstanceId ccvOwner
-
                 create CCIP.Tickets.CCVVerifyTicket with
-                    ccvInstanceAddress = ccvInstanceAddress
-                    versionTag = versionTag
+                    ccvInstanceId = ccvInstanceId
                     ccvOwner = ccvOwner
+                    versionTag = versionTag
                     ccipOwner = ccipOwner
-                    caller = receiver
+                    receiver = receiver
                     messageHash = messageHash
                     sourceChainSelector = sourceChainSelector
                     sequenceNumber = sequenceNumber
