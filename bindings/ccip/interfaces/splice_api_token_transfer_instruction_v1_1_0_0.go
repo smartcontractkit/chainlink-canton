@@ -51,21 +51,14 @@ type ITransferInstruction interface {
 
 // Transfer is a Record type
 type Transfer struct {
-	Sender PARTY `json:"sender"`
-
-	Receiver PARTY `json:"receiver"`
-
-	Amount NUMERIC `json:"amount"`
-
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	RequestedAt TIMESTAMP `json:"requestedAt"`
-
-	ExecuteBefore TIMESTAMP `json:"executeBefore"`
-
+	Sender           PARTY         `json:"sender"`
+	Receiver         PARTY         `json:"receiver"`
+	Amount           NUMERIC       `json:"amount"`
+	InstrumentId     InstrumentId  `json:"instrumentId"`
+	RequestedAt      TIMESTAMP     `json:"requestedAt"`
+	ExecuteBefore    TIMESTAMP     `json:"executeBefore"`
 	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
-
-	Meta Metadata `json:"meta"`
+	Meta             Metadata      `json:"meta"`
 }
 
 // ToMap converts Transfer to a map for DAML arguments
@@ -121,9 +114,8 @@ func (t *Transfer) UnmarshalJSON(data []byte) error {
 
 // TransferFactoryView is a Record type
 type TransferFactoryView struct {
-	Admin PARTY `json:"admin"`
-
-	Meta Metadata `json:"meta"`
+	Admin PARTY    `json:"admin"`
+	Meta  Metadata `json:"meta"`
 }
 
 // ToMap converts TransferFactoryView to a map for DAML arguments
@@ -156,8 +148,7 @@ func (t *TransferFactoryView) UnmarshalJSON(data []byte) error {
 // TransferFactoryPublicFetch is a Record type
 type TransferFactoryPublicFetch struct {
 	ExpectedAdmin PARTY `json:"expectedAdmin"`
-
-	Actor PARTY `json:"actor"`
+	Actor         PARTY `json:"actor"`
 }
 
 // ToMap converts TransferFactoryPublicFetch to a map for DAML arguments
@@ -183,11 +174,9 @@ func (t *TransferFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 
 // TransferFactoryTransfer is a Record type
 type TransferFactoryTransfer struct {
-	ExpectedAdmin PARTY `json:"expectedAdmin"`
-
-	Transfer Transfer `json:"transfer"`
-
-	ExtraArgs ExtraArgs `json:"extraArgs"`
+	ExpectedAdmin PARTY     `json:"expectedAdmin"`
+	Transfer      Transfer  `json:"transfer"`
+	ExtraArgs     ExtraArgs `json:"extraArgs"`
 }
 
 // ToMap converts TransferFactoryTransfer to a map for DAML arguments
@@ -227,11 +216,9 @@ func (t *TransferFactoryTransfer) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionResult is a Record type
 type TransferInstructionResult struct {
-	Output TransferInstructionResultOutput `json:"output"`
-
-	SenderChangeCids []CONTRACT_ID `json:"senderChangeCids"`
-
-	Meta Metadata `json:"meta"`
+	Output           TransferInstructionResultOutput `json:"output"`
+	SenderChangeCids []CONTRACT_ID                   `json:"senderChangeCids"`
+	Meta             Metadata                        `json:"meta"`
 }
 
 // ToMap converts TransferInstructionResult to a map for DAML arguments
@@ -442,13 +429,10 @@ var _ VARIANT = (*TransferInstructionStatus)(nil)
 
 // TransferInstructionView is a Record type
 type TransferInstructionView struct {
-	OriginalInstructionCid *CONTRACT_ID `json:"originalInstructionCid"`
-
-	Transfer Transfer `json:"transfer"`
-
-	Status TransferInstructionStatus `json:"status"`
-
-	Meta Metadata `json:"meta"`
+	OriginalInstructionCid *CONTRACT_ID              `json:"originalInstructionCid"`
+	Transfer               Transfer                  `json:"transfer"`
+	Status                 TransferInstructionStatus `json:"status"`
+	Meta                   Metadata                  `json:"meta"`
 }
 
 // ToMap converts TransferInstructionView to a map for DAML arguments
@@ -565,9 +549,8 @@ func (t *TransferInstructionReject) UnmarshalJSON(data []byte) error {
 
 // TransferInstructionUpdate is a Record type
 type TransferInstructionUpdate struct {
-	ExtraActors []PARTY `json:"extraActors"`
-
-	ExtraArgs ExtraArgs `json:"extraArgs"`
+	ExtraActors []PARTY   `json:"extraActors"`
+	ExtraArgs   ExtraArgs `json:"extraArgs"`
 }
 
 // ToMap converts TransferInstructionUpdate to a map for DAML arguments
@@ -662,20 +645,22 @@ func (t *TransferPendingInternalWorkflow) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// ITransferFactoryInterfaceID returns the interface ID for the ITransferFactory interface
-func ITransferFactoryInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.TransferInstructionV1", "TransferFactory")
+// ITransferFactoryInterfaceID returns the interface ID for the ITransferFactory interface using the package name
+func ITransferFactoryInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.TransferInstructionV1", "TransferFactory")
 }
 
-// ITransferInstructionInterfaceID returns the interface ID for the ITransferInstruction interface
-func ITransferInstructionInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.TransferInstructionV1", "TransferInstruction")
+// ITransferFactoryInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func ITransferFactoryInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.TransferInstructionV1", "TransferFactory")
+}
+
+// ITransferInstructionInterfaceID returns the interface ID for the ITransferInstruction interface using the package name
+func ITransferInstructionInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.TransferInstructionV1", "TransferInstruction")
+}
+
+// ITransferInstructionInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func ITransferInstructionInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.TransferInstructionV1", "TransferInstruction")
 }

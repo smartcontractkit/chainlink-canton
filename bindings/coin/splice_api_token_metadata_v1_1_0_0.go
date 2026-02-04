@@ -31,7 +31,6 @@ type AnyContractView struct {
 // ToMap converts AnyContractView to a map for DAML arguments
 func (t AnyContractView) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
-
 	return m
 }
 
@@ -237,8 +236,7 @@ func (t *ChoiceExecutionMetadata) UnmarshalJSON(data []byte) error {
 // ExtraArgs is a Record type
 type ExtraArgs struct {
 	Context ChoiceContext `json:"context"`
-
-	Meta Metadata `json:"meta"`
+	Meta    Metadata      `json:"meta"`
 }
 
 // ToMap converts ExtraArgs to a map for DAML arguments
@@ -304,11 +302,12 @@ func (t *Metadata) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// IAnyContractInterfaceID returns the interface ID for the IAnyContract interface
-func IAnyContractInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.MetadataV1", "AnyContract")
+// IAnyContractInterfaceID returns the interface ID for the IAnyContract interface using the package name
+func IAnyContractInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.MetadataV1", "AnyContract")
+}
+
+// IAnyContractInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func IAnyContractInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.MetadataV1", "AnyContract")
 }
