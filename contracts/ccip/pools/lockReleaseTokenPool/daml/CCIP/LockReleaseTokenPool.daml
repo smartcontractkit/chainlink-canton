@@ -19,12 +19,13 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
-import qualified CCIP.CCVId
 import qualified CCIP.Client
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RawInstanceAddress
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -45,11 +46,10 @@ data TransferTimeout
 -- | Per-chain CCV requirements for the pool.
 -- This partially matches the EVM pattern in AdvancedPoolHooks.sol which is primarily based on chain selector:
 -- https://github.com/smartcontractkit/chainlink-ccip/blob/afc2e9e58c953fbdeee724ac5fae021155ca6325/chains/evm/contracts/pools/AdvancedPoolHooks.sol#L235
--- Users that require more expressiveness can implement or modify LockReleaseTokenPool_GetRequiredCCVs below directly.
 data ChainCCVConfig = ChainCCVConfig
     with
-        inboundCCVs : [CCIP.CCVId.CCVId]   -- Required CCVs for incoming transfers
-        outboundCCVs : [CCIP.CCVId.CCVId]  -- Required CCVs for outgoing transfers
+        inboundCCVs : [RawInstanceAddress]   -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]  -- Required CCVs for outgoing transfers
     deriving (Eq, Show)
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
@@ -119,8 +119,8 @@ template LockReleaseTokenPool
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         caller = arg.caller
 
-        -- Get required CCVs based on chain and direction.
-        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [CCIP.CCVId.CCVId]
+        -- Get required CCV raw instance addresses based on chain and direction.
+        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
             with
                 remoteChainSelector : Numeric 0
                 amount : Numeric 0
@@ -147,23 +147,24 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
-                -- Get required CCVs for inbound
-                let requiredCCVIds = case Map.lookup sourceChainSelector chainCCVRequirements of
+                -- Get required CCV instance addresses for inbound (convert to hashes)
+                let requiredCCVAddresses = case Map.lookup sourceChainSelector chainCCVRequirements of
                         None -> []
-                        Some config -> config.inboundCCVs
+                        Some config -> map CCIP.RawInstanceAddress.toInstanceAddress config.inboundCCVs
 
-                -- Fetch all provided tickets and extract their CCVIds
-                providedCCVIds <- forA ccvVerifyTickets \ticketCid -> do
+                -- Fetch all provided tickets and compute their instance addresses
+                providedCCVAddresses <- forA ccvVerifyTickets \ticketCid -> do
                     ticket <- fetch ticketCid
                     -- Validate ticket is for this message
                     assertMsg "CCVVerifyTicket messageHash mismatch" (ticket.messageHash == messageHash)
                     assertMsg "CCVVerifyTicket sourceChainSelector mismatch" (ticket.sourceChainSelector == sourceChainSelector)
-                    pure ticket.ccvId
+                    -- Compute address from (instanceId, owner)
+                    pure (CCIP.MessageCodecV1.encodeInstanceAddress ticket.ccvInstanceId ticket.ccvOwner)
 
                 -- Validate all required CCVs are present
-                forA_ requiredCCVIds \requiredId ->
-                    assertMsg ("missing required pool CCV: " <> show requiredId)
-                        (requiredId `elem` providedCCVIds)
+                forA_ requiredCCVAddresses \requiredAddr ->
+                    assertMsg ("missing required pool CCV address: " <> requiredAddr)
+                        (requiredAddr `elem` providedCCVAddresses)
 
                 -- Issue TokenPoolCCVVerifiedTicket
                 create CCIP.Tickets.TokenPoolCCVVerifiedTicket with
@@ -172,7 +173,7 @@ template LockReleaseTokenPool
                     receiver = receiver
                     messageHash = messageHash
                     sourceChainSelector = sourceChainSelector
-                    verifiedCCVIds = dedupSort providedCCVIds
+                    verifiedCCVAddresses = dedupSort providedCCVAddresses
 
         -- Release tokens by consuming a TokenReceiveTicket.
         -- Transfers tokens from pool to receiver via TransferFactory.
@@ -292,12 +293,12 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
-                -- Build receipt identifying this pool instance.
-                -- Format: "pool:{instanceId}:{poolOwner}:{instrumentId}"
+                -- Build receipt identifying this pool instance using 32-byte instance address.
+                let poolAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId poolOwner
                 let poolReceipt = CCIP.Tickets.Receipt with
-                        issuer = "pool:" <> instanceId
-                            <> ":" <> CCIP.MessageCodecV1.encodePartyId poolOwner
-                            <> ":" <> CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+                        issuerType = CCIP.Tickets.IssuerType_Pool
+                        issuerAddress = poolAddr
+                        versionTag = None  -- Pools don't have version tags
                         destGasLimit = 0
                         destBytesOverhead = 0
                         feeTokenAmount = 0.0
@@ -307,9 +308,10 @@ template LockReleaseTokenPool
                 _tokenSendTicket <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueSendTicket
                     with
                         instrumentId = instrumentId
+                        poolInstanceId = instanceId
                         sender = caller
                         amount = tokenAmount.amount
-                        sourceTokenAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
+                        sourceTokenAddress = poolAddr
                         destTokenAddress = ""
                         tokenReceiver = message.receiver
                         extraData = ""
