@@ -3,10 +3,8 @@
 -- The ccipOwner signatory ensures only authorized tickets are created.
 module CCIP.CCVRegistry where
 
-import DA.Crypto.Text (BytesHex)
-import DA.Optional (fromSomeNote)
+import DA.Crypto.Text (BytesHex, byteCount)
 
-import qualified CCIP.CCVId
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
 
@@ -20,23 +18,27 @@ template CCVRegistry
 
         -- | Issue a CCV ticket for outbound message (forwardToVerifier equivalent).
         -- Called by CCV after processing send request.
-        -- The version tag is extracted from the first 4 bytes of verifierBlob.
+        -- Computes instance address from instanceId and owner for validation.
         nonconsuming choice CCVRegistry_IssueCCVTicket : ContractId CCIP.Tickets.CCVTicket
             with
-                ccvOwner : Party  -- Controller - becomes part of CCVId
-                verifierBlob : BytesHex  -- Contains version tag in first 4 bytes
+                ccvInstanceId : Text           -- CCV's instanceId
+                versionTag : BytesHex          -- 4-byte version tag
+                ccvOwner : Party               -- Controller (also used for address computation)
+                verifierBlob : BytesHex
                 messageSentObservers : [Party]
                 sender : Party
-                receipt : CCIP.Tickets.Receipt  -- Fee/gas contribution from this CCV
+                receipt : CCIP.Tickets.Receipt
             controller ccvOwner
             do
-                -- Extract version tag from first 4 bytes of verifierBlob
-                let versionTag = fromSomeNote "CCVRegistry: Failed to extract version tag from verifierBlob"
-                        (CCIP.MessageCodecV1.extractBytes verifierBlob 0 4)
-                let ccvId = CCIP.CCVId.makeCCVId versionTag ccvOwner
+                assertMsg "CCVRegistry: version tag must be 4 bytes"
+                    (byteCount versionTag == 4)
+
+                -- Compute instance address from instanceId and owner
+                let ccvInstanceAddress = CCIP.MessageCodecV1.instanceAddress ccvInstanceId ccvOwner
 
                 create CCIP.Tickets.CCVTicket with
-                    ccvId = ccvId
+                    ccvInstanceAddress = ccvInstanceAddress
+                    versionTag = versionTag
                     ccvOwner = ccvOwner
                     ccipOwner = ccipOwner
                     sender = sender
@@ -46,24 +48,25 @@ template CCVRegistry
 
         -- | Issue a CCV verify ticket for inbound message verification.
         -- Called by CCV after successful verification.
-        -- The version tag is extracted from the first 4 bytes of verifierResults.
         nonconsuming choice CCVRegistry_IssueVerifyTicket : ContractId CCIP.Tickets.CCVVerifyTicket
             with
-                ccvOwner : Party  -- Controller - becomes part of CCVId
-                verifierResults : BytesHex  -- Contains version tag in first 4 bytes
+                ccvInstanceId : Text
+                versionTag : BytesHex          -- 4-byte version tag
+                ccvOwner : Party               -- Controller (also used for address computation)
                 messageHash : BytesHex
                 sourceChainSelector : Numeric 0
                 sequenceNumber : Numeric 0
                 receiver : Party
             controller ccvOwner
             do
-                -- Extract version tag from first 4 bytes of verifierResults
-                let versionTag = fromSomeNote "CCVRegistry: Failed to extract version tag from verifierResults"
-                        (CCIP.MessageCodecV1.extractBytes verifierResults 0 4)
-                let ccvId = CCIP.CCVId.makeCCVId versionTag ccvOwner
+                assertMsg "CCVRegistry: version tag must be 4 bytes"
+                    (byteCount versionTag == 4)
+
+                let ccvInstanceAddress = CCIP.MessageCodecV1.instanceAddress ccvInstanceId ccvOwner
 
                 create CCIP.Tickets.CCVVerifyTicket with
-                    ccvId = ccvId
+                    ccvInstanceAddress = ccvInstanceAddress
+                    versionTag = versionTag
                     ccvOwner = ccvOwner
                     ccipOwner = ccipOwner
                     caller = receiver
