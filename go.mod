@@ -24,7 +24,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/smartcontractkit/chain-selectors v1.0.91
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260202190341-36d42e56bd53
-	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260122165924-94e0fad14fe8
+	github.com/smartcontractkit/chainlink-common v0.9.6
 	github.com/smartcontractkit/chainlink-deployments-framework v0.78.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
@@ -175,7 +175,6 @@ require (
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20251124151448-0448aefdaab9 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.17.0 // indirect
-	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260124000807-bff5e296dfb7 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.13.9 // indirect
 	github.com/smartcontractkit/chainlink-ton v0.0.0-20260119210543-276a92092771 // indirect

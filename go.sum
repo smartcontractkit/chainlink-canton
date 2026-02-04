@@ -700,8 +700,8 @@ github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250
 github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20250912190424-fd2e35d7deb5/go.mod h1:xtZNi6pOKdC3sLvokDvXOhgHzT+cyBqH/gWwvxTxqrg=
 github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260202190341-36d42e56bd53 h1:FstCjr6G/wu7gkSriVVBlNaYMPjs+Fvge7NfYLalLko=
 github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260202190341-36d42e56bd53/go.mod h1:gUbichNQBqk+fBF2aV40ZkzFmAJ8SygH6DEPd3cJkQE=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20260122165924-94e0fad14fe8 h1:kDHw2ta45azZGdfLldVloLAbo+JS3zIXXRlAIO8f1js=
-github.com/smartcontractkit/chainlink-common v0.9.6-0.20260122165924-94e0fad14fe8/go.mod h1:Eg5rz/fQINjR9H0TxHw7j+zGZeYxprUpEQZzC5JGHG4=
+github.com/smartcontractkit/chainlink-common v0.9.6 h1:xE6x3kujV0NC7AMo/LdCszVTc2ZR9bQWOlZvYiYvuoY=
+github.com/smartcontractkit/chainlink-common v0.9.6/go.mod h1:1r3aM96KHAESfnayJ3BTHCkP1qJS1BEG1r4czeoaXlA=
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 h1:FJAFgXS9oqASnkS03RE1HQwYQQxrO4l46O5JSzxqLgg=
 github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10/go.mod h1:oiDa54M0FwxevWwyAX773lwdWvFYYlYHHQV1LQ5HpWY=
 github.com/smartcontractkit/chainlink-deployments-framework v0.78.0 h1:Wh2DXmYBnTunJ5+IqsGTLe5qFdbkK9nmgKKvF86Sagc=
@@ -710,8 +710,6 @@ github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20251124151448-0448ae
 github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20251124151448-0448aefdaab9/go.mod h1:jUC52kZzEnWF9tddHh85zolKybmLpbQ1oNA4FjOHt1Q=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.17.0 h1:xHPmFDhff7QpeFxKsZfk+24j4AlnQiFjjRh5O87Peu4=
 github.com/smartcontractkit/chainlink-protos/job-distributor v0.17.0/go.mod h1:/dVVLXrsp+V0AbcYGJo3XMzKg3CkELsweA/TTopCsKE=
-github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b h1:QuI6SmQFK/zyUlVWEf0GMkiUYBPY4lssn26nKSd/bOM=
-github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b/go.mod h1:qSTSwX3cBP3FKQwQacdjArqv0g6QnukjV4XuzO6UyoY=
 github.com/smartcontractkit/chainlink-protos/op-catalog v0.0.4 h1:AEnxv4HM3WD1RbQkRiFyb9cJ6YKAcqBp1CpIcFdZfuo=
 github.com/smartcontractkit/chainlink-protos/op-catalog v0.0.4/go.mod h1:PjZD54vr6rIKEKQj6HNA4hllvYI/QpT+Zefj3tqkFAs=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471 h1:EaLuGs7jZ6Vm2iv6rNK3bQ3XN5CRbFd4knjjvaD1zFc=
@@ -1068,8 +1066,8 @@ golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8T
 golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da h1:noIWHXmPHxILtqtCOPIhSt0ABwskkZKjD3bXGnZGpNY=
 golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da/go.mod h1:NDW/Ps6MPRej6fsCIbMTohpP40sJ/P/vI1MoTEGwX90=
-gonum.org/v1/gonum v0.17.0 h1:VbpOemQlsSMrYmn7T2OUvQ4dqxQXU+ouZFQsZOx50z4=
-gonum.org/v1/gonum v0.17.0/go.mod h1:El3tOrEuMpv2UdMrbNlKEh9vd86bmQ6vqIcDwxEOc1E=
+gonum.org/v1/gonum v0.16.0 h1:5+ul4Swaf3ESvrOnidPp4GZbzf0mxVQpDCYUQE7OJfk=
+gonum.org/v1/gonum v0.16.0/go.mod h1:fef3am4MQ93R2HHpKnLk4/Tbh/s0+wqD5nfa6Pnwy4E=
 google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=
 google.golang.org/appengine v1.4.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
 google.golang.org/genproto v0.0.0-20180817151627-c66870c02cf8/go.mod h1:JiN7NxoALGmiZfu7CAH4rXhgtRTLTxftemlI0sWmxmc=
