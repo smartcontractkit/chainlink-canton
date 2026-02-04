@@ -63,11 +63,12 @@ template TokenSendTicket
 
 
 -- | Ticket issued by the CCV (via CCVRegistry) for outbound attestation.
+-- Stakeholders can read all fields directly; instance address computed as needed.
 template CCVTicket
     with
-        ccvInstanceAddress : BytesHex
-        versionTag : BytesHex          -- 4-byte version tag (e.g., "49ff34ed")
+        ccvInstanceId : Text
         ccvOwner : Party
+        versionTag : BytesHex          -- 4-byte version tag (e.g., "49ff34ed")
         ccipOwner : Party
         sender : Party
 
@@ -78,20 +79,25 @@ template CCVTicket
         signatory ccvOwner
         observer ccipOwner, sender
 
-        -- Returns: (instanceAddress, versionTag, verifierBlob, observers, receipt)
-        choice CCVTicket_Consume : (BytesHex, BytesHex, BytesHex, [Party], Receipt)
-            controller ccipOwner
-            do pure (ccvInstanceAddress, versionTag, verifierBlob, messageSentObservers, receipt)
+        -- Archive/cleanup choice - allows sender or ccipOwner to clean up
+        choice CCVTicket_Archive : ()
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "CCVTicket_Archive: caller must be sender or ccipOwner"
+                    (caller == sender || caller == ccipOwner)
 
 
 -- | Ticket issued by CCV (via CCVRegistry) after verifying an inbound message.
+-- Stakeholders can read all fields directly; instance address computed as needed.
 template CCVVerifyTicket
     with
-        ccvInstanceAddress : BytesHex
-        versionTag : BytesHex          -- 4-byte version tag
+        ccvInstanceId : Text           -- CCV's instanceId
         ccvOwner : Party
+        versionTag : BytesHex          -- 4-byte version tag
         ccipOwner : Party
-        caller : Party
+        receiver : Party               -- Message receiver (observer)
 
         messageHash : BytesHex
 
@@ -99,12 +105,16 @@ template CCVVerifyTicket
         sequenceNumber : Numeric 0
     where
         signatory ccvOwner
-        observer ccipOwner, caller
+        observer ccipOwner, receiver
 
-        -- Returns instance address for validation
-        choice CCVVerifyTicket_Consume : BytesHex
-            controller ccipOwner
-            do pure ccvInstanceAddress
+        -- Archive/cleanup choice - allows receiver or ccipOwner to clean up
+        choice CCVVerifyTicket_Archive : ()
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "CCVVerifyTicket_Archive: caller must be receiver or ccipOwner"
+                    (caller == receiver || caller == ccipOwner)
 
 
 -- | Ticket issued by tokenpool after verifying its required CCVs for inbound transfer.
