@@ -5,7 +5,6 @@ import DA.Optional (fromSomeNote)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.CCVId
 import qualified CCIP.CCVRegistry
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
@@ -80,18 +79,16 @@ template CommitteeVerifier
                 let numberOfSignatures = signatureLength / signature_length
                 assertMsg "Insufficient signatures provided" (numberOfSignatures >= threshold)
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
-                -- split signatureData into r and s components
                 let signatures = parseSignatures signatureData
 
-                -- calculate the signed hash
+                -- Calculate the signed hash
                 let signedHash = keccak256 (versionTag <> (CCIP.MessageCodecV1.encodeMessageV1 message))
 
-                -- verify signatures
+                -- Verify signatures
                 let validSigners = findValidSigners signedHash signatures signers
                 let validSignerCount = countValidSigners validSigners
 
-                -- check that number of valid signers == numer of signatures provided
-                -- if it isn't this either means duplicate signatures or signatures from non-signers have been provided
+                -- Check that number of valid signers == number of signatures provided
                 assertMsg "Invalid signatures detected" (validSignerCount == numberOfSignatures)
 
                 -- Check threshold requirement
@@ -101,11 +98,11 @@ template CommitteeVerifier
                 -- Calculate message hash for the ticket
                 let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 message)
 
-                -- Issue verify ticket via CCVRegistry
-                -- CCVRegistry extracts version tag from first 4 bytes of verifierResults
+                -- Issue verify ticket via CCVRegistry (registry computes instance address)
                 exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
+                    ccvInstanceId = instanceId
+                    versionTag = versionTag
                     ccvOwner = owner
-                    verifierResults = verifierResults  -- Contains version tag in first 4 bytes
                     messageHash = messageHash
                     sourceChainSelector = message.sourceChainSelector
                     sequenceNumber = message.sequenceNumber
@@ -123,23 +120,28 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
-                -- Build verifierBlob with version tag as first 4 bytes
-                let verifierBlob = versionTag  -- In simple case, blob is just version tag
+                -- Compute instance address for this CCV
+                let ccvAddr = CCIP.MessageCodecV1.instanceAddress instanceId owner
 
-                -- Build stub Receipt (fee details TBD)
-                let ccvId = CCIP.CCVId.makeCCVId versionTag owner
+                -- Build verifierBlob with version tag as first 4 bytes
+                let verifierBlob = versionTag
+
+                -- Build Receipt with instance address
                 let receipt = CCIP.Tickets.Receipt with
-                        issuer = ccvId
+                        issuerType = CCIP.Tickets.IssuerType_CCV
+                        issuerAddress = ccvAddr
+                        versionTag = Some versionTag
                         destGasLimit = 0
                         destBytesOverhead = 0
                         feeTokenAmount = 0.0
                         extraArgs = ""
 
-                -- Issue CCV ticket via CCVRegistry
-                -- CCVRegistry extracts version tag from first 4 bytes of verifierBlob
+                -- Issue CCV ticket via CCVRegistry with pre-computed instance address
                 exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
+                    ccvInstanceAddress = ccvAddr
+                    versionTag = versionTag
                     ccvOwner = owner
-                    verifierBlob = verifierBlob  -- Contains version tag in first 4 bytes
+                    verifierBlob = verifierBlob
                     messageSentObservers = [messageSentObserver]
                     sender = caller
                     receipt = receipt
@@ -171,7 +173,6 @@ validateSignature messageHash publicKey r s =
     secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
 
 -- Find valid signers by checking each signature against all signers
--- Returns a map of valid signers (using list of tuples as map representation)
 findValidSigners : BytesHex -> [(BytesHex, BytesHex)] -> [BytesHex] -> [(BytesHex, Bool)]
 findValidSigners messageHash signatures signerKeys =
     map (\signer -> (signer, isValidSigner messageHash signatures signer)) signerKeys
