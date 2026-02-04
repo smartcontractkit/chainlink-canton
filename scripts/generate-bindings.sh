@@ -39,10 +39,24 @@ log_info "Using godaml: $GODAML_BIN"
 log_info "Available DARs in $DAR_DIR:"
 ls -1 "$DAR_DIR" | sed 's/^/  - /' || true
 
-# Clean outputs
+# Clean outputs (preserve custom bindings.go)
 log_info "Cleaning generated output dirs..."
+BINDINGS_GO="$GEN_DIR/bindings.go"
+BINDINGS_BACKUP=""
+if [ -f "$BINDINGS_GO" ]; then
+  BINDINGS_BACKUP="$(mktemp)"
+  cp "$BINDINGS_GO" "$BINDINGS_BACKUP"
+  log_info "Preserved bindings.go"
+fi
+
 rm -rf "$GEN_DIR"
 mkdir -p "$COIN_OUTPUT_DIR" "$CCIP_OUTPUT_DIR" "$MCMS_OUTPUT_DIR"
+
+if [ -n "$BINDINGS_BACKUP" ] && [ -f "$BINDINGS_BACKUP" ]; then
+  cp "$BINDINGS_BACKUP" "$BINDINGS_GO"
+  rm -f "$BINDINGS_BACKUP"
+  log_info "Restored bindings.go"
+fi
 
 # If required=1 and godaml fails -> exit. If required=0 -> warn and continue.
 run_godaml() {

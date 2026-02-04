@@ -14,6 +14,8 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
@@ -368,7 +370,7 @@ func testExecuteOpFlow(
 
 	// Get new MCMS contract ID from exercise result
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -450,31 +452,26 @@ func testExecuteOpFlow(
 			// Check for Counter contract
 			if entityName == "Counter" {
 				newCounterCid = created.GetContractId()
-				for _, field := range created.GetCreateArguments().GetFields() {
-					if field.GetLabel() == "value" {
-						counterValue = field.GetValue().GetInt64()
-						break
-					}
+				counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](created)
+				if err != nil {
+					t.Logf("Failed to unmarshal Counter: %v", err)
+				} else {
+					counterValue = int64(counter.Value)
 				}
 			}
 
 			// Check for MCMSEntrypointEvent (emitted by Counter.mcmsEntrypoint)
 			if entityName == "MCMSEntrypointEvent" {
 				eventFound = true
-				for _, field := range created.GetCreateArguments().GetFields() {
-					switch field.GetLabel() {
-					case "instanceId":
-						eventInstanceId = field.GetValue().GetText()
-					case "functionName":
-						eventFunctionName = field.GetValue().GetText()
-					case "operationData":
-						eventOperationData = field.GetValue().GetText()
-					case "contractIdsAsText":
-						if listValue := field.GetValue().GetList(); listValue != nil {
-							for _, elem := range listValue.GetElements() {
-								eventContractIdsAsText = append(eventContractIdsAsText, elem.GetText())
-							}
-						}
+				event, err := bindings.UnmarshalCreatedEvent[mcms.MCMSEntrypointEvent](created)
+				if err != nil {
+					t.Logf("Failed to unmarshal MCMSEntrypointEvent: %v", err)
+				} else {
+					eventInstanceId = string(event.InstanceId)
+					eventFunctionName = string(event.FunctionName)
+					eventOperationData = string(event.OperationData)
+					for _, cid := range event.ContractIdsAsText {
+						eventContractIdsAsText = append(eventContractIdsAsText, string(cid))
 					}
 				}
 			}
@@ -493,8 +490,9 @@ func testExecuteOpFlow(
 	require.Len(t, eventContractIdsAsText, 1, "Should have 1 contractId passed through")
 	t.Logf("MCMSEntrypointEvent verified: instanceId=%s, functionName=%s, contractIdsAsText=%v",
 		eventInstanceId, eventFunctionName, eventContractIdsAsText)
-	// Note: The show representation in Daml may wrap the CID, so we just check it's not empty
-	assert.NotEmpty(t, eventContractIdsAsText[0], "contractIdsAsText[0] should contain the serialized Counter CID")
+	// Verify the contractId in the event contains the counter CID
+	// Note: Daml's show representation may wrap it, but it should contain the CID
+	assert.Contains(t, eventContractIdsAsText[0], "<contract-id>", "contractIdsAsText[0] should contain the Counter CID")
 
 	// ========================
 	// |   7. Verify Counter  |
@@ -512,11 +510,11 @@ func testExecuteOpFlow(
 	var queriedValue int64 = -1
 	for _, contract := range counterContracts {
 		if contract.GetCreatedEvent().GetContractId() == newCounterCid {
-			for _, field := range contract.GetCreatedEvent().GetCreateArguments().GetFields() {
-				if field.GetLabel() == "value" {
-					queriedValue = field.GetValue().GetInt64()
-					break
-				}
+			counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](contract.GetCreatedEvent())
+			if err != nil {
+				t.Logf("Failed to unmarshal Counter from ACS: %v", err)
+			} else {
+				queriedValue = int64(counter.Value)
 			}
 		}
 	}
@@ -892,7 +890,7 @@ func testReplayProtection(
 
 	// Get new MCMS contract ID
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1156,7 +1154,7 @@ func testExecuteMCMSOp(
 
 	// Get new contract ID from SetRoot result
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1244,6 +1242,9 @@ func testExecuteMCMSOp(
 	t.Log("ExecuteMcmsOp succeeded (bob executed with disclosed contract)")
 	time.Sleep(5 * time.Second) // Wait for ACS to update on ccip participant
 
+	// Store old contract ID to verify it changed
+	oldMcmsCid := mcmsCid
+
 	// Bob can't see the created event (not an observer), so query from alice's participant
 	// The old contract should be archived, so find the active one
 	t.Log("Querying ACS from alice's participant to find the new contract...")
@@ -1285,46 +1286,45 @@ func testExecuteMCMSOp(
 	require.NoError(t, err)
 	defer acsRes.CloseSend()
 
+	foundContract := false
 	for {
 		ac, err := acsRes.Recv()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		require.NoError(t, err)
-		if c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-			if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() == "MCMS" {
-				// Check if this is our MCMS by matching mcmsId
-				for _, field := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
-					if field.GetLabel() == "mcmsId" && field.GetValue().GetText() == mcmsId {
-						newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
-						for _, f := range c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields() {
-							if f.GetLabel() == "config" {
-								configRecord := f.GetValue().GetRecord()
-								for _, configField := range configRecord.GetFields() {
-									if configField.GetLabel() == "signers" {
-										newNumSigners = int64(len(configField.GetValue().GetList().GetElements()))
-									}
-									if configField.GetLabel() == "groupQuorums" {
-										quorums := configField.GetValue().GetList().GetElements()
-										if len(quorums) > 0 {
-											newQuorum = quorums[0].GetInt64()
-										}
-									}
-								}
-							}
-						}
 
-						break
-					}
-				}
-			}
+		c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
+		if !ok {
+			continue
 		}
-		if newMcmsCid != "" {
-			break
+
+		if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() != bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
+			continue
 		}
+
+		// Unmarshal the MCMS contract for type-safe access
+		mcmsContract, err := bindings.UnmarshalActiveContract[mcms.MCMS](c)
+		require.NoError(t, err, "Failed to unmarshal MCMS contract")
+
+		// Check if this is our MCMS by matching mcmsId
+		if string(mcmsContract.McmsId) != mcmsId {
+			continue
+		}
+
+		newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
+		newNumSigners = int64(len(mcmsContract.Config.Signers))
+		if len(mcmsContract.Config.GroupQuorums) > 0 {
+			newQuorum = int64(mcmsContract.Config.GroupQuorums[0])
+		}
+		foundContract = true
+
+		break
 	}
-	require.NotEmpty(t, newMcmsCid, "Should find new MCMS contract in ACS")
-	t.Logf("Found new MCMS contract: %s", newMcmsCid)
+	require.True(t, foundContract, "Should find MCMS contract with mcmsId=%s in ACS", mcmsId)
+	require.NotEmpty(t, newMcmsCid, "Should have new MCMS contract ID")
+	require.NotEqual(t, oldMcmsCid, newMcmsCid, "MCMS contract ID should change after ExecuteMcmsOp (old contract archived, new created)")
+	t.Logf("Found new MCMS contract: %s (changed from %s)", newMcmsCid, oldMcmsCid)
 	t.Logf("Verified config from ACS: numSigners=%d, quorum=%d", newNumSigners, newQuorum)
 
 	require.Equal(t, int64(3), newNumSigners, "Should still have 3 signers")
@@ -1591,7 +1591,7 @@ func testSignatoryCheck(
 
 	// Get new MCMS contract ID
 	for _, event := range setRootRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.MCMS{}.GetTemplateID()) {
 			mcmsCid = created.GetContractId()
 			break
 		}
@@ -1664,7 +1664,7 @@ func testSignatoryCheck(
 	// Verify counter was incremented
 	var counterValue int64 = -1
 	for _, event := range executeOpRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "Counter" {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.Counter{}.GetTemplateID()) {
 			for _, field := range created.GetCreateArguments().GetFields() {
 				if field.GetLabel() == "value" {
 					counterValue = field.GetValue().GetInt64()
