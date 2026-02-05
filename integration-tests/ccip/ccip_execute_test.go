@@ -23,6 +23,7 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/noders-team/go-daml/pkg/types"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -340,10 +342,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: disclosedFactory.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "partyOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-e2e"}}},
-					}}}},
+					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
+						PartyOwner: types.PARTY(partyReceiver),
+						InstanceId: types.TEXT("test-router-e2e"),
+					}),
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
@@ -404,23 +406,23 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Build MessageV1 Daml record (no token transfer)
-	messageV1Record := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "sourceChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(remoteSelector, 10)}}},
-		{Label: "destChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(env.Selector, 10)}}},
-		{Label: "sequenceNumber", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "1"}}},
-		{Label: "executionGasLimit", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 200000}}},
-		{Label: "ccipReceiveGasLimit", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 100000}}},
-		{Label: "finality", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
-		{Label: "ccvAndExecutorHash", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "0000000000000000000000000000000000000000000000000000000000000000"}}},
-		{Label: "onRampAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte("0000000000000000000000000000000000000001"))}}},
-		{Label: "offRampAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte("0000000000000000000000000000000000000002"))}}},
-		{Label: "sender", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte("0000000000000000000000000000000000000003"))}}},
-		{Label: "receiver", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(EncodePartyID(partyReceiver))}}},
-		{Label: "destBlob", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-		{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
-		{Label: "messageData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(testPayload)}}},
-	}}}}
+	// Build MessageV1 Daml record (no token transfer) using bindings
+	messageV1 := ccvs.MessageV1{
+		SourceChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		DestChainSelector:   types.NUMERIC(strconv.FormatUint(env.Selector, 10)),
+		SequenceNumber:      types.NUMERIC("1"),
+		ExecutionGasLimit:   types.INT64(200000),
+		CcipReceiveGasLimit: types.INT64(100000),
+		Finality:            types.INT64(2000),
+		CcvAndExecutorHash:  types.TEXT("0000000000000000000000000000000000000000000000000000000000000000"),
+		OnRampAddress:       types.TEXT(hex.EncodeToString([]byte("0000000000000000000000000000000000000001"))),
+		OffRampAddress:      types.TEXT(hex.EncodeToString([]byte("0000000000000000000000000000000000000002"))),
+		Sender:              types.TEXT(hex.EncodeToString([]byte("0000000000000000000000000000000000000003"))),
+		Receiver:            types.TEXT(hex.EncodeToString(EncodePartyID(partyReceiver))),
+		DestBlob:            types.TEXT(""),
+		TokenTransfer:       nil, // No token transfer
+		MessageData:         types.TEXT(hex.EncodeToString(testPayload)),
+	}
 
 	// Call CommitteeVerifier_VerifyMessage to get CCVVerifyTicket
 	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -431,14 +433,14 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier"},
 					ContractId: disclosedCCV.ContractId,
 					Choice:     "CommitteeVerifier_VerifyMessage",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "ccvRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCVRegistry.ContractId}}},
-						{Label: "message", Value: messageV1Record},
-						{Label: "messageId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: messageHashHex}}},
-						{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
-						{Label: "receiver", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-					}}}},
+					ChoiceArgument: ledger.MapToValue(ccvs.CommitteeVerifierVerifyMessage{
+						CcvRegistryCid:  types.CONTRACT_ID(disclosedCCVRegistry.ContractId),
+						Message:         messageV1,
+						MessageId:       types.TEXT(messageHashHex),
+						VerifierResults: types.TEXT(verifierResultsHex),
+						Receiver:        types.PARTY(partyReceiver),
+						Caller:          types.PARTY(partyReceiver),
+					}),
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
@@ -490,17 +492,15 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter"},
 					ContractId: disclosedRouter.ContractId,
 					Choice:     "Execute",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "offRampCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedOffRamp.ContractId}}},
-						{Label: "globalConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedGlobalConfig.ContractId}}},
-						{Label: "tokenAdminRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTar.ContractId}}},
-						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
-						{Label: "ccvVerifyTickets", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-							{Sum: &apiv2.Value_ContractId{ContractId: ccvVerifyTicketCid}},
-						}}}}},
-						{Label: "tokenPoolCCVTicket", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
-						{Label: "receiverRequiredCCVIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-					}}}},
+					ChoiceArgument: ledger.MapToValue(perpartyrouter.Execute{
+						OffRampCid:             types.CONTRACT_ID(disclosedOffRamp.ContractId),
+						GlobalConfigCid:        types.CONTRACT_ID(disclosedGlobalConfig.ContractId),
+						TokenAdminRegistryCid:  types.CONTRACT_ID(disclosedTar.ContractId),
+						EncodedMessage:         types.TEXT(encodedMessageHex),
+						CcvVerifyTickets:       []types.CONTRACT_ID{types.CONTRACT_ID(ccvVerifyTicketCid)},
+						TokenPoolCCVTicket:     nil,
+						ReceiverRequiredCCVIds: []types.TEXT{},
+					}),
 				}},
 			}},
 			ActAs:              []string{partyReceiver},

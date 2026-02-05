@@ -81,14 +81,14 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			// Get template ID and choice name from the method
 			exerciseCommand := params.Method(contractID, input.Args)
 
-			// Convert args struct directly to apiv2.Record using ledger.ConvertToRecord
-			choiceArgument := ledger.ConvertToRecord(input.Args)
-
 			// Parse template ID to get package ID, module name, and entity name
 			packageID, moduleName, entityName, err := parseTemplateIDFromString(exerciseCommand.TemplateID)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to parse template ID %s: %w", exerciseCommand.TemplateID, err)
 			}
+
+			// Convert args struct to ledger.MapToValue for ChoiceArgument
+			choiceArgument := ledger.MapToValue(input.Args)
 
 			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
@@ -104,7 +104,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 								},
 								ContractId:     contractID,
 								Choice:         exerciseCommand.Choice,
-								ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: choiceArgument}},
+								ChoiceArgument: choiceArgument,
 							},
 						},
 					}},

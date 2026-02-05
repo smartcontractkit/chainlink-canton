@@ -7,8 +7,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/noders-team/go-daml/pkg/client"
+	"github.com/noders-team/go-daml/pkg/auth"
 	"github.com/noders-team/go-daml/pkg/types"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -19,6 +21,8 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
@@ -35,48 +39,53 @@ func TestDeployChainContracts(t *testing.T) {
 	}).Initialize(t.Context())
 	require.NoError(t, err)
 
-	// TODO Expose via CLDF/CTF
 	token, err := bc.(*canton.Chain).Participants[0].JWTProvider.Token(t.Context())
 	require.NoError(t, err)
-	bindingClient, err := client.NewDamlClient(token, bc.(*canton.Chain).Participants[0].Endpoints.GRPCLedgerAPIURL).
-		WithAdminAddress(bc.(*canton.Chain).Participants[0].Endpoints.AdminAPIURL).
-		Build(t.Context())
-	require.NoError(t, err, "failed to create Daml binding client")
-	t.Cleanup(bindingClient.Close)
+
+	// Create gRPC clients
+	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	adminApiClient, err := grpc.NewClient(bc.(*canton.Chain).Participants[0].Endpoints.AdminAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
+	require.NoError(t, err, "Failed to dial gRPC admin API")
+	ledgerApiClient, err := grpc.NewClient(bc.(*canton.Chain).Participants[0].Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
+	require.NoError(t, err, "Failed to dial gRPC ledger API")
+
+	packageServiceClient := participantv30.NewPackageServiceClient(adminApiClient)
+	userManagementServiceClient := admin.NewUserManagementServiceClient(ledgerApiClient)
 
 	// Upload Dars
-	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get common dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), commonDar, "")
-	require.NoError(t, err, "failed to upload common dar file")
-	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get offramp dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), offRampDar, "")
-	require.NoError(t, err, "failed to upload offramp dar file")
-	onRampDar, err := contracts.GetDar(contracts.CCIPOnRamp, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get onramp dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), onRampDar, "")
-	require.NoError(t, err, "failed to upload onramp dar file")
-	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get token admin registry dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), tokenAdminRegistryDar, "")
-	require.NoError(t, err, "failed to upload token admin registry dar file")
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get committee verifier dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), committeeVerifierDar, "")
-	require.NoError(t, err, "failed to upload committee verifier dar file")
-	tokenPoolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get token pool dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), tokenPoolDar, "")
-	require.NoError(t, err, "failed to upload token pool dar file")
-	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get per-party router dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), perPartyRouterDar, "")
-	require.NoError(t, err, "failed to upload per-party router dar file")
+	dars := []struct {
+		contract contracts.Package
+		name     string
+	}{
+		{contracts.CCIPCommon, "common"},
+		{contracts.CCIPOffRamp, "offramp"},
+		{contracts.CCIPOnRamp, "onramp"},
+		{contracts.CCIPTokenAdminRegistry, "token admin registry"},
+		{contracts.CCIPCommitteeVerifier, "committee verifier"},
+		{contracts.CCIPLockReleaseTokenPool, "token pool"},
+		{contracts.CCIPPerPartyRouter, "per-party router"},
+	}
+
+	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(dars))
+	for _, dar := range dars {
+		darBytes, err := contracts.GetDar(dar.contract, contracts.CurrentVersion)
+		require.NoError(t, err, "failed to get %s dar file", dar.name)
+		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{Bytes: darBytes})
+	}
+
+	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+		Dars:               darData,
+		VetAllPackages:     true,
+		SynchronizeVetting: true,
+	})
+	require.NoError(t, err, "failed to upload DAR files")
 
 	// Get primary party
-	user, err := bindingClient.UserMng.GetUser(t.Context(), "user-participant1")
+	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
+		UserId: "user-participant1",
+	})
 	require.NoError(t, err, "failed to get user")
+	user := userResp.GetUser()
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -108,17 +117,17 @@ func TestDeployChainContracts(t *testing.T) {
 	config := CantonCSDeps[DeployChainContractsConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,
-		Party:         user.PrimaryParty,
+		Party:         user.GetPrimaryParty(),
 		Config: DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
-				CCIPOwnerParty: user.PrimaryParty,
+				CCIPOwnerParty: user.GetPrimaryParty(),
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Template: ccvs.CommitteeVerifier{
-							Owner:               types.PARTY(user.PrimaryParty),
-							CcipOwner:           types.PARTY(user.PrimaryParty),
+							Owner:               types.PARTY(user.GetPrimaryParty()),
+							CcipOwner:           types.PARTY(user.GetPrimaryParty()),
 							VersionTag:          types.TEXT(versionTag),
-							MessageSentObserver: types.PARTY(user.PrimaryParty),
+							MessageSentObserver: types.PARTY(user.GetPrimaryParty()),
 							StorageLocation:     "ipfs://test-receive",
 							Threshold:           2,
 							Signers:             ccvSignerPubKeys,
