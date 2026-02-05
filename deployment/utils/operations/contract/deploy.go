@@ -7,7 +7,7 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -73,12 +73,14 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 				return datastore.AddressRef{}, fmt.Errorf("input deps selector %d does not match operation chain selector %d", input.ChainSelector, deps.Chain.Selector)
 			}
 
-			createCommand := templWithID.(TT).CreateCommand()
+			// Convert template struct directly to apiv2.Record using ledger.ConvertToRecord
+			createArgs := ledger.ConvertToRecord(templWithID)
 
-			// Convert model.CreateCommand to apiv2.CreateCommand
-			apiv2CreateCmd, err := convertCreateCommandToAPIV2(createCommand)
+			// Get template ID components
+			templateID := templWithID.(TT).GetTemplateID()
+			packageID, moduleName, entityName, err := parseTemplateIDFromString(templateID)
 			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to convert create command: %w", err)
+				return datastore.AddressRef{}, fmt.Errorf("failed to parse template ID %s: %w", templateID, err)
 			}
 
 			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -86,7 +88,16 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,
 					Commands: []*apiv2.Command{{
-						Command: &apiv2.Command_Create{Create: apiv2CreateCmd},
+						Command: &apiv2.Command_Create{
+							Create: &apiv2.CreateCommand{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  packageID,
+									ModuleName: moduleName,
+									EntityName: entityName,
+								},
+								CreateArguments: createArgs,
+							},
+						},
 					}},
 				},
 			})
@@ -146,35 +157,6 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 	}
 
 	return template, nil
-}
-
-// convertCreateCommandToAPIV2 converts a model.CreateCommand to apiv2.CreateCommand
-func convertCreateCommandToAPIV2(cmd *model.CreateCommand) (*apiv2.CreateCommand, error) {
-	packageID, moduleName, entityName, err := parseTemplateID(cmd.TemplateID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template ID %s: %w", cmd.TemplateID, err)
-	}
-
-	// Convert arguments map to apiv2.Value (Record)
-	createArgumentsValue, err := convertMapToAPIV2Value(cmd.Arguments)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert arguments: %w", err)
-	}
-
-	// Extract Record from Value
-	recordValue, ok := createArgumentsValue.GetSum().(*apiv2.Value_Record)
-	if !ok {
-		return nil, fmt.Errorf("failed to extract Record from Value")
-	}
-
-	return &apiv2.CreateCommand{
-		TemplateId: &apiv2.Identifier{
-			PackageId:  packageID,
-			ModuleName: moduleName,
-			EntityName: entityName,
-		},
-		CreateArguments: recordValue.Record,
-	}, nil
 }
 
 // TODO: packageName add package name to bindings instead

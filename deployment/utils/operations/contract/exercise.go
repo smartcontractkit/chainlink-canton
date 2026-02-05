@@ -2,7 +2,6 @@ package contract
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -77,20 +77,36 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
+
+			// Get template ID and choice name from the method
 			exerciseCommand := params.Method(contractID, input.Args)
 
-			// Convert model.ExerciseCommand to apiv2.ExerciseCommand
-			apiv2ExerciseCmd, err := convertExerciseCommandToAPIV2(exerciseCommand)
+			// Convert args struct directly to apiv2.Record using ledger.ConvertToRecord
+			choiceArgument := ledger.ConvertToRecord(input.Args)
+
+			// Parse template ID to get package ID, module name, and entity name
+			packageID, moduleName, entityName, err := parseTemplateIDFromString(exerciseCommand.TemplateID)
 			if err != nil {
-				return ExerciseOutput{}, fmt.Errorf("failed to convert exercise command: %w", err)
+				return ExerciseOutput{}, fmt.Errorf("failed to parse template ID %s: %w", exerciseCommand.TemplateID, err)
 			}
 
-			_, err = deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,
 					Commands: []*apiv2.Command{{
-						Command: &apiv2.Command_Exercise{Exercise: apiv2ExerciseCmd},
+						Command: &apiv2.Command_Exercise{
+							Exercise: &apiv2.ExerciseCommand{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  packageID,
+									ModuleName: moduleName,
+									EntityName: entityName,
+								},
+								ContractId:     contractID,
+								Choice:         exerciseCommand.Choice,
+								ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: choiceArgument}},
+							},
+						},
 					}},
 				},
 			})
@@ -103,7 +119,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			return ExerciseOutput{
 				ChainSelector: input.ChainSelector,
 				ExecInfo: &ExecInfo{
-					UpdateID: "", // Update ID not available in v2 API response
+					UpdateID: submitResp.GetTransaction().GetUpdateId(),
 				},
 			}, nil
 		},
@@ -118,7 +134,7 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 	}
 
 	// Parse template ID to get package ID, module name, and entity name
-	packageID, moduleName, entityName, err := parseTemplateID(templateId)
+	packageID, moduleName, entityName, err := parseTemplateIDFromString(templateId)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template ID: %w", err)
 	}
@@ -206,8 +222,8 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 	return contractID, nil
 }
 
-// parseTemplateID parses a template ID string like "#package:Module:Entity" into its components
-func parseTemplateID(templateID string) (packageID, moduleName, entityName string, err error) {
+// parseTemplateIDFromString parses a template ID string like "#package:Module:Entity" into its components
+func parseTemplateIDFromString(templateID string) (packageID, moduleName, entityName string, err error) {
 	if !strings.HasPrefix(templateID, "#") {
 		return "", "", "", fmt.Errorf("template ID must start with #")
 	}
@@ -216,46 +232,4 @@ func parseTemplateID(templateID string) (packageID, moduleName, entityName strin
 		return "", "", "", fmt.Errorf("template ID must have format #package:module:entity, got: %s", templateID)
 	}
 	return parts[0], parts[1], parts[2], nil
-}
-
-// convertExerciseCommandToAPIV2 converts a model.ExerciseCommand to apiv2.ExerciseCommand
-func convertExerciseCommandToAPIV2(cmd *model.ExerciseCommand) (*apiv2.ExerciseCommand, error) {
-	packageID, moduleName, entityName, err := parseTemplateID(cmd.TemplateID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse template ID %s: %w", cmd.TemplateID, err)
-	}
-
-	// Convert arguments map to apiv2.Value (Record)
-	choiceArgument, err := convertMapToAPIV2Value(cmd.Arguments)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert arguments: %w", err)
-	}
-
-	return &apiv2.ExerciseCommand{
-		TemplateId: &apiv2.Identifier{
-			PackageId:  packageID,
-			ModuleName: moduleName,
-			EntityName: entityName,
-		},
-		ContractId:     cmd.ContractID,
-		Choice:         cmd.Choice,
-		ChoiceArgument: choiceArgument,
-	}, nil
-}
-
-// convertMapToAPIV2Value converts a map[string]interface{} to apiv2.Value (Record)
-func convertMapToAPIV2Value(m map[string]interface{}) (*apiv2.Value, error) {
-	// Convert map to JSON, then unmarshal as apiv2.Value
-	// This is a simplified approach - for production, you might want a more robust conversion
-	jsonBytes, err := json.Marshal(m)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal map to JSON: %w", err)
-	}
-
-	var value apiv2.Value
-	if err := json.Unmarshal(jsonBytes, &value); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON to apiv2.Value: %w", err)
-	}
-
-	return &value, nil
 }
