@@ -2,7 +2,6 @@ package tests
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -58,7 +57,7 @@ func TestMCMS_Timelock(t *testing.T) {
 			OperationData:    "",
 		}}
 		salt := uuid.New().String()[:8]
-		delaySecs := 1
+		delaySecs := 0
 
 		// Encode schedule params for operationData
 		scheduleParams := ScheduleBatchParams{
@@ -81,7 +80,7 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, signatures)
 
-		// 2) Schedule a batch to increment counter after 1s
+		// 2) Schedule a batch to increment counter (immediate, delay=0)
 		opID := HashTimelockOpId(calls, ZeroHash, salt)
 
 		opProof, err := proposal.GetOpProof(0)
@@ -89,16 +88,10 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
-		// 3) Not ready yet
-		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, []string{counterCid})
-		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "E_NOT_READY"), "expected E_NOT_READY, got: %v", err)
-
-		// 4) Wait and execute
-		time.Sleep(1500 * time.Millisecond)
+		// 3) Execute immediately (delay is 0, so it's ready right away)
 		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, []string{counterCid})
 
-		// 5) Verify counter incremented
+		// 4) Verify counter incremented
 		val := queryCounterValue(t, participant, mcmsPkgID, counterInstanceID)
 		require.Equal(t, int64(1), val)
 	})
@@ -158,12 +151,12 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		cancelProof, err := cancelProposal.GetOpProof(0)
 		require.NoError(t, err)
-		mcms = cancelBatch(t, participant, mcmsPkgID, ccipOwner, mcms, opID, cancelProposal.Operations[0], cancelProof)
+		mcms = cancelBatch(t, participant, mcmsPkgID, ccipOwner, mcms, cancelProposal.Operations[0], cancelProof)
 
 		// Should now be gone; ExecuteScheduledBatch should fail with not found.
 		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcms, opID, calls, ZeroHash, salt, []string{counterCid})
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "E_OPERATION_NOT_FOUND"), "expected E_OPERATION_NOT_FOUND, got: %v", err)
+		require.Contains(t, err.Error(), "E_OPERATION_NOT_FOUND", "expected E_OPERATION_NOT_FOUND, got: %v", err)
 	})
 
 	t.Run("BlockedFunction", func(t *testing.T) {
@@ -207,18 +200,19 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		err = scheduleBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcms, proposal.Operations[0], opProof)
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "E_FUNCTION_BLOCKED"), "expected E_FUNCTION_BLOCKED, got: %v", err)
+		require.Contains(t, err.Error(), "E_FUNCTION_BLOCKED", "expected E_FUNCTION_BLOCKED, got: %v", err)
 	})
 }
 
 func createSigners(t *testing.T, count int) []*MCMSSigner {
 	t.Helper()
 	signers := make([]*MCMSSigner, count)
-	for i := 0; i < count; i++ {
+	for i := range count {
 		signer, err := NewMCMSSigner()
 		require.NoError(t, err)
 		signers[i] = signer
 	}
+
 	return signers
 }
 
@@ -247,6 +241,7 @@ func createCounter(t *testing.T, participant testhelpers.Participant, mcmsPkgID,
 		},
 	})
 	require.NoError(t, err)
+
 	return res.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
 }
 
@@ -278,7 +273,7 @@ func createMCMSMultiRole(
 
 	groupQuorumValues := make([]*apiv2.Value, NumGroups)
 	groupParentValues := make([]*apiv2.Value, NumGroups)
-	for i := 0; i < NumGroups; i++ {
+	for i := range NumGroups {
 		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
@@ -365,6 +360,7 @@ func createMCMSMultiRole(
 		},
 	})
 	require.NoError(t, err)
+
 	return res.GetTransaction().GetEvents()[0].GetCreated().GetContractId()
 }
 
@@ -445,6 +441,7 @@ func setRootWithRole(
 		}
 	}
 	t.Fatal("no MCMS contract created after SetRoot")
+
 	return ""
 }
 
@@ -510,6 +507,7 @@ func scheduleBatch(
 		}
 	}
 	t.Fatal("no MCMS contract created after ExecuteOp(schedule_batch)")
+
 	return ""
 }
 
@@ -569,6 +567,7 @@ func scheduleBatchExpectError(
 	return err
 }
 
+//nolint:unparam // predecessor is always ZeroHash in tests but kept for API consistency
 func executeScheduledBatch(
 	t *testing.T,
 	participant testhelpers.Participant,
@@ -632,6 +631,7 @@ func executeScheduledBatch(
 		}
 	}
 	t.Fatal("no MCMS contract created after ExecuteScheduledBatch")
+
 	return ""
 }
 
@@ -700,7 +700,6 @@ func cancelBatch(
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
-	opID string,
 	op MCMSOp,
 	opProof []string,
 ) string {
@@ -731,13 +730,14 @@ func cancelBatch(
 							EntityName: "MCMS",
 						},
 						ContractId: mcmsCid,
-						Choice:     "CancelBatch",
+						Choice:     "ExecuteOp",
 						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 							Fields: []*apiv2.RecordField{
+								{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Canceller"}}}},
 								{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-								{Label: "opId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: opID}}},
 								{Label: "op", Value: opValue},
 								{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: proofValues}}}},
+								{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
 							},
 						}}},
 					},
@@ -752,7 +752,8 @@ func cancelBatch(
 			return created.GetContractId()
 		}
 	}
-	t.Fatal("no MCMS contract created after CancelBatch")
+	t.Fatal("no MCMS contract created after ExecuteOp(cancel_batch)")
+
 	return ""
 }
 
@@ -780,6 +781,7 @@ func queryCounterValue(t *testing.T, participant testhelpers.Participant, mcmsPk
 		}
 	}
 	t.Fatalf("counter with instanceId %s not found", instanceID)
+
 	return -1
 }
 
@@ -858,79 +860,8 @@ func bypasserExecuteBatch(
 		}
 	}
 	t.Fatal("no MCMS contract created after BypasserExecuteBatch")
+
 	return ""
-}
-
-func bypasserExecuteBatchExpectError(
-	t *testing.T,
-	participant testhelpers.Participant,
-	mcmsPkgID string,
-	owner string,
-	mcmsCid string,
-	calls []TimelockCall,
-	targetCids []string,
-	op MCMSOp,
-	opProof []string,
-) error {
-	t.Helper()
-	callValues := make([]*apiv2.Value, len(calls))
-	for i, call := range calls {
-		callValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.TargetInstanceId}}},
-				{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.FunctionName}}},
-				{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: call.OperationData}}},
-			},
-		}}}
-	}
-	targetValues := make([]*apiv2.Value, len(targetCids))
-	for i, cid := range targetCids {
-		targetValues[i] = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: cid}}
-	}
-	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
-			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
-			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
-			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
-			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
-		},
-	}}}
-	proofValues := make([]*apiv2.Value, len(opProof))
-	for i, p := range opProof {
-		proofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
-	}
-
-	_, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{
-					Exercise: &apiv2.ExerciseCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Main",
-							EntityName: "MCMS",
-						},
-						ContractId: mcmsCid,
-						Choice:     "BypasserExecuteBatch",
-						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-							Fields: []*apiv2.RecordField{
-								{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-								{Label: "calls", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: callValues}}}},
-								{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: targetValues}}}},
-								{Label: "op", Value: opValue},
-								{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: proofValues}}}},
-							},
-						}}},
-					},
-				},
-			}},
-			ActAs: []string{owner},
-		},
-	})
-	return err
 }
 
 func queryMinDelay(

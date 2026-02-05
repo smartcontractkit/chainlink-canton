@@ -134,6 +134,7 @@ func NewMCMSSignerFromSeed(seed int64) (*MCMSSigner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create key from seed: %w", err)
 	}
+
 	return NewMCMSSignerFromKey(privateKey), nil
 }
 
@@ -255,20 +256,22 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 // Matches Canton's hashTimelockOpId: keccak256(encodedCalls || predecessor || salt)
 func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 	// Encode calls
-	var encodedCalls string
+	var sb strings.Builder
 	for _, call := range calls {
-		encodedCalls += AsciiToHex(call.TargetInstanceId) +
-			AsciiToHex(call.FunctionName) +
-			EncodeOperationDataForHash(call.OperationData)
+		sb.WriteString(AsciiToHex(call.TargetInstanceId))
+		sb.WriteString(AsciiToHex(call.FunctionName))
+		sb.WriteString(EncodeOperationDataForHash(call.OperationData))
 	}
 
 	// Combine with predecessor and salt
-	encoded := encodedCalls + AsciiToHex(predecessor) + AsciiToHex(salt)
+	sb.WriteString(AsciiToHex(predecessor))
+	sb.WriteString(AsciiToHex(salt))
 
-	data, err := hex.DecodeString(encoded)
+	data, err := hex.DecodeString(sb.String())
 	if err != nil {
 		panic(fmt.Sprintf("HashTimelockOpId: invalid hex encoding: %v", err))
 	}
+
 	return hex.EncodeToString(crypto.Keccak256(data))
 }
 
@@ -279,6 +282,7 @@ func EncodeOperationDataForHash(operationData string) string {
 	if isValidHex(operationData) {
 		return operationData
 	}
+
 	return AsciiToHex(operationData)
 }
 
@@ -295,6 +299,7 @@ func isValidHex(s string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -895,15 +900,16 @@ func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 //
 // where encodeText = uint8(len) <> asciiBytes
 func EncodeBlockedFunction(bf BlockedFunction) string {
-	var buf []byte
-	// targetInstanceId
 	targetBytes := []byte(bf.TargetInstanceId)
+	fnBytes := []byte(bf.FunctionName)
+	buf := make([]byte, 0, 1+len(targetBytes)+1+len(fnBytes))
+	// targetInstanceId
 	buf = append(buf, byte(len(targetBytes)))
 	buf = append(buf, targetBytes...)
 	// functionName
-	fnBytes := []byte(bf.FunctionName)
 	buf = append(buf, byte(len(fnBytes)))
 	buf = append(buf, fnBytes...)
+
 	return hex.EncodeToString(buf)
 }
 
@@ -946,6 +952,7 @@ func encodeText(s string) []byte {
 	buf := make([]byte, 0, 1+len(textBytes))
 	buf = append(buf, byte(len(textBytes)))
 	buf = append(buf, textBytes...)
+
 	return buf
 }
 
@@ -953,10 +960,13 @@ func encodeText(s string) []byte {
 // Format: encodeText(targetInstanceId) + encodeText(functionName) + encodeText(operationData)
 // Matches Canton MCMS.Codec.encodeTimelockCall
 func encodeTimelockCall(call TimelockCall) []byte {
-	var buf []byte
+	// Calculate size: 3 length bytes + string contents
+	size := 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
+	buf := make([]byte, 0, size)
 	buf = append(buf, encodeText(call.TargetInstanceId)...)
 	buf = append(buf, encodeText(call.FunctionName)...)
 	buf = append(buf, encodeText(call.OperationData)...)
+
 	return buf
 }
 
@@ -964,7 +974,12 @@ func encodeTimelockCall(call TimelockCall) []byte {
 // Format: numCalls (1 byte) + calls + encodeText(predecessor) + encodeText(salt) + uint32(delaySecs)
 // Matches Canton MCMS.Codec.encodeScheduleBatchParams
 func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
-	var buf []byte
+	// Estimate size: 1 (numCalls) + calls + predecessor + salt + 4 (delay)
+	estimatedSize := 1 + len(params.Predecessor) + 1 + len(params.Salt) + 1 + 4
+	for _, call := range params.Calls {
+		estimatedSize += 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
+	}
+	buf := make([]byte, 0, estimatedSize)
 
 	// Encode calls list: uint8(numCalls) + encoded calls
 	buf = append(buf, byte(len(params.Calls)))
@@ -990,7 +1005,12 @@ func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
 // Format: numCalls (1 byte) + encoded calls
 // Matches Canton MCMS.Codec.encodeBypasserExecuteParams
 func EncodeBypasserExecuteParams(params BypasserExecuteParams) string {
-	var buf []byte
+	// Estimate size: 1 (numCalls) + calls
+	estimatedSize := 1
+	for _, call := range params.Calls {
+		estimatedSize += 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
+	}
+	buf := make([]byte, 0, estimatedSize)
 
 	// Encode calls list: uint8(numCalls) + encoded calls
 	buf = append(buf, byte(len(params.Calls)))

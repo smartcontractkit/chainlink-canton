@@ -1394,20 +1394,46 @@ func testExecuteMCMSOp(
 			continue
 		}
 
-		// Unmarshal the MCMS contract for type-safe access
-		mcmsContract, err := bindings.UnmarshalActiveContract[mcms.MCMS](c)
-		require.NoError(t, err, "Failed to unmarshal MCMS contract")
+		// Parse fields manually to avoid RELTIME unmarshaling issues with bindings
+		// The MCMS contract has a minDelay field of type RelTime which Canton returns
+		// as a record {"microseconds": N} but go-daml expects a simple number
+		fields := c.ActiveContract.GetCreatedEvent().GetCreateArguments().GetFields()
+		var contractInstanceId string
+		var proposerConfig *apiv2.Record
+		for _, field := range fields {
+			switch field.GetLabel() {
+			case "instanceId":
+				contractInstanceId = field.GetValue().GetText()
+			case "proposer":
+				// proposer is a RoleState record with a config field
+				for _, pf := range field.GetValue().GetRecord().GetFields() {
+					if pf.GetLabel() == "config" {
+						proposerConfig = pf.GetValue().GetRecord()
+					}
+				}
+			}
+		}
 
 		// Check if this is our MCMS by matching instanceId (new multi-role structure)
-		if string(mcmsContract.InstanceId) != mcmsInstanceId {
+		if contractInstanceId != mcmsInstanceId {
 			continue
 		}
 
 		newMcmsCid = c.ActiveContract.GetCreatedEvent().ContractId
-		// Access config via Proposer.Config (new multi-role structure)
-		newNumSigners = int64(len(mcmsContract.Proposer.Config.Signers))
-		if len(mcmsContract.Proposer.Config.GroupQuorums) > 0 {
-			newQuorum = int64(mcmsContract.Proposer.Config.GroupQuorums[0])
+
+		// Extract signers and groupQuorums from proposer config
+		if proposerConfig != nil {
+			for _, cf := range proposerConfig.GetFields() {
+				switch cf.GetLabel() {
+				case "signers":
+					newNumSigners = int64(len(cf.GetValue().GetList().GetElements()))
+				case "groupQuorums":
+					quorums := cf.GetValue().GetList().GetElements()
+					if len(quorums) > 0 {
+						newQuorum = quorums[0].GetInt64()
+					}
+				}
+			}
 		}
 		foundContract = true
 
@@ -1448,8 +1474,8 @@ func testSignatoryCheck(
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
-	ccipParticipant, userParticipant testhelpers.Participant,
-	ccipOwnerParty, userParty string,
+	ccipParticipant, _ testhelpers.Participant,
+	ccipOwnerParty, _ string,
 ) {
 	// ========================
 	// |   Contract Constants |
