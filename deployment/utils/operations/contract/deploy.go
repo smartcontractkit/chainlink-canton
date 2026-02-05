@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/aws/smithy-go/ptr"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
@@ -74,17 +75,25 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 
 			createCommand := templWithID.(TT).CreateCommand()
 
-			submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(b.GetContext(), &model.SubmitAndWaitRequest{
-				Commands: &model.Commands{
-					CommandID: uuid.Must(uuid.NewUUID()).String(),
+			// Convert model.CreateCommand to apiv2.CreateCommand
+			apiv2CreateCmd, err := convertCreateCommandToAPIV2(createCommand)
+			if err != nil {
+				return datastore.AddressRef{}, fmt.Errorf("failed to convert create command: %w", err)
+			}
+
+			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+				Commands: &apiv2.Commands{
+					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,
-					Commands:  []*model.Command{{Command: createCommand}},
+					Commands: []*apiv2.Command{{
+						Command: &apiv2.Command_Create{Create: apiv2CreateCmd},
+					}},
 				},
 			})
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to submit create command: %w", err)
 			}
-			contractId, err := getDeployedContractIDFromEvents(submitResp.Transaction.Events, input.Template, params.PackageName)
+			contractId, err := getDeployedContractIDFromEvents(submitResp.GetTransaction().GetEvents(), input.Template, params.PackageName)
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to get deployed contract ID: %w", err)
 			}
@@ -139,16 +148,55 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 	return template, nil
 }
 
+// convertCreateCommandToAPIV2 converts a model.CreateCommand to apiv2.CreateCommand
+func convertCreateCommandToAPIV2(cmd *model.CreateCommand) (*apiv2.CreateCommand, error) {
+	packageID, moduleName, entityName, err := parseTemplateID(cmd.TemplateID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template ID %s: %w", cmd.TemplateID, err)
+	}
+
+	// Convert arguments map to apiv2.Value (Record)
+	createArgumentsValue, err := convertMapToAPIV2Value(cmd.Arguments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert arguments: %w", err)
+	}
+
+	// Extract Record from Value
+	recordValue, ok := createArgumentsValue.GetSum().(*apiv2.Value_Record)
+	if !ok {
+		return nil, fmt.Errorf("failed to extract Record from Value")
+	}
+
+	return &apiv2.CreateCommand{
+		TemplateId: &apiv2.Identifier{
+			PackageId:  packageID,
+			ModuleName: moduleName,
+			EntityName: entityName,
+		},
+		CreateArguments: recordValue.Record,
+	}, nil
+}
+
 // TODO: packageName add package name to bindings instead
-func getDeployedContractIDFromEvents(events []*model.Event, template common.Template, packageName string) (string, error) {
+func getDeployedContractIDFromEvents(events []*apiv2.Event, template common.Template, packageName string) (string, error) {
 	for _, event := range events {
-		if event.Created == nil {
+		created := event.GetCreated()
+		if created == nil {
 			continue
 		}
 
-		if contracts.ReplacePackageIdWithNameInTemplateID(template.GetTemplateID(), packageName) ==
-			contracts.ReplacePackageIdWithNameInTemplateID(event.Created.TemplateID, event.Created.PackageName) {
-			return event.Created.ContractID, nil
+		templateID := created.GetTemplateId()
+		if templateID == nil {
+			continue
+		}
+
+		// Compare template IDs
+		expectedTemplateID := contracts.ReplacePackageIdWithNameInTemplateID(template.GetTemplateID(), packageName)
+		eventTemplateID := fmt.Sprintf("#%s:%s:%s", templateID.GetPackageId(), templateID.GetModuleName(), templateID.GetEntityName())
+		eventTemplateIDWithPackageName := contracts.ReplacePackageIdWithNameInTemplateID(eventTemplateID, packageName)
+
+		if expectedTemplateID == eventTemplateIDWithPackageName {
+			return created.GetContractId(), nil
 		}
 	}
 
