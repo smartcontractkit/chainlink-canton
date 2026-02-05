@@ -2,7 +2,7 @@ package sequences
 
 import (
 	"fmt"
-	"math/big"
+	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/noders-team/go-daml/pkg/types"
@@ -23,14 +23,14 @@ type ConfigureChainForLanesInput struct {
 	// The selector of the chain being configured.
 	ChainSelector uint64
 	// The GlobalConfig address on the chain being configured.
-	GlobalConfig contracts.InstanceID
+	GlobalConfig contracts.InstanceAddress
 	// The FeeQuoter address on the chain being configured.
-	FeeQuoter contracts.InstanceID
+	FeeQuoter contracts.InstanceAddress
 	// The OnRamp address on the chain being configured.
 	// Similarly, we assume that all connections will use the same OnRamp.
-	OnRamp contracts.InstanceID
+	OnRamp contracts.InstanceAddress
 	// The OffRamp address on the chain being configured
-	OffRamp contracts.InstanceID
+	OffRamp contracts.InstanceAddress
 
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
@@ -50,8 +50,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 		globalConfigSourceChainConfigArgs := make([]common.UpdateSourceChainConfig, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
-			// TODO: the bindings force a big.Int to be scaled by 10
-			remoteSelectorScaled := big.NewInt(0).Mul(big.NewInt(0).SetUint64(remoteSelector), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(10), nil))
+			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
 
 			// Inbound / OffRamp
 			defaultInboundCCVs := make([]types.TEXT, 0, len(remoteConfig.DefaultInboundCCVs))
@@ -67,7 +66,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				onRamps = append(onRamps, types.TEXT(onRamp))
 			}
 			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.UpdateSourceChainConfig{
-				SourceChainSelector: remoteSelectorScaled,
+				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
 				Config: common.SourceChainConfig{
 					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
 					OnRampAddress:    onRamps[0], // TODO: currently only support one onRamp
@@ -84,13 +83,13 @@ var ConfigureChainForLanes = operations.NewSequence(
 		// Apply SourceChainConfigs to GlobalConfig
 		for i, arg := range globalConfigSourceChainConfigArgs {
 			_, err := operations.ExecuteOperation(b, global_config.UpdateSourceChainConfig, deps, contract.ChoiceInput[common.UpdateSourceChainConfig]{
-				ChainSelector: deps.Chain.Selector,
-				InstanceID:    input.GlobalConfig,
-				ActAs:         []string{deps.Party},
-				Args:          arg,
+				ChainSelector:   deps.Chain.Selector,
+				InstanceAddress: input.GlobalConfig,
+				ActAs:           []string{deps.Party},
+				Args:            arg,
 			})
 			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, (*big.Int)(arg.SourceChainSelector).String(), err)
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.SourceChainSelector), err)
 			}
 		}
 

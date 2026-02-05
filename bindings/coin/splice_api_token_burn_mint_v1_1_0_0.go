@@ -32,9 +32,8 @@ type IBurnMintFactory interface {
 
 // BurnMintFactoryView is a Record type
 type BurnMintFactoryView struct {
-	Admin PARTY `json:"admin"`
-
-	Meta Metadata `json:"meta"`
+	Admin PARTY    `json:"admin"`
+	Meta  Metadata `json:"meta"`
 }
 
 // ToMap converts BurnMintFactoryView to a map for DAML arguments
@@ -66,17 +65,12 @@ func (t *BurnMintFactoryView) UnmarshalJSON(data []byte) error {
 
 // BurnMintFactoryBurnMint is a Record type
 type BurnMintFactoryBurnMint struct {
-	ExpectedAdmin PARTY `json:"expectedAdmin"`
-
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
-
-	Outputs []BurnMintOutput `json:"outputs"`
-
-	ExtraActors []PARTY `json:"extraActors"`
-
-	ExtraArgs ExtraArgs `json:"extraArgs"`
+	ExpectedAdmin    PARTY            `json:"expectedAdmin"`
+	InstrumentId     InstrumentId     `json:"instrumentId"`
+	InputHoldingCids []CONTRACT_ID    `json:"inputHoldingCids"`
+	Outputs          []BurnMintOutput `json:"outputs"`
+	ExtraActors      []PARTY          `json:"extraActors"`
+	ExtraArgs        ExtraArgs        `json:"extraArgs"`
 }
 
 // ToMap converts BurnMintFactoryBurnMint to a map for DAML arguments
@@ -176,8 +170,7 @@ func (t *BurnMintFactoryBurnMintResult) UnmarshalJSON(data []byte) error {
 // BurnMintFactoryPublicFetch is a Record type
 type BurnMintFactoryPublicFetch struct {
 	ExpectedAdmin PARTY `json:"expectedAdmin"`
-
-	Actor PARTY `json:"actor"`
+	Actor         PARTY `json:"actor"`
 }
 
 // ToMap converts BurnMintFactoryPublicFetch to a map for DAML arguments
@@ -203,10 +196,8 @@ func (t *BurnMintFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 
 // BurnMintOutput is a Record type
 type BurnMintOutput struct {
-	Owner PARTY `json:"owner"`
-
-	Amount NUMERIC `json:"amount"`
-
+	Owner   PARTY         `json:"owner"`
+	Amount  NUMERIC       `json:"amount"`
 	Context ChoiceContext `json:"context"`
 }
 
@@ -216,7 +207,7 @@ func (t BurnMintOutput) ToMap() map[string]interface{} {
 
 	m["owner"] = t.Owner.ToMap()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["context"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -239,11 +230,12 @@ func (t *BurnMintOutput) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// IBurnMintFactoryInterfaceID returns the interface ID for the IBurnMintFactory interface
-func IBurnMintFactoryInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
+// IBurnMintFactoryInterfaceID returns the interface ID for the IBurnMintFactory interface using the package name
+func IBurnMintFactoryInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
+}
+
+// IBurnMintFactoryInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func IBurnMintFactoryInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
 }

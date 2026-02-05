@@ -19,19 +19,13 @@ var (
 
 // ExecuteFromRouter is a Record type
 type ExecuteFromRouter struct {
-	RouterPartyOwner PARTY `json:"routerPartyOwner"`
-
-	ReceiverRequiredCCVs []TEXT `json:"receiverRequiredCCVs"`
-
-	GlobalConfigCid CONTRACT_ID `json:"globalConfigCid"`
-
-	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-
-	EncodedMessage TEXT `json:"encodedMessage"`
-
-	CcvVerifyTickets []CONTRACT_ID `json:"ccvVerifyTickets"`
-
-	TokenPoolCCVTicket *CONTRACT_ID `json:"tokenPoolCCVTicket"`
+	RouterPartyOwner      PARTY         `json:"routerPartyOwner"`
+	ReceiverRequiredCCVs  []TEXT        `json:"receiverRequiredCCVs"`
+	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
+	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	EncodedMessage        TEXT          `json:"encodedMessage"`
+	CcvVerifyTickets      []CONTRACT_ID `json:"ccvVerifyTickets"`
+	TokenPoolCCVTicket    *CONTRACT_ID  `json:"tokenPoolCCVTicket"`
 }
 
 // ToMap converts ExecuteFromRouter to a map for DAML arguments
@@ -100,15 +94,11 @@ func (t *ExecuteFromRouter) UnmarshalJSON(data []byte) error {
 
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
-	MessageHash TEXT `json:"messageHash"`
-
-	Message MessageV1 `json:"message"`
-
-	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
-
-	SequenceNumber NUMERIC `json:"sequenceNumber"`
-
-	TokenReceiveTicket *CONTRACT_ID `json:"tokenReceiveTicket"`
+	MessageHash         TEXT         `json:"messageHash"`
+	Message             MessageV1    `json:"message"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
+	SequenceNumber      NUMERIC      `json:"sequenceNumber"`
+	TokenReceiveTicket  *CONTRACT_ID `json:"tokenReceiveTicket"`
 }
 
 // ToMap converts ExecuteFromRouterResult to a map for DAML arguments
@@ -125,9 +115,9 @@ func (t ExecuteFromRouterResult) ToMap() map[string]interface{} {
 		return t.Message
 	}()
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["sequenceNumber"] = (*big.Int)(t.SequenceNumber)
+	m["sequenceNumber"] = t.SequenceNumber
 
 	if t.TokenReceiveTicket != nil {
 		m["tokenReceiveTicket"] = map[string]interface{}{
@@ -155,17 +145,12 @@ func (t *ExecuteFromRouterResult) UnmarshalJSON(data []byte) error {
 
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
-	GlobalConfigCid CONTRACT_ID `json:"globalConfigCid"`
-
-	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-
-	ReceiverRequiredCCVs []TEXT `json:"receiverRequiredCCVs"`
-
-	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
-
-	HasTokenTransfer BOOL `json:"hasTokenTransfer"`
-
-	InstrumentId *InstrumentId `json:"instrumentId"`
+	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
+	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs  []TEXT        `json:"receiverRequiredCCVs"`
+	SourceChainSelector   NUMERIC       `json:"sourceChainSelector"`
+	HasTokenTransfer      BOOL          `json:"hasTokenTransfer"`
+	InstrumentId          *InstrumentId `json:"instrumentId"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
@@ -196,7 +181,7 @@ func (t GetRequiredCCVsForExecute) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
 
@@ -226,17 +211,21 @@ func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
 
 // OffRamp is a Template type
 type OffRamp struct {
-	CcipOwner PARTY `json:"ccipOwner"`
-
-	InstanceId TEXT `json:"instanceId"`
+	CcipOwner  PARTY `json:"ccipOwner"`
+	InstanceId TEXT  `json:"instanceId"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t OffRamp) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OffRamp", "OffRamp")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t OffRamp) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t OffRamp) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
@@ -248,6 +237,22 @@ func (t OffRamp) CreateCommand() *model.CreateCommand {
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t OffRamp) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
 		Arguments:  args,
 	}
 }
@@ -265,40 +270,64 @@ func (t *OffRamp) UnmarshalJSON(data []byte) error {
 // Choice methods for OffRamp
 
 // GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this OffRamp contract
+// This method uses the package name in the template ID
 func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OffRamp", "OffRamp"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
 		Choice:     "GetRequiredCCVsForExecute",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetRequiredCCVsForExecuteWithPackageID exercises the GetRequiredCCVsForExecute choice using the provided package ID instead of package name
+func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForExecute",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this OffRamp contract
+// This method uses the package name in the template ID
 func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OffRamp", "OffRamp"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
 		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
 
-		Arguments: map[string]interface{}{},
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // ExecuteFromRouter exercises the ExecuteFromRouter choice on this OffRamp contract
+// This method uses the package name in the template ID
 func (t OffRamp) ExecuteFromRouter(contractID string, args ExecuteFromRouter) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.OffRamp", "OffRamp"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
 		Choice:     "ExecuteFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// ExecuteFromRouterWithPackageID exercises the ExecuteFromRouter choice using the provided package ID instead of package name
+func (t OffRamp) ExecuteFromRouterWithPackageID(contractID string, packageID string, args ExecuteFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "ExecuteFromRouter",
+		Arguments:  argsToMap(args),
 	}
 }

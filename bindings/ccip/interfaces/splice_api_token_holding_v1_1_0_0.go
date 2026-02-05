@@ -26,15 +26,11 @@ type IHolding interface {
 
 // HoldingView is a Record type
 type HoldingView struct {
-	Owner PARTY `json:"owner"`
-
+	Owner        PARTY        `json:"owner"`
 	InstrumentId InstrumentId `json:"instrumentId"`
-
-	Amount NUMERIC `json:"amount"`
-
-	Lock *Lock `json:"lock"`
-
-	Meta Metadata `json:"meta"`
+	Amount       NUMERIC      `json:"amount"`
+	Lock         *Lock        `json:"lock"`
+	Meta         Metadata     `json:"meta"`
 }
 
 // ToMap converts HoldingView to a map for DAML arguments
@@ -51,7 +47,7 @@ func (t HoldingView) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	if t.Lock != nil {
 		m["lock"] = map[string]interface{}{
@@ -88,8 +84,7 @@ func (t *HoldingView) UnmarshalJSON(data []byte) error {
 // InstrumentId is a Record type
 type InstrumentId struct {
 	Admin PARTY `json:"admin"`
-
-	Id TEXT `json:"id"`
+	Id    TEXT  `json:"id"`
 }
 
 // ToMap converts InstrumentId to a map for DAML arguments
@@ -115,13 +110,10 @@ func (t *InstrumentId) UnmarshalJSON(data []byte) error {
 
 // Lock is a Record type
 type Lock struct {
-	Holders []PARTY `json:"holders"`
-
-	ExpiresAt *TIMESTAMP `json:"expiresAt"`
-
-	ExpiresAfter RELTIME `json:"expiresAfter"`
-
-	Context *TEXT `json:"context"`
+	Holders      []PARTY    `json:"holders"`
+	ExpiresAt    *TIMESTAMP `json:"expiresAt"`
+	ExpiresAfter RELTIME    `json:"expiresAfter"`
+	Context      *TEXT      `json:"context"`
 }
 
 // ToMap converts Lock to a map for DAML arguments
@@ -179,11 +171,12 @@ func (t *Lock) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// IHoldingInterfaceID returns the interface ID for the IHolding interface
-func IHoldingInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "Splice.Api.Token.HoldingV1", "Holding")
+// IHoldingInterfaceID returns the interface ID for the IHolding interface using the package name
+func IHoldingInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.HoldingV1", "Holding")
+}
+
+// IHoldingInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func IHoldingInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.HoldingV1", "Holding")
 }

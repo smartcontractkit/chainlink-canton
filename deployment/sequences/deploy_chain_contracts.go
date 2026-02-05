@@ -2,7 +2,6 @@ package sequences
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/noders-team/go-daml/pkg/types"
@@ -30,7 +29,9 @@ import (
 )
 
 type CommitteeVerifierParams struct {
-	Template ccvs.CommitteeVerifier
+	// Qualifier distinguishes between multiple deployments of the committee verifier on the same chain.
+	Qualifier string
+	Template  ccvs.CommitteeVerifier
 }
 
 type GlobalConfigParams struct {
@@ -143,6 +144,7 @@ var DeployChainContracts = operations.NewSequence(
 				ActAs:         []string{deps.Party},
 				Template:      committeeVerifier.Template,
 				OwnerParty:    committeeVerifier.Template.Owner,
+				Qualifier:     &committeeVerifier.Qualifier,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier #%v: %w", i, err)
@@ -152,8 +154,6 @@ var DeployChainContracts = operations.NewSequence(
 
 		// Deploy Global Config
 		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
-		// TODO: the bindings force a big.Int to be scaled by 10
-		(*big.Int)(input.GlobalConfig.Template.ChainSelector).Mul((*big.Int)(input.GlobalConfig.Template.ChainSelector), big.NewInt(0).Exp(big.NewInt(10), big.NewInt(10), nil))
 		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[common.GlobalConfig]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{deps.Party},

@@ -97,20 +97,29 @@ func TestMCMSOps(t *testing.T) {
 		GroupParents: groupParents,
 	}
 
+	// Create RoleState for each role (multi-role MCMS structure)
+	roleState := mcms.RoleState{
+		Config:       config,
+		SeenHashes:   nil,
+		ExpiringRoot: mcms.ExpiringRoot{},
+		RootMetadata: mcms.RootMetadata{},
+	}
+
 	var mcmsInstanceID contracts.InstanceID
 	t.Run("Deploy", func(t *testing.T) {
 		result, err := cld_ops.ExecuteOperation(bundle, Deploy, deps, contract.DeployInput[mcms.MCMS]{
 			ChainSelector: cantonChain.Selector,
 			ActAs:         []string{user.PrimaryParty},
 			Template: mcms.MCMS{
-				Owner:        types.PARTY(user.PrimaryParty),
-				Role:         mcms.RoleProposer,
-				ChainId:      types.INT64(chainID),
-				McmsId:       types.TEXT(mcmsID),
-				Config:       config,
-				SeenHashes:   nil,
-				ExpiringRoot: mcms.ExpiringRoot{},
-				RootMetadata: mcms.RootMetadata{},
+				Owner:              types.PARTY(user.PrimaryParty),
+				InstanceId:         types.TEXT(mcmsID + "@" + user.PrimaryParty),
+				ChainId:            types.INT64(chainID),
+				Proposer:           roleState,
+				Canceller:          roleState,
+				Bypasser:           roleState,
+				MinDelay:           0,
+				BlockedFunctions:   nil,
+				TimelockTimestamps: nil,
 			},
 			OwnerParty: types.PARTY(user.PrimaryParty),
 		})
@@ -154,10 +163,11 @@ func TestMCMSOps(t *testing.T) {
 		newGroupQuorums[0] = types.INT64(3) // 3-of-4 for group 0
 
 		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, deps, contract.ChoiceInput[mcms.SetConfig]{
-			ChainSelector: cantonChain.Selector,
-			InstanceID:    mcmsInstanceID,
-			ActAs:         []string{user.PrimaryParty},
+			ChainSelector:   cantonChain.Selector,
+			InstanceAddress: mcmsInstanceID.InstanceAddress(),
+			ActAs:           []string{user.PrimaryParty},
 			Args: mcms.SetConfig{
+				TargetRole:      mcms.RoleProposer, // Target the proposer role
 				NewSigners:      newSigners,
 				NewGroupQuorums: newGroupQuorums,
 				NewGroupParents: groupParents,      // Keep same parent structure

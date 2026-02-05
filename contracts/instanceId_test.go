@@ -29,6 +29,10 @@ func TestInstanceId(t *testing.T) {
 		gotPrefix, gotErr := instanceID.Prefix()
 		require.NoError(t, gotErr)
 		require.Truef(t, strings.HasPrefix(gotPrefix, prefix), "expected prefix to start with %s, got %s", prefix, gotPrefix)
+
+		instanceAddress := instanceID.InstanceAddress()
+		require.Len(t, instanceAddress, 32)
+		require.NotZero(t, instanceAddress)
 	})
 	t.Run("invalid prefix (length)", func(t *testing.T) {
 		t.Parallel()

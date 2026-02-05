@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "f804e1cf588d2bd9854e990297f2595d215cb808d9fec918460796b5d3d49b2c"
+const PackageName = "ccip-tokenadminregistry"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -46,17 +46,12 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // ConsumeReceiveTicketResult is a Record type
 type ConsumeReceiveTicketResult struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	Amount NUMERIC `json:"amount"`
-
-	Receiver PARTY `json:"receiver"`
-
-	TokenReceiver PARTY `json:"tokenReceiver"`
-
-	MessageHash TEXT `json:"messageHash"`
-
-	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
+	InstrumentId        InstrumentId `json:"instrumentId"`
+	Amount              NUMERIC      `json:"amount"`
+	Receiver            PARTY        `json:"receiver"`
+	TokenReceiver       PARTY        `json:"tokenReceiver"`
+	MessageHash         TEXT         `json:"messageHash"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
 }
 
 // ToMap converts ConsumeReceiveTicketResult to a map for DAML arguments
@@ -71,7 +66,7 @@ func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
 		return t.InstrumentId
 	}()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["receiver"] = t.Receiver.ToMap()
 
@@ -79,7 +74,7 @@ func (t ConsumeReceiveTicketResult) ToMap() map[string]interface{} {
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	return m
 }
@@ -96,19 +91,22 @@ func (t *ConsumeReceiveTicketResult) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistry is a Template type
 type TokenAdminRegistry struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
+	Owner        PARTY  `json:"owner"`
+	InstanceId   TEXT   `json:"instanceId"`
 	TokenConfigs GENMAP `json:"tokenConfigs"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t TokenAdminRegistry) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t TokenAdminRegistry) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
@@ -132,6 +130,30 @@ func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t TokenAdminRegistry) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["owner"] = t.Owner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenConfigs"] = func() interface{} {
+		if t.TokenConfigs == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.TokenConfigs}
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t TokenAdminRegistry) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
@@ -145,140 +167,219 @@ func (t *TokenAdminRegistry) UnmarshalJSON(data []byte) error {
 // Choice methods for TokenAdminRegistry
 
 // TokenAdminRegistryGetTokenConfig exercises the TokenAdminRegistry_GetTokenConfig choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_GetTokenConfig",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryGetTokenConfigWithPackageID exercises the TokenAdminRegistry_GetTokenConfig choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfigWithPackageID(contractID string, packageID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_GetTokenConfig",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistrySetPool exercises the TokenAdminRegistry_SetPool choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args TokenAdminRegistrySetPool) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetPool",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistrySetPoolWithPackageID exercises the TokenAdminRegistry_SetPool choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetPoolWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetPool",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryAcceptAdminRole exercises the TokenAdminRegistry_AcceptAdminRole choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRole(contractID string, args TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AcceptAdminRole",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryAcceptAdminRoleWithPackageID exercises the TokenAdminRegistry_AcceptAdminRole choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRoleWithPackageID(contractID string, packageID string, args TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_AcceptAdminRole",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryTransferAdminRole exercises the TokenAdminRegistry_TransferAdminRole choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRole(contractID string, args TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_TransferAdminRole",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryTransferAdminRoleWithPackageID exercises the TokenAdminRegistry_TransferAdminRole choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRoleWithPackageID(contractID string, packageID string, args TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_TransferAdminRole",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryProposeAdministrator exercises the TokenAdminRegistry_ProposeAdministrator choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID string, args TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ProposeAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryProposeAdministratorWithPackageID exercises the TokenAdminRegistry_ProposeAdministrator choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(contractID string, packageID string, args TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_ProposeAdministrator",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryIssueSendTicket exercises the TokenAdminRegistry_IssueSendTicket choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryIssueSendTicket(contractID string, args TokenAdminRegistryIssueSendTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IssueSendTicket",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryIssueSendTicketWithPackageID exercises the TokenAdminRegistry_IssueSendTicket choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIssueSendTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryIssueSendTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IssueSendTicket",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryIssueReceiveTicket exercises the TokenAdminRegistry_IssueReceiveTicket choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicket(contractID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryIssueReceiveTicketWithPackageID exercises the TokenAdminRegistry_IssueReceiveTicket choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
 
-		Arguments: map[string]interface{}{},
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // TokenAdminRegistryConsumeReceiveTicket exercises the TokenAdminRegistry_ConsumeReceiveTicket choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// TokenAdminRegistryConsumeReceiveTicketWithPackageID exercises the TokenAdminRegistry_ConsumeReceiveTicket choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // TokenAdminRegistryAcceptAdminRole is a Record type
 type TokenAdminRegistryAcceptAdminRole struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-
-	Caller PARTY `json:"caller"`
+	Caller       PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryAcceptAdminRole to a map for DAML arguments
@@ -310,11 +411,9 @@ func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryConsumeReceiveTicket is a Record type
 type TokenAdminRegistryConsumeReceiveTicket struct {
-	TicketCid CONTRACT_ID `json:"ticketCid"`
-
+	TicketCid    CONTRACT_ID  `json:"ticketCid"`
 	InstrumentId InstrumentId `json:"instrumentId"`
-
-	PoolOwner PARTY `json:"poolOwner"`
+	PoolOwner    PARTY        `json:"poolOwner"`
 }
 
 // ToMap converts TokenAdminRegistryConsumeReceiveTicket to a map for DAML arguments
@@ -355,8 +454,7 @@ func (t *TokenAdminRegistryConsumeReceiveTicket) UnmarshalJSON(data []byte) erro
 // TokenAdminRegistryGetTokenConfig is a Record type
 type TokenAdminRegistryGetTokenConfig struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-
-	Caller PARTY `json:"caller"`
+	Caller       PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryGetTokenConfig to a map for DAML arguments
@@ -388,11 +486,9 @@ func (t *TokenAdminRegistryGetTokenConfig) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryIsAdministrator is a Record type
 type TokenAdminRegistryIsAdministrator struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	Administrator PARTY `json:"administrator"`
-
-	Caller PARTY `json:"caller"`
+	InstrumentId  InstrumentId `json:"instrumentId"`
+	Administrator PARTY        `json:"administrator"`
+	Caller        PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryIsAdministrator to a map for DAML arguments
@@ -426,21 +522,14 @@ func (t *TokenAdminRegistryIsAdministrator) UnmarshalJSON(data []byte) error {
 
 // TokenAdminRegistryIssueReceiveTicket is a Record type
 type TokenAdminRegistryIssueReceiveTicket struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	PoolOwner PARTY `json:"poolOwner"`
-
-	Receiver PARTY `json:"receiver"`
-
-	TokenReceiver PARTY `json:"tokenReceiver"`
-
-	Amount NUMERIC `json:"amount"`
-
-	MessageHash TEXT `json:"messageHash"`
-
-	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
-
-	Caller PARTY `json:"caller"`
+	InstrumentId        InstrumentId `json:"instrumentId"`
+	PoolOwner           PARTY        `json:"poolOwner"`
+	Receiver            PARTY        `json:"receiver"`
+	TokenReceiver       PARTY        `json:"tokenReceiver"`
+	Amount              NUMERIC      `json:"amount"`
+	MessageHash         TEXT         `json:"messageHash"`
+	SourceChainSelector NUMERIC      `json:"sourceChainSelector"`
+	Caller              PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
@@ -461,11 +550,11 @@ func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]interface{} {
 
 	m["tokenReceiver"] = t.TokenReceiver.ToMap()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -484,23 +573,15 @@ func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalJSON(data []byte) error 
 
 // TokenAdminRegistryIssueSendTicket is a Record type
 type TokenAdminRegistryIssueSendTicket struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	Sender PARTY `json:"sender"`
-
-	Amount NUMERIC `json:"amount"`
-
-	SourceTokenAddress TEXT `json:"sourceTokenAddress"`
-
-	DestTokenAddress TEXT `json:"destTokenAddress"`
-
-	TokenReceiver TEXT `json:"tokenReceiver"`
-
-	ExtraData TEXT `json:"extraData"`
-
-	Receipt Receipt `json:"receipt"`
-
-	PoolOwner PARTY `json:"poolOwner"`
+	InstrumentId       InstrumentId `json:"instrumentId"`
+	Sender             PARTY        `json:"sender"`
+	Amount             NUMERIC      `json:"amount"`
+	SourceTokenAddress TEXT         `json:"sourceTokenAddress"`
+	DestTokenAddress   TEXT         `json:"destTokenAddress"`
+	TokenReceiver      TEXT         `json:"tokenReceiver"`
+	ExtraData          TEXT         `json:"extraData"`
+	Receipt            Receipt      `json:"receipt"`
+	PoolOwner          PARTY        `json:"poolOwner"`
 }
 
 // ToMap converts TokenAdminRegistryIssueSendTicket to a map for DAML arguments
@@ -517,7 +598,7 @@ func (t TokenAdminRegistryIssueSendTicket) ToMap() map[string]interface{} {
 
 	m["sender"] = t.Sender.ToMap()
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["sourceTokenAddress"] = string(t.SourceTokenAddress)
 
@@ -553,10 +634,8 @@ func (t *TokenAdminRegistryIssueSendTicket) UnmarshalJSON(data []byte) error {
 // TokenAdminRegistryProposeAdministrator is a Record type
 type TokenAdminRegistryProposeAdministrator struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-
-	NewAdmin PARTY `json:"newAdmin"`
-
-	Caller PARTY `json:"caller"`
+	NewAdmin     PARTY        `json:"newAdmin"`
+	Caller       PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryProposeAdministrator to a map for DAML arguments
@@ -590,11 +669,9 @@ func (t *TokenAdminRegistryProposeAdministrator) UnmarshalJSON(data []byte) erro
 
 // TokenAdminRegistrySetPool is a Record type
 type TokenAdminRegistrySetPool struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	OptTokenPoolOwner *PARTY `json:"optTokenPoolOwner"`
-
-	Caller PARTY `json:"caller"`
+	InstrumentId      InstrumentId `json:"instrumentId"`
+	OptTokenPoolOwner *PARTY       `json:"optTokenPoolOwner"`
+	Caller            PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistrySetPool to a map for DAML arguments
@@ -638,10 +715,8 @@ func (t *TokenAdminRegistrySetPool) UnmarshalJSON(data []byte) error {
 // TokenAdminRegistryTransferAdminRole is a Record type
 type TokenAdminRegistryTransferAdminRole struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
-
-	NewAdmin PARTY `json:"newAdmin"`
-
-	Caller PARTY `json:"caller"`
+	NewAdmin     PARTY        `json:"newAdmin"`
+	Caller       PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryTransferAdminRole to a map for DAML arguments
@@ -675,10 +750,8 @@ func (t *TokenAdminRegistryTransferAdminRole) UnmarshalJSON(data []byte) error {
 
 // TokenConfig is a Record type
 type TokenConfig struct {
-	Admin *PARTY `json:"admin"`
-
-	PendingAdmin *PARTY `json:"pendingAdmin"`
-
+	Admin          *PARTY `json:"admin"`
+	PendingAdmin   *PARTY `json:"pendingAdmin"`
 	TokenPoolOwner *PARTY `json:"tokenPoolOwner"`
 }
 

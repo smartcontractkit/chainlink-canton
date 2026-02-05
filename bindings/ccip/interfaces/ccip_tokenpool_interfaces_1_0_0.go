@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "0638f5f813f3124dbe979110a1621ab9496610ce6e5701128eba2bc8be77be94"
+const PackageName = "ccip-tokenpool-interfaces"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -65,12 +65,9 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // FeeInput is a Record type
 type FeeInput struct {
-	InstrumentId InstrumentId `json:"instrumentId"`
-
-	TransferFactory CONTRACT_ID `json:"transferFactory"`
-
-	ExtraArgs ExtraArgs `json:"extraArgs"`
-
+	InstrumentId     InstrumentId  `json:"instrumentId"`
+	TransferFactory  CONTRACT_ID   `json:"transferFactory"`
+	ExtraArgs        ExtraArgs     `json:"extraArgs"`
 	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
 }
 
@@ -125,8 +122,7 @@ func (t *FeeInput) UnmarshalJSON(data []byte) error {
 
 // LockOrBurnResult is a Record type
 type LockOrBurnResult struct {
-	PoolChangeCids []CONTRACT_ID `json:"poolChangeCids"`
-
+	PoolChangeCids   []CONTRACT_ID `json:"poolChangeCids"`
 	SenderChangeCids []CONTRACT_ID `json:"senderChangeCids"`
 }
 
@@ -165,9 +161,8 @@ func (t *LockOrBurnResult) UnmarshalJSON(data []byte) error {
 
 // ReleaseOrMintResult is a Record type
 type ReleaseOrMintResult struct {
-	Output ReleaseOrMintResultOutput `json:"output"`
-
-	PoolChangeCids []CONTRACT_ID `json:"poolChangeCids"`
+	Output         ReleaseOrMintResultOutput `json:"output"`
+	PoolChangeCids []CONTRACT_ID             `json:"poolChangeCids"`
 }
 
 // ToMap converts ReleaseOrMintResult to a map for DAML arguments
@@ -313,10 +308,8 @@ func (t *ReleaseOrMintResultPending) UnmarshalJSON(data []byte) error {
 
 // TokenInput is a Record type
 type TokenInput struct {
-	TransferFactory CONTRACT_ID `json:"transferFactory"`
-
-	ExtraArgs ExtraArgs `json:"extraArgs"`
-
+	TransferFactory   CONTRACT_ID   `json:"transferFactory"`
+	ExtraArgs         ExtraArgs     `json:"extraArgs"`
 	TokenPoolHoldings []CONTRACT_ID `json:"tokenPoolHoldings"`
 }
 
@@ -363,10 +356,8 @@ func (t *TokenInput) UnmarshalJSON(data []byte) error {
 
 // TokenPoolView is a Record type
 type TokenPoolView struct {
-	Owner PARTY `json:"owner"`
-
-	CcipOwner PARTY `json:"ccipOwner"`
-
+	Owner        PARTY        `json:"owner"`
+	CcipOwner    PARTY        `json:"ccipOwner"`
 	InstrumentId InstrumentId `json:"instrumentId"`
 }
 
@@ -401,26 +392,21 @@ func (t *TokenPoolView) UnmarshalJSON(data []byte) error {
 
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
-	RemoteChainSelector NUMERIC `json:"remoteChainSelector"`
-
-	Amount NUMERIC `json:"amount"`
-
-	Finality INT64 `json:"finality"`
-
-	ExtraData TEXT `json:"extraData"`
-
-	Direction TransferDirection `json:"direction"`
-
-	Caller PARTY `json:"caller"`
+	RemoteChainSelector NUMERIC           `json:"remoteChainSelector"`
+	Amount              NUMERIC           `json:"amount"`
+	Finality            INT64             `json:"finality"`
+	ExtraData           TEXT              `json:"extraData"`
+	Direction           TransferDirection `json:"direction"`
+	Caller              PARTY             `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
 func (t TokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["remoteChainSelector"] = (*big.Int)(t.RemoteChainSelector)
+	m["remoteChainSelector"] = t.RemoteChainSelector
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["finality"] = int64(t.Finality)
 
@@ -451,30 +437,22 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
 
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
-	DestChainSelector NUMERIC `json:"destChainSelector"`
-
-	Message Canton2AnyMessage `json:"message"`
-
-	TokenInput TokenInput `json:"tokenInput"`
-
-	FeeInput FeeInput `json:"feeInput"`
-
-	SenderInputCids []CONTRACT_ID `json:"senderInputCids"`
-
-	OnRampCid CONTRACT_ID `json:"onRampCid"`
-
-	FeeQuoterCid CONTRACT_ID `json:"feeQuoterCid"`
-
-	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-
-	Caller PARTY `json:"caller"`
+	DestChainSelector     NUMERIC           `json:"destChainSelector"`
+	Message               Canton2AnyMessage `json:"message"`
+	TokenInput            TokenInput        `json:"tokenInput"`
+	FeeInput              FeeInput          `json:"feeInput"`
+	SenderInputCids       []CONTRACT_ID     `json:"senderInputCids"`
+	OnRampCid             CONTRACT_ID       `json:"onRampCid"`
+	FeeQuoterCid          CONTRACT_ID       `json:"feeQuoterCid"`
+	TokenAdminRegistryCid CONTRACT_ID       `json:"tokenAdminRegistryCid"`
+	Caller                PARTY             `json:"caller"`
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
 func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = (*big.Int)(t.DestChainSelector)
+	m["destChainSelector"] = t.DestChainSelector
 
 	m["message"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -550,12 +528,9 @@ func (t *TokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
 // TokenPoolReleaseFromTicket is a Record type
 type TokenPoolReleaseFromTicket struct {
 	TokenReceiveTicketCid CONTRACT_ID `json:"tokenReceiveTicketCid"`
-
 	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
-
-	TokenInput TokenInput `json:"tokenInput"`
-
-	Caller PARTY `json:"caller"`
+	TokenInput            TokenInput  `json:"tokenInput"`
+	Caller                PARTY       `json:"caller"`
 }
 
 // ToMap converts TokenPoolReleaseFromTicket to a map for DAML arguments
@@ -603,17 +578,12 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
 
 // TokenPoolVerifyCCVs is a Record type
 type TokenPoolVerifyCCVs struct {
-	CcvVerifyTickets []CONTRACT_ID `json:"ccvVerifyTickets"`
-
-	MessageHash TEXT `json:"messageHash"`
-
-	SourceChainSelector NUMERIC `json:"sourceChainSelector"`
-
-	Amount NUMERIC `json:"amount"`
-
-	Receiver PARTY `json:"receiver"`
-
-	Caller PARTY `json:"caller"`
+	CcvVerifyTickets    []CONTRACT_ID `json:"ccvVerifyTickets"`
+	MessageHash         TEXT          `json:"messageHash"`
+	SourceChainSelector NUMERIC       `json:"sourceChainSelector"`
+	Amount              NUMERIC       `json:"amount"`
+	Receiver            PARTY         `json:"receiver"`
+	Caller              PARTY         `json:"caller"`
 }
 
 // ToMap converts TokenPoolVerifyCCVs to a map for DAML arguments
@@ -630,9 +600,9 @@ func (t TokenPoolVerifyCCVs) ToMap() map[string]interface{} {
 
 	m["messageHash"] = string(t.MessageHash)
 
-	m["sourceChainSelector"] = (*big.Int)(t.SourceChainSelector)
+	m["sourceChainSelector"] = t.SourceChainSelector
 
-	m["amount"] = (*big.Int)(t.Amount)
+	m["amount"] = t.Amount
 
 	m["receiver"] = t.Receiver.ToMap()
 
@@ -663,7 +633,12 @@ const (
 func (e TransferDirection) GetEnumConstructor() string { return string(e) }
 
 func (e TransferDirection) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "CCIP.Interfaces.TokenPool", "TransferDirection")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.TokenPool", "TransferDirection")
+}
+
+// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
+func (e TransferDirection) GetEnumTypeIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Interfaces.TokenPool", "TransferDirection")
 }
 
 func (e TransferDirection) MarshalJSON() ([]byte, error) {
@@ -678,11 +653,12 @@ func (e *TransferDirection) UnmarshalJSON(data []byte) error {
 
 var _ ENUM = TransferDirection("")
 
-// IITokenPoolInterfaceID returns the interface ID for the IITokenPool interface
-func IITokenPoolInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "CCIP.Interfaces.TokenPool", "ITokenPool")
+// IITokenPoolInterfaceID returns the interface ID for the IITokenPool interface using the package name
+func IITokenPoolInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.TokenPool", "ITokenPool")
+}
+
+// IITokenPoolInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func IITokenPoolInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Interfaces.TokenPool", "ITokenPool")
 }

@@ -84,14 +84,14 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to submit create command: %w", err)
 			}
-			contractId, err := getDeployContractIDFromEvents(submitResp.Transaction.Events, input.Template, params.PackageName)
+			contractId, err := getDeployedContractIDFromEvents(submitResp.Transaction.Events, input.Template, params.PackageName)
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to get deployed contract ID: %w", err)
 			}
-			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps.Chain), "contractID", contractId)
+			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps.Chain), "contractID", contractId, "instanceID", instanceID.String(), "instanceAddress", instanceID.InstanceAddress().Hex())
 
 			return datastore.AddressRef{
-				Address:       instanceID.String(),
+				Address:       instanceID.InstanceAddress().Hex(),
 				ChainSelector: input.ChainSelector,
 				Type:          datastore.ContractType(params.TypeAndVersion.Type),
 				Version:       &params.TypeAndVersion.Version,
@@ -140,7 +140,7 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 }
 
 // TODO: packageName add package name to bindings instead
-func getDeployContractIDFromEvents(events []*model.Event, template common.Template, packageName string) (string, error) {
+func getDeployedContractIDFromEvents(events []*model.Event, template common.Template, packageName string) (string, error) {
 	for _, event := range events {
 		if event.Created == nil {
 			continue
