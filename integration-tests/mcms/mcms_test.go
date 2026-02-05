@@ -228,6 +228,7 @@ func TestMCMSCrypto_TimeToHex(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			ts := time.Unix(tc.unixTime, 0)
 			result := TimeToHex(ts)
 			fmt.Printf("\n%s:\n", tc.name)

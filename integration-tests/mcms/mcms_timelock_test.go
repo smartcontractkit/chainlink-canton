@@ -957,6 +957,7 @@ func queryBlockedFunctionsCount(
 	})
 	require.NoError(t, err)
 	exerciseResult := res.GetTransaction().GetEvents()[0].GetExercised().GetExerciseResult()
+
 	return exerciseResult.GetInt64()
 }
 
