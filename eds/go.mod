@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/eds
 
-go 1.25.6
+go 1.25.5
 
 replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
