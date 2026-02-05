@@ -227,7 +227,7 @@ func parseTemplateIDFromString(templateID string) (packageID, moduleName, entity
 	if !strings.HasPrefix(templateID, "#") {
 		return "", "", "", fmt.Errorf("template ID must start with #")
 	}
-	parts := strings.Split(templateID[1:], ":")
+	parts := strings.Split(templateID, ":")
 	if len(parts) != 3 {
 		return "", "", "", fmt.Errorf("template ID must have format #package:module:entity, got: %s", templateID)
 	}
