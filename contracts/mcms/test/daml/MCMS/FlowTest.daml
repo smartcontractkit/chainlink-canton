@@ -87,13 +87,13 @@ realTestSignatures : [RawSignature]
 realTestSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "e3f037233bfbf3ecc041245de9c72ec5d1d29335ffb5b2d074eb17d43e23151e"
-      , s = "0c104a12e4745024a3276bab7698aec7200fba2eb50ba368c911ae354c2fff35"
+      , r = "c82d140d22ca95ccbe2a41e803c69e336bb6bac3afbe92f7968317b50d51f829"
+      , s = "65020ad3b8ba9b8fd39c4b5907411e7c6448f5068d0562236f385f23fd4e1be3"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "f569bc6a4cc82a7c8c8ff01e686e68dbdb39a47f50e539485f750be81a33be66"
-      , s = "3f3f68634fe6e5f9bc9ab2745fa4c344e44812e8a68350e299da85f3e377a8a8"
+      , r = "390099c2faf379475a8ebd27c737a7d4e449a7f8a94c74830a151429a085e654"
+      , s = "3411081f42c536a01d82dc02560a10b6f073a34cb5af23421d9d594b60bb329b"
       }
   ]
 
@@ -373,13 +373,13 @@ testNonStakeholderCanExecuteWithDisclosures = script do
   let externalBypasserSignatures =
         [ RawSignature
             { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-            , r = "abf9430583e6e6818f55573bbefb1031bde0576e8b760b80cf2739a3ea1032ed"
-            , s = "6f42d36d2fa9c5c03e85b054c859d2bf7fa53c52c850fb2234c40a33e850a826"
+            , r = "77595c7c914b6bac8d4b1c845861603d024d8dd26989ee5425792325d1cf1cc3"
+            , s = "329acc44efb5700cbe78ce65c9270b2a5786112e247ce172bc12b85e0b93f2f8"
             }
         , RawSignature
             { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-            , r = "c42ef80cf07cbcf42336acad98756232bfbffa7728696fc75bf24988dace7b9e"
-            , s = "65b4ad11847b380b28bb43b04b62bcfb7eab9f47c37d54e3f98a1bf11106fd06"
+            , r = "4201e9762ad1d3a862d30032938f908f0ab150e72b1e9db4cf836fdc1aa80d91"
+            , s = "1cbf89b7a23863b79d0a6192bccee247fc614f4b5d5e749c5db581234b549fe3"
             }
         ]
 

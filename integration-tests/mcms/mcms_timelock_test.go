@@ -564,6 +564,7 @@ func scheduleBatchExpectError(
 			ActAs: []string{owner},
 		},
 	})
+
 	return err
 }
 
@@ -691,6 +692,7 @@ func executeScheduledBatchExpectError(
 			ActAs: []string{owner},
 		},
 	})
+
 	return err
 }
 
@@ -908,6 +910,7 @@ func queryMinDelay(
 	require.NoError(t, err)
 	// GetMinDelay returns RelTime which is a record with microseconds field
 	exerciseResult := res.GetTransaction().GetEvents()[0].GetExercised().GetExerciseResult()
+
 	return exerciseResult.GetRecord().GetFields()[0].GetValue().GetInt64()
 }
 

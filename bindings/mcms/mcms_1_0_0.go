@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "a1ce9f83bb4d8df813b23e9cb3116949c5a06b6a120059e2c81088d453ccaf60"
+const PackageName = "mcms"
 const SDKVersion = "3.4.10"
 
 type Template interface {
@@ -59,13 +59,10 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // APSetConfig is a Record type
 type APSetConfig struct {
-	ApSigners []SignerInfo `json:"apSigners"`
-
-	ApGroupQuorums []INT64 `json:"apGroupQuorums"`
-
-	ApGroupParents []INT64 `json:"apGroupParents"`
-
-	ApClearRoot BOOL `json:"apClearRoot"`
+	ApSigners      []SignerInfo `json:"apSigners"`
+	ApGroupQuorums []INT64      `json:"apGroupQuorums"`
+	ApGroupParents []INT64      `json:"apGroupParents"`
+	ApClearRoot    BOOL         `json:"apClearRoot"`
 }
 
 // ToMap converts APSetConfig to a map for DAML arguments
@@ -171,7 +168,6 @@ type ArchiveMCMSEntrypointEvent struct {
 // ToMap converts ArchiveMCMSEntrypointEvent to a map for DAML arguments
 func (t ArchiveMCMSEntrypointEvent) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
-
 	return m
 }
 
@@ -263,8 +259,7 @@ var _ VARIANT = (*ArgValue)(nil)
 // BlockedFunction is a Record type
 type BlockedFunction struct {
 	TargetInstanceId TEXT `json:"targetInstanceId"`
-
-	FunctionName TEXT `json:"functionName"`
+	FunctionName     TEXT `json:"functionName"`
 }
 
 // ToMap converts BlockedFunction to a map for DAML arguments
@@ -325,11 +320,9 @@ func (t *BypasserExecuteParams) UnmarshalJSON(data []byte) error {
 
 // CanExecuteOp is a Record type
 type CanExecuteOp struct {
-	Submitter PARTY `json:"submitter"`
-
-	TargetRole Role `json:"targetRole"`
-
-	Op Op `json:"op"`
+	Submitter  PARTY `json:"submitter"`
+	TargetRole Role  `json:"targetRole"`
+	Op         Op    `json:"op"`
 }
 
 // ToMap converts CanExecuteOp to a map for DAML arguments
@@ -393,19 +386,22 @@ func (t *CancelBatchParams) UnmarshalJSON(data []byte) error {
 
 // Counter is a Template type
 type Counter struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
-	Value INT64 `json:"value"`
+	Owner      PARTY `json:"owner"`
+	InstanceId TEXT  `json:"instanceId"`
+	Value      INT64 `json:"value"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t Counter) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t Counter) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t Counter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
@@ -424,6 +420,25 @@ func (t Counter) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t Counter) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["owner"] = t.Owner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["value"] = int64(t.Value)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t Counter) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
@@ -437,67 +452,107 @@ func (t *Counter) UnmarshalJSON(data []byte) error {
 // Choice methods for Counter
 
 // Archive exercises the Archive choice on this Counter contract
+// This method uses the package name in the template ID
 func (t Counter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
 		ContractID: contractID,
 		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
 
-		Arguments: map[string]interface{}{},
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t Counter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // GetValue exercises the GetValue choice on this Counter contract
+// This method uses the package name in the template ID
 func (t Counter) GetValue(contractID string, args GetValue) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
 		ContractID: contractID,
 		Choice:     "GetValue",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetValueWithPackageID exercises the GetValue choice using the provided package ID instead of package name
+func (t Counter) GetValueWithPackageID(contractID string, packageID string, args GetValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "GetValue",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // GetInstanceIdChoice exercises the GetInstanceIdChoice choice on this Counter contract
+// This method uses the package name in the template ID
 func (t Counter) GetInstanceIdChoice(contractID string, args GetInstanceIdChoice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "Counter"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
 		ContractID: contractID,
 		Choice:     "GetInstanceIdChoice",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetInstanceIdChoiceWithPackageID exercises the GetInstanceIdChoice choice using the provided package ID instead of package name
+func (t Counter) GetInstanceIdChoiceWithPackageID(contractID string, packageID string, args GetInstanceIdChoice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "GetInstanceIdChoice",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this Counter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
 func (t Counter) MCMSReceiverGetInstanceId(contractID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSReceiver"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t Counter) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this Counter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
 func (t Counter) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSReceiver"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -507,14 +562,10 @@ var _ IMCMSReceiver = (*Counter)(nil)
 
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	TargetRole Role `json:"targetRole"`
-
-	Submitter PARTY `json:"submitter"`
-
-	Op Op `json:"op"`
-
-	OpProof []TEXT `json:"opProof"`
-
+	TargetRole Role          `json:"targetRole"`
+	Submitter  PARTY         `json:"submitter"`
+	Op         Op            `json:"op"`
+	OpProof    []TEXT        `json:"opProof"`
 	TargetCids []CONTRACT_ID `json:"targetCids"`
 }
 
@@ -571,17 +622,12 @@ func (t *ExecuteOp) UnmarshalJSON(data []byte) error {
 
 // ExecuteScheduledBatch is a Record type
 type ExecuteScheduledBatch struct {
-	Submitter PARTY `json:"submitter"`
-
-	OpId TEXT `json:"opId"`
-
-	Calls []TimelockCall `json:"calls"`
-
-	Predecessor TEXT `json:"predecessor"`
-
-	Salt TEXT `json:"salt"`
-
-	TargetCids []CONTRACT_ID `json:"targetCids"`
+	Submitter   PARTY          `json:"submitter"`
+	OpId        TEXT           `json:"opId"`
+	Calls       []TimelockCall `json:"calls"`
+	Predecessor TEXT           `json:"predecessor"`
+	Salt        TEXT           `json:"salt"`
+	TargetCids  []CONTRACT_ID  `json:"targetCids"`
 }
 
 // ToMap converts ExecuteScheduledBatch to a map for DAML arguments
@@ -632,11 +678,9 @@ func (t *ExecuteScheduledBatch) UnmarshalJSON(data []byte) error {
 
 // ExpiringRoot is a Record type
 type ExpiringRoot struct {
-	Root TEXT `json:"root"`
-
+	Root       TEXT      `json:"root"`
 	ValidUntil TIMESTAMP `json:"validUntil"`
-
-	OpCount INT64 `json:"opCount"`
+	OpCount    INT64     `json:"opCount"`
 }
 
 // ToMap converts ExpiringRoot to a map for DAML arguments
@@ -760,9 +804,8 @@ func (t *GetMinDelay) UnmarshalJSON(data []byte) error {
 
 // GetState is a Record type
 type GetState struct {
-	Submitter PARTY `json:"submitter"`
-
-	TargetRole Role `json:"targetRole"`
+	Submitter  PARTY `json:"submitter"`
+	TargetRole Role  `json:"targetRole"`
 }
 
 // ToMap converts GetState to a map for DAML arguments
@@ -795,8 +838,7 @@ func (t *GetState) UnmarshalJSON(data []byte) error {
 // GetTimestamp is a Record type
 type GetTimestamp struct {
 	Submitter PARTY `json:"submitter"`
-
-	OpId TEXT `json:"opId"`
+	OpId      TEXT  `json:"opId"`
 }
 
 // ToMap converts GetTimestamp to a map for DAML arguments
@@ -847,8 +889,7 @@ func (t *GetValue) UnmarshalJSON(data []byte) error {
 // IsOperation is a Record type
 type IsOperation struct {
 	Submitter PARTY `json:"submitter"`
-
-	OpId TEXT `json:"opId"`
+	OpId      TEXT  `json:"opId"`
 }
 
 // ToMap converts IsOperation to a map for DAML arguments
@@ -875,8 +916,7 @@ func (t *IsOperation) UnmarshalJSON(data []byte) error {
 // IsOperationDone is a Record type
 type IsOperationDone struct {
 	Submitter PARTY `json:"submitter"`
-
-	OpId TEXT `json:"opId"`
+	OpId      TEXT  `json:"opId"`
 }
 
 // ToMap converts IsOperationDone to a map for DAML arguments
@@ -903,8 +943,7 @@ func (t *IsOperationDone) UnmarshalJSON(data []byte) error {
 // IsOperationPending is a Record type
 type IsOperationPending struct {
 	Submitter PARTY `json:"submitter"`
-
-	OpId TEXT `json:"opId"`
+	OpId      TEXT  `json:"opId"`
 }
 
 // ToMap converts IsOperationPending to a map for DAML arguments
@@ -931,8 +970,7 @@ func (t *IsOperationPending) UnmarshalJSON(data []byte) error {
 // IsOperationReady is a Record type
 type IsOperationReady struct {
 	Submitter PARTY `json:"submitter"`
-
-	OpId TEXT `json:"opId"`
+	OpId      TEXT  `json:"opId"`
 }
 
 // ToMap converts IsOperationReady to a map for DAML arguments
@@ -958,31 +996,28 @@ func (t *IsOperationReady) UnmarshalJSON(data []byte) error {
 
 // MCMS is a Template type
 type MCMS struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
-	ChainId INT64 `json:"chainId"`
-
-	Proposer RoleState `json:"proposer"`
-
-	Canceller RoleState `json:"canceller"`
-
-	Bypasser RoleState `json:"bypasser"`
-
-	MinDelay RELTIME `json:"minDelay"`
-
-	BlockedFunctions []BlockedFunction `json:"blockedFunctions"`
-
-	TimelockTimestamps GENMAP `json:"timelockTimestamps"`
+	Owner              PARTY             `json:"owner"`
+	InstanceId         TEXT              `json:"instanceId"`
+	ChainId            INT64             `json:"chainId"`
+	Proposer           RoleState         `json:"proposer"`
+	Canceller          RoleState         `json:"canceller"`
+	Bypasser           RoleState         `json:"bypasser"`
+	MinDelay           RELTIME           `json:"minDelay"`
+	BlockedFunctions   []BlockedFunction `json:"blockedFunctions"`
+	TimelockTimestamps GENMAP            `json:"timelockTimestamps"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t MCMS) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t MCMS) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t MCMS) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
@@ -1059,6 +1094,83 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["owner"] = t.Owner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["chainId"] = int64(t.ChainId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["proposer"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Proposer).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Proposer
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["canceller"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Canceller).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Canceller
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["bypasser"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Bypasser).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Bypasser
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minDelay"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.MinDelay).(mapper); ok {
+			return m.toMap()
+		}
+		return t.MinDelay
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["blockedFunctions"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.BlockedFunctions))
+		for _, e := range t.BlockedFunctions {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["timelockTimestamps"] = func() interface{} {
+		if t.TimelockTimestamps == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.TimelockTimestamps}
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t MCMS) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
@@ -1072,219 +1184,340 @@ func (t *MCMS) UnmarshalJSON(data []byte) error {
 // Choice methods for MCMS
 
 // SetConfig exercises the SetConfig choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
+func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // SetRoot exercises the SetRoot choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "SetRoot",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// SetRootWithPackageID exercises the SetRoot choice using the provided package ID instead of package name
+func (t MCMS) SetRootWithPackageID(contractID string, packageID string, args SetRoot) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetRoot",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // ExecuteOp exercises the ExecuteOp choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) ExecuteOp(contractID string, args ExecuteOp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "ExecuteOp",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// ExecuteOpWithPackageID exercises the ExecuteOp choice using the provided package ID instead of package name
+func (t MCMS) ExecuteOpWithPackageID(contractID string, packageID string, args ExecuteOp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "ExecuteOp",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // ExecuteScheduledBatch exercises the ExecuteScheduledBatch choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) ExecuteScheduledBatch(contractID string, args ExecuteScheduledBatch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "ExecuteScheduledBatch",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// ExecuteScheduledBatchWithPackageID exercises the ExecuteScheduledBatch choice using the provided package ID instead of package name
+func (t MCMS) ExecuteScheduledBatchWithPackageID(contractID string, packageID string, args ExecuteScheduledBatch) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "ExecuteScheduledBatch",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // CanExecuteOp exercises the CanExecuteOp choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) CanExecuteOp(contractID string, args CanExecuteOp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "CanExecuteOp",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// CanExecuteOpWithPackageID exercises the CanExecuteOp choice using the provided package ID instead of package name
+func (t MCMS) CanExecuteOpWithPackageID(contractID string, packageID string, args CanExecuteOp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "CanExecuteOp",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // IsOperationReady exercises the IsOperationReady choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) IsOperationReady(contractID string, args IsOperationReady) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "IsOperationReady",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// IsOperationReadyWithPackageID exercises the IsOperationReady choice using the provided package ID instead of package name
+func (t MCMS) IsOperationReadyWithPackageID(contractID string, packageID string, args IsOperationReady) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationReady",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // Archive exercises the Archive choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
 
-		Arguments: map[string]interface{}{},
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t MCMS) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // GetState exercises the GetState choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) GetState(contractID string, args GetState) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetState",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetStateWithPackageID exercises the GetState choice using the provided package ID instead of package name
+func (t MCMS) GetStateWithPackageID(contractID string, packageID string, args GetState) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetState",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // IsOperation exercises the IsOperation choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) IsOperation(contractID string, args IsOperation) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "IsOperation",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// IsOperationWithPackageID exercises the IsOperation choice using the provided package ID instead of package name
+func (t MCMS) IsOperationWithPackageID(contractID string, packageID string, args IsOperation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperation",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // IsOperationPending exercises the IsOperationPending choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) IsOperationPending(contractID string, args IsOperationPending) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "IsOperationPending",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// IsOperationPendingWithPackageID exercises the IsOperationPending choice using the provided package ID instead of package name
+func (t MCMS) IsOperationPendingWithPackageID(contractID string, packageID string, args IsOperationPending) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationPending",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // IsOperationDone exercises the IsOperationDone choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) IsOperationDone(contractID string, args IsOperationDone) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "IsOperationDone",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// IsOperationDoneWithPackageID exercises the IsOperationDone choice using the provided package ID instead of package name
+func (t MCMS) IsOperationDoneWithPackageID(contractID string, packageID string, args IsOperationDone) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationDone",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // GetTimestamp exercises the GetTimestamp choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) GetTimestamp(contractID string, args GetTimestamp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetTimestamp",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetTimestampWithPackageID exercises the GetTimestamp choice using the provided package ID instead of package name
+func (t MCMS) GetTimestampWithPackageID(contractID string, packageID string, args GetTimestamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetTimestamp",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // GetMinDelay exercises the GetMinDelay choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) GetMinDelay(contractID string, args GetMinDelay) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetMinDelay",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetMinDelayWithPackageID exercises the GetMinDelay choice using the provided package ID instead of package name
+func (t MCMS) GetMinDelayWithPackageID(contractID string, packageID string, args GetMinDelay) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetMinDelay",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // GetBlockedFunctions exercises the GetBlockedFunctions choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) GetBlockedFunctions(contractID string, args GetBlockedFunctions) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetBlockedFunctions",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetBlockedFunctionsWithPackageID exercises the GetBlockedFunctions choice using the provided package ID instead of package name
+func (t MCMS) GetBlockedFunctionsWithPackageID(contractID string, packageID string, args GetBlockedFunctions) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetBlockedFunctions",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // GetBlockedFunctionsCount exercises the GetBlockedFunctionsCount choice on this MCMS contract
+// This method uses the package name in the template ID
 func (t MCMS) GetBlockedFunctionsCount(contractID string, args GetBlockedFunctionsCount) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Main", "MCMS"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetBlockedFunctionsCount",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// GetBlockedFunctionsCountWithPackageID exercises the GetBlockedFunctionsCount choice using the provided package ID instead of package name
+func (t MCMS) GetBlockedFunctionsCountWithPackageID(contractID string, packageID string, args GetBlockedFunctionsCount) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetBlockedFunctionsCount",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSEntrypointEvent is a Template type
 type MCMSEntrypointEvent struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
-
+	Owner             PARTY  `json:"owner"`
+	InstanceId        TEXT   `json:"instanceId"`
+	FunctionName      TEXT   `json:"functionName"`
+	OperationData     TEXT   `json:"operationData"`
 	ContractIdsAsText []TEXT `json:"contractIdsAsText"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t MCMSEntrypointEvent) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSEntrypointEvent")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t MCMSEntrypointEvent) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
@@ -1315,6 +1548,37 @@ func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t MCMSEntrypointEvent) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["owner"] = t.Owner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["functionName"] = string(t.FunctionName)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["operationData"] = string(t.OperationData)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["contractIdsAsText"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ContractIdsAsText))
+		for _, e := range t.ContractIdsAsText {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t MCMSEntrypointEvent) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
@@ -1328,36 +1592,51 @@ func (t *MCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 // Choice methods for MCMSEntrypointEvent
 
 // Archive exercises the Archive choice on this MCMSEntrypointEvent contract
+// This method uses the package name in the template ID
 func (t MCMSEntrypointEvent) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSEntrypointEvent"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent"),
 		ContractID: contractID,
 		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
 
-		Arguments: map[string]interface{}{},
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t MCMSEntrypointEvent) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
 	}
 }
 
 // ArchiveMCMSEntrypointEvent exercises the Archive_MCMSEntrypointEvent choice on this MCMSEntrypointEvent contract
+// This method uses the package name in the template ID
 func (t MCMSEntrypointEvent) ArchiveMCMSEntrypointEvent(contractID string, args ArchiveMCMSEntrypointEvent) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Counter", "MCMSEntrypointEvent"),
-
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent"),
 		ContractID: contractID,
 		Choice:     "Archive_MCMSEntrypointEvent",
+		Arguments:  argsToMap(args),
+	}
+}
 
-		Arguments: argsToMap(args),
+// ArchiveMCMSEntrypointEventWithPackageID exercises the Archive_MCMSEntrypointEvent choice using the provided package ID instead of package name
+func (t MCMSEntrypointEvent) ArchiveMCMSEntrypointEventWithPackageID(contractID string, packageID string, args ArchiveMCMSEntrypointEvent) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent"),
+		ContractID: contractID,
+		Choice:     "Archive_MCMSEntrypointEvent",
+		Arguments:  argsToMap(args),
 	}
 }
 
 // MCMSReceiverView is a Record type
 type MCMSReceiverView struct {
-	Owner PARTY `json:"owner"`
-
-	InstanceId TEXT `json:"instanceId"`
+	Owner      PARTY `json:"owner"`
+	InstanceId TEXT  `json:"instanceId"`
 }
 
 // ToMap converts MCMSReceiverView to a map for DAML arguments
@@ -1383,13 +1662,10 @@ func (t *MCMSReceiverView) UnmarshalJSON(data []byte) error {
 
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
-	Caller PARTY `json:"caller"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
-
-	ContractIds []CONTRACT_ID `json:"contractIds"`
+	Caller        PARTY         `json:"caller"`
+	FunctionName  TEXT          `json:"functionName"`
+	OperationData TEXT          `json:"operationData"`
+	ContractIds   []CONTRACT_ID `json:"contractIds"`
 }
 
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
@@ -1449,17 +1725,12 @@ func (t *MCMSReceiverGetInstanceId) UnmarshalJSON(data []byte) error {
 
 // MCMSState is a Record type
 type MCMSState struct {
-	Role Role `json:"role"`
-
-	OpCount INT64 `json:"opCount"`
-
-	PostOpCount INT64 `json:"postOpCount"`
-
-	ValidUntil TIMESTAMP `json:"validUntil"`
-
-	HasActiveRoot BOOL `json:"hasActiveRoot"`
-
-	NumSigners INT64 `json:"numSigners"`
+	Role          Role      `json:"role"`
+	OpCount       INT64     `json:"opCount"`
+	PostOpCount   INT64     `json:"postOpCount"`
+	ValidUntil    TIMESTAMP `json:"validUntil"`
+	HasActiveRoot BOOL      `json:"hasActiveRoot"`
+	NumSigners    INT64     `json:"numSigners"`
 }
 
 // ToMap converts MCMSState to a map for DAML arguments
@@ -1499,11 +1770,9 @@ func (t *MCMSState) UnmarshalJSON(data []byte) error {
 
 // MultisigConfig is a Record type
 type MultisigConfig struct {
-	Signers []SignerInfo `json:"signers"`
-
-	GroupQuorums []INT64 `json:"groupQuorums"`
-
-	GroupParents []INT64 `json:"groupParents"`
+	Signers      []SignerInfo `json:"signers"`
+	GroupQuorums []INT64      `json:"groupQuorums"`
+	GroupParents []INT64      `json:"groupParents"`
 }
 
 // ToMap converts MultisigConfig to a map for DAML arguments
@@ -1554,17 +1823,12 @@ func (t *MultisigConfig) UnmarshalJSON(data []byte) error {
 
 // Op is a Record type
 type Op struct {
-	ChainId INT64 `json:"chainId"`
-
-	MultisigId TEXT `json:"multisigId"`
-
-	Nonce INT64 `json:"nonce"`
-
-	TargetInstanceId TEXT `json:"targetInstanceId"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
+	ChainId          INT64 `json:"chainId"`
+	MultisigId       TEXT  `json:"multisigId"`
+	Nonce            INT64 `json:"nonce"`
+	TargetInstanceId TEXT  `json:"targetInstanceId"`
+	FunctionName     TEXT  `json:"functionName"`
+	OperationData    TEXT  `json:"operationData"`
 }
 
 // ToMap converts Op to a map for DAML arguments
@@ -1599,10 +1863,8 @@ func (t *Op) UnmarshalJSON(data []byte) error {
 // RawSignature is a Record type
 type RawSignature struct {
 	PublicKey TEXT `json:"publicKey"`
-
-	R TEXT `json:"r"`
-
-	S TEXT `json:"s"`
+	R         TEXT `json:"r"`
+	S         TEXT `json:"s"`
 }
 
 // ToMap converts RawSignature to a map for DAML arguments
@@ -1642,7 +1904,12 @@ const (
 func (e Role) GetEnumConstructor() string { return string(e) }
 
 func (e Role) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageID, "MCMS.Types", "Role")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Types", "Role")
+}
+
+// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
+func (e Role) GetEnumTypeIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Types", "Role")
 }
 
 func (e Role) MarshalJSON() ([]byte, error) {
@@ -1659,13 +1926,10 @@ var _ ENUM = Role("")
 
 // RoleState is a Record type
 type RoleState struct {
-	Config MultisigConfig `json:"config"`
-
-	SeenHashes GENMAP `json:"seenHashes"`
-
-	ExpiringRoot ExpiringRoot `json:"expiringRoot"`
-
-	RootMetadata RootMetadata `json:"rootMetadata"`
+	Config       MultisigConfig `json:"config"`
+	SeenHashes   GENMAP         `json:"seenHashes"`
+	ExpiringRoot ExpiringRoot   `json:"expiringRoot"`
+	RootMetadata RootMetadata   `json:"rootMetadata"`
 }
 
 // ToMap converts RoleState to a map for DAML arguments
@@ -1718,15 +1982,11 @@ func (t *RoleState) UnmarshalJSON(data []byte) error {
 
 // RootMetadata is a Record type
 type RootMetadata struct {
-	ChainId INT64 `json:"chainId"`
-
-	MultisigId TEXT `json:"multisigId"`
-
-	PreOpCount INT64 `json:"preOpCount"`
-
-	PostOpCount INT64 `json:"postOpCount"`
-
-	OverridePreviousRoot BOOL `json:"overridePreviousRoot"`
+	ChainId              INT64 `json:"chainId"`
+	MultisigId           TEXT  `json:"multisigId"`
+	PreOpCount           INT64 `json:"preOpCount"`
+	PostOpCount          INT64 `json:"postOpCount"`
+	OverridePreviousRoot BOOL  `json:"overridePreviousRoot"`
 }
 
 // ToMap converts RootMetadata to a map for DAML arguments
@@ -1758,13 +2018,10 @@ func (t *RootMetadata) UnmarshalJSON(data []byte) error {
 
 // ScheduleBatchParams is a Record type
 type ScheduleBatchParams struct {
-	Calls []TimelockCall `json:"calls"`
-
-	Predecessor TEXT `json:"predecessor"`
-
-	Salt TEXT `json:"salt"`
-
-	DelaySecs INT64 `json:"delaySecs"`
+	Calls       []TimelockCall `json:"calls"`
+	Predecessor TEXT           `json:"predecessor"`
+	Salt        TEXT           `json:"salt"`
+	DelaySecs   INT64          `json:"delaySecs"`
 }
 
 // ToMap converts ScheduleBatchParams to a map for DAML arguments
@@ -1805,15 +2062,11 @@ func (t *ScheduleBatchParams) UnmarshalJSON(data []byte) error {
 
 // SetConfig is a Record type
 type SetConfig struct {
-	TargetRole Role `json:"targetRole"`
-
-	NewSigners []SignerInfo `json:"newSigners"`
-
-	NewGroupQuorums []INT64 `json:"newGroupQuorums"`
-
-	NewGroupParents []INT64 `json:"newGroupParents"`
-
-	ClearRoot BOOL `json:"clearRoot"`
+	TargetRole      Role         `json:"targetRole"`
+	NewSigners      []SignerInfo `json:"newSigners"`
+	NewGroupQuorums []INT64      `json:"newGroupQuorums"`
+	NewGroupParents []INT64      `json:"newGroupParents"`
+	ClearRoot       BOOL         `json:"clearRoot"`
 }
 
 // ToMap converts SetConfig to a map for DAML arguments
@@ -1874,13 +2127,10 @@ func (t *SetConfig) UnmarshalJSON(data []byte) error {
 
 // SetConfigParams is a Record type
 type SetConfigParams struct {
-	Signers []SignerInfo `json:"signers"`
-
-	GroupQuorums []INT64 `json:"groupQuorums"`
-
-	GroupParents []INT64 `json:"groupParents"`
-
-	ClearRoot BOOL `json:"clearRoot"`
+	Signers      []SignerInfo `json:"signers"`
+	GroupQuorums []INT64      `json:"groupQuorums"`
+	GroupParents []INT64      `json:"groupParents"`
+	ClearRoot    BOOL         `json:"clearRoot"`
 }
 
 // ToMap converts SetConfigParams to a map for DAML arguments
@@ -1933,19 +2183,13 @@ func (t *SetConfigParams) UnmarshalJSON(data []byte) error {
 
 // SetRoot is a Record type
 type SetRoot struct {
-	TargetRole Role `json:"targetRole"`
-
-	Submitter PARTY `json:"submitter"`
-
-	NewRoot TEXT `json:"newRoot"`
-
-	ValidUntil TIMESTAMP `json:"validUntil"`
-
-	Metadata RootMetadata `json:"metadata"`
-
-	MetadataProof []TEXT `json:"metadataProof"`
-
-	Signatures []RawSignature `json:"signatures"`
+	TargetRole    Role           `json:"targetRole"`
+	Submitter     PARTY          `json:"submitter"`
+	NewRoot       TEXT           `json:"newRoot"`
+	ValidUntil    TIMESTAMP      `json:"validUntil"`
+	Metadata      RootMetadata   `json:"metadata"`
+	MetadataProof []TEXT         `json:"metadataProof"`
+	Signatures    []RawSignature `json:"signatures"`
 }
 
 // ToMap converts SetRoot to a map for DAML arguments
@@ -2010,11 +2254,9 @@ func (t *SetRoot) UnmarshalJSON(data []byte) error {
 
 // SignerInfo is a Record type
 type SignerInfo struct {
-	SignerAddress TEXT `json:"signerAddress"`
-
-	SignerIndex INT64 `json:"signerIndex"`
-
-	SignerGroup INT64 `json:"signerGroup"`
+	SignerAddress TEXT  `json:"signerAddress"`
+	SignerIndex   INT64 `json:"signerIndex"`
+	SignerGroup   INT64 `json:"signerGroup"`
 }
 
 // ToMap converts SignerInfo to a map for DAML arguments
@@ -2043,10 +2285,8 @@ func (t *SignerInfo) UnmarshalJSON(data []byte) error {
 // TimelockCall is a Record type
 type TimelockCall struct {
 	TargetInstanceId TEXT `json:"targetInstanceId"`
-
-	FunctionName TEXT `json:"functionName"`
-
-	OperationData TEXT `json:"operationData"`
+	FunctionName     TEXT `json:"functionName"`
+	OperationData    TEXT `json:"operationData"`
 }
 
 // ToMap converts TimelockCall to a map for DAML arguments
@@ -2072,11 +2312,12 @@ func (t *TimelockCall) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// IMCMSReceiverInterfaceID returns the interface ID for the IMCMSReceiver interface
-func IMCMSReceiverInterfaceID(packageID *string) string {
-	pkgID := PackageID
-	if packageID != nil {
-		pkgID = *packageID
-	}
-	return fmt.Sprintf("#%s:%s:%s", pkgID, "MCMS.MCMSReceiver", "MCMSReceiver")
+// IMCMSReceiverInterfaceID returns the interface ID for the IMCMSReceiver interface using the package name
+func IMCMSReceiverInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSReceiver", "MCMSReceiver")
+}
+
+// IMCMSReceiverInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func IMCMSReceiverInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSReceiver", "MCMSReceiver")
 }

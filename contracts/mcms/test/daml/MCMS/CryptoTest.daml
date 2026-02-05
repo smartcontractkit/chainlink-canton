@@ -3,11 +3,12 @@
 -- Uses hardcoded values from Go tests (src/tests/mcms_test.go)
 module MCMS.CryptoTest where
 
-import DA.Date (datetime, Month(..))
+import DA.Date (datetime, Month(..), date)
 import DA.Crypto.Text (keccak256)
 import DA.Text qualified as T
+import DA.Time (time)
 import Daml.Script
-import MCMS.Crypto (publicKeyToAddress, hashPair, verifyMerkleProof, hashOpLeafNative, hashMetadataLeafNative, computeSignedHashNative, rawToDerSignature, replicateText)
+import MCMS.Crypto (publicKeyToAddress, hashPair, verifyMerkleProof, hashOpLeafNative, hashMetadataLeafNative, computeSignedHashNative, rawToDerSignature, replicateText, timeToHex)
 import MCMS.Types (Op(..), RootMetadata(..))
 
 -- ===========================================================================
@@ -158,17 +159,45 @@ testCryptoHashMetadataLeaf = script do
 
   debug "✓ hashMetadataLeafNative test passed"
 
+-- | Test timeToHex function
+-- Verifies Canton encodes Unix timestamps correctly as 32-byte hex
+testCryptoTimeToHex : Script ()
+testCryptoTimeToHex = script do
+  -- Unix timestamp 1700000000 = 0x6553f100
+  -- datetime 2023 Nov 14 22 13 20 is exactly Unix 1700000000
+  let t = datetime 2023 Nov 14 22 13 20
+  let expected = "000000000000000000000000000000000000000000000000000000006553f100"
+  let result = timeToHex t
+  assertMsg ("timeToHex mismatch: expected " <> expected <> " got " <> result) $
+    result == expected
+
+  -- Test epoch (Unix 0)
+  let epochTime = time (date 1970 Jan 1) 0 0 0
+  let expectedEpoch = "0000000000000000000000000000000000000000000000000000000000000000"
+  let resultEpoch = timeToHex epochTime
+  assertMsg ("timeToHex epoch mismatch: expected " <> expectedEpoch <> " got " <> resultEpoch) $
+    resultEpoch == expectedEpoch
+
+  debug "✓ timeToHex test passed"
+
 -- | Test computeSignedHashNative function
 -- Verifies Canton computes the signed hash the same way as Go
 testCryptoComputeSignedHash : Script ()
 testCryptoComputeSignedHash = script do
   -- From Go test: TestMCMSCrypto_SignedHash
   -- root = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-  -- validUntil = Unix 1700000000 (but timeToHex returns all zeros for now)
-  -- signedHash = "d33814f8c09cbc949e2016d6b2b6ba1346c12e86fc0617d1d9e77a09a6a43501"
+  -- validUntil = Unix 1700000000 (0x6553f100)
+  -- innerData = root || timeToHex(validUntil)
+  -- innerHash = keccak256(innerData)
+  -- signedHash = keccak256("\x19Ethereum Signed Message:\n32" || innerHash)
+  --
+  -- With proper timestamp encoding:
+  -- innerData = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" ||
+  --             "000000000000000000000000000000000000000000000000000000006553f100"
+  -- expectedHash = "a96a392cce9d743dccbf235388ca4f72c050e5ec7f3c6913312d277b75522212"
   let root = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-  let validUntil = datetime 2023 Nov 14 22 13 20  -- Approximate, doesn't matter since timeToHex returns 0
-  let expectedHash = "d33814f8c09cbc949e2016d6b2b6ba1346c12e86fc0617d1d9e77a09a6a43501"
+  let validUntil = datetime 2023 Nov 14 22 13 20  -- Unix 1700000000
+  let expectedHash = "a96a392cce9d743dccbf235388ca4f72c050e5ec7f3c6913312d277b75522212"
   let actualHash = computeSignedHashNative root validUntil
 
   assertMsg ("computeSignedHashNative mismatch: expected " <> expectedHash <> " got " <> actualHash) $
@@ -201,6 +230,7 @@ testAllCrypto = script do
   testCryptoMerkleProof
   testCryptoHashOpLeaf
   testCryptoHashMetadataLeaf
+  testCryptoTimeToHex
   testCryptoComputeSignedHash
   testCryptoDerEncoding
   debug "=========================================="

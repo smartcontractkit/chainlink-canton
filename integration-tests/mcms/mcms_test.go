@@ -191,6 +191,55 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 // These tests output all values in a format usable for Daml tests
 // ===========================================================================
 
+// TestMCMSCrypto_TimeToHex tests the timestamp to hex encoding
+func TestMCMSCrypto_TimeToHex(t *testing.T) {
+	t.Parallel()
+
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("TEST: TimeToHex Encoding")
+	fmt.Println(strings.Repeat("=", 80))
+
+	testCases := []struct {
+		name     string
+		unixTime int64
+		expected string
+	}{
+		{
+			name:     "Unix 1700000000 (2023-11-14 22:13:20 UTC)",
+			unixTime: 1700000000,
+			expected: "000000000000000000000000000000000000000000000000000000006553f100",
+		},
+		{
+			name:     "Unix 0 (epoch)",
+			unixTime: 0,
+			expected: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:     "Unix 1 (epoch + 1 second)",
+			unixTime: 1,
+			expected: "0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			name:     "Unix 4294967295 (max uint32)",
+			unixTime: 4294967295, // 0xFFFFFFFF
+			expected: "00000000000000000000000000000000000000000000000000000000ffffffff",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := time.Unix(tc.unixTime, 0)
+			result := TimeToHex(ts)
+			fmt.Printf("\n%s:\n", tc.name)
+			fmt.Printf("  Unix: %d\n", tc.unixTime)
+			fmt.Printf("  Hex:  %s\n", result)
+			require.Equal(t, tc.expected, result, "TimeToHex mismatch")
+		})
+	}
+
+	fmt.Println("\n✓ TimeToHex encoding tests passed")
+}
+
 // TestMCMSCrypto_SignedHash tests the signed hash computation
 func TestMCMSCrypto_SignedHash(t *testing.T) {
 	t.Parallel()
@@ -213,10 +262,18 @@ func TestMCMSCrypto_SignedHash(t *testing.T) {
 	fmt.Println("\n-- Output Values (for Daml tests) --")
 	fmt.Printf("signedHash = \"%s\"\n", signedHash)
 
+	// Verify the expected hash (must match Daml's computeSignedHashNative)
+	// With proper timestamp encoding (Unix 1700000000 = 0x6553f100):
+	// innerData = root || "000000000000000000000000000000000000000000000000000000006553f100"
+	// innerHash = keccak256(innerData)
+	// signedHash = keccak256("\x19Ethereum Signed Message:\n32" || innerHash)
+	expectedHash := "a96a392cce9d743dccbf235388ca4f72c050e5ec7f3c6913312d277b75522212"
+	require.Equal(t, expectedHash, signedHash, "signedHash must match Daml's computeSignedHashNative")
+
 	// Verify it's deterministic
 	signedHash2 := ComputeSignedHash(root, validUntil)
 	require.Equal(t, signedHash, signedHash2)
-	fmt.Println("\n✓ Signed hash is deterministic")
+	fmt.Println("\n✓ Signed hash is deterministic and matches expected value")
 }
 
 // TestMCMSCrypto_MerkleTree tests Merkle tree construction and proofs

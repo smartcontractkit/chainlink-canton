@@ -210,12 +210,11 @@ func ComputeSignedHash(root string, validUntil time.Time) string {
 	return hex.EncodeToString(crypto.Keccak256(prefixedData))
 }
 
-// TimeToHex converts time to 32-byte hex (matching Canton's placeholder)
-// Canton currently uses padLeft32 "0" - we match that for compatibility
+// TimeToHex converts time to 32-byte hex (matching ABI encoding of uint32)
+// Encodes Unix timestamp in seconds, left-padded to 32 bytes
 func TimeToHex(t time.Time) string {
-	// For now, match Canton's placeholder implementation
-	// TODO: Implement proper timestamp encoding when Canton updates
-	return strings.Repeat("0", 64)
+	unixSeconds := t.Unix()
+	return PadLeft32(fmt.Sprintf("%x", unixSeconds))
 }
 
 // HashOpLeaf hashes an operation to get its Merkle leaf

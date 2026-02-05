@@ -86,13 +86,13 @@ externalBypasserSignatures : [RawSignature]
 externalBypasserSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "abf9430583e6e6818f55573bbefb1031bde0576e8b760b80cf2739a3ea1032ed"
-      , s = "6f42d36d2fa9c5c03e85b054c859d2bf7fa53c52c850fb2234c40a33e850a826"
+      , r = "77595c7c914b6bac8d4b1c845861603d024d8dd26989ee5425792325d1cf1cc3"
+      , s = "329acc44efb5700cbe78ce65c9270b2a5786112e247ce172bc12b85e0b93f2f8"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "c42ef80cf07cbcf42336acad98756232bfbffa7728696fc75bf24988dace7b9e"
-      , s = "65b4ad11847b380b28bb43b04b62bcfb7eab9f47c37d54e3f98a1bf11106fd06"
+      , r = "4201e9762ad1d3a862d30032938f908f0ab150e72b1e9db4cf836fdc1aa80d91"
+      , s = "1cbf89b7a23863b79d0a6192bccee247fc614f4b5d5e749c5db581234b549fe3"
       }
   ]
 
@@ -136,13 +136,13 @@ externalScheduleSignatures : [RawSignature]
 externalScheduleSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "82e5962f020af98929935681ed70cbcb5dea88fa62a951ea51331ce8e6ec732c"
-      , s = "3e8b9cced26c6de97b90122babf06ca518b14256d29c11a63300074fc1f781ce"
+      , r = "a6812d71e15691c9a868eb1b7fae27363652950097e171f5b547fd324ee0577d"
+      , s = "1fc7064bb6773d0619cfa2ccca2fd5457089abae549f976e0cd7769912a5303c"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "42b422d8f9445ebaff2f0bfe5e103a26bb6d1fbbb8d45b18ee4f77791ae81310"
-      , s = "1977f53aede420b9e76d30e779ab0ef304039c9977ef353a529af3bbd548b654"
+      , r = "5676ac6af3dd74f5945d55d1eea750d0eedf273d005a7edc06cb09b86e5c0158"
+      , s = "2503feb40e40893910173f1510d551f30753c17d263b888c0307795ab849cd72"
       }
   ]
 

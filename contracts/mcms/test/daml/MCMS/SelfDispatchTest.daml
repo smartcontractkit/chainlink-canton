@@ -85,13 +85,13 @@ timelockScheduleSignatures : [RawSignature]
 timelockScheduleSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "9fd1da548b00aa1b6e486ce9d79c2a90c4f258a50907c6dbf18eead208241ead"
-      , s = "4ebf5e4d51834e32b012be77406572f69497d8abd3f4b1c5b96b5cf4a043c3cd"
+      , r = "21e1827817a408b503f087db6ce5d91083bd7915f9699920513f68ec738bd7e7"
+      , s = "30bf07c1951b371a91306cc67a577f62a43e20062bd835a26b62c9392d0c076a"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "79b006c16eda5976aff94f111e6f38c5ebfab69304d2ae11181cba0fa91f996d"
-      , s = "56a9512b9ecd2d992532e057d3d01b878e8c4beb6ad73f7ce1d4981edae421ae"
+      , r = "d15d1cffc411122aeca1738d366a5d5f580d0dd2799803fb9135b694c61135ef"
+      , s = "65471931f6e0dec00fa4b5003de28ae86c04e85aa91101e881e1f7bf797eb3fd"
       }
   ]
 
@@ -132,13 +132,13 @@ timelockBypasserSignatures : [RawSignature]
 timelockBypasserSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "94211331944aa65c7ba3f2bac2570f68ca9c1c534c2c8cba53105be5ff925d9c"
-      , s = "494416a24ce7bfbaa0a35504752c8209cc3eaf46e8eb05eedb2e6ec8cc2049e3"
+      , r = "4d19607646ca803fe3b4c2ae8d87077ad11b89f8cade2d660e2408f443e32249"
+      , s = "7f994716dfc77079d07d0ff4c5a53dbdb6086cf70cd6c0d2c7ce13ce1002a534"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "090d403e077de57bce888e062063ced13bf54a5e06f5486922c0d5b085f19857"
-      , s = "315fb88d5a936ee15a71cfd1d83b4e4aabd17119b01368c810b195ba1214ab74"
+      , r = "8633164138f73845986e2171fe130c493bcad5ccacac41aa1e386a0833b97bfd"
+      , s = "04d6f0a6adb533e2ad8b5e64af1f5e4662c710385ab3053a3b4df3fb587698f8"
       }
   ]
 

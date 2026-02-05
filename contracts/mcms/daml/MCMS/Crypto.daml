@@ -2,8 +2,8 @@ module MCMS.Crypto where
 
 import DA.Crypto.Text (BytesHex, keccak256, secp256k1WithEcdsaOnly)
 import DA.Text qualified as T
-import DA.Time (subTime)
-import DA.Date (Month(..), datetime)
+import DA.Time (subTime, convertRelTimeToMicroseconds, time)
+import DA.Date (Month(..), date)
 import MCMS.Types (Op(..), RootMetadata(..), TimelockCall(..))
 
 -- ===========================================================================
@@ -241,8 +241,17 @@ intToHexHelperTop : Int -> BytesHex -> BytesHex
 intToHexHelperTop 0 acc = acc
 intToHexHelperTop x acc = intToHexHelperTop (x / 16) (intToHexDigit (x % 16) <> acc)
 
+-- | Unix epoch (1970-01-01 00:00:00 UTC)
+epoch : Time
+epoch = time (date 1970 Jan 1) 0 0 0
+
+-- | Convert Time to Unix seconds
+timeToUnixSeconds : Time -> Int
+timeToUnixSeconds t = convertRelTimeToMicroseconds (subTime t epoch) / 1_000_000
+
+-- | Convert Time to 32-byte hex (matching ABI encoding of uint32)
 timeToHex : Time -> BytesHex
-timeToHex _ = padLeft32 "0"  -- Placeholder
+timeToHex t = padLeft32 (intToHex (timeToUnixSeconds t))
 
 asciiToHex : Text -> BytesHex
 asciiToHex t = asciiToHexHelperTop t ""
