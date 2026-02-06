@@ -13,6 +13,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.OffRamp
 import qualified CCIP.OnRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -60,6 +61,7 @@ interface ITokenPool where
         with
             tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             tokenInput : TokenInput
             caller : Party
         controller caller
@@ -76,6 +78,7 @@ interface ITokenPool where
             onRampCid : ContractId CCIP.OnRamp.OnRamp
             feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             caller : Party
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
