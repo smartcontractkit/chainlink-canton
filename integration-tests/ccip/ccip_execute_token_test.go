@@ -666,21 +666,6 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Call TokenPool_ReleaseFromTicket - receiver triggers their own release
 	// This is the real flow: receiver calls from their participant with their authorization
-	// Convert choiceContext from apiv2.Value to binding type
-	var choiceContextBinding lockreleasetokenpool.ChoiceContext
-	if choiceContext != nil && choiceContext.GetRecord() != nil {
-		err = ledger.RecordToStruct(choiceContext.GetRecord(), &choiceContextBinding)
-		require.NoError(t, err, "failed to convert choiceContext to binding type")
-	} else {
-		choiceContextBinding = lockreleasetokenpool.ChoiceContext{Values: types.TEXTMAP{}}
-	}
-
-	// Convert poolHoldingCids from []*apiv2.Value to []types.CONTRACT_ID
-	poolHoldingContractIds := make([]types.CONTRACT_ID, len(poolHoldingCids))
-	for i, cid := range poolHoldingCids {
-		poolHoldingContractIds[i] = types.CONTRACT_ID(cid.GetContractId())
-	}
-
 	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -689,19 +674,19 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenpool-interfaces", ModuleName: "CCIP.Interfaces.TokenPool", EntityName: "ITokenPool"},
 					ContractId: disclosedPool.ContractId,
 					Choice:     "TokenPool_ReleaseFromTicket",
-					ChoiceArgument: ledger.MapToValue(lockreleasetokenpool.LockReleaseTokenPoolReleaseFromTicket{
-						TokenReceiveTicketCid: types.CONTRACT_ID(tokenReceiveTicketCid),
-						TokenAdminRegistryCid: types.CONTRACT_ID(disclosedTar.ContractId),
-						TokenInput: lockreleasetokenpool.TokenInput{
-							TransferFactory: types.CONTRACT_ID(transferFactoryCid),
-							ExtraArgs: lockreleasetokenpool.ExtraArgs{
-								Context: choiceContextBinding,
-								Meta:    lockreleasetokenpool.Metadata{Values: types.TEXTMAP{}},
-							},
-							TokenPoolHoldings: poolHoldingContractIds,
-						},
-						Caller: types.PARTY(partyReceiver),
-					}),
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "tokenReceiveTicketCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: tokenReceiveTicketCid}}},
+						{Label: "tokenAdminRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTar.ContractId}}},
+						{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}}},
+							{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "context", Value: choiceContext},
+								{Label: "meta", Value: emptyMetadata},
+							}}}}},
+							{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: poolHoldingCids}}}},
+						}}}}},
+						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+					}}}},
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
@@ -750,17 +735,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 				CreatedEventBlob: createdEventBlob,
 			})
 		}
-		acceptContextValue, err := testhelpers.ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
+		acceptContext, err := testhelpers.ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
 		require.NoError(t, err)
-
-		// Convert acceptContext from apiv2.Value to binding type
-		var acceptContextBinding lockreleasetokenpool.ChoiceContext
-		if acceptContextValue != nil && acceptContextValue.GetRecord() != nil {
-			err = ledger.RecordToStruct(acceptContextValue.GetRecord(), &acceptContextBinding)
-			require.NoError(t, err, "failed to convert acceptContext to binding type")
-		} else {
-			acceptContextBinding = lockreleasetokenpool.ChoiceContext{Values: types.TEXTMAP{}}
-		}
 
 		_, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 			Commands: &apiv2.Commands{
@@ -770,12 +746,12 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
 						ContractId: pendingTransferInstructionCid,
 						Choice:     "TransferInstruction_Accept",
-						ChoiceArgument: ledger.MapToValue(lockreleasetokenpool.TransferInstructionAccept{
-							ExtraArgs: lockreleasetokenpool.ExtraArgs{
-								Context: acceptContextBinding,
-								Meta:    lockreleasetokenpool.Metadata{Values: types.TEXTMAP{}},
-							},
-						}),
+						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "context", Value: acceptContext},
+								{Label: "meta", Value: emptyMetadata},
+							}}}}},
+						}}}},
 					}},
 				}},
 				ActAs:              []string{partyReceiver},
@@ -841,3 +817,10 @@ func buildTokenTransferV1(amount *big.Int, sourcePoolOwner, destTokenAddressHex,
 		ExtraData:          []byte{},
 	}
 }
+
+var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+	{
+		Label: "values",
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
+	},
+}}}}
