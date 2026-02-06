@@ -22,9 +22,9 @@ template OffRamp
     with
         instanceId : Text
         ccipOwner : Party
-        globalConfigInstanceAddress : RawInstanceAddress
-        rmnRemoteInstanceAddress : RawInstanceAddress
-        tokenAdminRegistryInstanceAddress : RawInstanceAddress
+        globalConfigInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory ccipOwner
 
@@ -32,11 +32,11 @@ template OffRamp
         -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
         -- Includes receiver's required CCVs since they're executing the message.
         -- Note: pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs.
-        nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVsForExecute : [CCIP.RawInstanceAddress.RawInstanceAddress]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                receiverRequiredCCVs : [RawInstanceAddress]
+                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 sourceChainSelector : Numeric 0
                 hasTokenTransfer : Bool
                 instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
@@ -66,7 +66,7 @@ template OffRamp
         nonconsuming choice ExecuteFromRouter : ExecuteFromRouterResult
             with
                 routerPartyOwner : Party
-                receiverRequiredCCVs : [RawInstanceAddress]
+                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
 
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -92,11 +92,24 @@ template OffRamp
                 assertMsg "offramp: message not for this party"
                     (message.receiver == expectedReceiverAddr)
 
-                -- Fetch and verify global config
-                -- Validate GlobalConfig instance address
+                -- Validate dependency instance addresses
                 globalConfig <- fetch globalConfigCid
-                assertMsg "offramp: globalconfig ccipowner mismatch"
-                    (globalConfig.ccipOwner == ccipOwner)
+                CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner globalConfigInstanceAddress
+
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "offramp: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                CCIP.RawInstanceAddress.assertEqual "offramp: tokenadminregistry instance address mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner tokenAdminRegistryInstanceAddress
+
+                -- Check RMN curse for source chain
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = ccipOwner
+                    chainSelector = message.sourceChainSelector
+                assertMsg "offramp: source chain is cursed" (not isCursed)
 
                 sourceConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetSourceChainConfig with
