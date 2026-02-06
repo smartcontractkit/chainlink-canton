@@ -2,13 +2,16 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -71,115 +74,165 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			}
 
 			// Find contract by InstanceAddress
-			createEvent, err := FindCreateEventByInstanceAddress(b.GetContext(), b.Logger, deps.BindingClient, deps.Party, params.Template.GetTemplateID(), input.InstanceAddress)
+			contractID, err := FindContractIDByInstanceAddress(b.GetContext(), b.Logger, deps.StateServiceClient, deps.Party, params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
-			exerciseCommand := params.Method(createEvent.ContractID, input.Args)
 
-			submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(b.GetContext(), &model.SubmitAndWaitRequest{
-				Commands: &model.Commands{
-					CommandID: uuid.Must(uuid.NewUUID()).String(),
+			// Get template ID and choice name from the method
+			exerciseCommand := params.Method(contractID, input.Args)
+
+			// Parse template ID to get package ID, module name, and entity name
+			packageID, moduleName, entityName, err := parseTemplateIDFromString(exerciseCommand.TemplateID)
+			if err != nil {
+				return ExerciseOutput{}, fmt.Errorf("failed to parse template ID %s: %w", exerciseCommand.TemplateID, err)
+			}
+
+			// Convert args struct to ledger.MapToValue for ChoiceArgument
+			choiceArgument := ledger.MapToValue(input.Args)
+
+			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+				Commands: &apiv2.Commands{
+					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,
-					Commands:  []*model.Command{{Command: exerciseCommand}},
-				}},
-			)
+					Commands: []*apiv2.Command{{
+						Command: &apiv2.Command_Exercise{
+							Exercise: &apiv2.ExerciseCommand{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  packageID,
+									ModuleName: moduleName,
+									EntityName: entityName,
+								},
+								ContractId:     contractID,
+								Choice:         exerciseCommand.Choice,
+								ChoiceArgument: choiceArgument,
+							},
+						},
+					}},
+				},
+			})
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to submit exercise command: %w", err)
 			}
 
+			// Note: apiv2.SubmitAndWaitForTransactionResponse doesn't expose UpdateId directly
+			// The transaction was successfully submitted, which is what matters
 			return ExerciseOutput{
 				ChainSelector: input.ChainSelector,
 				ExecInfo: &ExecInfo{
-					UpdateID: submitResp.UpdateID,
+					UpdateID: submitResp.GetTransaction().GetUpdateId(),
 				},
 			}, nil
 		},
 	)
 }
 
-func FindCreateEventByInstanceAddress(ctx context.Context, logger logger.Logger, bindingClient *client.DamlBindingClient, party, templateId string, instanceAddress contracts.InstanceAddress) (*model.CreatedEvent, error) {
-	currentOffset, err := bindingClient.StateService.GetLedgerEnd(ctx, &model.GetLedgerEndRequest{})
+// FindContractIDByInstanceAddress finds a contract ID by its instance address
+func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, stateService apiv2.StateServiceClient, party, templateId string, instanceAddress contracts.InstanceAddress) (string, error) {
+	ledgerEndResp, err := stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ledger end: %w", err)
+		return "", fmt.Errorf("failed to get ledger end: %w", err)
 	}
-	responseChan, errChan := bindingClient.StateService.GetActiveContracts(ctx, &model.GetActiveContractsRequest{
-		ActiveAtOffset: currentOffset.Offset,
-		EventFormat: &model.EventFormat{
-			FiltersByParty: map[string]*model.Filters{
+
+	// Parse template ID to get package ID, module name, and entity name
+	packageID, moduleName, entityName, err := parseTemplateIDFromString(templateId)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template ID: %w", err)
+	}
+
+	activeContractsResp, err := stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: ledgerEndResp.GetOffset(),
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
 				party: {
-					Inclusive: &model.InclusiveFilters{
-						TemplateFilters: []*model.TemplateFilter{
-							{
-								TemplateID:              templateId,
-								IncludeCreatedEventBlob: false,
+					Cumulative: []*apiv2.CumulativeFilter{
+						{
+							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+								TemplateFilter: &apiv2.TemplateFilter{
+									TemplateId: &apiv2.Identifier{
+										PackageId:  packageID,
+										ModuleName: moduleName,
+										EntityName: entityName,
+									},
+									IncludeCreatedEventBlob: false,
+								},
 							},
 						},
 					},
 				},
 			},
-			// Verbose is needed for the record labels to be returned
 			Verbose: true,
 		},
 	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get active contracts: %w", err)
+	}
+	defer activeContractsResp.CloseSend()
 
-	var createEvent *model.CreatedEvent
-
+	var contractID string
 	for {
-		select {
-		case resp, ok := <-responseChan:
-			if !ok {
-				// Channel closed, stream ended
-				if createEvent == nil {
-					return nil, fmt.Errorf("no active contract found for InstanceAddress %s", instanceAddress.String())
-				}
-
-				return createEvent, nil
+		activeContract, err := activeContractsResp.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
 			}
-			if resp != nil && resp.ContractEntry != nil {
-				if entry, ok := resp.ContractEntry.(*model.ActiveContractEntry); ok {
-					// Compare the instanceId field
 
-					createArguments, ok := entry.ActiveContract.CreatedEvent.CreateArguments.(*v2.Record)
-					if !ok {
-						logger.Debugw("Skipping contract with unexpected create arguments type", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
-						continue
-					}
-					var contractInstanceId string
-					for _, field := range createArguments.GetFields() {
-						if field.GetLabel() == "instanceId" {
-							contractInstanceId = field.GetValue().GetText()
-							break
-						}
-					}
-					if contractInstanceId == "" {
-						logger.Debugw("Skipping contract with missing instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID)
-						continue
-					}
-					instanceID := contracts.InstanceID(contractInstanceId)
-					if !instanceID.Valid() {
-						logger.Debugw("Skipping contract with invalid instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID, "instanceId", contractInstanceId)
-						continue
-					}
-					if instanceAddress != instanceID.InstanceAddress() {
-						// Not the contract we're looking for
-						logger.Debugw("Skipping contract with different instanceId field", "contractID", entry.ActiveContract.CreatedEvent.ContractID, "instanceId", contractInstanceId)
-						continue
-					}
+			return "", fmt.Errorf("failed to receive active contracts: %w", err)
+		}
 
-					if createEvent != nil {
-						// contract was already found. This is an error, InstanceID must be unique
-						return nil, fmt.Errorf("multiple active contracts found for InstanceID %s", instanceID.String())
-					}
-					createEvent = entry.ActiveContract.CreatedEvent
+		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+			createArguments := c.ActiveContract.GetCreatedEvent().GetCreateArguments()
+			if createArguments == nil {
+				logger.Debugw("Skipping contract with nil create arguments", "contractID", c.ActiveContract.GetCreatedEvent().ContractId)
+				continue
+			}
+
+			var contractInstanceId string
+			for _, field := range createArguments.GetFields() {
+				if field.GetLabel() == "instanceId" {
+					contractInstanceId = field.GetValue().GetText()
+					break
 				}
 			}
-		case err := <-errChan:
-			if err != nil {
-				return nil, fmt.Errorf("failed to get active contracts: %w", err)
+			if contractInstanceId == "" {
+				logger.Debugw("Skipping contract with missing instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId)
+				continue
 			}
-		case <-ctx.Done():
-			return nil, ctx.Err()
+
+			instanceID := contracts.InstanceID(contractInstanceId)
+			if !instanceID.Valid() {
+				logger.Debugw("Skipping contract with invalid instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "instanceId", contractInstanceId)
+				continue
+			}
+
+			if instanceAddress != instanceID.InstanceAddress() {
+				logger.Debugw("Skipping contract with different instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "instanceId", contractInstanceId)
+				continue
+			}
+
+			if contractID != "" {
+				return "", fmt.Errorf("multiple active contracts found for InstanceID %s", instanceID.String())
+			}
+			contractID = c.ActiveContract.GetCreatedEvent().ContractId
 		}
 	}
+
+	if contractID == "" {
+		return "", fmt.Errorf("no active contract found for InstanceAddress %s", instanceAddress.String())
+	}
+
+	return contractID, nil
+}
+
+// parseTemplateIDFromString parses a template ID string like "#package:Module:Entity" into its components
+func parseTemplateIDFromString(templateID string) (packageID, moduleName, entityName string, err error) {
+	if !strings.HasPrefix(templateID, "#") {
+		return "", "", "", fmt.Errorf("template ID must start with #")
+	}
+	parts := strings.Split(templateID, ":")
+	if len(parts) != 3 {
+		return "", "", "", fmt.Errorf("template ID must have format #package:module:entity, got: %s", templateID)
+	}
+
+	return parts[0], parts[1], parts[2], nil
 }

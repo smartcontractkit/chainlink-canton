@@ -3,10 +3,13 @@ package changesets
 import (
 	"fmt"
 
-	"github.com/noders-team/go-daml/pkg/client"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/noders-team/go-daml/pkg/auth"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
@@ -38,21 +41,22 @@ func (c ConfigureChainForLanes) Apply(e cldf.Environment, config CantonCSDeps[Co
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	participant := chain.Participants[config.Participant]
 
-	// TODO: change bindings to allow passing a JWT provider directly
 	token, err := participant.JWTProvider.Token(e.GetContext())
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get JWT: %w", err)
 	}
 
-	bindingClient, err := client.NewDamlClient(token, participant.Endpoints.GRPCLedgerAPIURL).Build(e.GetContext())
+	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	ledgerApiClient, err := grpc.NewClient(participant.Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
 	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create Daml binding client: %w", err)
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create gRPC ledger API client: %w", err)
 	}
 
 	deps := dependencies.CantonDeps{
-		Chain:         chain,
-		BindingClient: bindingClient,
-		Party:         config.Party,
+		Chain:                chain,
+		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
+		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
+		Party:                config.Party,
 	}
 
 	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.ConfigureChainForLanes, deps, config.Config.Input)
