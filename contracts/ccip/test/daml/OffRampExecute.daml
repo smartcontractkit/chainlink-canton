@@ -15,7 +15,8 @@ import CCIP.Internal qualified as Internal
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OffRamp qualified as OffRamp
 import CCIP.PerPartyRouter qualified as PerPartyRouter
-import CCIP.RawInstanceAddress qualified as RawInstanceAddress
+import qualified CCIP.RawInstanceAddress
+import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 
 
@@ -32,10 +33,20 @@ import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 -- CCV requirement checking works, and execute succeeds when CCV requirements are satisfied.
 testExecuteWithCCVTicket = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     receiver <- allocateParty "receiver"
 
     let sourceChainSelector : Numeric 0 = 123.0
     let destChainSelector : Numeric 0 = 456.0
+
+    let globalConfigInstanceId = "test-globalconfig"
+    let rmnInstanceId = "test-rmn"
+    let tokenAdminRegistryInstanceId = "test-tar"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Deploy CCVRegistry for issuing verification tickets
     ccvRegistry <- submit ccipOwner do
@@ -46,12 +57,12 @@ testExecuteWithCCVTicket = script do
     -- Build CCV raw instance address and 32-byte hash
     let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
     let ccvInstanceId = "test-ccv-committee"
-    let ccvRawAddress = RawInstanceAddress.make ccvInstanceId ccipOwner
+    let ccvRawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccipOwner
 
     -- Deploy GlobalConfig with lane-mandated CCV requirement (uses raw instance addresses)
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
-            instanceId = "test-globalconfig"
+            instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -62,18 +73,29 @@ testExecuteWithCCVTicket = script do
                 laneMandatedCCVs = [ccvRawAddress]  -- Require this CCV raw instance address for verification
                 defaultCCVs = [])]
 
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- Deploy TokenAdminRegistry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
-            instanceId = "test-tar"
+            instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- Deploy OffRamp
+    -- Deploy OffRamp with instance address fields
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
             instanceId = "test-offramp"
             ccipOwner = ccipOwner
+            globalConfigInstanceAddress = globalConfigInstanceAddress
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router for receiver
     factory <- submit ccipOwner do
@@ -128,10 +150,12 @@ testExecuteWithCCVTicket = script do
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Execute via PerPartyRouter with CCVVerifyTicket
-    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
+    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
+            rmnRemoteCid = rmnRemote
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -153,19 +177,29 @@ testExecuteWithCCVTicket = script do
 -- Verifies that lane-mandated CCVs must be provided.
 testExecuteFailsMissingCCV = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     receiver <- allocateParty "receiver"
 
     let sourceChainSelector : Numeric 0 = 123.0
     let destChainSelector : Numeric 0 = 456.0
 
+    let globalConfigInstanceId = "test-globalconfig-missing"
+    let rmnInstanceId = "test-rmn-missing"
+    let tokenAdminRegistryInstanceId = "test-tar-missing"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
     -- Build CCV raw instance address
     let ccvInstanceId = "test-ccv-committee-missing"
-    let ccvRawAddress = RawInstanceAddress.make ccvInstanceId ccipOwner
+    let ccvRawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccipOwner
 
     -- Deploy GlobalConfig with lane-mandated CCV requirement (uses raw instance addresses)
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
-            instanceId = "test-globalconfig-missing"
+            instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -176,18 +210,29 @@ testExecuteFailsMissingCCV = script do
                 laneMandatedCCVs = [ccvRawAddress]  -- Require this CCV raw instance address
                 defaultCCVs = [])]
 
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- Deploy TokenAdminRegistry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
-            instanceId = "test-tar-missing"
+            instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- Deploy OffRamp
+    -- Deploy OffRamp with instance address fields
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
             instanceId = "test-offramp-missing"
             ccipOwner = ccipOwner
+            globalConfigInstanceAddress = globalConfigInstanceAddress
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router
     factory <- submit ccipOwner do
@@ -225,10 +270,12 @@ testExecuteFailsMissingCCV = script do
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Execute WITHOUT providing the required CCVVerifyTicket - should fail
-    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
+    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
+            rmnRemoteCid = rmnRemote
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -246,16 +293,26 @@ testExecuteFailsMissingCCV = script do
 -- Verifies receiver validation in OffRamp.
 testExecuteWrongReceiver = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     receiver <- allocateParty "receiver"
     otherParty <- allocateParty "other-party"
 
     let sourceChainSelector : Numeric 0 = 123.0
     let destChainSelector : Numeric 0 = 456.0
 
+    let globalConfigInstanceId = "test-globalconfig-wrongrecv"
+    let rmnInstanceId = "test-rmn-wrongrecv"
+    let tokenAdminRegistryInstanceId = "test-tar-wrongrecv"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
     -- Deploy GlobalConfig (no CCV requirements for simplicity)
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
-            instanceId = "test-globalconfig-wrongrecv"
+            instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
@@ -266,18 +323,29 @@ testExecuteWrongReceiver = script do
                 laneMandatedCCVs = []  -- No CCV requirements
                 defaultCCVs = [])]
 
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- Deploy TokenAdminRegistry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
-            instanceId = "test-tar-wrongrecv"
+            instanceId = tokenAdminRegistryInstanceId
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- Deploy OffRamp
+    -- Deploy OffRamp with instance address fields
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
             instanceId = "test-offramp-wrongrecv"
             ccipOwner = ccipOwner
+            globalConfigInstanceAddress = globalConfigInstanceAddress
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router for receiver
     factory <- submit ccipOwner do
@@ -315,10 +383,12 @@ testExecuteWrongReceiver = script do
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Execute should fail: message receiver address != router partyOwner address
-    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
+    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
+            rmnRemoteCid = rmnRemote
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry

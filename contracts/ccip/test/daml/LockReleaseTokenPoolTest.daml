@@ -13,6 +13,8 @@ import CCIP.FeeQuoter qualified as FeeQuoter
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.OnRamp qualified as OnRamp
+import qualified CCIP.RawInstanceAddress
+import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.Tickets qualified as Tickets
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 
@@ -25,20 +27,38 @@ import TestToken qualified
 -- | Test LockOrBurn transfers tokens from sender to pool.
 testLockOrBurn = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     poolOwner <- allocateParty "pool-owner"
     sender <- allocateParty "sender"
 
     let destChainSelector : Numeric 0 = 456.0
 
+    let globalConfigInstanceId = "test-globalconfig"
+    let rmnInstanceId = "test-rmn"
+    let tokenAdminRegistryInstanceId = "test-tar"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "TestToken"
+
+    -- Deploy RMNRemote
+    _rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
 
     -- Deploy TokenAdminRegistry and register pool
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             owner = ccipOwner
-            instanceId = "test-tar"
+            instanceId = tokenAdminRegistryInstanceId
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
@@ -85,6 +105,9 @@ testLockOrBurn = script do
         createCmd OnRamp.OnRamp with
             ccipOwner = ccipOwner
             instanceId = "test-onramp"
+            globalConfigInstanceAddress = globalConfigInstanceAddress
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
     feeQuoter <- submit ccipOwner do
         createCmd FeeQuoter.FeeQuoter with

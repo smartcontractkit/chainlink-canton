@@ -13,24 +13,32 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import qualified CCIP.RawInstanceAddress
+import qualified CCIP.RMNRemote
 import qualified CCIP.TokenAdminRegistry
 
 
 -- | test ccip send via perpartyrouter.
 testCCIPSend = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     user <- allocateParty "user"
 
     let globalConfigInstanceId = "test-globalconfig"
     let onRampInstanceId = "test-onramp"
+    let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
     -- deploy global config
-    let defaultExecutor = RawInstanceAddress ("default-executor@" <> partyToText ccipOwner)
+    let defaultExecutor = CCIP.RawInstanceAddress.make "default-executor" ccipOwner
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
@@ -45,6 +53,14 @@ testCCIPSend = script do
                 defaultCCVs = [])]
             sourceChainConfigs = Map.empty
 
+    -- deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- deploy token admin registry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
@@ -52,11 +68,14 @@ testCCIPSend = script do
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- deploy onramp
+    -- deploy onramp with instance address fields
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            globalConfigInstanceAddress = globalConfigInstanceAddress
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
     -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
@@ -76,16 +95,18 @@ testCCIPSend = script do
     let router = createResult.router
     let factory = createResult.factory
 
-    -- disclose onramp, globalconfig, and tokenAdminRegistry to user
+    -- disclose onramp, globalconfig, tokenAdminRegistry, and rmnRemote to user
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- user sends ccip message (ccipOwner acts via PerPartyRouter signatory)
     -- user passes globalConfigCid via explicit disclosure
     let receiver = CCIP.MessageCodecV1.encodePartyAddress user
-    sendResult <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
+    sendResult <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.CCIPSend with
+            rmnRemoteCid = rmnRemote
             onRampCid = onRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -107,8 +128,9 @@ testCCIPSend = script do
     debug ("message sent: " <> show sendResult.messageId)
 
     -- send another message, sequence number should be 2
-    sendResult2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
+    sendResult2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd newRouter CCIP.PerPartyRouter.CCIPSend with
+            rmnRemoteCid = rmnRemote
             onRampCid = onRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -131,14 +153,21 @@ testCCIPSend = script do
 -- | test ccip execute via perpartyrouter.
 testCCIPExecute = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     receiver <- allocateParty "receiver"
 
     let globalConfigInstanceId = "test-globalconfig"
     let offRampInstanceId = "test-offramp"
+    let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- deploy global config
     globalConfig <- submit ccipOwner do
@@ -154,6 +183,14 @@ testCCIPExecute = script do
                 laneMandatedCCVs = []
                 defaultCCVs = [])]
 
+    -- deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- deploy token admin registry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
@@ -161,11 +198,14 @@ testCCIPExecute = script do
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- deploy offramp
+    -- deploy offramp with instance address fields
     offRamp <- submit ccipOwner do
         createCmd CCIP.OffRamp.OffRamp with
             instanceId = offRampInstanceId
             ccipOwner = ccipOwner
+            globalConfigInstanceAddress = globalConfigInstanceAddress
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
     -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
@@ -203,16 +243,18 @@ testCCIPExecute = script do
 
     let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
 
-    -- disclose offramp, globalconfig, tokenadminregistry to receiver
+    -- disclose offramp, globalconfig, tokenadminregistry, rmnRemote to receiver
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- receiver executes the message (ccipOwner acts via PerPartyRouter signatory)
     -- receiver passes all cids via explicit disclosure
     -- no token transfer, so tokenPoolCCVTicket is None and no TokenReceiveTicket will be created
-    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry) do
+    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.Execute with
+            rmnRemoteCid = rmnRemote
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
