@@ -8,11 +8,14 @@ import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.CCVRegistry qualified as CCVRegistry
+import qualified CCIP.RawInstanceAddress
+import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
 
 setup = script do
     owner <- allocateParty "owner"
+    rmnOwner <- allocateParty "rmn-owner"
 
     let msg = PayloadBuilder.testMessage1
     let encodedMsg = PayloadBuilder.testMessage1Encoded
@@ -26,6 +29,18 @@ setup = script do
         createCmd CCVRegistry.CCVRegistry with
             ccipOwner = owner
             instanceId = "test-ccvregistry"
+
+    let rmnInstanceId = "test-rmn"
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = owner
+            cursedSubjects = []
+
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Validate signatures individually
     forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
@@ -49,9 +64,11 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 1
             signers = pubKeys1
-    submit owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+    submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults = verifierResults1
             receiver = owner
@@ -73,9 +90,11 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 3
             signers = pubKeys2
-    submit owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+    submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults = verifierResults2
             receiver = owner
@@ -97,6 +116,7 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 20
             signers = pubKeys3
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
     debug ("===== Passed Test3 =====")
 
     debug ("===== Test4 =====")
@@ -113,9 +133,11 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 3
             signers = pubKeys4
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults = verifierResults4
             receiver = owner
@@ -136,9 +158,11 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 4
             signers = pubKeys5
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults = verifierResults5
             receiver = owner
@@ -159,9 +183,11 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 3
             signers = pubKeys6
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults = verifierResults6
             receiver = owner
@@ -180,6 +206,7 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 0
             signers = []
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
     debug ("===== Passed Test7 =====")
 
     debug ("===== Test8 =====")
@@ -194,6 +221,7 @@ setup = script do
             storageLocation = ""
             threshold = 1
             signers = PayloadBuilder.getPubkeysForIndices [0]
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
     debug ("===== Passed Test8 =====")
 
     debug ("===== Test9 =====")
@@ -209,9 +237,11 @@ setup = script do
             storageLocation = "ipfs://example"
             threshold = 2
             signers = pubKeys9
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults =
                 "01234567" <> -- invalid version tag
@@ -219,9 +249,10 @@ setup = script do
                 "deadbeef"    -- invalid signature data
             receiver = owner
             caller = owner
-    submitMustFail owner do
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
@@ -229,9 +260,10 @@ setup = script do
                 "deadbeef"    -- invalid signature data
             receiver = owner
             caller = owner
-    submitMustFail owner do
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
+            rmnRemoteCid = rmnRemote
             message = msg
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag

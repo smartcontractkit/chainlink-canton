@@ -132,6 +132,7 @@ testLockOrBurn = script do
             chainCCVRequirements = Map.empty
             poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
 
     -- Build message with token amount (5 tokens)
     let message = Client.Canton2AnyMessage with
@@ -163,11 +164,13 @@ testLockOrBurn = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner _rmnRemote
 
     -- Call LockOrBurn
     result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
                       <> disclose disclosedPool <> disclose disclosedTar
-                      <> disclose disclosedFactory <> disclose disclosedPreapproval) do
+                      <> disclose disclosedFactory <> disclose disclosedPreapproval
+                      <> disclose disclosedRmnRemote) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
             destChainSelector = destChainSelector
             message = message
@@ -177,6 +180,7 @@ testLockOrBurn = script do
             onRampCid = onRamp
             feeQuoterCid = feeQuoter
             tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = _rmnRemote
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -201,10 +205,13 @@ testLockOrBurn = script do
 -- | Test ReleaseFromTicket transfers tokens from pool to receiver.
 testReleaseFromTicket = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     poolOwner <- allocateParty "pool-owner"
     receiver <- allocateParty "receiver"
 
     let sourceChainSelector : Numeric 0 = 123.0
+    let rmnInstanceId = "test-rmn-release"
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
 
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -230,6 +237,14 @@ testReleaseFromTicket = script do
             admin = ccipOwner
             preapprovalCid = Some receiverPreapproval
 
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- Deploy TokenAdminRegistry
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
@@ -248,6 +263,7 @@ testReleaseFromTicket = script do
             chainCCVRequirements = Map.empty
             poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates)
     tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
@@ -272,14 +288,16 @@ testReleaseFromTicket = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Call ReleaseFromTicket
     result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
                       <> disclose disclosedTar <> disclose disclosedFactory
-                      <> disclose disclosedPreapproval) do
+                      <> disclose disclosedPreapproval <> disclose disclosedRmnRemote) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = rmnRemote
             tokenInput = tokenInput
             caller = receiver
 
