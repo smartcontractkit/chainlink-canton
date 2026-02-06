@@ -26,6 +26,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
+import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -69,6 +70,7 @@ template LockReleaseTokenPool
         poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
+        rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory poolOwner
 
@@ -103,6 +105,7 @@ template LockReleaseTokenPool
                     with
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         tokenInput = arg.tokenInput
                         caller = arg.caller
 
@@ -117,6 +120,7 @@ template LockReleaseTokenPool
                         onRampCid = arg.onRampCid
                         feeQuoterCid = arg.feeQuoterCid
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         caller = arg.caller
 
         -- Get required CCV raw instance addresses based on chain and direction.
@@ -182,12 +186,22 @@ template LockReleaseTokenPool
             with
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
             controller caller
             do
                 -- Fetch and validate the ticket
                 ticket <- fetch tokenReceiveTicketCid
+
+                -- Validate RMN instance and check source chain curse
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "pool: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = poolOwner
+                    chainSelector = ticket.sourceChainSelector
+                assertMsg "pool: source chain is cursed" (not isCursed)
                 assertMsg "TokenReceiveTicket instrumentId mismatch" (ticket.instrumentId == instrumentId)
                 assertMsg "TokenReceiveTicket poolOwner mismatch" (ticket.poolOwner == poolOwner)
 
@@ -255,9 +269,19 @@ template LockReleaseTokenPool
                 onRampCid : ContractId CCIP.OnRamp.OnRamp
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 caller : Party
             controller caller, poolOwner
             do
+                -- Validate RMN instance and check destination chain curse
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "pool: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = poolOwner
+                    chainSelector = destChainSelector
+                assertMsg "pool: destination chain is cursed" (not isCursed)
+
                 -- Find token amount for this pool's instrument
                 let matchingAmounts = filter (\ta -> ta.instrumentId == instrumentId) message.tokenAmounts
                 assertMsg "LockOrBurn: no matching token amount for this pool's instrument"
