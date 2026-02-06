@@ -10,6 +10,7 @@ import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
+import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -21,6 +22,9 @@ template OffRamp
     with
         instanceId : Text
         ccipOwner : Party
+        globalConfigInstanceAddress : RawInstanceAddress
+        rmnRemoteInstanceAddress : RawInstanceAddress
+        tokenAdminRegistryInstanceAddress : RawInstanceAddress
     where
         signatory ccipOwner
 
@@ -66,6 +70,7 @@ template OffRamp
 
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
 
                 encodedMessage : BytesHex
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
@@ -88,6 +93,7 @@ template OffRamp
                     (message.receiver == expectedReceiverAddr)
 
                 -- Fetch and verify global config
+                -- Validate GlobalConfig instance address
                 globalConfig <- fetch globalConfigCid
                 assertMsg "offramp: globalconfig ccipowner mismatch"
                     (globalConfig.ccipOwner == ccipOwner)

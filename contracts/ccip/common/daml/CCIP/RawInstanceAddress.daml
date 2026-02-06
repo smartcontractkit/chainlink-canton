@@ -19,6 +19,12 @@ make instanceId owner =
     then error "RawInstanceAddress: instanceId cannot contain '@'"
     else RawInstanceAddress (instanceId <> "@" <> partyToText owner)
 
+-- | Asserts that a (instanceId, owner) pair matches the expected RawInstanceAddress.
+assertEqual : Text -> Text -> Party -> RawInstanceAddress -> Update ()
+assertEqual msg instanceId owner expected =
+    let computed = make instanceId owner
+    in assertMsg msg (computed == expected)
+
 -- | Convert to 32-byte hashed instance address for message encoding.
 toInstanceAddress : RawInstanceAddress -> BytesHex
 toInstanceAddress (RawInstanceAddress raw) =
