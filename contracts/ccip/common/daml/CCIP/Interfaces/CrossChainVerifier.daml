@@ -6,6 +6,7 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import qualified CCIP.CCVRegistry
+import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 
 interface ICrossChainVerifier where
@@ -18,6 +19,7 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
         with
             ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             message : MessageCodecV1.MessageV1
             verifierResults : BytesHex
             receiver : Party
@@ -29,6 +31,7 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_ForwardToVerifier : ContractId CCIP.Tickets.CCVTicket
         with
             ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             message : MessageCodecV1.MessageV1
             feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             feeTokenAmount : Decimal
