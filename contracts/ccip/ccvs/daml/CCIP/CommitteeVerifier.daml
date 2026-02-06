@@ -7,6 +7,8 @@ import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.CCVRegistry
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.RawInstanceAddress
+import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.Interfaces.CrossChainVerifier
 
@@ -29,6 +31,7 @@ template CommitteeVerifier
 
         threshold : Int
         signers : [BytesHex]
+        rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory owner
         ensure storageLocation /= "" && threshold > 0 && length signers >= threshold && versionTag /= ""
@@ -42,6 +45,7 @@ template CommitteeVerifier
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
                     with
                         ccvRegistryCid = arg.ccvRegistryCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         message = arg.message
                         verifierResults = arg.verifierResults
                         receiver = arg.receiver
@@ -51,6 +55,7 @@ template CommitteeVerifier
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
                     with
                         ccvRegistryCid = arg.ccvRegistryCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         message = arg.message
                         feeToken = arg.feeToken
                         feeTokenAmount = arg.feeTokenAmount
@@ -61,12 +66,22 @@ template CommitteeVerifier
         nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
             with
                 ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 message : CCIP.MessageCodecV1.MessageV1
                 verifierResults : BytesHex
                 receiver : Party
                 caller : Party
             controller caller
             do
+                -- Validate RMN instance and check source chain curse
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = owner
+                    chainSelector = message.sourceChainSelector
+                assertMsg "verifier: source chain is cursed" (not isCursed)
+
                 -- Verify version tag matches
                 let verifierVersion = fromSomeNote "Failed to extract verifier version" (CCIP.MessageCodecV1.extractBytes verifierResults 0 (byteCount versionTag))
                 assertMsg "Invalid CCV Version" (verifierVersion == versionTag)
@@ -109,6 +124,7 @@ template CommitteeVerifier
         nonconsuming choice CommitteeVerifier_ForwardToVerifier : ContractId CCIP.Tickets.CCVTicket
             with
                 ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 message : CCIP.MessageCodecV1.MessageV1
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
                 feeTokenAmount : Decimal
@@ -116,6 +132,15 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
+                -- Validate RMN instance and check destination chain curse
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = owner
+                    chainSelector = message.destChainSelector
+                assertMsg "verifier: destination chain is cursed" (not isCursed)
+
                 -- Compute instance address for receipt (registry will compute independently for validation)
                 let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId owner
 
