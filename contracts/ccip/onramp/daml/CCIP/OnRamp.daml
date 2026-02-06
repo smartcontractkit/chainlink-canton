@@ -8,8 +8,8 @@ import DA.Optional (isSome, catOptionals)
 
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
-import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
+import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -20,6 +20,9 @@ template OnRamp
     with
         instanceId : Text
         ccipOwner : Party
+        globalConfigInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory ccipOwner
 
@@ -27,7 +30,7 @@ template OnRamp
         -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
         -- Does NOT include sender's router CCVs - we don't know what the receiver requires.
         -- Note: pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs.
-        nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVsForSend : [CCIP.RawInstanceAddress.RawInstanceAddress]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -62,6 +65,7 @@ template OnRamp
             with
                 routerPartyOwner : Party
 
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
 
@@ -79,10 +83,24 @@ template OnRamp
             controller ccipOwner
             do
 
-                -- Fetch and validate global config
+                -- Validate dependency instance addresses
                 globalConfig <- fetch globalConfigCid
-                assertMsg "onramp: globalconfig ccipowner mismatch"
-                    (globalConfig.ccipOwner == ccipOwner)
+                CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner globalConfigInstanceAddress
+
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "onramp: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                CCIP.RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner tokenAdminRegistryInstanceAddress
+
+                -- Check RMN curse for destination chain
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = ccipOwner
+                    chainSelector = destChainSelector
+                assertMsg "onramp: destination chain is cursed" (not isCursed)
 
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetDestChainConfig with
