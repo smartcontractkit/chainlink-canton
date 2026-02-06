@@ -3,6 +3,7 @@ packages:
   - ccip/ccipreceiver
   - ccip/ccvs
   - ccip/common
+  - ccip/rmn
   - ccip/feequoter
   - ccip/tokenAdminRegistry
   - ccip/onramp
