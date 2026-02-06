@@ -2,6 +2,7 @@ package contract
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -172,9 +173,10 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 	for {
 		activeContract, err := activeContractsResp.Recv()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			return "", fmt.Errorf("failed to receive active contracts: %w", err)
 		}
 
@@ -231,5 +233,6 @@ func parseTemplateIDFromString(templateID string) (packageID, moduleName, entity
 	if len(parts) != 3 {
 		return "", "", "", fmt.Errorf("template ID must have format #package:module:entity, got: %s", templateID)
 	}
+
 	return parts[0], parts[1], parts[2], nil
 }

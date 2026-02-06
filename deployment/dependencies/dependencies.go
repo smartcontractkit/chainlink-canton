@@ -9,7 +9,7 @@ import (
 // TODO: use the CLDF cldf_chain.BlockChains directly instead once client & party have been added there
 
 type CantonDeps = struct {
-	Chain              canton.Chain
+	Chain                canton.Chain
 	CommandServiceClient apiv2.CommandServiceClient
 	StateServiceClient   apiv2.StateServiceClient
 	Party                string
