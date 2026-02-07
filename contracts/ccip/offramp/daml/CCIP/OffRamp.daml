@@ -26,6 +26,7 @@ template OffRamp
         globalConfigInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        ccvRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory ccipOwner
 
@@ -178,6 +179,11 @@ template OffRamp
                         assertMsg "offramp: source chain disabled" c.isEnabled
                         pure c
 
+                -- Decode instrument ID from token transfer (used for pool identity validation)
+                let optInstrumentId = case message.tokenTransfer of
+                        None -> None
+                        Some tt -> CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress
+
                 -- Consume tokenPoolCCVTicket if provided
                 poolHasRequirements <- case tokenPoolCCVTicket of
                     None -> pure False
@@ -187,11 +193,32 @@ template OffRamp
                             (ticket.ccipOwner == ccipOwner)
                         assertMsg "offramp: tokenPoolCCVTicket executingMessage mismatch"
                             (ticket.executingMessageCid == executingMessageCid)
+
+                        -- Validate pool identity against TokenAdminRegistry
+                        case optInstrumentId of
+                            Some instId -> do
+                                configOpt <- exercise tokenAdminRegistryCid
+                                    CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
+                                        instrumentId = instId
+                                        caller = ccipOwner
+                                case configOpt of
+                                    Some config -> do
+                                        (regPoolOwner, regPoolInstanceId) <- case (config.tokenPoolOwner, config.tokenPoolInstanceId) of
+                                            (Some po, Some pid) -> pure (po, pid)
+                                            _ -> abort "offramp: no pool registered for instrument"
+                                        let registeredPoolAddr = CCIP.RawInstanceAddress.make regPoolInstanceId regPoolOwner
+                                        CCIP.RawInstanceAddress.assertEqual
+                                            "offramp: tokenPoolCCVTicket pool instance address mismatch"
+                                            ticket.poolInstanceId ticket.poolOwner
+                                            registeredPoolAddr
+                                    None -> abort "offramp: no token config for instrument"
+                            None -> pure ()
+
                         -- Validate that pool's ticket CIDs are a subset of provided ccvVerifyTickets
                         Foldable.forA_ ticket.ccvVerifyTicketCids $ \poolTicketCid ->
                             assertMsg "offramp: pool CCV ticket not in provided tickets"
                                 (poolTicketCid `elem` ccvVerifyTickets)
-                        exercise ticketCid CCIP.Tickets.TokenPoolCCVVerifiedTicket_Consume
+                        exercise ticketCid CCIP.Tickets.TokenPoolCCVVerifiedTicket_Archive with caller = ccipOwner
                         pure (not (null ticket.ccvVerifyTicketCids))
 
                 -- Determine if defaults should apply (check raw addresses before conversion)
@@ -210,11 +237,12 @@ template OffRamp
                 let requiredCCVAddresses = dedup $
                         map CCIP.RawInstanceAddress.toInstanceAddress allRawAddrs
 
-                -- Process CCV verification tickets: validate executingMessageCid, compute addresses, archive
+                -- Process CCV verification tickets: validate registry instance address, compute addresses, archive
                 providedCCVAddresses <- forA ccvVerifyTickets $ \ticketCid -> do
                     ticket <- fetch ticketCid
-                    assertMsg "offramp: ccvverifyticket ccipowner mismatch"
-                        (ticket.ccipOwner == ccipOwner)
+                    CCIP.RawInstanceAddress.assertEqual "offramp: ccvverifyticket registry instance address mismatch"
+                        ticket.ccvRegistryInstanceId ticket.ccvRegistryOwner
+                        ccvRegistryInstanceAddress
                     assertMsg "offramp: ccvverifyticket executingMessage mismatch"
                         (ticket.executingMessageCid == executingMessageCid)
                     -- Compute instance address from (instanceId, owner)
@@ -229,7 +257,7 @@ template OffRamp
                         (requiredAddr `elem` providedCCVAddresses)
 
                 -- Issue token receive ticket if tokenReceiver is set.
-                -- PrepareExecute guarantees tokenReceiver ↔ tokenTransfer consistency.
+                -- PrepareExecute guarantees tokenReceiver <-> tokenTransfer consistency.
                 tokenReceiveTicketCid <- case execMsg.tokenReceiver of
                     None -> pure None
                     Some tokenReceiver -> do
@@ -257,7 +285,6 @@ template OffRamp
                                 amount = tt.amount
                                 messageHash = messageId
                                 sourceChainSelector = message.sourceChainSelector
-                                caller = ccipOwner
                         pure (Some ticketCid)
 
                 -- Consume the ExecutingMessageV1
