@@ -134,16 +134,14 @@ template CCIPReceiver
                     ccvVerifyTickets
                     tokenPoolCCVTicket
                     receiverRequiredCCVs = allRequiredCCVs
-                    tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
 
-                -- Token release (unchanged from before)
+                -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
                     (Some tt, Some ticketCid) -> do
                         releaseResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
                                 tokenReceiveTicketCid = ticketCid
                                 tokenAdminRegistryCid
-                                rmnRemoteCid
                                 tokenInput = tt.tokenInput
                                 caller = owner
                         pure (Some releaseResult)
