@@ -203,10 +203,10 @@ template OffRamp
                                         caller = ccipOwner
                                 case configOpt of
                                     Some config -> do
-                                        (regPoolOwner, regPoolInstanceId) <- case (config.tokenPoolOwner, config.tokenPoolInstanceId) of
-                                            (Some po, Some pid) -> pure (po, pid)
-                                            _ -> abort "offramp: no pool registered for instrument"
-                                        let registeredPoolAddr = CCIP.RawInstanceAddress.make regPoolInstanceId regPoolOwner
+                                        pool <- case config.tokenPool of
+                                            Some p -> pure p
+                                            None -> abort "offramp: no pool registered for instrument"
+                                        let registeredPoolAddr = CCIP.RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
                                         CCIP.RawInstanceAddress.assertEqual
                                             "offramp: tokenPoolCCVTicket pool instance address mismatch"
                                             ticket.poolInstanceId ticket.poolOwner
@@ -272,9 +272,9 @@ template OffRamp
                                 caller = ccipOwner
                         poolOwner <- case configOpt of
                             None -> abort "offramp: no token config for instrument"
-                            Some config -> case config.tokenPoolOwner of
+                            Some config -> case config.tokenPool of
                                 None -> abort "offramp: no pool registered for instrument"
-                                Some po -> pure po
+                                Some pool -> pure pool.poolOwner
 
                         ticketCid <- exercise tokenAdminRegistryCid
                             CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
