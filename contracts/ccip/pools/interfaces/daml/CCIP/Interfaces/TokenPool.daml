@@ -7,10 +7,8 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Client
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
-import qualified CCIP.Interfaces.CrossChainVerifier
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.OffRamp
 import qualified CCIP.OnRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
@@ -44,14 +42,11 @@ interface ITokenPool where
         do tokenPool_getRequiredCCVsImpl this self arg
 
     -- Verify CCVs and issue TokenPoolCCVVerifiedTicket for inbound transfers.
-    -- Called by receiver BEFORE calling PerPartyRouter.Execute.
+    -- Fetches ExecutingMessageV1 for source chain selector lookup.
     nonconsuming choice TokenPool_VerifyCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
         with
+            executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-            messageHash : BytesHex
-            sourceChainSelector : Numeric 0
-            amount : Numeric 0
-            receiver : Party
             caller : Party
         controller caller
         do tokenPool_verifyCCVsImpl this self arg
