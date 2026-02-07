@@ -214,16 +214,16 @@ template TokenAdminRegistry
                     sourceChainSelector = sourceChainSelector
 
         -- | Consume a token receive ticket to authorize token release.
-        -- Called by tokenpool when releasing tokens to receiver.
-        -- Validates that caller is the registered pool and ticket was issued by this TAR.
-        nonconsuming choice TokenAdminRegistry_ConsumeReceiveTicket : ConsumeReceiveTicketResult
+        -- Validates caller is the registered pool owner, ticket was issued by this TAR,
+        -- then archives the ticket. Callers should fetch the ticket beforehand to read
+        -- its fields (poolOwner is an observer on TokenReceiveTicket).
+        nonconsuming choice TokenAdminRegistry_ConsumeReceiveTicket : ()
             with
                 ticketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
             do
-                -- Validate caller is the registered pool for this instrument
                 case Map.lookup instrumentId tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_ConsumeReceiveTicket: No config for instrument"
@@ -236,48 +236,27 @@ template TokenAdminRegistry
                                     abort "TokenAdminRegistry_ConsumeReceiveTicket: Caller is not the registered pool owner"
                                 else do
                                     ticket <- fetch ticketCid
-                                    -- Validate the ticket was issued by this registry instance
                                     assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: instanceId mismatch"
                                         (ticket.tokenAdminRegistryInstanceId == instanceId)
                                     assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: owner mismatch"
                                         (ticket.ccipOwner == owner)
-                                    -- TAR is the signatory, so archive directly
                                     archive ticketCid
-                                    pure ConsumeReceiveTicketResult with
-                                        instrumentId = ticket.instrumentId
-                                        amount = ticket.amount
-                                        receiver = ticket.receiver
-                                        tokenReceiver = ticket.tokenReceiver
-                                        messageHash = ticket.messageHash
-                                        sourceChainSelector = ticket.sourceChainSelector
 
         -- | Consume a token send ticket for outbound token transfer.
-        -- Called by OnRamp to validate and archive the ticket.
-        -- Validates that the ticket was issued by this TAR instance.
-        nonconsuming choice TokenAdminRegistry_ConsumeSendTicket : ConsumeSendTicketResult
+        -- Validates the ticket was issued by this TAR instance, then archives it.
+        -- Callers should fetch the ticket beforehand to read its fields
+        -- (ccipOwner is the signatory on TokenSendTicket).
+        nonconsuming choice TokenAdminRegistry_ConsumeSendTicket : ()
             with
                 ticketCid : ContractId CCIP.Tickets.TokenSendTicket
             controller owner
             do
                 ticket <- fetch ticketCid
-                -- Validate the ticket was issued by this registry instance
                 assertMsg "TokenAdminRegistry_ConsumeSendTicket: instanceId mismatch"
                     (ticket.tokenAdminRegistryInstanceId == instanceId)
                 assertMsg "TokenAdminRegistry_ConsumeSendTicket: owner mismatch"
                     (ticket.ccipOwner == owner)
-                -- TAR is the signatory, so archive directly
                 archive ticketCid
-                pure ConsumeSendTicketResult with
-                    poolInstanceId = ticket.poolInstanceId
-                    poolOwner = ticket.poolOwner
-                    sender = ticket.sender
-                    instrumentId = ticket.instrumentId
-                    amount = ticket.amount
-                    sourceTokenAddress = ticket.sourceTokenAddress
-                    destTokenAddress = ticket.destTokenAddress
-                    tokenReceiver = ticket.tokenReceiver
-                    extraData = ticket.extraData
-                    receipt = ticket.receipt
 
 
 -- | Registered pool identity for a token instrument.
@@ -295,27 +274,3 @@ data TokenConfig = TokenConfig
     deriving (Eq, Show)
 
 
-data ConsumeReceiveTicketResult = ConsumeReceiveTicketResult
-    with
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
-        receiver : Party
-        tokenReceiver : Party
-        messageHash : BytesHex
-        sourceChainSelector : Numeric 0
-    deriving (Eq, Show)
-
-
-data ConsumeSendTicketResult = ConsumeSendTicketResult
-    with
-        poolInstanceId : Text
-        poolOwner : Party
-        sender : Party
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
-        sourceTokenAddress : BytesHex
-        destTokenAddress : BytesHex
-        tokenReceiver : BytesHex
-        extraData : BytesHex
-        receipt : CCIP.Tickets.Receipt
-    deriving (Eq, Show)
