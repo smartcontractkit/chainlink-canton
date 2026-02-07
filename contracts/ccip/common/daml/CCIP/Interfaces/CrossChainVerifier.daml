@@ -4,8 +4,9 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import qualified CCIP.CCVRegistry
+import qualified CCIP.ExecutingMessageV1
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 
@@ -20,9 +21,8 @@ interface ICrossChainVerifier where
         with
             ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-            message : MessageCodecV1.MessageV1
+            executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             verifierResults : BytesHex
-            receiver : Party
             caller : Party
         controller caller
         do crossChainVerifier_verifyMessageImpl this self arg
