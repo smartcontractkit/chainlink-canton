@@ -113,19 +113,18 @@ template OnRamp
                         assertMsg "onramp: destination chain disabled" c.isEnabled
                         pure c
 
-                -- Process optional token transfer ticket via TAR's ConsumeSendTicket,
-                -- which validates the ticket was issued by the configured TAR instance and archives it
+                -- Fetch and consume the optional token send ticket. The TAR validates
+                -- the ticket was issued by this registry instance and archives it.
                 (tokenTransfer, instrumentId, poolReceipt) <- case tokenSendTicket of
                     None -> pure (None, None, None)
                     Some ticketCid -> do
-                        ticket <- exercise tokenAdminRegistryCid
+                        ticket <- fetch ticketCid
+                        exercise tokenAdminRegistryCid
                             CCIP.TokenAdminRegistry.TokenAdminRegistry_ConsumeSendTicket with
                                 ticketCid = ticketCid
                         assertMsg "onramp: tokensendticket sender mismatch"
                             (ticket.sender == routerPartyOwner)
-                        -- Compute pool address from (instanceId, owner)
                         let poolAddr = CCIP.MessageCodecV1.encodeInstanceAddress ticket.poolInstanceId ticket.poolOwner
-                        -- Build TokenTransferV1 directly
                         let tt = CCIP.MessageCodecV1.TokenTransferV1 with
                                 amount = ticket.amount
                                 sourcePoolAddress = poolAddr
