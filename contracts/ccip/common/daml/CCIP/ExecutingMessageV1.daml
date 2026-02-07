@@ -1,0 +1,41 @@
+-- | Executing message contract for inbound CCIP message processing.
+-- Created by PrepareExecute, consumed by OffRamp.ExecuteFromRouter.
+-- Provides a single source of truth for decoded message and resolved party identities.
+module CCIP.ExecutingMessageV1 where
+
+import DA.Crypto.Text (BytesHex)
+import DA.List (dedup)
+
+import qualified CCIP.MessageCodecV1
+
+-- | Build the observer list from receiver, optional token receiver, and caller.
+buildObservingParties : Party -> Optional Party -> Party -> [Party]
+buildObservingParties receiver tokenReceiver caller =
+    dedup $
+        [receiver, caller]
+        ++ case tokenReceiver of
+            Some p -> [p]
+            None -> []
+
+template ExecutingMessageV1
+    with
+        ccipOwner : Party
+        message : CCIP.MessageCodecV1.MessageV1
+        messageId : BytesHex
+        receiver : Party
+        tokenReceiver : Optional Party
+        caller : Party
+        observingParties : [Party]
+    where
+        signatory ccipOwner
+        observer observingParties
+
+        -- Consumed by OffRamp.ExecuteFromRouter after successful execution,
+        -- or for cleanup if Execute never completed.
+        choice ExecutingMessageV1_Archive : ()
+            with
+                archiver : Party
+            controller archiver
+            do
+                assertMsg "executingMessage: archiver must be ccipOwner, receiver, or caller"
+                    (archiver == ccipOwner || archiver `elem` observingParties)
