@@ -1,14 +1,13 @@
 -- | Receiver-side entry point for CCIP message execution.
--- Performs CCV verification, message execution, and token release
--- in a single atomic transaction.
+-- Calls PrepareExecute to create an ExecutingMessageV1, then passes it
+-- to CCV verification, pool verification, and the final Execute.
 --
 -- Only `owner` is a signatory. The CCIP participant does not need this DAR
 -- because ccipOwner is not a party on this contract.
 module CCIP.CCIPReceiver where
 
-import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
-import DA.Optional (fromSomeNote)
 
 import qualified CCIP.CCVRegistry
 import qualified CCIP.Interfaces.CrossChainVerifier
@@ -18,8 +17,8 @@ import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
-import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.GlobalConfig
+import qualified CCIP.TokenAdminRegistry
 
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
 -- with the attestation data that verifier needs.
@@ -65,10 +64,10 @@ template CCIPReceiver
             controller owner
             do create this with requiredCCVs = newRequiredCCVs
 
+
         -- | Executes an inbound CCIP message end-to-end.
-        -- Verifies with each CCV via interface, optionally verifies pool CCVs,
-        -- delegates to PerPartyRouter.Execute, and releases tokens if applicable.
-        nonconsuming choice Execute : ContractId MessageReceived
+        -- TODO: consider allowing arbitrary callers
+        nonconsuming choice Execute : ContractId CCIPMessageReceived
             with
                 -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
@@ -93,47 +92,37 @@ template CCIPReceiver
                 additionalRequiredCCVs : [RawInstanceAddress]
             controller owner
             do
-                -- PerPartyRouter re-decodes from encodedMessage internally,
-                -- but CCVs need the decoded form for signature verification.
-                let message = fromSomeNote "ccipReceiver: failed to decode message"
-                        (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
-                -- TODO: messageHash shouldn't be necessary for VerifyCCVs
-                let messageHash = keccak256 encodedMessage
+                -- PrepareExecute: decode, validate, create ExecutingMessageV1
+                executingMessageCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
+                    offRampCid = offRampCid
+                    rmnRemoteCid = rmnRemoteCid
+                    encodedMessage = encodedMessage
+                    receiverParty = owner
+                    tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
+                    caller = owner
 
-                -- Verify with each CCV via interface. Produces one
-                -- CCVVerifyTicket per verifier, created within this transaction.
+                -- CCV verification using ExecutingMessageV1
                 ccvVerifyTickets <- forA ccvInputs $ \input ->
                     exercise input.ccvCid
                         CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
                             ccvRegistryCid
                             rmnRemoteCid
-                            message
+                            executingMessageCid = executingMessageCid
                             verifierResults = input.verifierResults
-                            receiver = owner
                             caller = owner
 
-                -- Pool CCV verification. The pool fetches the CCVVerifyTickets
-                -- to check its per-chain requirements.
-                -- OffRamp archives the tickets later in this same transaction.
+                -- Pool CCV verification using ExecutingMessageV1
                 tokenPoolCCVTicket <- case tokenTransfer of
                     None -> pure None
                     Some tt -> do
-                        let tokenAmount = case message.tokenTransfer of
-                                None -> 0.0
-                                Some transfer -> transfer.amount
                         ticket <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_VerifyCCVs with
+                                executingMessageCid = executingMessageCid
                                 ccvVerifyTickets
-                                messageHash
-                                sourceChainSelector = message.sourceChainSelector
-                                amount = tokenAmount
-                                receiver = owner
                                 caller = owner
                         pure (Some ticket)
 
-                -- Delegate to PerPartyRouter, which handles replay prevention,
-                -- delegates to OffRamp for CCV coverage validation and ticket
-                -- consumption, and emits ExecutionStateChanged.
+                -- Execute using ExecutingMessageV1
                 let allRequiredCCVs = dedup (requiredCCVs ++ additionalRequiredCCVs)
 
                 result <- exercise routerCid CCIP.PerPartyRouter.Execute with
@@ -141,14 +130,13 @@ template CCIPReceiver
                     offRampCid
                     globalConfigCid
                     tokenAdminRegistryCid
-                    encodedMessage
+                    executingMessageCid = executingMessageCid
                     ccvVerifyTickets
                     tokenPoolCCVTicket
                     receiverRequiredCCVs = allRequiredCCVs
                     tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
 
-                -- Token release. Consumes the TokenReceiveTicket produced by
-                -- OffRamp and transfers tokens from pool to receiver.
+                -- Token release (unchanged from before)
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
                     (Some tt, Some ticketCid) -> do
                         releaseResult <- exercise tt.tokenPoolCid
@@ -165,7 +153,7 @@ template CCIPReceiver
                     owner
                     router = result.router
                     messageId = result.messageId
-                    message
+                    message = result.message
                     tokenReleaseResult
 
                 ---------------------------------------------------------------------------
