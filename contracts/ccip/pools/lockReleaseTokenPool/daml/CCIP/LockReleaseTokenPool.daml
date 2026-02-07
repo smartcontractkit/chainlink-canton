@@ -9,8 +9,9 @@ module CCIP.LockReleaseTokenPool where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Foldable (forA_)
-import DA.List (dedupSort, head)
+import DA.List (head)
 import qualified DA.Map as Map
+import DA.Optional (fromSomeNote)
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
 import DA.Time (time, addRelTime, hours)
@@ -20,6 +21,7 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Client
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
@@ -93,11 +95,8 @@ template LockReleaseTokenPool
             tokenPool_verifyCCVsImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyCCVs
                     with
+                        executingMessageCid = arg.executingMessageCid
                         ccvVerifyTickets = arg.ccvVerifyTickets
-                        messageHash = arg.messageHash
-                        sourceChainSelector = arg.sourceChainSelector
-                        amount = arg.amount
-                        receiver = arg.receiver
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
@@ -141,43 +140,64 @@ template LockReleaseTokenPool
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
 
         -- Verify CCVs and issue TokenPoolCCVVerifiedTicket.
+        -- Validates that the message has a token transfer targeting this pool's instrument,
+        -- then fetches each provided ticket to compute its RawInstanceAddress and matches
+        -- against the pool's per-chain inbound CCV requirements.
+        -- Aborts if any required CCV is not covered by the provided tickets.
         nonconsuming choice LockReleaseTokenPool_VerifyCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
             with
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-                messageHash : BytesHex
-                sourceChainSelector : Numeric 0
-                amount : Numeric 0
-                receiver : Party
                 caller : Party
             controller caller
             do
-                -- Get required CCV instance addresses for inbound (convert to hashes)
-                let requiredCCVAddresses = case Map.lookup sourceChainSelector chainCCVRequirements of
+                execMsg <- fetch executingMessageCid
+                let message = execMsg.message
+
+                -- Must have a token transfer
+                tt <- case message.tokenTransfer of
+                    None -> abort "pool: no token transfer in message"
+                    Some t -> pure t
+
+                -- Validate destTokenAddress matches this pool's instrumentId
+                let expectedAddr = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+                assertMsg "pool: destTokenAddress does not match pool instrumentId"
+                    (tt.destTokenAddress == expectedAddr)
+
+                -- PrepareExecute guarantees tokenReceiver is set when tokenTransfer exists
+                let tokenReceiverParty = fromSomeNote
+                        "pool: tokenReceiver not set (invariant: PrepareExecute resolves this for token transfers)"
+                        execMsg.tokenReceiver
+
+                let requiredAddrs = case Map.lookup message.sourceChainSelector chainCCVRequirements of
                         None -> []
-                        Some config -> map CCIP.RawInstanceAddress.toInstanceAddress config.inboundCCVs
+                        Some config -> config.inboundCCVs
 
-                -- Fetch all provided tickets and compute their instance addresses
-                providedCCVAddresses <- forA ccvVerifyTickets \ticketCid -> do
+                -- Fetch each ticket, compute its RawInstanceAddress, keep only
+                -- those matching a required CCV.
+                matchedTickets <- forA ccvVerifyTickets $ \ticketCid -> do
                     ticket <- fetch ticketCid
-                    -- Validate ticket is for this message
-                    assertMsg "CCVVerifyTicket messageHash mismatch" (ticket.messageHash == messageHash)
-                    assertMsg "CCVVerifyTicket sourceChainSelector mismatch" (ticket.sourceChainSelector == sourceChainSelector)
-                    -- Compute address from (instanceId, owner)
-                    pure (CCIP.MessageCodecV1.encodeInstanceAddress ticket.ccvInstanceId ticket.ccvOwner)
+                    let addr = CCIP.RawInstanceAddress.make ticket.ccvInstanceId ticket.ccvOwner
+                    pure (ticketCid, addr)
 
-                -- Validate all required CCVs are present
-                forA_ requiredCCVAddresses \requiredAddr ->
-                    assertMsg ("missing required pool CCV address: " <> requiredAddr)
-                        (requiredAddr `elem` providedCCVAddresses)
+                let selectedTickets =
+                        [ cid | (cid, addr) <- matchedTickets, addr `elem` requiredAddrs ]
 
-                -- Issue TokenPoolCCVVerifiedTicket
+                -- Every required CCV must be covered
+                -- TODO: consider erroring on duplicate tickets with the same RawInstanceAddress
+                let coveredAddrs = [ addr | (_cid, addr) <- matchedTickets, addr `elem` requiredAddrs ]
+                forA_ requiredAddrs $ \required ->
+                    assertMsg ("pool: missing required CCV " <> show required)
+                        (required `elem` coveredAddrs)
+
                 create CCIP.Tickets.TokenPoolCCVVerifiedTicket with
                     poolOwner = poolOwner
                     ccipOwner = ccipOwner
-                    receiver = receiver
-                    messageHash = messageHash
-                    sourceChainSelector = sourceChainSelector
-                    verifiedCCVAddresses = dedupSort providedCCVAddresses
+                    receiver = execMsg.receiver
+                    tokenReceiver = tokenReceiverParty
+                    executor = caller
+                    executingMessageCid = executingMessageCid
+                    ccvVerifyTicketCids = selectedTickets
 
         -- Release tokens by consuming a TokenReceiveTicket.
         -- Transfers tokens from pool to receiver via TransferFactory.
