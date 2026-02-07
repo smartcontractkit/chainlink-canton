@@ -11,6 +11,9 @@ import qualified CCIP.Tickets
 template TokenAdminRegistry
     with
         instanceId : Text
+        -- owner has to be ccipOwner (ie, the owner of the OffRamp) in order to be able to consume
+        -- send tickets
+        -- TODO: rename to ccipOwner to be explicit
         owner : Party
 
         tokenConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenConfig
@@ -31,7 +34,7 @@ template TokenAdminRegistry
         choice TokenAdminRegistry_SetPool : ContractId TokenAdminRegistry
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                optTokenPoolOwner : Optional Party
+                tokenPool : Optional PoolRegistration
                 caller : Party
             controller caller
             do
@@ -46,9 +49,7 @@ template TokenAdminRegistry
                                 if admin /= caller then
                                     abort "TokenAdminRegistry_SetPool: Caller is not the admin"
                                 else do
-                                    let updatedConfig = config
-                                            with
-                                                tokenPoolOwner = optTokenPoolOwner
+                                    let updatedConfig = config with tokenPool
                                         updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
@@ -131,7 +132,7 @@ template TokenAdminRegistry
                             let newConfig = TokenConfig with
                                     admin = None
                                     pendingAdmin = Some newAdmin
-                                    tokenPoolOwner = None
+                                    tokenPool = None
                                 updatedMap = Map.insert instrumentId newConfig tokenConfigs
                             create this with tokenConfigs = updatedMap
                         Some config ->
@@ -144,12 +145,12 @@ template TokenAdminRegistry
                                 create this with tokenConfigs = updatedMap
 
         -- | Issue a token send ticket for outbound token transfer.
-        -- Called by tokenpool after locking tokens.
-        -- Validates that caller is the registered pool for the instrument.
+        -- Called by a token pool after locking tokens.
+        -- Validates that caller is the registered party for the instrument.
         nonconsuming choice TokenAdminRegistry_IssueSendTicket : ContractId CCIP.Tickets.TokenSendTicket
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                poolInstanceId : Text  -- Pool's instanceId for address computation
+                poolInstanceId : Text
                 sender : Party
                 amount : Numeric 0
                 sourceTokenAddress : BytesHex
@@ -157,24 +158,26 @@ template TokenAdminRegistry
                 tokenReceiver : BytesHex
                 extraData : BytesHex
                 receipt : CCIP.Tickets.Receipt
-                poolOwner : Party  -- controller - must be registered pool
-            controller poolOwner
+                caller : Party
+            controller caller
             do
-                -- Validate poolOwner is the registered pool for this instrument
+                -- Validate caller is the registered pool owner for this instrument
                 case Map.lookup instrumentId tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_IssueSendTicket: No config for instrument"
                     Some config ->
-                        case config.tokenPoolOwner of
+                        case config.tokenPool of
                             None ->
                                 abort "TokenAdminRegistry_IssueSendTicket: No pool registered for instrument"
-                            Some registeredPool ->
-                                if registeredPool /= poolOwner then
-                                    abort "TokenAdminRegistry_IssueSendTicket: Caller is not the registered pool"
-                                else
-                                    create CCIP.Tickets.TokenSendTicket with
+                            Some pool -> do
+                                assertMsg "TokenAdminRegistry_IssueSendTicket: Caller is not the registered pool owner"
+                                    (pool.poolOwner == caller)
+                                assertMsg "TokenAdminRegistry_IssueSendTicket: poolInstanceId does not match registered pool"
+                                    (pool.poolInstanceId == poolInstanceId)
+                                create CCIP.Tickets.TokenSendTicket with
                                         poolInstanceId = poolInstanceId
-                                        poolOwner = poolOwner
+                                        poolOwner = caller
+                                        tokenAdminRegistryInstanceId = instanceId
                                         ccipOwner = owner
                                         sender = sender
                                         instrumentId = instrumentId
@@ -187,7 +190,7 @@ template TokenAdminRegistry
 
         -- | Issue a token receive ticket for inbound token transfer.
         -- Called by OffRamp after successful message verification.
-        -- Caller must be ccipOwner (same as registry owner).
+        -- Only the registry owner (ccipOwner) can call this.
         nonconsuming choice TokenAdminRegistry_IssueReceiveTicket : ContractId CCIP.Tickets.TokenReceiveTicket
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -197,14 +200,11 @@ template TokenAdminRegistry
                 amount : Numeric 0
                 messageHash : BytesHex
                 sourceChainSelector : Numeric 0
-                caller : Party  -- should be ccipOwner (offramp)
-            controller caller
+            controller owner
             do
-                -- Validate caller is the ccipOwner
-                assertMsg "TokenAdminRegistry_IssueReceiveTicket: Caller must be ccipOwner"
-                    (caller == owner)
                 create CCIP.Tickets.TokenReceiveTicket with
                     ccipOwner = owner
+                    tokenAdminRegistryInstanceId = instanceId
                     poolOwner = poolOwner
                     receiver = receiver
                     tokenReceiver = tokenReceiver
@@ -215,29 +215,34 @@ template TokenAdminRegistry
 
         -- | Consume a token receive ticket to authorize token release.
         -- Called by tokenpool when releasing tokens to receiver.
-        -- Validates that caller is the registered pool for the destination token.
-        choice TokenAdminRegistry_ConsumeReceiveTicket : ConsumeReceiveTicketResult
+        -- Validates that caller is the registered pool and ticket was issued by this TAR.
+        nonconsuming choice TokenAdminRegistry_ConsumeReceiveTicket : ConsumeReceiveTicketResult
             with
                 ticketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                poolOwner : Party  -- controller - must be registered pool
-            controller poolOwner
+                caller : Party
+            controller caller
             do
-                -- Validate poolOwner is the registered pool for this instrument
+                -- Validate caller is the registered pool for this instrument
                 case Map.lookup instrumentId tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_ConsumeReceiveTicket: No config for instrument"
                     Some config ->
-                        case config.tokenPoolOwner of
+                        case config.tokenPool of
                             None ->
                                 abort "TokenAdminRegistry_ConsumeReceiveTicket: No pool registered for instrument"
-                            Some registeredPool ->
-                                if registeredPool /= poolOwner then
-                                    abort "TokenAdminRegistry_ConsumeReceiveTicket: Caller is not the registered pool"
+                            Some pool ->
+                                if pool.poolOwner /= caller then
+                                    abort "TokenAdminRegistry_ConsumeReceiveTicket: Caller is not the registered pool owner"
                                 else do
-                                    -- Fetch and archive the ticket
                                     ticket <- fetch ticketCid
-                                    exercise ticketCid CCIP.Tickets.TokenReceiveTicket_Consume
+                                    -- Validate the ticket was issued by this registry instance
+                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: instanceId mismatch"
+                                        (ticket.tokenAdminRegistryInstanceId == instanceId)
+                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: owner mismatch"
+                                        (ticket.ccipOwner == owner)
+                                    -- TAR is the signatory, so archive directly
+                                    archive ticketCid
                                     pure ConsumeReceiveTicketResult with
                                         instrumentId = ticket.instrumentId
                                         amount = ticket.amount
@@ -246,12 +251,47 @@ template TokenAdminRegistry
                                         messageHash = ticket.messageHash
                                         sourceChainSelector = ticket.sourceChainSelector
 
+        -- | Consume a token send ticket for outbound token transfer.
+        -- Called by OnRamp to validate and archive the ticket.
+        -- Validates that the ticket was issued by this TAR instance.
+        nonconsuming choice TokenAdminRegistry_ConsumeSendTicket : ConsumeSendTicketResult
+            with
+                ticketCid : ContractId CCIP.Tickets.TokenSendTicket
+            controller owner
+            do
+                ticket <- fetch ticketCid
+                -- Validate the ticket was issued by this registry instance
+                assertMsg "TokenAdminRegistry_ConsumeSendTicket: instanceId mismatch"
+                    (ticket.tokenAdminRegistryInstanceId == instanceId)
+                assertMsg "TokenAdminRegistry_ConsumeSendTicket: owner mismatch"
+                    (ticket.ccipOwner == owner)
+                -- TAR is the signatory, so archive directly
+                archive ticketCid
+                pure ConsumeSendTicketResult with
+                    poolInstanceId = ticket.poolInstanceId
+                    poolOwner = ticket.poolOwner
+                    sender = ticket.sender
+                    instrumentId = ticket.instrumentId
+                    amount = ticket.amount
+                    sourceTokenAddress = ticket.sourceTokenAddress
+                    destTokenAddress = ticket.destTokenAddress
+                    tokenReceiver = ticket.tokenReceiver
+                    extraData = ticket.extraData
+                    receipt = ticket.receipt
+
+
+-- | Registered pool identity for a token instrument.
+data PoolRegistration = PoolRegistration
+    with
+        poolOwner : Party
+        poolInstanceId : Text
+    deriving (Eq, Show)
 
 data TokenConfig = TokenConfig
     with
         admin : Optional Party
         pendingAdmin : Optional Party
-        tokenPoolOwner : Optional Party
+        tokenPool : Optional PoolRegistration
     deriving (Eq, Show)
 
 
@@ -263,4 +303,19 @@ data ConsumeReceiveTicketResult = ConsumeReceiveTicketResult
         tokenReceiver : Party
         messageHash : BytesHex
         sourceChainSelector : Numeric 0
+    deriving (Eq, Show)
+
+
+data ConsumeSendTicketResult = ConsumeSendTicketResult
+    with
+        poolInstanceId : Text
+        poolOwner : Party
+        sender : Party
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        sourceTokenAddress : BytesHex
+        destTokenAddress : BytesHex
+        tokenReceiver : BytesHex
+        extraData : BytesHex
+        receipt : CCIP.Tickets.Receipt
     deriving (Eq, Show)
