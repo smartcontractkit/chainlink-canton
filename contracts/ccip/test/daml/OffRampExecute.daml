@@ -132,6 +132,23 @@ testExecuteWithCCVTicket = script do
 
     debug ("Message hash: " <> messageHash)
 
+    -- Disclose contracts to receiver
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    -- PrepareExecute to create ExecutingMessageV1
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            offRampCid = offRamp
+            rmnRemoteCid = rmnRemote
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+
     -- Issue CCVVerifyTicket via CCVRegistry directly (registry computes instance address)
     -- (In production this would be done by CommitteeVerifier after signature verification)
     ccvVerifyTicket <- submit ccipOwner do
@@ -139,18 +156,11 @@ testExecuteWithCCVTicket = script do
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
             ccvOwner = ccipOwner
-            messageHash = messageHash
-            sourceChainSelector = sourceChainSelector
-            sequenceNumber = 1.0
+            executingMessageCid = executingMessageCid
             receiver = receiver
+            caller = receiver
 
     debug ("CCVVerifyTicket created")
-
-    -- Disclose contracts to receiver
-    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
-    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
-    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Execute via PerPartyRouter with CCVVerifyTicket
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
@@ -159,11 +169,10 @@ testExecuteWithCCVTicket = script do
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
-            encodedMessage = encodedMessage
+            executingMessageCid = executingMessageCid
             ccvVerifyTickets = [ccvVerifyTicket]
             tokenPoolCCVTicket = None
             receiverRequiredCCVs = []
-            tokenReceiverParty = None
 
     -- Verify SUCCESS
     executeResult.state === Internal.SUCCESS
@@ -272,6 +281,17 @@ testExecuteFailsMissingCCV = script do
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
+    -- PrepareExecute
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            offRampCid = offRamp
+            rmnRemoteCid = rmnRemote
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+
     -- Execute WITHOUT providing the required CCVVerifyTicket - should fail
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
@@ -279,11 +299,10 @@ testExecuteFailsMissingCCV = script do
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
-            encodedMessage = encodedMessage
+            executingMessageCid = executingMessageCid
             ccvVerifyTickets = []  -- Empty! Missing required CCV
             tokenPoolCCVTicket = None
             receiverRequiredCCVs = []
-            tokenReceiverParty = None
 
     debug ("Execute fails with missing CCV: PASSED")
     pure ()
@@ -381,22 +400,17 @@ testExecuteWrongReceiver = script do
 
     -- Disclose contracts
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
-    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
-    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Execute should fail: message receiver address != router partyOwner address
-    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
-        exerciseCmd router PerPartyRouter.Execute with
-            rmnRemoteCid = rmnRemote
+    -- PrepareExecute should fail because receiver address doesn't match
+    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
             offRampCid = offRamp
-            globalConfigCid = globalConfig
-            tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = rmnRemote
             encodedMessage = encodedMessage
-            ccvVerifyTickets = []
-            tokenPoolCCVTicket = None
-            receiverRequiredCCVs = []
+            receiverParty = receiver  -- Providing receiver, but message.receiver is otherParty
             tokenReceiverParty = None
+            caller = receiver
 
     debug ("Execute fails with wrong receiver: PASSED")
     pure ()

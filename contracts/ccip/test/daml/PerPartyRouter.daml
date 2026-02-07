@@ -249,8 +249,17 @@ testCCIPExecute = script do
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- receiver executes the message (ccipOwner acts via PerPartyRouter signatory)
-    -- receiver passes all cids via explicit disclosure
+    -- PrepareExecute: decode, validate, create ExecutingMessageV1
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
+            offRampCid = offRamp
+            rmnRemoteCid = rmnRemote
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+    -- Execute: receiver passes all cids via explicit disclosure
     -- no token transfer, so tokenPoolCCVTicket is None and no TokenReceiveTicket will be created
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.Execute with
@@ -258,11 +267,10 @@ testCCIPExecute = script do
             offRampCid = offRamp
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
-            encodedMessage = encodedMessage
+            executingMessageCid = executingMessageCid
             ccvVerifyTickets = []
             tokenPoolCCVTicket = None
             receiverRequiredCCVs = []
-            tokenReceiverParty = None
 
     -- verify execution succeeded
     executeResult.state === CCIP.Internal.SUCCESS

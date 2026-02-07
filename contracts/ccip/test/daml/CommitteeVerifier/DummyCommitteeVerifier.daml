@@ -1,6 +1,6 @@
 module CommitteeVerifier.DummyCommitteeVerifier where
 
-import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Crypto.Text (BytesHex)
 
 import qualified CCIP.CCVRegistry
 import qualified CCIP.MessageCodecV1
@@ -26,23 +26,18 @@ template DummyCommitteeVerifier
                 storageLocation = "ipfs://dummy"
 
             crossChainVerifier_verifyMessageImpl self arg = do
-                -- verifierResults should start with version tag (first 4 bytes)
-                -- For testing, we use "01" as a failure trigger
                 case arg.verifierResults of
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
                         debug ("DummyCommitteeVerifier: Simulated successful verification")
-                        -- Calculate message hash
-                        let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 arg.message)
-                        -- Issue verify ticket via CCVRegistry (registry computes instance address)
+                        execMsg <- fetch arg.executingMessageCid
                         exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
                             ccvInstanceId = instanceId
                             ccvOwner = owner
                             versionTag = versionTag
-                            messageHash = messageHash
-                            sourceChainSelector = arg.message.sourceChainSelector
-                            sequenceNumber = arg.message.sequenceNumber
-                            receiver = arg.receiver
+                            executingMessageCid = arg.executingMessageCid
+                            receiver = execMsg.receiver
+                            caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 -- Compute instance address for receipt

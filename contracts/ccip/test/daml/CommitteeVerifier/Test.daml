@@ -8,6 +8,7 @@ import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.CCVRegistry qualified as CCVRegistry
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
@@ -19,11 +20,10 @@ setup = script do
 
     let msg = PayloadBuilder.testMessage1
     let encodedMsg = PayloadBuilder.testMessage1Encoded
-    debug ("Encoded message: " <> encodedMsg)
-    let preimage = CommitteeVerifier.versionTagV1_7_0 <> encodedMsg
-    debug ("Preimage for hashing: " <> preimage)
-    let hashedMsg = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> encodedMsg)
-    debug ("Hashed message: " <> hashedMsg)
+    let messageId = keccak256 encodedMsg
+    debug ("messageId: " <> messageId)
+    let signedHash = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> messageId)
+    debug ("signedHash: " <> signedHash)
 
     ccvRegistry <- submit owner do
         createCmd CCVRegistry.CCVRegistry with
@@ -42,9 +42,22 @@ setup = script do
 
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
+    -- Create ExecutingMessageV1 for the test message.
+    -- In production, PrepareExecute creates this; here we create it directly
+    -- since these tests focus on signature verification.
+    executingMessageCid <- submit owner do
+        createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
+            ccipOwner = owner
+            message = msg
+            messageId = keccak256 encodedMsg
+            receiver = owner
+            tokenReceiver = None
+            executor = owner
+            observingParties = [owner]
+
     -- Validate signatures individually
     forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
-        let verified = CommitteeVerifier.validateSignature hashedMsg pubKey r s
+        let verified = CommitteeVerifier.validateSignature signedHash pubKey r s
         assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
 
 
@@ -69,9 +82,8 @@ setup = script do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults1
-            receiver = owner
             caller = owner
     debug ("===== Passed Test1 =====")
 
@@ -95,9 +107,8 @@ setup = script do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults2
-            receiver = owner
             caller = owner
     debug ("===== Passed Test2 =====")
 
@@ -138,9 +149,8 @@ setup = script do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults4
-            receiver = owner
             caller = owner
     debug ("===== Passed Test4 =====")
 
@@ -163,9 +173,8 @@ setup = script do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults5
-            receiver = owner
             caller = owner
     debug ("===== Passed Test5 =====")
 
@@ -188,9 +197,8 @@ setup = script do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults6
-            receiver = owner
             caller = owner
     debug ("===== Passed Test6 =====")
 
@@ -242,34 +250,31 @@ setup = script do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults =
                 "01234567" <> -- invalid version tag
                 "0004" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
-            receiver = owner
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "ffff" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
-            receiver = owner
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
-            message = msg
+            executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
-            receiver = owner
             caller = owner
 
     debug ("===== Passed Test9 =====")
