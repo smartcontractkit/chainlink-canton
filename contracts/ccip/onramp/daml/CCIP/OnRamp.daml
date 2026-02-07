@@ -23,6 +23,7 @@ template OnRamp
         globalConfigInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        ccvRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory ccipOwner
 
@@ -112,13 +113,14 @@ template OnRamp
                         assertMsg "onramp: destination chain disabled" c.isEnabled
                         pure c
 
-                -- Process optional token transfer ticket: read fields, build TokenTransferV1, archive
+                -- Process optional token transfer ticket via TAR's ConsumeSendTicket,
+                -- which validates the ticket was issued by the configured TAR instance and archives it
                 (tokenTransfer, instrumentId, poolReceipt) <- case tokenSendTicket of
                     None -> pure (None, None, None)
                     Some ticketCid -> do
-                        ticket <- fetch ticketCid
-                        assertMsg "onramp: tokensendticket ccipowner mismatch"
-                            (ticket.ccipOwner == ccipOwner)
+                        ticket <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_ConsumeSendTicket with
+                                ticketCid = ticketCid
                         assertMsg "onramp: tokensendticket sender mismatch"
                             (ticket.sender == routerPartyOwner)
                         -- Compute pool address from (instanceId, owner)
@@ -131,8 +133,6 @@ template OnRamp
                                 destTokenAddress = ticket.destTokenAddress
                                 tokenReceiver = ticket.tokenReceiver
                                 extraData = ticket.extraData
-                        -- Archive the ticket
-                        exercise ticketCid CCIP.Tickets.TokenSendTicket_Archive
                         pure (Some tt, Some ticket.instrumentId, Some ticket.receipt)
 
                 -- Get required CCV addresses for this send
@@ -144,11 +144,12 @@ template OnRamp
                     hasTokenTransfer = hasTokenTransfer
                     instrumentId = instrumentId
 
-                -- Process CCV tickets: read fields, compute instance addresses, archive
+                -- Process CCV tickets: validate registry instance address, compute addresses, archive
                 ccvData <- forA ccvTickets $ \ticketCid -> do
                     ticket <- fetch ticketCid
-                    assertMsg "onramp: ccvticket ccipowner mismatch"
-                        (ticket.ccipOwner == ccipOwner)
+                    CCIP.RawInstanceAddress.assertEqual "onramp: ccvticket registry instance address mismatch"
+                        ticket.ccvRegistryInstanceId ticket.ccvRegistryOwner
+                        ccvRegistryInstanceAddress
                     assertMsg "onramp: ccvticket sender mismatch"
                         (ticket.sender == routerPartyOwner)
                     -- Compute instance address from (instanceId, owner)
