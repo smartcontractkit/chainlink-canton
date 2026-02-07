@@ -6,6 +6,7 @@ import DA.Optional (fromSomeNote)
 import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.CCVRegistry
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
@@ -46,9 +47,8 @@ template CommitteeVerifier
                     with
                         ccvRegistryCid = arg.ccvRegistryCid
                         rmnRemoteCid = arg.rmnRemoteCid
-                        message = arg.message
+                        executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
-                        receiver = arg.receiver
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
@@ -63,16 +63,20 @@ template CommitteeVerifier
                         caller = arg.caller
 
         -- | Verify an inbound message and issue a CCVVerifyTicket via CCVRegistry.
+        -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
+        -- for signature verification (encoding is deterministic).
         nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
             with
                 ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                message : CCIP.MessageCodecV1.MessageV1
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
-                receiver : Party
                 caller : Party
             controller caller
             do
+                execMsg <- fetch executingMessageCid
+                let message = execMsg.message
+
                 -- Validate RMN instance and check source chain curse
                 rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
@@ -93,8 +97,8 @@ template CommitteeVerifier
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
                 let signatures = parseSignatures signatureData
 
-                -- Calculate the signed hash
-                let signedHash = keccak256 (versionTag <> (CCIP.MessageCodecV1.encodeMessageV1 message))
+                -- Matches EVM: signers sign keccak256(versionTag ++ messageHash)
+                let signedHash = keccak256 (versionTag <> execMsg.messageId)
 
                 -- Verify signatures
                 let validSigners = findValidSigners signedHash signatures signers
@@ -107,18 +111,14 @@ template CommitteeVerifier
                 assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold)
                     (validSignerCount >= threshold)
 
-                -- Calculate message hash for the ticket
-                let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 message)
-
-                -- Issue verify ticket via CCVRegistry (registry computes instance address)
+                -- Issue verify ticket via CCVRegistry
                 exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
                     ccvInstanceId = instanceId
                     ccvOwner = owner
                     versionTag = versionTag
-                    messageHash = messageHash
-                    sourceChainSelector = message.sourceChainSelector
-                    sequenceNumber = message.sequenceNumber
-                    receiver = receiver
+                    executingMessageCid = executingMessageCid
+                    receiver = execMsg.receiver
+                    caller = caller
 
         -- | Forward message for verification and issue a CCVTicket via CCVRegistry.
         nonconsuming choice CommitteeVerifier_ForwardToVerifier : ContractId CCIP.Tickets.CCVTicket
