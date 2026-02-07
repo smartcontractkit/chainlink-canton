@@ -5,6 +5,8 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
+import qualified CCIP.ExecutingMessageV1
+
 
 -- | Issuer type for receipts.
 data IssuerType
@@ -67,7 +69,7 @@ template CCVTicket
         receipt : Receipt              -- Fee/gas contribution from this CCV
     where
         signatory ccvOwner
-        observer ccipOwner, sender
+        observer sender
 
         -- Archive/cleanup choice - allows sender or ccipOwner to clean up
         choice CCVTicket_Archive : ()
@@ -80,50 +82,56 @@ template CCVTicket
 
 
 -- | Ticket issued by CCV (via CCVRegistry) after verifying an inbound message.
--- Stakeholders can read all fields directly; instance address computed as needed.
+-- References the ExecutingMessageV1 that was verified against.
 template CCVVerifyTicket
     with
         ccvInstanceId : Text           -- CCV's instanceId
         ccvOwner : Party
         versionTag : BytesHex          -- 4-byte version tag
         ccipOwner : Party
-        receiver : Party               -- Message receiver (observer)
-
-        messageHash : BytesHex
-
-        sourceChainSelector : Numeric 0
-        sequenceNumber : Numeric 0
+        receiver : Party               -- Message receiver
+        executor : Party               -- Executor party (may differ from receiver)
+        executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
     where
         signatory ccvOwner
-        observer ccipOwner, receiver
+        observer receiver, executor
 
-        -- Archive/cleanup choice - allows receiver or ccipOwner to clean up
         choice CCVVerifyTicket_Archive : ()
             with
                 caller : Party
             controller caller
             do
-                assertMsg "CCVVerifyTicket_Archive: caller must be receiver or ccipOwner"
-                    (caller == receiver || caller == ccipOwner)
+                assertMsg "CCVVerifyTicket_Archive: caller must be receiver, ccipOwner, or executor"
+                    (caller == receiver || caller == ccipOwner || caller == executor)
 
 
 -- | Ticket issued by tokenpool after verifying its required CCVs for inbound transfer.
 -- Passed to PerPartyRouter.Execute to prove pool's CCV requirements are satisfied.
+-- Contains the CCV tickets that satisfy the pool's per-chain requirements.
 template TokenPoolCCVVerifiedTicket
     with
         poolOwner : Party
         ccipOwner : Party
         receiver : Party
-        messageHash : BytesHex
-        sourceChainSelector : Numeric 0
-        verifiedCCVAddresses : [BytesHex]  -- List of 32-byte instance addresses
+        tokenReceiver : Party
+        executor : Party
+        executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+        ccvVerifyTicketCids : [ContractId CCVVerifyTicket]
     where
         signatory poolOwner
-        observer ccipOwner, receiver
+        observer ccipOwner, receiver, tokenReceiver, executor
 
-        choice TokenPoolCCVVerifiedTicket_Consume : [BytesHex]
+        choice TokenPoolCCVVerifiedTicket_Consume : ()
             controller ccipOwner
-            do pure verifiedCCVAddresses
+            do pure ()
+
+        choice TokenPoolCCVVerifiedTicket_Archive : ()
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "TokenPoolCCVVerifiedTicket_Archive: caller must be receiver, ccipOwner, or executor"
+                    (caller == receiver || caller == ccipOwner || caller == executor)
 
 
 -- | Ticket issued by OffRamp after successful message verification.
