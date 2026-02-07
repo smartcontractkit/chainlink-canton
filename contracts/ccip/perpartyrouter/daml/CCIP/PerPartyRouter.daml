@@ -5,6 +5,7 @@ import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Optional (fromOptional)
 
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
@@ -154,19 +155,57 @@ template PerPartyRouter
                     ccipMessageSent = ccipMessageSentCid
                     messageId = result.messageId
 
+        -- | Prepare an inbound message for execution.
+        -- Performs early replay check and delegates to OffRamp.PrepareExecute.
+        -- TODO: consider relaxing to allow `controller caller`
+        nonconsuming choice PrepareExecute : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+            with
+                offRampCid : ContractId CCIP.OffRamp.OffRamp
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                encodedMessage : BytesHex
+                receiverParty : Party
+                tokenReceiverParty : Optional Party
+                caller : Party
+            controller partyOwner
+            do
+                -- Validate offRamp
+                offRamp <- fetch offRampCid
+                assertMsg "router: offramp ccipowner mismatch"
+                    (offRamp.ccipOwner == ccipOwner)
+
+                -- Early replay check (informational; Execute is authoritative)
+                let messageId = keccak256 encodedMessage
+                let currentState = fromOptional
+                        CCIP.Internal.UNTOUCHED
+                        (Map.lookup messageId executionStates)
+                case currentState of
+                    CCIP.Internal.SUCCESS -> abort "message already executed successfully"
+                    CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
+                    _ -> pure ()
+
+                -- Delegate to OffRamp
+                executingMessageCid <- exercise offRampCid CCIP.OffRamp.PrepareExecute with
+                    encodedMessage = encodedMessage
+                    rmnRemoteCid = rmnRemoteCid
+                    receiverParty = receiverParty
+                    tokenReceiverParty = tokenReceiverParty
+                    caller = caller
+
+                pure executingMessageCid
+
         -- | execute an inbound ccip message.
         -- receiver declares their CCV requirements as a parameter.
+        -- TODO: consider relaxing to allow `controller caller`
         choice Execute : ExecuteResult
             with
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 offRampCid : ContractId CCIP.OffRamp.OffRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                encodedMessage : BytesHex
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
                 tokenPoolCCVTicket : Optional (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
                 receiverRequiredCCVs : [RawInstanceAddress]
-                tokenReceiverParty : Optional Party  -- Required if message has token transfer
             controller partyOwner
             do
                 -- validate offramp belongs to same deployment
@@ -174,32 +213,33 @@ template PerPartyRouter
                 assertMsg "router: offramp ccipowner mismatch"
                     (offRamp.ccipOwner == ccipOwner)
 
-                -- check execution state (replay prevention)
-                let messageHash = keccak256 encodedMessage
+                -- Fetch ExecutingMessageV1 for messageId (used for replay tracking)
+                execMsg <- fetch executingMessageCid
+                let messageId = execMsg.messageId
+
+                -- Authoritative replay check
                 let currentState = fromOptional
                         CCIP.Internal.UNTOUCHED
-                        (Map.lookup messageHash executionStates)
+                        (Map.lookup messageId executionStates)
 
                 case currentState of
                     CCIP.Internal.SUCCESS -> abort "message already executed successfully"
                     CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
                     _ -> pure ()
 
-                -- delegate to offramp (which issues TokenReceiveTicket via TokenAdminRegistry)
-                -- pass receiver's required CCVs and tokenPoolCCVTicket
+                -- delegate to offramp
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
                     receiverRequiredCCVs = receiverRequiredCCVs
+                    executingMessageCid = executingMessageCid
                     rmnRemoteCid = rmnRemoteCid
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
-                    encodedMessage = encodedMessage
                     ccvVerifyTickets = ccvVerifyTickets
                     tokenPoolCCVTicket = tokenPoolCCVTicket
-                    tokenReceiverParty = tokenReceiverParty
 
                 -- update state
-                let newStates = Map.insert result.messageHash CCIP.Internal.SUCCESS executionStates
+                let newStates = Map.insert result.messageId CCIP.Internal.SUCCESS executionStates
                 routerCid <- create this with executionStates = newStates
 
                 -- emit event
@@ -209,14 +249,14 @@ template PerPartyRouter
                     event = ExecutionStateChangedEvent with
                         sourceChainSelector = result.sourceChainSelector
                         sequenceNumber = result.sequenceNumber
-                        messageId = result.messageHash
+                        messageId = result.messageId
                         state = CCIP.Internal.SUCCESS
                         returnData = ""
 
                 pure ExecuteResult with
                     router = routerCid
                     tokenReceiveTicket = result.tokenReceiveTicket
-                    messageId = result.messageHash
+                    messageId = result.messageId
                     message = result.message
                     state = CCIP.Internal.SUCCESS
 
