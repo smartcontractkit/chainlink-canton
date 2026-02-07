@@ -144,11 +144,12 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 
 // GenerateVerifierResults generates the verifierResults blob for CommitteeVerifier.
 // Format: versionTag (4 bytes) || signatureLength (2 bytes) || signatures (64 bytes each)
+// Matches EVM: signers sign keccak256(versionTag || messageId) where messageId = keccak256(encodedMessage).
 func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.PrivateKey) ([]byte, error) {
 	versionTag, _ := hex.DecodeString("49ff34ed")
 
-	preimage := append(versionTag, encodedMessage...)
-	msgHash := crypto.Keccak256(preimage)
+	messageId := crypto.Keccak256(encodedMessage)
+	msgHash := crypto.Keccak256(append(versionTag, messageId...))
 
 	var signatures []byte
 	for _, pk := range privateKeys {
