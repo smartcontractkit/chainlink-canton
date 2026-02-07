@@ -29,6 +29,7 @@ testCCIPSend = script do
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
+    let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -36,6 +37,7 @@ testCCIPSend = script do
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- deploy global config
     let defaultExecutor = CCIP.RawInstanceAddress.make "default-executor" ccipOwner
@@ -76,6 +78,7 @@ testCCIPSend = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- deploy perpartyrouter factory
     factory <- submit ccipOwner do
@@ -161,6 +164,7 @@ testCCIPExecute = script do
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
+    let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -168,6 +172,7 @@ testCCIPExecute = script do
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- deploy global config
     globalConfig <- submit ccipOwner do
@@ -206,6 +211,7 @@ testCCIPExecute = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- deploy perpartyrouter factory
     factory <- submit ccipOwner do

@@ -42,16 +42,18 @@ testExecuteWithCCVTicket = script do
     let globalConfigInstanceId = "test-globalconfig"
     let rmnInstanceId = "test-rmn"
     let tokenAdminRegistryInstanceId = "test-tar"
+    let ccvRegistryInstanceId = "test-ccvregistry"
 
     -- Compute instance addresses
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy CCVRegistry for issuing verification tickets
     ccvRegistry <- submit ccipOwner do
         createCmd CCVRegistry.CCVRegistry with
-            instanceId = "test-ccvregistry"
+            instanceId = ccvRegistryInstanceId
             ccipOwner = ccipOwner
 
     -- Build CCV raw instance address and 32-byte hash
@@ -96,6 +98,7 @@ testExecuteWithCCVTicket = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router for receiver
     factory <- submit ccipOwner do
@@ -195,11 +198,13 @@ testExecuteFailsMissingCCV = script do
     let globalConfigInstanceId = "test-globalconfig-missing"
     let rmnInstanceId = "test-rmn-missing"
     let tokenAdminRegistryInstanceId = "test-tar-missing"
+    let ccvRegistryInstanceId = "test-ccvregistry-missing"
 
     -- Compute instance addresses
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance address
     let ccvInstanceId = "test-ccv-committee-missing"
@@ -242,6 +247,7 @@ testExecuteFailsMissingCCV = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router
     factory <- submit ccipOwner do
@@ -322,11 +328,13 @@ testExecuteWrongReceiver = script do
     let globalConfigInstanceId = "test-globalconfig-wrongrecv"
     let rmnInstanceId = "test-rmn-wrongrecv"
     let tokenAdminRegistryInstanceId = "test-tar-wrongrecv"
+    let ccvRegistryInstanceId = "test-ccvregistry-wrongrecv"
 
     -- Compute instance addresses
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy GlobalConfig (no CCV requirements for simplicity)
     globalConfig <- submit ccipOwner do
@@ -365,6 +373,7 @@ testExecuteWrongReceiver = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router for receiver
     factory <- submit ccipOwner do
