@@ -1,5 +1,10 @@
 -- | Raw instance address type for human-readable CCV identification.
 -- Format: "instanceId@partyId" - can be parsed to identify the contract and owner.
+--
+-- TODO: consider moving this or combining with MessageCodecV1 and naming make
+-- `encodeRawInstanceAddress` for consistency. then `encodeInstanceAddress` can
+-- leverage `encodeRawInstanceAddress` or `toInstanceAddress` below and we always
+-- hash instance addresses in the same manner using the same implementation.
 module CCIP.RawInstanceAddress where
 
 import DA.Crypto.Text (BytesHex, keccak256, toHex)
