@@ -142,6 +142,7 @@ template CCIPReceiver
                             CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
                                 tokenReceiveTicketCid = ticketCid
                                 tokenAdminRegistryCid
+                                rmnRemoteCid
                                 tokenInput = tt.tokenInput
                                 caller = owner
                         pure (Some releaseResult)
