@@ -36,7 +36,8 @@ template CCVRegistry
                     ccvInstanceId = ccvInstanceId
                     ccvOwner = ccvOwner
                     versionTag = versionTag
-                    ccipOwner = ccipOwner
+                    ccvRegistryInstanceId = instanceId
+                    ccvRegistryOwner = ccipOwner
                     sender = sender
                     verifierBlob = verifierBlob
                     messageSentObservers = messageSentObservers
@@ -61,7 +62,8 @@ template CCVRegistry
                     ccvInstanceId = ccvInstanceId
                     ccvOwner = ccvOwner
                     versionTag = versionTag
-                    ccipOwner = ccipOwner
+                    ccvRegistryInstanceId = instanceId
+                    ccvRegistryOwner = ccipOwner
                     receiver = receiver
                     executor = caller
                     executingMessageCid = executingMessageCid
