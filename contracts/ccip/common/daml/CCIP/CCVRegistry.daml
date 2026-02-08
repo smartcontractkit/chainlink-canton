@@ -16,33 +16,6 @@ template CCVRegistry
     where
         signatory ccipOwner
 
-        -- | Issue a CCV ticket for outbound message (forwardToVerifier equivalent).
-        -- Called by CCV after processing send request.
-        nonconsuming choice CCVRegistry_IssueCCVTicket : ContractId CCIP.Tickets.CCVTicket
-            with
-                ccvInstanceId : Text           -- CCV's instanceId
-                ccvOwner : Party               -- Controller
-                versionTag : BytesHex          -- 4-byte version tag
-                verifierBlob : BytesHex
-                messageSentObservers : [Party]
-                sender : Party
-                receipt : CCIP.Tickets.Receipt
-            controller ccvOwner
-            do
-                assertMsg "CCVRegistry: version tag must be 4 bytes"
-                    (byteCount versionTag == 4)
-
-                create CCIP.Tickets.CCVTicket with
-                    ccvInstanceId = ccvInstanceId
-                    ccvOwner = ccvOwner
-                    versionTag = versionTag
-                    ccvRegistryInstanceId = instanceId
-                    ccvRegistryOwner = ccipOwner
-                    sender = sender
-                    verifierBlob = verifierBlob
-                    messageSentObservers = messageSentObservers
-                    receipt = receipt
-
         -- | Issue a CCV verify ticket for inbound message verification.
         -- Called by CCV after successful verification.
         nonconsuming choice CCVRegistry_IssueVerifyTicket : ContractId CCIP.Tickets.CCVVerifyTicket
