@@ -5,8 +5,9 @@ import (
 	"reflect"
 
 	"github.com/aws/smithy-go/ptr"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -72,19 +73,38 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 				return datastore.AddressRef{}, fmt.Errorf("input deps selector %d does not match operation chain selector %d", input.ChainSelector, deps.Chain.Selector)
 			}
 
-			createCommand := templWithID.(TT).CreateCommand()
+			// Convert template struct directly to apiv2.Record using ledger.ConvertToRecord
+			createArgs := ledger.ConvertToRecord(templWithID)
 
-			submitResp, err := deps.BindingClient.CommandService.SubmitAndWaitForTransaction(b.GetContext(), &model.SubmitAndWaitRequest{
-				Commands: &model.Commands{
-					CommandID: uuid.Must(uuid.NewUUID()).String(),
+			// Get template ID components
+			templateID := templWithID.(TT).GetTemplateID()
+			packageID, moduleName, entityName, err := parseTemplateIDFromString(templateID)
+			if err != nil {
+				return datastore.AddressRef{}, fmt.Errorf("failed to parse template ID %s: %w", templateID, err)
+			}
+
+			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+				Commands: &apiv2.Commands{
+					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,
-					Commands:  []*model.Command{{Command: createCommand}},
+					Commands: []*apiv2.Command{{
+						Command: &apiv2.Command_Create{
+							Create: &apiv2.CreateCommand{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  packageID,
+									ModuleName: moduleName,
+									EntityName: entityName,
+								},
+								CreateArguments: createArgs,
+							},
+						},
+					}},
 				},
 			})
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to submit create command: %w", err)
 			}
-			contractId, err := getDeployedContractIDFromEvents(submitResp.Transaction.Events, input.Template, params.PackageName)
+			contractId, err := getDeployedContractIDFromEvents(submitResp.GetTransaction().GetEvents(), input.Template, params.PackageName)
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to get deployed contract ID: %w", err)
 			}
@@ -140,15 +160,25 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 }
 
 // TODO: packageName add package name to bindings instead
-func getDeployedContractIDFromEvents(events []*model.Event, template common.Template, packageName string) (string, error) {
+func getDeployedContractIDFromEvents(events []*apiv2.Event, template common.Template, packageName string) (string, error) {
 	for _, event := range events {
-		if event.Created == nil {
+		created := event.GetCreated()
+		if created == nil {
 			continue
 		}
 
-		if contracts.ReplacePackageIdWithNameInTemplateID(template.GetTemplateID(), packageName) ==
-			contracts.ReplacePackageIdWithNameInTemplateID(event.Created.TemplateID, event.Created.PackageName) {
-			return event.Created.ContractID, nil
+		templateID := created.GetTemplateId()
+		if templateID == nil {
+			continue
+		}
+
+		// Compare template IDs
+		expectedTemplateID := contracts.ReplacePackageIdWithNameInTemplateID(template.GetTemplateID(), packageName)
+		eventTemplateID := fmt.Sprintf("#%s:%s:%s", templateID.GetPackageId(), templateID.GetModuleName(), templateID.GetEntityName())
+		eventTemplateIDWithPackageName := contracts.ReplacePackageIdWithNameInTemplateID(eventTemplateID, packageName)
+
+		if expectedTemplateID == eventTemplateIDWithPackageName {
+			return created.GetContractId(), nil
 		}
 	}
 

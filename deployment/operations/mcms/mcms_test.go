@@ -4,7 +4,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/noders-team/go-daml/pkg/client"
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
+	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	"github.com/noders-team/go-daml/pkg/auth"
 	"github.com/noders-team/go-daml/pkg/types"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -12,6 +15,8 @@ import (
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -30,24 +35,37 @@ func TestMCMSOps(t *testing.T) {
 	require.NoError(t, err)
 	cantonChain := bc.(*canton.Chain)
 
-	// TODO Expose via CLDF/CTF
 	token, err := cantonChain.Participants[0].JWTProvider.Token(t.Context())
 	require.NoError(t, err)
-	bindingClient, err := client.NewDamlClient(token, cantonChain.Participants[0].Endpoints.GRPCLedgerAPIURL).
-		WithAdminAddress(cantonChain.Participants[0].Endpoints.AdminAPIURL).
-		Build(t.Context())
-	require.NoError(t, err, "failed to create Daml binding client")
-	t.Cleanup(bindingClient.Close)
+
+	// Create gRPC clients
+	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	adminApiClient, err := grpc.NewClient(cantonChain.Participants[0].Endpoints.AdminAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
+	require.NoError(t, err, "Failed to dial gRPC admin API")
+	ledgerApiClient, err := grpc.NewClient(cantonChain.Participants[0].Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
+	require.NoError(t, err, "Failed to dial gRPC ledger API")
+
+	packageServiceClient := participantv30.NewPackageServiceClient(adminApiClient)
+	userManagementServiceClient := admin.NewUserManagementServiceClient(ledgerApiClient)
 
 	// Upload Dar
 	mcmdDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err, "failed to get MCMS dar file")
-	err = bindingClient.PackageMng.UploadDarFile(t.Context(), mcmdDar, "")
+	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+		Dars: []*participantv30.UploadDarRequest_UploadDarData{
+			{Bytes: mcmdDar},
+		},
+		VetAllPackages:     true,
+		SynchronizeVetting: true,
+	})
 	require.NoError(t, err, "failed to upload MCMS dar file")
 
 	// Get primary party
-	user, err := bindingClient.UserMng.GetUser(t.Context(), "user-participant1")
+	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
+		UserId: "user-participant1",
+	})
 	require.NoError(t, err, "failed to get user")
+	primaryParty := userResp.GetUser().GetPrimaryParty()
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -56,9 +74,10 @@ func TestMCMSOps(t *testing.T) {
 		reporter,
 	)
 	deps := dependencies.CantonDeps{
-		Chain:         *cantonChain,
-		BindingClient: bindingClient,
-		Party:         user.PrimaryParty,
+		Chain:                *cantonChain,
+		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
+		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
+		Party:                primaryParty,
 	}
 
 	chainID := int64(1)
@@ -109,9 +128,9 @@ func TestMCMSOps(t *testing.T) {
 	t.Run("Deploy", func(t *testing.T) {
 		result, err := cld_ops.ExecuteOperation(bundle, Deploy, deps, contract.DeployInput[mcms.MCMS]{
 			ChainSelector: cantonChain.Selector,
-			ActAs:         []string{user.PrimaryParty},
+			ActAs:         []string{primaryParty},
 			Template: mcms.MCMS{
-				Owner:              types.PARTY(user.PrimaryParty),
+				Owner:        types.PARTY(primaryParty),
 				InstanceId:         types.TEXT(mcmsID + "@" + user.PrimaryParty),
 				ChainId:            types.INT64(chainID),
 				Proposer:           roleState,
@@ -121,7 +140,7 @@ func TestMCMSOps(t *testing.T) {
 				BlockedFunctions:   nil,
 				TimelockTimestamps: nil,
 			},
-			OwnerParty: types.PARTY(user.PrimaryParty),
+			OwnerParty: types.PARTY(primaryParty),
 		})
 		require.NoError(t, err, "failed to deploy MCMS")
 		mcmsInstanceID = contracts.InstanceID(result.Output.Address)
@@ -165,7 +184,7 @@ func TestMCMSOps(t *testing.T) {
 		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, deps, contract.ChoiceInput[mcms.SetConfig]{
 			ChainSelector:   cantonChain.Selector,
 			InstanceAddress: mcmsInstanceID.InstanceAddress(),
-			ActAs:           []string{user.PrimaryParty},
+			ActAs:           []string{primaryParty},
 			Args: mcms.SetConfig{
 				TargetRole:      mcms.RoleProposer, // Target the proposer role
 				NewSigners:      newSigners,
