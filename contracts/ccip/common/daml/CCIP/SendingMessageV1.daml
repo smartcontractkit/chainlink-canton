@@ -1,0 +1,292 @@
+-- | Sending message contract for outbound CCIP message processing.
+-- Evolves from a static container to a collecting contract. Each consuming
+-- choice consumes the old contract and creates a new one with appended data.
+-- The ccipOwner signatory is inherited from the consumed contract, so any
+-- caller can trigger the mutation.
+module CCIP.SendingMessageV1 where
+
+import DA.Crypto.Text (BytesHex, keccak256, byteCount)
+import DA.Foldable qualified as Foldable
+import DA.List (dedup)
+import DA.Optional (isNone)
+
+import qualified CCIP.MessageCodecV1
+
+import qualified Splice.Api.Token.HoldingV1
+
+data CCVFee = CCVFee
+    with
+        ccvInstanceId : Text
+        ccvOwner : Party
+        feeUSDCents : Decimal
+        destGasLimit : Int
+        destBytesOverhead : Int
+    deriving (Eq, Show)
+
+data TokenSendFee = TokenSendFee
+    with
+        poolInstanceId : Text
+        poolOwner : Party
+        feeUSDCents : Decimal
+        destGasOverhead : Int
+        destBytesOverhead : Int
+    deriving (Eq, Show)
+
+data VerifierData = VerifierData
+    with
+        ccvInstanceId : Text
+        ccvOwner : Party
+        versionTag : BytesHex
+        verifierBlob : BytesHex
+        messageSentObservers : [Party]
+    deriving (Eq, Show)
+
+data TokenSendData = TokenSendData
+    with
+        poolInstanceId : Text
+        poolOwner : Party
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        destTokenAddress : BytesHex
+        tokenReceiver : BytesHex
+        extraData : BytesHex
+    deriving (Eq, Show)
+
+template SendingMessageV1
+    with
+        ccipOwner : Party
+        sender : Party
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        hasTokenTransfer : Bool
+        expectedCCVAddresses : [BytesHex]
+
+        -- Raw MessageV1 fields (always populated at PrepareSend)
+        sourceChainSelector : Numeric 0
+        senderAddress : BytesHex
+        receiver : BytesHex
+        payload : BytesHex
+        executionGasLimit : Int
+        ccipReceiveGasLimit : Int
+        finality : Int
+        ccvAndExecutorHash : BytesHex
+        onRampAddress : BytesHex
+        offRampAddress : BytesHex
+        -- Token transfer fields (populated when hasTokenTransfer = True)
+        sourcePoolAddress : BytesHex
+        sourceTokenAddress : BytesHex
+        tokenReceiver : BytesHex
+        tokenAmount : Numeric 0
+
+        -- Constructed message. For message-only: populated at PrepareSend.
+        -- For token transfers: None/"" until AddTokenSend.
+        message : Optional CCIP.MessageCodecV1.MessageV1
+        encodedMessage : BytesHex
+        messageId : BytesHex
+
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+
+        networkFeeUSDCents : Decimal
+        ccvFees : [CCVFee]
+        tokenSendFee : Optional TokenSendFee
+
+        -- Populated by FinalizeFee (batch conversion from USD to fee
+        -- token units at a single price point). Empty until then.
+        feesFinalized : Bool
+        ccvFeeTokenAmounts : [Numeric 0]
+        tokenSendFeeTokenAmount : Numeric 0
+        networkFeeTokenAmount : Numeric 0
+
+        verifierData : [VerifierData]
+        tokenSendData : Optional TokenSendData
+        tokenPoolCCVsVerified : Bool
+
+        observingParties : [Party]
+    where
+        signatory ccipOwner
+        observer observingParties
+
+        choice AddCCVFee : ContractId SendingMessageV1
+            with
+                ccvInstanceId : Text
+                feeUSDCents : Decimal
+                destGasLimit : Int
+                destBytesOverhead : Int
+                caller : Party
+            controller caller
+            do
+                assertMsg "cannot add CCV fee after fees finalized"
+                    (not feesFinalized)
+                let fee = CCVFee with
+                        ccvInstanceId, ccvOwner = caller
+                        feeUSDCents, destGasLimit, destBytesOverhead
+                create this with ccvFees = ccvFees ++ [fee]
+
+        choice AddTokenSendFee : ContractId SendingMessageV1
+            with
+                poolInstanceId : Text
+                poolOwner : Party
+                feeUSDCents : Decimal
+                destGasOverhead : Int
+                destBytesOverhead : Int
+                caller : Party
+            controller caller
+            do
+                assertMsg "cannot add token send fee after fees finalized"
+                    (not feesFinalized)
+                assertMsg "token send fee already set"
+                    (isNone tokenSendFee)
+                let fee = TokenSendFee with
+                        poolInstanceId, poolOwner
+                        feeUSDCents, destGasOverhead, destBytesOverhead
+                create this with tokenSendFee = Some fee
+
+        choice AddVerifierData : ContractId SendingMessageV1
+            with
+                ccvInstanceId : Text
+                versionTag : BytesHex
+                verifierBlob : BytesHex
+                messageSentObservers : [Party]
+                caller : Party
+            controller caller
+            do
+                assertMsg "version tag must be 4 bytes"
+                    (byteCount versionTag == 4)
+                let vd = VerifierData with
+                        ccvInstanceId
+                        ccvOwner = caller
+                        versionTag, verifierBlob, messageSentObservers
+                create this with
+                    verifierData = verifierData ++ [vd]
+                    observingParties =
+                        dedup (observingParties ++ messageSentObservers)
+
+        -- Constructs MessageV1 from SendingMessageV1 fields with pool-provided
+        -- destTokenAddress and extraData (destPoolData). Encodes the
+        -- message and computes the final messageId. Only valid when
+        -- hasTokenTransfer = True and message is not yet constructed.
+        choice AddTokenSend : ContractId SendingMessageV1
+            with
+                poolInstanceId : Text
+                poolOwner : Party
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                amount : Numeric 0
+                destTokenAddress : BytesHex
+                addTokenReceiver : BytesHex
+                extraData : BytesHex
+                caller : Party
+            controller caller
+            do
+                assertMsg "token send already set" (isNone tokenSendData)
+                assertMsg "message already constructed" (isNone message)
+                assertMsg "not a token transfer send" hasTokenTransfer
+
+                let tsd = TokenSendData with
+                        poolInstanceId, poolOwner, instrumentId, amount
+                        destTokenAddress
+                        tokenReceiver = addTokenReceiver
+                        extraData
+
+                let tokenTransferV1 = CCIP.MessageCodecV1.TokenTransferV1 with
+                        sourcePoolAddress, sourceTokenAddress
+                        destTokenAddress = destTokenAddress
+                        tokenReceiver = addTokenReceiver
+                        amount = tokenAmount
+                        extraData = extraData
+                let messageV1 = CCIP.MessageCodecV1.MessageV1 with
+                        sourceChainSelector, destChainSelector, sequenceNumber
+                        executionGasLimit, ccipReceiveGasLimit
+                        finality
+                        ccvAndExecutorHash
+                        onRampAddress, offRampAddress
+                        sender = senderAddress
+                        receiver
+                        destBlob = ""
+                        tokenTransfer = Some tokenTransferV1
+                        messageData = payload
+
+                let encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
+                let msgId = keccak256 encoded
+
+                create this with
+                    tokenSendData = Some tsd
+                    message = Some messageV1
+                    encodedMessage = encoded
+                    messageId = msgId
+
+        -- Sets tokenPoolCCVsVerified flag after the pool has validated
+        -- that its outbound CCV requirements are covered by verifierData.
+        -- Called directly by the pool (no TAR intermediary needed since
+        -- pool identity is validated against tokenSendData, which was
+        -- set by TAR during AddTokenSend).
+        choice MarkTokenPoolCCVsVerified : ContractId SendingMessageV1
+            with
+                poolInstanceId : Text
+                caller : Party
+            controller caller
+            do
+                assertMsg "token pool CCVs already verified"
+                    (not tokenPoolCCVsVerified)
+                tsd <- case tokenSendData of
+                    None -> abort "no token send data"
+                    Some t -> pure t
+                assertMsg "caller is not the registered pool owner"
+                    (caller == tsd.poolOwner)
+                assertMsg "pool instance id mismatch"
+                    (poolInstanceId == tsd.poolInstanceId)
+                create this with tokenPoolCCVsVerified = True
+
+        -- Archives the SendingMessageV1 for a cancelled send.
+        -- Returns the token send data so the caller can issue a refund
+        -- ticket via TAR. Only needed for non-atomic sends where
+        -- LockOrBurn succeeded but a later phase failed.
+        choice CancelSend : Optional TokenSendData
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "only sender can cancel" (caller == sender)
+                pure tokenSendData
+
+        -- Batch-converts all USD fees to fee token units at a single
+        -- price point. The caller queries FeeQuoter.GetTokenPrice
+        -- and passes the price directly to avoid a circular dependency
+        -- between ccip-common and ccip-feequoter packages.
+        choice FinalizeFee : ContractId SendingMessageV1
+            with
+                feeTokenPrice : Decimal
+                caller : Party
+            controller caller
+            do
+                assertMsg "fees already finalized" (not feesFinalized)
+                assertMsg "fee token price must be positive"
+                    (feeTokenPrice > 0.0)
+
+                let convertUSD usdCents =
+                        intToNumeric (truncate (usdCents / feeTokenPrice))
+
+                let ccvAmounts = map
+                        (\fee -> convertUSD fee.feeUSDCents) ccvFees
+                let poolAmount = case tokenSendFee of
+                        None -> 0.0
+                        Some fee -> convertUSD fee.feeUSDCents
+                let networkAmount = convertUSD networkFeeUSDCents
+
+                create this with
+                    feesFinalized = True
+                    ccvFeeTokenAmounts = ccvAmounts
+                    tokenSendFeeTokenAmount = poolAmount
+                    networkFeeTokenAmount = networkAmount
+
+        -- Total fee in fee token units. Matches EVM where
+        -- forwardToVerifier receives the total feeTokenAmount.
+        -- Requires FinalizeFee to have been called.
+        nonconsuming choice FeeTokenAmount : Numeric 0
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "fees not finalized" feesFinalized
+                pure (Foldable.sum ccvFeeTokenAmounts
+                    + tokenSendFeeTokenAmount
+                    + networkFeeTokenAmount)
