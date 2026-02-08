@@ -227,6 +227,8 @@ template MCMS
         case op.functionName of
           "schedule_batch" -> do
             assertMsg "E_WRONG_ROLE_FOR_SCHEDULE: must use Proposer" $ targetRole == Proposer
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
             case decodeScheduleBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode schedule_batch params"
               Some params ->
@@ -234,6 +236,8 @@ template MCMS
 
           "bypasser_execute_batch" -> do
             assertMsg "E_WRONG_ROLE_FOR_BYPASS: must use Bypasser" $ targetRole == Bypasser
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
             case decodeBypasserExecuteParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode bypasser_execute_batch params"
               Some params ->
@@ -241,6 +245,8 @@ template MCMS
 
           "cancel_batch" -> do
             assertMsg "E_WRONG_ROLE_FOR_CANCEL: must use Canceller" $ targetRole == Canceller
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
             case decodeCancelBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode cancel_batch params"
               Some params ->

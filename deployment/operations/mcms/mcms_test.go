@@ -130,8 +130,8 @@ func TestMCMSOps(t *testing.T) {
 			ChainSelector: cantonChain.Selector,
 			ActAs:         []string{primaryParty},
 			Template: mcms.MCMS{
-				Owner:        types.PARTY(primaryParty),
-				InstanceId:         types.TEXT(mcmsID + "@" + user.PrimaryParty),
+				Owner:              types.PARTY(primaryParty),
+				InstanceId:         types.TEXT(mcmsID + "@" + primaryParty),
 				ChainId:            types.INT64(chainID),
 				Proposer:           roleState,
 				Canceller:          roleState,
