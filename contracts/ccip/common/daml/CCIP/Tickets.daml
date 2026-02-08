@@ -27,32 +27,6 @@ data Receipt = Receipt
         extraArgs : BytesHex           -- Entity-specific arguments
     deriving (Eq, Show)
 
--- | Ticket issued by the CCV (via CCVRegistry) for outbound attestation.
--- Stakeholders can read all fields directly; instance address computed as needed.
-template CCVTicket
-    with
-        ccvInstanceId : Text
-        ccvOwner : Party
-        versionTag : BytesHex          -- 4-byte version tag (e.g., "49ff34ed")
-        ccvRegistryInstanceId : Text   -- Identifies the issuing CCVRegistry
-        ccvRegistryOwner : Party       -- CCVRegistry's signatory party
-        sender : Party
-
-        verifierBlob : BytesHex
-        messageSentObservers : [Party]
-        receipt : Receipt              -- Fee/gas contribution from this CCV
-    where
-        signatory ccvRegistryOwner
-        observer ccvOwner, sender
-
-        choice CCVTicket_Archive : ()
-            with
-                caller : Party
-            controller caller
-            do
-                assertMsg "CCVTicket_Archive: caller must be sender or ccvRegistryOwner"
-                    (caller == sender || caller == ccvRegistryOwner)
-
 
 -- | Ticket issued by CCV (via CCVRegistry) after verifying an inbound message.
 -- References the ExecutingMessageV1 that was verified against.
@@ -77,29 +51,6 @@ template CCVVerifyTicket
             do
                 assertMsg "CCVVerifyTicket_Archive: caller must be receiver, ccvRegistryOwner, or executor"
                     (caller == receiver || caller == ccvRegistryOwner || caller == executor)
-
--- | Ticket issued by TokenAdminRegistry after pool locks tokens for outbound transfer.
--- Stakeholders can read all fields directly; pool address computed by OnRamp.
--- Archived by TokenAdminRegistry_ConsumeSendTicket.
-template TokenSendTicket
-    with
-        ccipOwner : Party      -- TAR's signatory party
-        tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
-        poolInstanceId : Text          -- Pool's instanceId for address computation
-        poolOwner : Party
-        sender : Party
-
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-
-        sourceTokenAddress : BytesHex
-        amount : Numeric 0
-        destTokenAddress : BytesHex
-        tokenReceiver : BytesHex
-        extraData : BytesHex
-        receipt : Receipt              -- Fee/gas contribution from pool
-    where
-        signatory ccipOwner
-        observer poolOwner, sender
 
 -- | Ticket issued by tokenpool after verifying its required CCVs for inbound transfer.
 -- Passed to PerPartyRouter.Execute to prove pool's CCV requirements are satisfied.
