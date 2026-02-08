@@ -116,7 +116,7 @@ template CCIPReceiver
                     None -> pure None
                     Some tt -> do
                         ticket <- exercise tt.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_VerifyCCVs with
+                            CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundCCVs with
                                 executingMessageCid = executingMessageCid
                                 ccvVerifyTickets
                                 caller = owner
@@ -148,18 +148,16 @@ template CCIPReceiver
                         pure (Some releaseResult)
                     _ -> pure None
 
+                -- Receivers that need custom behavior can fork this receiver and add
+                -- business logic here, e.g., parse and act on the message or
+                -- programmatic token transfers.
+
                 create CCIPMessageReceived with
                     owner
                     router = result.router
                     messageId = result.messageId
                     message = result.message
                     tokenReleaseResult
-
-                ---------------------------------------------------------------------------
-                -- Receivers that need custom behavior can fork this receiver and add the
-                -- business logic here eg parse and act on the message or programatic
-                -- token transfers.
-                ---------------------------------------------------------------------------
 
 -- | Record of a successfully received CCIP message.
 template CCIPMessageReceived
