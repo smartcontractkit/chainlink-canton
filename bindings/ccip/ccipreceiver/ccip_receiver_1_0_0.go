@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	"https://github.com/smartcontractkit/go-daml/pkg/codec"
-	"https://github.com/smartcontractkit/go-daml/pkg/model"
-	. "https://github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/codec"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -60,7 +60,7 @@ func (t CCIPReceiver) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CCIPReceiver) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPReceiver", "CCIPReceiver")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CCIPReceiver", "CCIPReceiver")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -229,7 +229,7 @@ func (t MessageReceived) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t MessageReceived) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPReceiver", "MessageReceived")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CCIPReceiver", "MessageReceived")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

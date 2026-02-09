@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	"https://github.com/smartcontractkit/go-daml/pkg/codec"
-	"https://github.com/smartcontractkit/go-daml/pkg/model"
-	. "https://github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/codec"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -211,7 +211,7 @@ func (t CCVRegistry) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CCVRegistry) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCVRegistry", "CCVRegistry")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CCVRegistry", "CCVRegistry")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -426,7 +426,7 @@ func (t CCVTicket) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CCVTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "CCVTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Tickets", "CCVTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -607,7 +607,7 @@ func (t CCVVerifyTicket) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CCVVerifyTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "CCVVerifyTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Tickets", "CCVVerifyTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1060,7 +1060,7 @@ func (t GlobalConfig) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t GlobalConfig) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1497,7 +1497,7 @@ func (t TokenPoolCCVVerifiedTicket) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenPoolCCVVerifiedTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenPoolCCVVerifiedTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Tickets", "TokenPoolCCVVerifiedTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1663,7 +1663,7 @@ func (t TokenReceiveTicket) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenReceiveTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1845,7 +1845,7 @@ func (t TokenSendTicket) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenSendTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenSendTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Tickets", "TokenSendTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -2140,7 +2140,7 @@ func IIAny2CantonMessageReceiverInterfaceID() string {
 
 // IIAny2CantonMessageReceiverInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIAny2CantonMessageReceiverInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Interfaces.Any2CantonMessageReceiver", "IAny2CantonMessageReceiver")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.Any2CantonMessageReceiver", "IAny2CantonMessageReceiver")
 }
 
 // IICrossChainVerifierInterfaceID returns the interface ID for the IICrossChainVerifier interface using the package name
@@ -2150,5 +2150,5 @@ func IICrossChainVerifierInterfaceID() string {
 
 // IICrossChainVerifierInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IICrossChainVerifierInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Interfaces.CrossChainVerifier", "ICrossChainVerifier")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.CrossChainVerifier", "ICrossChainVerifier")
 }
