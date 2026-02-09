@@ -3,8 +3,7 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 import DA.Crypto.Text (BytesHex)
 
 import qualified CCIP.CCVRegistry
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.Tickets
+import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
 
 -- | Dummy version tag for testing
@@ -17,6 +16,9 @@ template DummyCommitteeVerifier
         owner : Party
         ccipOwner : Party
         versionTag : BytesHex
+        feeUSDCents : Decimal
+        destGasLimit : Int
+        destBytesOverhead : Int
     where
         signatory owner
 
@@ -29,7 +31,7 @@ template DummyCommitteeVerifier
                 case arg.verifierResults of
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
-                        debug ("DummyCommitteeVerifier: Simulated successful verification")
+                        debug "DummyCommitteeVerifier: Simulated successful verification"
                         execMsg <- fetch arg.executingMessageCid
                         exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
                             ccvInstanceId = instanceId
@@ -39,29 +41,44 @@ template DummyCommitteeVerifier
                             receiver = execMsg.receiver
                             caller = arg.caller
 
-            crossChainVerifier_forwardToVerifierImpl self arg = do
-                -- Compute instance address for receipt
-                let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId owner
+            crossChainVerifier_calculateFeeImpl self arg = do
+                exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
+                    DummyCommitteeVerifier_CalculateFee with
+                        sendingMessageCid = arg.sendingMessageCid
+                        caller = arg.caller
 
-                -- Build verifierBlob with version tag as first 4 bytes
+            crossChainVerifier_forwardToVerifierImpl self arg = do
+                exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
+                    DummyCommitteeVerifier_ForwardToVerifier with
+                        sendingMessageCid = arg.sendingMessageCid
+                        caller = arg.caller
+
+        nonconsuming choice DummyCommitteeVerifier_CalculateFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                caller : Party
+            controller caller
+            do
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                    ccvInstanceId = instanceId
+                    feeUSDCents = feeUSDCents
+                    destGasLimit = destGasLimit
+                    destBytesOverhead = destBytesOverhead
+                    caller = owner
+
+        nonconsuming choice DummyCommitteeVerifier_ForwardToVerifier
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                caller : Party
+            controller caller
+            do
                 let verifierBlob = versionTag
 
-                -- Build Receipt with instance address
-                let receipt = CCIP.Tickets.Receipt with
-                        issuerType = CCIP.Tickets.IssuerType_CCV
-                        issuerAddress = ccvAddr
-                        versionTag = Some versionTag
-                        destGasLimit = 0
-                        destBytesOverhead = 0
-                        feeTokenAmount = 0.0
-                        extraArgs = ""
-
-                -- Issue CCV ticket via CCVRegistry (registry computes instance address)
-                exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
                     ccvInstanceId = instanceId
-                    ccvOwner = owner
                     versionTag = versionTag
                     verifierBlob = verifierBlob
                     messageSentObservers = [owner]
-                    sender = arg.caller
-                    receipt = receipt
+                    caller = owner
