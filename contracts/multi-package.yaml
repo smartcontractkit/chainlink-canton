@@ -1,6 +1,7 @@
 packages:
   - coin
   - ccip/ccipreceiver
+  - ccip/ccipsender
   - ccip/ccvs
   - ccip/common
   - ccip/rmn
