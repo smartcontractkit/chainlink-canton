@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/ccv_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -50,20 +49,6 @@ var DeployChainContracts = operations.NewSequence(
 	"Deploys all required contracts for CCIP 1.7.0 to a Canton chain",
 	func(b operations.Bundle, deps dependencies.CantonDeps, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		var results []datastore.AddressRef
-
-		// Deploy CCVRegistry
-		deployCCVRegistryReport, err := operations.ExecuteOperation(b, ccv_registry.Deploy, deps, contract.DeployInput[common.CCVRegistry]{
-			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
-			Template: common.CCVRegistry{
-				CcipOwner: types.PARTY(input.CCIPOwnerParty),
-			},
-			OwnerParty: types.PARTY(input.CCIPOwnerParty),
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CCVRegistry: %w", err)
-		}
-		results = append(results, deployCCVRegistryReport.Output)
 
 		// Deploy FeeQuoter
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
