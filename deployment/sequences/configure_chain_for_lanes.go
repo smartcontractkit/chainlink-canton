@@ -53,13 +53,13 @@ var ConfigureChainForLanes = operations.NewSequence(
 			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
 
 			// Inbound / OffRamp
-			defaultInboundCCVs := make([]types.TEXT, 0, len(remoteConfig.DefaultInboundCCVs))
+			defaultInboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
 			for _, ccv := range remoteConfig.DefaultInboundCCVs {
-				defaultInboundCCVs = append(defaultInboundCCVs, types.TEXT(ccv))
+				defaultInboundCCVs = append(defaultInboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
-			laneMandatedInboundCCVs := make([]types.TEXT, 0, len(remoteConfig.LaneMandatedInboundCCVs))
+			laneMandatedInboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
-				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, types.TEXT(ccv))
+				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
 			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
 			for _, onRamp := range remoteConfig.OnRamps {
