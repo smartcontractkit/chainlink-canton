@@ -67,10 +67,10 @@ template ExecutingMessageV1
                         ccvOwner = caller
                         versionTag]
 
-        -- Mark pool CCV requirements as satisfied. Pool exercises this directly.
+        -- Mark pool CCV requirements as satisfied. Only exercisable by ccipOwner,
+        -- which is authorized through TAR's signatory context when pool calls
+        -- TokenAdminRegistry_MarkPoolCCVsVerified.
         choice MarkPoolCCVsVerified : ContractId ExecutingMessageV1
-            with
-                caller : Party
-            controller caller
+            controller ccipOwner
             do
                 create this with poolCCVsVerified = True
