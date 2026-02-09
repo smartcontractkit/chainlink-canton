@@ -62,27 +62,25 @@ interface ITokenPool where
         controller caller
         do tokenPool_releaseFromTicketImpl this self arg
 
-    -- Lock/burn tokens for outbound transfer. Reads dest chain and token
-    -- amount from SendingMessageV1. Appends token send data via TAR.
+    -- Lock/burn tokens for outbound transfer. The pool is the source of
+    -- truth for the locked amount, which it records via SendingMessageV1.AddTokenSend.
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             tokenInput : TokenInput
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            amount : Numeric 0
             rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             caller : Party
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
 
-    -- Calculate fee for outbound token transfer (USD cents only).
-    -- Reads destChainSelector from SendingMessageV1, looks up per-chain
-    -- fee config, appends fee via TAR.AddTokenSendFee.
+    -- Calculate fee for outbound token transfer, which it records via
+    -- SendingMessageV1.AddTokenFee
     nonconsuming choice TokenPool_CalculateFee
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             caller : Party
         controller caller
         do tokenPool_calculateFeeImpl this self arg
