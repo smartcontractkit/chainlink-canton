@@ -4,7 +4,7 @@ module CCIP.OffRamp where
 import DA.Foldable qualified as Foldable
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.List (dedup)
-import DA.Optional (fromSomeNote)
+import DA.Optional (fromSomeNote, isSome)
 
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.GlobalConfig
@@ -15,7 +15,6 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
-import qualified Splice.Api.Token.HoldingV1
 
 
 -- | OffRamp contract for PerPartyRouter architecture.
@@ -30,17 +29,14 @@ template OffRamp
         signatory ccipOwner
 
         -- | Get required CCV raw instance addresses for inbound message execution.
-        -- Controller is ccipOwner - users access via PerPartyRouter wrapper.
-        -- Includes receiver's required CCVs since they're executing the message.
-        -- Note: pool CCVs are now managed by pools themselves via TokenPool_GetRequiredCCVs.
+        -- Returns lane-mandated + receiver + default CCVs. Pool CCVs are handled
+        -- separately via the pool → TAR → ExecutingMessageV1 path.
+        -- TODO: this should return lane-mandated and default CCVs separately
         nonconsuming choice GetRequiredCCVsForExecute : [CCIP.RawInstanceAddress.RawInstanceAddress]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 sourceChainSelector : Numeric 0
-                hasTokenTransfer : Bool
-                instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
             controller ccipOwner
             do
                 -- Get lane-mandated CCVs from GlobalConfig
@@ -120,7 +116,7 @@ template OffRamp
                     executor = caller
                     observingParties = observers
                     ccvVerifications = []
-                    poolCCVsVerified = False
+                    inboundPoolCCVs = None
 
         -- | Process a CCIP execute request from a PerPartyRouter.
         -- Reads CCV verifications and pool verification state from the ExecutingMessageV1
@@ -179,46 +175,33 @@ template OffRamp
                         assertMsg "offramp: source chain disabled" c.isEnabled
                         pure c
 
-                -- Decode instrument ID from token transfer (used for pool identity validation)
-                let optInstrumentId = case message.tokenTransfer of
-                        None -> None
-                        Some tt -> CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress
+                -- Get pool's declared CCV requirements from ExecutingMessageV1.
+                -- Pool records these via SetInboundPoolCCVs; None means pool wasn't called.
+                poolCCVs <- case execMsg.tokenReceiver of
+                    None -> pure []
+                    Some _ -> case execMsg.inboundPoolCCVs of
+                        None -> abort "offramp: pool CCVs not set for token transfer"
+                        Some ccvs -> pure ccvs
 
-                -- Validate pool CCV verification when token transfer exists.
-                -- Pool exercises MarkPoolCCVsVerified when called, so if token
-                -- transfer exists the flag must be True.
-                poolHasRequirements <- case execMsg.tokenReceiver of
-                    None -> pure False
-                    Some _ -> do
-                        assertMsg "offramp: pool CCVs not verified for token transfer"
-                            execMsg.poolCCVsVerified
-                        -- Check if pool actually had requirements (for default CCV logic)
-                        case optInstrumentId of
-                            Some instId -> do
-                                configOpt <- exercise tokenAdminRegistryCid
-                                    CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
-                                        instrumentId = instId
-                                        caller = ccipOwner
-                                case configOpt of
-                                    Some config -> case config.tokenPool of
-                                        Some _ -> pure True
-                                        None -> abort "offramp: no pool registered for instrument"
-                                    None -> abort "offramp: no token config for instrument"
-                            None -> pure False
+                -- Token-only: no message data, no receiver callback gas limit,
+                -- but has a token transfer. A no-op (no data, no token) falls
+                -- back to defaults instead.
+                let isTokenOnlyTransfer =
+                        message.messageData == ""
+                        && message.ccipReceiveGasLimit == 0
+                        && isSome message.tokenTransfer
 
-                -- Determine if defaults should apply
-                let hasSpecificRequirements =
-                        not (null sourceConfig.laneMandatedCCVs) ||
-                        not (null receiverRequiredCCVs) ||
-                        poolHasRequirements
-
-                -- Get default CCVs if no specific requirements
-                let defaultCCVs = if hasSpecificRequirements
+                -- Defaults apply when any source (receiver or pool) lacks specific
+                -- requirements, matching EVM's address(0) sentinel logic.
+                -- Token-only transfers skip defaults since only the token
+                -- issuer/pool takes risk.
+                let resolvedDefaultCCVs = if isTokenOnlyTransfer
+                        || (not (null receiverRequiredCCVs) && not (null poolCCVs))
                         then []
                         else sourceConfig.defaultCCVs
 
-                -- Combine all raw addresses and convert to hashed addresses
-                let allRawAddrs = sourceConfig.laneMandatedCCVs ++ receiverRequiredCCVs ++ defaultCCVs
+                -- Unified CCV list: lane-mandated + receiver + pool + defaults
+                let allRawAddrs = sourceConfig.laneMandatedCCVs ++ receiverRequiredCCVs ++ poolCCVs ++ resolvedDefaultCCVs
                 let requiredCCVAddresses = dedup $
                         map CCIP.RawInstanceAddress.toInstanceAddress allRawAddrs
 
