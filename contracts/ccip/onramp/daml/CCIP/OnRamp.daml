@@ -60,7 +60,6 @@ template OnRamp
                 destChainSelector : Numeric 0
                 receiver : BytesHex
                 payload : BytesHex
-                executionGasLimit : Int
                 ccipReceiveGasLimit : Int
                 currentSequenceNumber : Numeric 0
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
@@ -140,7 +139,7 @@ template OnRamp
                                     sourceChainSelector = globalConfig.chainSelector
                                     destChainSelector = destChainSelector
                                     sequenceNumber = newSequenceNumber
-                                    executionGasLimit = executionGasLimit
+                                    executionGasLimit = 0
                                     ccipReceiveGasLimit = ccipReceiveGasLimit
                                     finality = 2000
                                     ccvAndExecutorHash = ccvAndExecutorHash
@@ -168,7 +167,8 @@ template OnRamp
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
                     receiver, payload
-                    executionGasLimit, ccipReceiveGasLimit
+                    executionGasLimit = 0
+                    ccipReceiveGasLimit
                     finality = 2000
                     ccvAndExecutorHash = ccvAndExecutorHash
                     onRampAddress = onRampAddr
