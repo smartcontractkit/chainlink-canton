@@ -14,6 +14,7 @@ data-dependencies:
   - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-1.0.0.dar
   - ../onramp/.daml/dist/ccip-onramp-1.0.0.dar
   - ../offramp/.daml/dist/ccip-offramp-1.0.0.dar
+  - ../pools/interfaces/.daml/dist/ccip-tokenpool-interfaces-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
