@@ -125,7 +125,7 @@ template LockReleaseTokenPool
                         sendingMessageCid = arg.sendingMessageCid
                         tokenInput = arg.tokenInput
                         senderInputCids = arg.senderInputCids
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        amount = arg.amount
                         rmnRemoteCid = arg.rmnRemoteCid
                         caller = arg.caller
 
@@ -133,7 +133,6 @@ template LockReleaseTokenPool
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         caller = arg.caller
 
         -- Get required CCV raw instance addresses based on chain and direction.
@@ -294,12 +293,11 @@ template LockReleaseTokenPool
 
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
-        -- fee config, appends fee via TAR.AddTokenSendFee.
+        -- fee config, appends fee directly to SendingMessageV1.
         nonconsuming choice LockReleaseTokenPool_CalculateFee
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 caller : Party
             controller caller
             do
@@ -307,10 +305,10 @@ template LockReleaseTokenPool
                 let feeConfig = fromSomeNote "no pool fee config for dest chain"
                         (Map.lookup sendingMsg.destChainSelector chainFeeConfigs)
 
-                exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSendFee with
-                        sendingMessageCid = sendingMessageCid
-                        instrumentId = instrumentId
+                exercise sendingMessageCid
+                    CCIP.SendingMessageV1.AddTokenSendFee with
+                        poolInstanceId = instanceId
+                        poolOwner = poolOwner
                         feeUSDCents = feeConfig.feeUSDCents
                         destGasOverhead = feeConfig.destGasOverhead
                         destBytesOverhead = feeConfig.destBytesOverhead
@@ -325,7 +323,7 @@ template LockReleaseTokenPool
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                amount : Numeric 0
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 caller : Party
             controller caller, poolOwner
@@ -355,7 +353,7 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = intToDecimal (truncate sendingMsg.tokenAmount)
+                let amountDecimal : Decimal = intToDecimal (truncate amount)
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
@@ -372,17 +370,17 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
-                -- Append token send data via TAR (validates registration).
                 -- AddTokenSend merges poolRequiredCCVs into the unified CCV list
                 -- and constructs MessageV1 from SendingMessageV1 fields.
+                -- OnRamp cross-validates pool identity against TAR at CCIPSend.
                 let extraData = fromOptional "" destPoolData
-                newSendingMessageCid <- exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSend with
-                        sendingMessageCid = sendingMessageCid
+                newSendingMessageCid <- exercise sendingMessageCid
+                    CCIP.SendingMessageV1.AddTokenSend with
+                        poolInstanceId = instanceId
+                        poolOwner = poolOwner
                         instrumentId = instrumentId
-                        amount = sendingMsg.tokenAmount
+                        amount = amount
                         destTokenAddress = destTokenAddr
-                        tokenReceiver = sendingMsg.tokenReceiver
                         extraData = extraData
                         poolRequiredCCVs = poolRequiredCCVs
                         caller = poolOwner
