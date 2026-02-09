@@ -27,7 +27,6 @@ interface ITokenPool where
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
     tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
-    tokenPool_verifyOutboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyOutboundCCVs -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
 
     -- Get required CCV raw instance addresses for a transfer based on direction, amount, finality, etc.
     nonconsuming choice TokenPool_GetRequiredCCVs : [RawInstanceAddress]
@@ -87,17 +86,6 @@ interface ITokenPool where
             caller : Party
         controller caller
         do tokenPool_calculateFeeImpl this self arg
-
-    -- Validate pool's outbound CCV requirements against actual verifier
-    -- attestations in SendingMessageV1.verifierData. Called after
-    -- ForwardToVerifier, before CCIPSend.
-    nonconsuming choice TokenPool_VerifyOutboundCCVs
-            : ContractId CCIP.SendingMessageV1.SendingMessageV1
-        with
-            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            caller : Party
-        controller caller
-        do tokenPool_verifyOutboundCCVsImpl this self arg
 
 
 -- View of the TokenPool
