@@ -3,8 +3,9 @@ package changesets
 import (
 	"fmt"
 
+	"https://github.com/smartcontractkit/go-daml/pkg/auth"
+
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/noders-team/go-daml/pkg/auth"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"

@@ -9,9 +9,10 @@ import (
 	"sync"
 	"testing"
 
+	"https://github.com/smartcontractkit/go-daml/pkg/auth"
+
 	"github.com/BurntSushi/toml"
 	"github.com/deepmap/oapi-codegen/pkg/securityprovider"
-	"github.com/noders-team/go-daml/pkg/auth"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"

@@ -3,8 +3,9 @@ package sequences
 import (
 	"fmt"
 
+	"https://github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/Masterminds/semver/v3"
-	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"

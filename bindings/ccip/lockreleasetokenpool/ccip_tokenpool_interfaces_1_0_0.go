@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/noders-team/go-daml/pkg/codec"
-	"github.com/noders-team/go-daml/pkg/model"
-	. "github.com/noders-team/go-daml/pkg/types"
+	"https://github.com/smartcontractkit/go-daml/pkg/codec"
+	"https://github.com/smartcontractkit/go-daml/pkg/model"
+	. "https://github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (

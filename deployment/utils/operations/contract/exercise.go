@@ -7,11 +7,12 @@ import (
 	"io"
 	"strings"
 
+	"https://github.com/smartcontractkit/go-daml/pkg/model"
+	"https://github.com/smartcontractkit/go-daml/pkg/service/ledger"
+
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/noders-team/go-daml/pkg/model"
-	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"

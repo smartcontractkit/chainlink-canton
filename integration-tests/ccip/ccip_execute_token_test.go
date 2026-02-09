@@ -15,9 +15,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"https://github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"https://github.com/smartcontractkit/go-daml/pkg/types"
+
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/noders-team/go-daml/pkg/service/ledger"
-	"github.com/noders-team/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
