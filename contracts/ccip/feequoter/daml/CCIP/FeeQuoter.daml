@@ -4,14 +4,13 @@ import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
 import DA.Map qualified as Map
 import DA.Optional
-import DA.Text qualified as Text
 
 import Splice.Api.Token.HoldingV1
 
 import CCIP.Common qualified as Common
-import qualified CCIP.Client
 import qualified CCIP.SendingMessageV1
 
+-- TODO: double check and readd fee/price quoting
 template FeeQuoter
     with
         instanceId : Text
@@ -71,27 +70,6 @@ template FeeQuoter
         -- │                         Fee Quoting                          │
         -- ================================================================
 
-        -- deprecated
-        nonconsuming choice GetValidatedFee : Decimal
-            with
-                destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
-                caller : Party
-            controller caller
-            do
-                destChainConfig <- exercise self GetDestChainConfig with destChainSelector = destChainSelector, caller = caller
-
-                -- Validate message size
-                let messageSize = Text.length message.payload + Text.length message.extraArgs
-                assertMsg ("Message size exceeds maxDataBytes for destChainSelector " <> show destChainSelector <> ": " <> show messageSize <> " > " <> show destChainConfig.maxDataBytes) (messageSize <= destChainConfig.maxDataBytes)
-
-                -- Calculate fee components
-                let networkFee = destChainConfig.networkFeeUSD
-                feeTokenPrice <- exercise self GetTokenPrice with instrumentId = message.feeToken, caller = caller
-                let fee = networkFee / feeTokenPrice.price
-
-                return fee
-
         nonconsuming choice FeeQuoter_GetTokenTransferFee : (Decimal, Int, Int)
             with
                 destChainSelector : Numeric 0
@@ -107,17 +85,6 @@ template FeeQuoter
                         -- In a real implementation, you might want to pass the destChainSelector as an argument.
                         let defaultConfig = fromSomeNote "No dest chain configs available" (Map.lookup destChainSelector destChainConfigs)
                         return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
-
-        nonconsuming choice FeeQuoter_QuoteGasForExec : (Int, Decimal, Decimal, Decimal)
-            with
-                destChainSelector : Numeric 0
-                nonCalldataGas : Int
-                calldataSize : Int
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-                caller : Party
-            controller caller
-            do
-                return (0, 0.0, 0.0, 0.0) -- TODO
 
         -- Looks up the fee token price and premium multiplier from
         -- internal state, then exercises SendingMessageV1.FinalizeFee
