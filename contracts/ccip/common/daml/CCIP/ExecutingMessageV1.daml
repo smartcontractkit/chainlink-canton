@@ -8,6 +8,7 @@ import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
 import qualified CCIP.MessageCodecV1
+import CCIP.RawInstanceAddress (RawInstanceAddress)
 
 -- | Record of a CCV verification appended via AddCCVVerification.
 -- The ccvOwner is authenticated by Daml's controller mechanism.
@@ -37,7 +38,9 @@ template ExecutingMessageV1
         executor : Party
         observingParties : [Party]
         ccvVerifications : [CCVVerification]
-        poolCCVsVerified : Bool
+        -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
+        -- None = pool hasn't been called; Some [] = called, no requirements.
+        inboundPoolCCVs : Optional [RawInstanceAddress]
     where
         signatory ccipOwner
         observer observingParties
@@ -67,10 +70,13 @@ template ExecutingMessageV1
                         ccvOwner = caller
                         versionTag]
 
-        -- Mark pool CCV requirements as satisfied. Only exercisable by ccipOwner,
-        -- which is authorized through TAR's signatory context when pool calls
-        -- TokenAdminRegistry_MarkPoolCCVsVerified.
-        choice MarkPoolCCVsVerified : ContractId ExecutingMessageV1
+        -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner,
+        -- authorized through TAR's signatory context when pool calls
+        -- TokenAdminRegistry_SetInboundPoolCCVs. OffRamp verifies coverage.
+        choice SetInboundPoolCCVs : ContractId ExecutingMessageV1
+            with
+                poolCCVs : [RawInstanceAddress]
             controller ccipOwner
             do
-                create this with poolCCVsVerified = True
+                assertMsg "setInboundPoolCCVs: already set" (inboundPoolCCVs == None)
+                create this with inboundPoolCCVs = Some poolCCVs
