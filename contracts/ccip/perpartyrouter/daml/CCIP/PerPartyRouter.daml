@@ -1,26 +1,32 @@
--- | per-party router for ccip message sending and receiving.
+-- | Per-party router for CCIP message sending and receiving.
 module CCIP.PerPartyRouter where
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Optional (fromOptional)
+import DA.Time (addRelTime, hours)
 
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
+import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
 
 
--- | factory for creating perpartyrouters.
--- tracks (party, instanceId) combinations to prevent duplicate instanceIds.
+-- | Factory for creating PerPartyRouters.
+-- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
 template PerPartyRouterFactory
     with
         instanceId : Text
@@ -35,13 +41,11 @@ template PerPartyRouterFactory
                 instanceId : Text  -- user specifies their desired instanceId
             controller partyOwner
             do
-                -- Check party doesn't already have a route
-                -- NOTE: this is necessary to make sure that the same messageId isn't replayed, since
-                -- the `executionStates` map is in PerPartyRouter.
+                -- Check party doesn't already have a router.
+                -- Prevents messageId replay since executionStates is per-router.
                 assertMsg "router already exists for this party"
                     (not (Map.member partyOwner registeredRouters))
 
-                -- check instanceId is not already taken
                 assertMsg "instanceId already in use"
                     (instanceId `notElem` Map.values registeredRouters)
 
@@ -74,40 +78,37 @@ data CreateRouterResult = CreateRouterResult
     deriving (Eq, Show)
 
 
--- | per-party router - state container with delegation to onramp/offramp.
--- note: no stored cids - users pass all cids via explicit disclosure
+-- | Per-party router - state container with delegation to OnRamp/OffRamp.
+-- No stored CIDs; users pass all CIDs via explicit disclosure.
 template PerPartyRouter
     with
         instanceId : Text
         ccipOwner : Party
         partyOwner : Party
-        -- only per-party state, no stored cids
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
     where
         signatory ccipOwner
         observer partyOwner
 
-        -- | send a ccip message with optional token transfer.
-        -- note: tokenSendTicket was already validated at issuance via TokenAdminRegistry_IssueSendTicket
-        choice CCIPSend : CCIPSendResult
+        -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
+        nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 onRampCid : ContractId CCIP.OnRamp.OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 destChainSelector : Numeric 0
                 receiver : BytesHex
                 payload : BytesHex
                 executionGasLimit : Int
                 ccipReceiveGasLimit : Int
-
-                tokenSendTicket : Optional (ContractId CCIP.Tickets.TokenSendTicket)
-                ccvTickets : [ContractId CCIP.Tickets.CCVTicket]
+                senderRequiredCCVs : [RawInstanceAddress]
+                tokenTransferParams : Optional CCIP.OnRamp.TokenTransferParams
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
-                -- validate onramp belongs to same deployment
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
                     (onRamp.ccipOwner == ccipOwner)
@@ -115,45 +116,111 @@ template PerPartyRouter
                 let currentSeqNum = fromOptional 0.0
                         (Map.lookup destChainSelector outboundSequenceNumbers)
 
-                -- delegate to onramp (no router CCVs passed - sender doesn't know receiver's requirements)
+                exercise onRampCid CCIP.OnRamp.PrepareSendFromRouter with
+                    routerPartyOwner = partyOwner
+                    globalConfigCid
+                    tokenAdminRegistryCid
+                    feeQuoterCid
+                    rmnRemoteCid
+                    destChainSelector
+                    receiver
+                    payload
+                    executionGasLimit
+                    ccipReceiveGasLimit
+                    currentSequenceNumber = currentSeqNum
+                    senderRequiredCCVs
+                    tokenTransferParams
+                    feeToken
+
+        -- | Finalize a CCIP send. Collects total fee from sender, delegates to
+        -- OnRamp, updates sequence number state, emits CCIPMessageSent event.
+        -- Fee collection happens here (not OnRamp) because partyOwner's Daml
+        -- authorization is needed for the sender-side Splice transfer.
+        nonconsuming choice CCIPSend : CCIPSendResult
+            with
+                onRampCid : ContractId CCIP.OnRamp.OnRamp
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                feeTokenInput : CCIP.Interfaces.TokenPool.TokenInput
+                feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+            controller partyOwner
+            do
+                onRamp <- fetch onRampCid
+                assertMsg "router: onramp ccipowner mismatch"
+                    (onRamp.ccipOwner == ccipOwner)
+
+                sendingMsg <- fetch sendingMessageCid
+                let destChain = sendingMsg.destChainSelector
+
+                -- TODO: validate currentSeqNum here instead of OnRamp
+                let currentSeqNum = fromOptional 0.0
+                        (Map.lookup destChain outboundSequenceNumbers)
+
+                totalFee <- exercise sendingMessageCid
+                    CCIP.SendingMessageV1.FeeTokenAmount with
+                        caller = partyOwner
+
+                -- TODO: move to Router
+                feeChangeCids <- if totalFee > 0.0
+                    then do
+                        -- TODO: check executeBefore
+                        now <- getTime
+                        let feeTransfer =
+                                Splice.Api.Token.TransferInstructionV1.Transfer with
+                                    sender = partyOwner
+                                    receiver = ccipOwner
+                                    amount = intToDecimal (truncate totalFee)
+                                    instrumentId = sendingMsg.feeToken
+                                    requestedAt = now
+                                    executeBefore = addRelTime now (hours 1)
+                                    inputHoldingCids = feeTokenHoldingCids
+                                    meta = Splice.Api.Token.MetadataV1.emptyMetadata
+                        feeResult <- exercise
+                            feeTokenInput.transferFactory
+                            Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                                expectedAdmin = sendingMsg.feeToken.admin
+                                transfer = feeTransfer
+                                extraArgs = feeTokenInput.extraArgs
+                        case feeResult.output of
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                pure feeResult.senderChangeCids
+                            _ -> abort "fee transfer did not complete"
+                    else pure []
+
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
                     routerPartyOwner = partyOwner
-                    rmnRemoteCid = rmnRemoteCid
-                    globalConfigCid = globalConfigCid
-                    tokenAdminRegistryCid = tokenAdminRegistryCid
-                    destChainSelector = destChainSelector
-                    receiver = receiver
-                    payload = payload
-                    executionGasLimit = executionGasLimit
-                    ccipReceiveGasLimit = ccipReceiveGasLimit
                     currentSequenceNumber = currentSeqNum
-                    tokenSendTicket = tokenSendTicket
-                    ccvTickets = ccvTickets
+                    rmnRemoteCid
+                    globalConfigCid
+                    tokenAdminRegistryCid
+                    sendingMessageCid
 
-                -- update state
                 let newSeqNumbers = Map.insert
-                        result.destChainSelector
-                        result.newSequenceNumber
+                        destChain
+                        sendingMsg.sequenceNumber
                         outboundSequenceNumbers
                 routerCid <- create this with outboundSequenceNumbers = newSeqNumbers
 
-                -- emit event
+                -- TODO: create in OnRamp
                 ccipMessageSentCid <- create CCIPMessageSent with
-                    ccipOwner = ccipOwner
+                    ccipOwner
                     sender = partyOwner
                     observers = result.messageSentObservers
                     event = CCIPMessageSentEvent with
-                        destChainSelector = result.destChainSelector
-                        sequenceNumber = result.newSequenceNumber
-                        messageId = result.messageId
-                        encodedMessage = result.encodedMessage
+                        destChainSelector = destChain
+                        sequenceNumber = sendingMsg.sequenceNumber
+                        messageId = sendingMsg.messageId
+                        encodedMessage = sendingMsg.encodedMessage
                         verifierBlobs = result.verifierBlobs
                         receipts = result.receipts
 
                 pure CCIPSendResult with
                     router = routerCid
                     ccipMessageSent = ccipMessageSentCid
-                    messageId = result.messageId
+                    messageId = sendingMsg.messageId
+                    feeChangeCids
 
         -- | Prepare an inbound message for execution.
         -- Performs early replay check and delegates to OffRamp.PrepareExecute.
@@ -275,26 +342,18 @@ template PerPartyRouter
                 pure (fromOptional 0.0 (Map.lookup destChainSelector outboundSequenceNumbers))
 
         -- | Get all required CCV raw instance addresses for sending a message.
-        -- Thin wrapper that calls OnRamp. Does NOT pass receiver CCVs (sender doesn't know receiver's requirements).
         nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress]
             with
                 onRampCid : ContractId CCIP.OnRamp.OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 destChainSelector : Numeric 0
-                hasTokenTransfer : Bool
-                instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
                 exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
                     globalConfigCid = globalConfigCid
-                    tokenAdminRegistryCid = tokenAdminRegistryCid
                     destChainSelector = destChainSelector
-                    hasTokenTransfer = hasTokenTransfer
-                    instrumentId = instrumentId
 
         -- | Get all required CCV raw instance addresses for executing a message.
-        -- Thin wrapper that calls OffRamp with receiver's required CCVs passed as parameter.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
             with
                 offRampCid : ContractId CCIP.OffRamp.OffRamp
@@ -320,6 +379,7 @@ data CCIPSendResult = CCIPSendResult
         router : ContractId PerPartyRouter
         ccipMessageSent : ContractId CCIPMessageSent
         messageId : BytesHex
+        feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
 data ExecuteResult = ExecuteResult
