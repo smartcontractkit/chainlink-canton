@@ -105,7 +105,8 @@ template PerPartyRouter
                 executionGasLimit : Int
                 ccipReceiveGasLimit : Int
                 senderRequiredCCVs : [RawInstanceAddress]
-                tokenTransferParams : Optional CCIP.OnRamp.TokenTransferParams
+                withTokenTransfer : Bool
+                tokenReceiver : Optional BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
@@ -129,7 +130,8 @@ template PerPartyRouter
                     ccipReceiveGasLimit
                     currentSequenceNumber = currentSeqNum
                     senderRequiredCCVs
-                    tokenTransferParams
+                    withTokenTransfer
+                    tokenReceiver
                     feeToken
 
         -- | Finalize a CCIP send. Collects total fee from sender, delegates to
@@ -235,7 +237,6 @@ template PerPartyRouter
                 caller : Party
             controller partyOwner
             do
-                -- Validate offRamp
                 offRamp <- fetch offRampCid
                 assertMsg "router: offramp ccipowner mismatch"
                     (offRamp.ccipOwner == ccipOwner)
@@ -250,15 +251,13 @@ template PerPartyRouter
                     CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
                     _ -> pure ()
 
-                -- Delegate to OffRamp
-                executingMessageCid <- exercise offRampCid CCIP.OffRamp.PrepareExecute with
+                exercise offRampCid CCIP.OffRamp.PrepareExecute with
                     encodedMessage = encodedMessage
                     rmnRemoteCid = rmnRemoteCid
                     receiverParty = receiverParty
                     tokenReceiverParty = tokenReceiverParty
                     caller = caller
 
-                pure executingMessageCid
 
         -- | execute an inbound ccip message.
         -- receiver declares their CCV requirements as a parameter.
@@ -275,16 +274,13 @@ template PerPartyRouter
                 receiverRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
-                -- validate offramp belongs to same deployment
                 offRamp <- fetch offRampCid
                 assertMsg "router: offramp ccipowner mismatch"
                     (offRamp.ccipOwner == ccipOwner)
 
-                -- Fetch ExecutingMessageV1 for messageId (used for replay tracking)
                 execMsg <- fetch executingMessageCid
                 let messageId = execMsg.messageId
 
-                -- Authoritative replay check
                 let currentState = fromOptional
                         CCIP.Internal.UNTOUCHED
                         (Map.lookup messageId executionStates)
@@ -294,7 +290,6 @@ template PerPartyRouter
                     CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
                     _ -> pure ()
 
-                -- delegate to offramp
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
                     receiverRequiredCCVs = receiverRequiredCCVs
@@ -305,11 +300,9 @@ template PerPartyRouter
                     ccvVerifyTickets = ccvVerifyTickets
                     tokenPoolCCVTicket = tokenPoolCCVTicket
 
-                -- update state
                 let newStates = Map.insert result.messageId CCIP.Internal.SUCCESS executionStates
                 routerCid <- create this with executionStates = newStates
 
-                -- emit event
                 _ <- create ExecutionStateChanged with
                     ccipOwner = ccipOwner
                     receiver = partyOwner
