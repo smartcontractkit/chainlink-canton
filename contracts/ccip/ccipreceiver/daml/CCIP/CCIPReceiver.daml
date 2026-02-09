@@ -1,15 +1,16 @@
 -- | Receiver-side entry point for CCIP message execution.
--- Calls PrepareExecute to create an ExecutingMessageV1, then passes it
--- to CCV verification, pool verification, and the final Execute.
+-- Calls PrepareExecute to create an ExecutingMessageV1, then threads it
+-- through CCV verification and pool verification via foldlA, and
+-- finally calls Execute.
 --
 -- Only `owner` is a signatory. The CCIP participant does not need this DAR
 -- because ccipOwner is not a party on this contract.
 module CCIP.CCIPReceiver where
 
 import DA.Crypto.Text (BytesHex)
+import DA.Action (foldlA)
 import DA.List (dedup)
 
-import qualified CCIP.CCVRegistry
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
@@ -74,7 +75,6 @@ template CCIPReceiver
                 offRampCid : ContractId CCIP.OffRamp.OffRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
 
                 -- The encoded CCIP message (hex-encoded bytes)
@@ -93,7 +93,7 @@ template CCIPReceiver
             controller owner
             do
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1
-                executingMessageCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
+                emCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
                     offRampCid = offRampCid
                     rmnRemoteCid = rmnRemoteCid
                     encodedMessage = encodedMessage
@@ -101,28 +101,26 @@ template CCIPReceiver
                     tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
                     caller = owner
 
-                -- CCV verification using ExecutingMessageV1
-                ccvVerifyTickets <- forA ccvInputs $ \input ->
+                -- CCV verification: thread executingMessageCid through each CCV
+                emCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
-                            ccvRegistryCid
                             rmnRemoteCid
-                            executingMessageCid = executingMessageCid
+                            executingMessageCid = cid
                             verifierResults = input.verifierResults
                             caller = owner
+                    ) emCid ccvInputs
 
-                -- Pool CCV verification using ExecutingMessageV1
-                tokenPoolCCVTicket <- case tokenTransfer of
-                    None -> pure None
-                    Some tt -> do
-                        ticket <- exercise tt.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundCCVs with
-                                executingMessageCid = executingMessageCid
-                                ccvVerifyTickets
-                                caller = owner
-                        pure (Some ticket)
+                -- Pool CCV verification: confirm that CCV results contain token pool required CCVs
+                emCid <- case tokenTransfer of
+                    None -> pure emCid
+                    Some tt -> exercise tt.tokenPoolCid
+                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundCCVs with
+                            executingMessageCid = emCid
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            caller = owner
 
-                -- Execute using ExecutingMessageV1
+                -- Execute with the final executingMessageCid
                 let allRequiredCCVs = dedup (requiredCCVs ++ additionalRequiredCCVs)
 
                 result <- exercise routerCid CCIP.PerPartyRouter.Execute with
@@ -130,9 +128,7 @@ template CCIPReceiver
                     offRampCid
                     globalConfigCid
                     tokenAdminRegistryCid
-                    executingMessageCid = executingMessageCid
-                    ccvVerifyTickets
-                    tokenPoolCCVTicket
+                    executingMessageCid = emCid
                     receiverRequiredCCVs = allRequiredCCVs
 
                 -- Token release
