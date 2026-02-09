@@ -4,6 +4,7 @@ import Daml.Script
 
 import DA.Crypto.Text (keccak256)
 import DA.Foldable (forA_)
+import DA.Map qualified as Map
 import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
@@ -78,6 +79,7 @@ setup = script do
             threshold = 1
             signers = pubKeys1
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
@@ -103,6 +105,7 @@ setup = script do
             threshold = 3
             signers = pubKeys2
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
@@ -128,6 +131,7 @@ setup = script do
             threshold = 20
             signers = pubKeys3
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test3 =====")
 
     debug ("===== Test4 =====")
@@ -145,6 +149,7 @@ setup = script do
             threshold = 3
             signers = pubKeys4
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
@@ -169,6 +174,7 @@ setup = script do
             threshold = 4
             signers = pubKeys5
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
@@ -193,6 +199,7 @@ setup = script do
             threshold = 3
             signers = pubKeys6
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
@@ -215,6 +222,7 @@ setup = script do
             threshold = 0
             signers = []
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test7 =====")
 
     debug ("===== Test8 =====")
@@ -230,6 +238,7 @@ setup = script do
             threshold = 1
             signers = PayloadBuilder.getPubkeysForIndices [0]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test8 =====")
 
     debug ("===== Test9 =====")
@@ -246,6 +255,7 @@ setup = script do
             threshold = 2
             signers = pubKeys9
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
             ccvRegistryCid = ccvRegistry
