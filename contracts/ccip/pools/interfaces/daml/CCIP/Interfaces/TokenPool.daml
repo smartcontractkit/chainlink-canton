@@ -14,6 +14,7 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
 
+
 -- | Direction of token transfer for CCV requirement lookup.
 data TransferDirection = Outbound | Inbound
     deriving (Eq, Show)
@@ -23,7 +24,7 @@ interface ITokenPool where
     viewtype TokenPoolView
 
     tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [RawInstanceAddress]
-    tokenPool_verifyInboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyInboundCCVs -> Update (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
+    tokenPool_verifyInboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyInboundCCVs -> Update (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
     tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
@@ -40,12 +41,10 @@ interface ITokenPool where
         controller caller
         do tokenPool_getRequiredCCVsImpl this self arg
 
-    -- Verify inbound CCVs and issue TokenPoolCCVVerifiedTicket.
-    -- Fetches ExecutingMessageV1 for source chain selector lookup.
-    nonconsuming choice TokenPool_VerifyInboundCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
+    -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1.
+    nonconsuming choice TokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-            ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
             caller : Party
         controller caller
         do tokenPool_verifyInboundCCVsImpl this self arg
