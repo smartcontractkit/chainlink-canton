@@ -246,7 +246,6 @@ testCCIPExecute = script do
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
-    let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -254,7 +253,6 @@ testCCIPExecute = script do
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy GlobalConfig
     globalConfig <- submit ccipOwner do
@@ -293,7 +291,6 @@ testCCIPExecute = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
-            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouter factory
     factory <- submit ccipOwner do
@@ -354,8 +351,6 @@ testCCIPExecute = script do
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
             executingMessageCid = executingMessageCid
-            ccvVerifyTickets = []
-            tokenPoolCCVTicket = None
             receiverRequiredCCVs = []
 
     executeResult.state === CCIP.Internal.SUCCESS

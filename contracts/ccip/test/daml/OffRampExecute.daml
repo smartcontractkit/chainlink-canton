@@ -8,7 +8,7 @@ import DA.Crypto.Text (keccak256)
 import DA.Map qualified as Map
 import DA.Optional
 
-import CCIP.CCVRegistry qualified as CCVRegistry
+import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.GlobalConfig qualified as GlobalConfig
 import CCIP.Internal qualified as Internal
@@ -20,18 +20,16 @@ import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 
 
--- | Test execute with CCV ticket validation (bypasses signature verification).
+-- | Test execute with CCV verification via collecting contract pattern.
 --
--- This test issues CCVVerifyTickets directly via CCVRegistry rather than through
--- CommitteeVerifier with actual ECDSA signature verification. Daml Script allocates
--- parties with random suffixes, and since the message receiver field must contain
--- the party address hash, we cannot pre-compute valid signatures for runtime party IDs.
+-- This test exercises AddCCVVerification directly on ExecutingMessageV1 rather
+-- than through CommitteeVerifier with actual ECDSA signature verification.
+-- Daml Script allocates parties with random suffixes, and since the message
+-- receiver field must contain the party address hash, we cannot pre-compute
+-- valid signatures for runtime party IDs.
 --
 -- CommitteeVerifier signature verification is tested separately in CommitteeVerifier/Test.daml.
---
--- This test verifies that OffRamp correctly validates CCVVerifyTickets, lane-mandated
--- CCV requirement checking works, and execute succeeds when CCV requirements are satisfied.
-testExecuteWithCCVTicket = script do
+testExecuteWithCCVVerification = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
     receiver <- allocateParty "receiver"
@@ -42,26 +40,18 @@ testExecuteWithCCVTicket = script do
     let globalConfigInstanceId = "test-globalconfig"
     let rmnInstanceId = "test-rmn"
     let tokenAdminRegistryInstanceId = "test-tar"
-    let ccvRegistryInstanceId = "test-ccvregistry"
 
     -- Compute instance addresses
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
-    -- Deploy CCVRegistry for issuing verification tickets
-    ccvRegistry <- submit ccipOwner do
-        createCmd CCVRegistry.CCVRegistry with
-            instanceId = ccvRegistryInstanceId
-            ccipOwner = ccipOwner
-
-    -- Build CCV raw instance address and 32-byte hash
+    -- Build CCV raw instance address
     let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
     let ccvInstanceId = "test-ccv-committee"
     let ccvRawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccipOwner
 
-    -- Deploy GlobalConfig with lane-mandated CCV requirement (uses raw instance addresses)
+    -- Deploy GlobalConfig with lane-mandated CCV requirement
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
@@ -72,7 +62,7 @@ testExecuteWithCCVTicket = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
-                laneMandatedCCVs = [ccvRawAddress]  -- Require this CCV raw instance address for verification
+                laneMandatedCCVs = [ccvRawAddress]
                 defaultCCVs = [])]
 
     -- Deploy RMNRemote
@@ -90,7 +80,7 @@ testExecuteWithCCVTicket = script do
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- Deploy OffRamp with instance address fields
+    -- Deploy OffRamp
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
             instanceId = "test-offramp"
@@ -98,7 +88,6 @@ testExecuteWithCCVTicket = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
-            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router for receiver
     factory <- submit ccipOwner do
@@ -126,7 +115,7 @@ testExecuteWithCCVTicket = script do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = MessageCodecV1.encodePartyAddress receiver  -- 32-byte party address
+            receiver = MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
             tokenTransfer = None
             messageData = "48656c6c6f20576f726c64"
@@ -151,21 +140,17 @@ testExecuteWithCCVTicket = script do
             tokenReceiverParty = None
             caller = receiver
 
-
-    -- Issue CCVVerifyTicket via CCVRegistry directly (registry computes instance address)
-    -- (In production this would be done by CommitteeVerifier after signature verification)
-    ccvVerifyTicket <- submit ccipOwner do
-        exerciseCmd ccvRegistry CCVRegistry.CCVRegistry_IssueVerifyTicket with
+    -- Exercise AddCCVVerification directly on ExecutingMessageV1
+    -- (In production, CommitteeVerifier does this after signature verification)
+    executingMessageCid <- submit ccipOwner do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ccvVersionTag
-            ccvOwner = ccipOwner
-            executingMessageCid = executingMessageCid
-            receiver = receiver
-            caller = receiver
+            caller = ccipOwner
 
-    debug ("CCVVerifyTicket created")
+    debug ("CCV verification added to ExecutingMessageV1")
 
-    -- Execute via PerPartyRouter with CCVVerifyTicket
+    -- Execute via PerPartyRouter
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             rmnRemoteCid = rmnRemote
@@ -173,13 +158,11 @@ testExecuteWithCCVTicket = script do
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
             executingMessageCid = executingMessageCid
-            ccvVerifyTickets = [ccvVerifyTicket]
-            tokenPoolCCVTicket = None
             receiverRequiredCCVs = []
 
     -- Verify SUCCESS
     executeResult.state === Internal.SUCCESS
-    debug ("Execute with CCV ticket validation: SUCCESS")
+    debug ("Execute with CCV verification: SUCCESS")
     debug ("Message ID: " <> show executeResult.messageId)
 
     pure ()
@@ -198,19 +181,17 @@ testExecuteFailsMissingCCV = script do
     let globalConfigInstanceId = "test-globalconfig-missing"
     let rmnInstanceId = "test-rmn-missing"
     let tokenAdminRegistryInstanceId = "test-tar-missing"
-    let ccvRegistryInstanceId = "test-ccvregistry-missing"
 
     -- Compute instance addresses
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance address
     let ccvInstanceId = "test-ccv-committee-missing"
     let ccvRawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccipOwner
 
-    -- Deploy GlobalConfig with lane-mandated CCV requirement (uses raw instance addresses)
+    -- Deploy GlobalConfig with lane-mandated CCV requirement
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
@@ -221,7 +202,7 @@ testExecuteFailsMissingCCV = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
-                laneMandatedCCVs = [ccvRawAddress]  -- Require this CCV raw instance address
+                laneMandatedCCVs = [ccvRawAddress]
                 defaultCCVs = [])]
 
     -- Deploy RMNRemote
@@ -239,7 +220,7 @@ testExecuteFailsMissingCCV = script do
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- Deploy OffRamp with instance address fields
+    -- Deploy OffRamp
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
             instanceId = "test-offramp-missing"
@@ -247,7 +228,6 @@ testExecuteFailsMissingCCV = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
-            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router
     factory <- submit ccipOwner do
@@ -275,7 +255,7 @@ testExecuteFailsMissingCCV = script do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = MessageCodecV1.encodePartyAddress receiver  -- 32-byte party address
+            receiver = MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
             tokenTransfer = None
             messageData = "48656c6c6f20576f726c64"
@@ -297,8 +277,7 @@ testExecuteFailsMissingCCV = script do
             tokenReceiverParty = None
             caller = receiver
 
-
-    -- Execute WITHOUT providing the required CCVVerifyTicket - should fail
+    -- Execute WITHOUT adding any CCV verification - should fail
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             rmnRemoteCid = rmnRemote
@@ -306,8 +285,6 @@ testExecuteFailsMissingCCV = script do
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
             executingMessageCid = executingMessageCid
-            ccvVerifyTickets = []  -- Empty! Missing required CCV
-            tokenPoolCCVTicket = None
             receiverRequiredCCVs = []
 
     debug ("Execute fails with missing CCV: PASSED")
@@ -328,13 +305,11 @@ testExecuteWrongReceiver = script do
     let globalConfigInstanceId = "test-globalconfig-wrongrecv"
     let rmnInstanceId = "test-rmn-wrongrecv"
     let tokenAdminRegistryInstanceId = "test-tar-wrongrecv"
-    let ccvRegistryInstanceId = "test-ccvregistry-wrongrecv"
 
     -- Compute instance addresses
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy GlobalConfig (no CCV requirements for simplicity)
     globalConfig <- submit ccipOwner do
@@ -347,7 +322,7 @@ testExecuteWrongReceiver = script do
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
                 onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
-                laneMandatedCCVs = []  -- No CCV requirements
+                laneMandatedCCVs = []
                 defaultCCVs = [])]
 
     -- Deploy RMNRemote
@@ -365,7 +340,7 @@ testExecuteWrongReceiver = script do
             owner = ccipOwner
             tokenConfigs = Map.empty
 
-    -- Deploy OffRamp with instance address fields
+    -- Deploy OffRamp
     offRamp <- submit ccipOwner do
         createCmd OffRamp.OffRamp with
             instanceId = "test-offramp-wrongrecv"
@@ -373,7 +348,6 @@ testExecuteWrongReceiver = script do
             globalConfigInstanceAddress = globalConfigInstanceAddress
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
-            ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
     -- Deploy PerPartyRouterFactory and create router for receiver
     factory <- submit ccipOwner do
@@ -401,7 +375,7 @@ testExecuteWrongReceiver = script do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = MessageCodecV1.encodePartyAddress otherParty  -- Wrong receiver! (32-byte party address)
+            receiver = MessageCodecV1.encodePartyAddress otherParty  -- Wrong receiver!
             destBlob = ""
             tokenTransfer = None
             messageData = "48656c6c6f20576f726c64"

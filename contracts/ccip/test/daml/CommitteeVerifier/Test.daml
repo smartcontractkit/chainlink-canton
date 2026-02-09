@@ -8,12 +8,27 @@ import DA.Map qualified as Map
 import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
-import CCIP.CCVRegistry qualified as CCVRegistry
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
+
+-- | Helper to create a fresh ExecutingMessageV1 for each test.
+-- AddCCVVerification is a consuming choice, so each successful verify
+-- consumes the contract.
+createExecMsg : Party -> Script (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
+createExecMsg owner = submit owner do
+    createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
+        ccipOwner = owner
+        message = PayloadBuilder.testMessage1
+        messageId = keccak256 PayloadBuilder.testMessage1Encoded
+        receiver = owner
+        tokenReceiver = None
+        executor = owner
+        observingParties = [owner]
+        ccvVerifications = []
+        inboundPoolCCVs = None
 
 setup = script do
     owner <- allocateParty "owner"
@@ -25,11 +40,6 @@ setup = script do
     debug ("messageId: " <> messageId)
     let signedHash = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> messageId)
     debug ("signedHash: " <> signedHash)
-
-    ccvRegistry <- submit owner do
-        createCmd CCVRegistry.CCVRegistry with
-            ccipOwner = owner
-            instanceId = "test-ccvregistry"
 
     let rmnInstanceId = "test-rmn"
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
@@ -43,28 +53,16 @@ setup = script do
 
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Create ExecutingMessageV1 for the test message.
-    -- In production, PrepareExecute creates this; here we create it directly
-    -- since these tests focus on signature verification.
-    executingMessageCid <- submit owner do
-        createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
-            ccipOwner = owner
-            message = msg
-            messageId = keccak256 encodedMsg
-            receiver = owner
-            tokenReceiver = None
-            executor = owner
-            observingParties = [owner]
-
     -- Validate signatures individually
+    executingMessageCid <- createExecMsg owner
     forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
         let verified = CommitteeVerifier.validateSignature signedHash pubKey r s
         assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
 
 
-
     debug ("===== Test1 =====")
     -- single signer, threshold 1
+    executingMessageCid <- createExecMsg owner
     let indices1 = [0]
     let pubKeys1 = PayloadBuilder.getPubkeysForIndices indices1
     let verifierResults1 = PayloadBuilder.getVerifierResultsForIndices indices1
@@ -82,7 +80,6 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults1
@@ -91,6 +88,7 @@ setup = script do
 
     debug ("===== Test2 =====")
     -- multiple signers, threshold 3
+    executingMessageCid <- createExecMsg owner
     let indices2 = [0, 1, 2, 3, 4]
     let pubKeys2 = PayloadBuilder.getPubkeysForIndices indices2
     let verifierResults2 = PayloadBuilder.getVerifierResultsForIndices indices2
@@ -108,7 +106,6 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults2
@@ -136,6 +133,7 @@ setup = script do
 
     debug ("===== Test4 =====")
     -- submit with invalid signatures, threshold of 3 met, should fail
+    executingMessageCid <- createExecMsg owner
     let pubKeys4 = PayloadBuilder.getPubkeysForIndices [0, 2, 4, 6, 8, 10]
     let verifierResults4 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
     ccv4 <- submit owner do
@@ -152,7 +150,6 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults4
@@ -177,7 +174,6 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults5
@@ -202,7 +198,6 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults6
@@ -258,7 +253,6 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults =
@@ -268,7 +262,6 @@ setup = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults =
@@ -278,7 +271,6 @@ setup = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
             rmnRemoteCid = rmnRemote
             executingMessageCid = executingMessageCid
             verifierResults =

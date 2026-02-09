@@ -2,7 +2,7 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.CCVRegistry
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
 
@@ -32,14 +32,10 @@ template DummyCommitteeVerifier
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
                         debug "DummyCommitteeVerifier: Simulated successful verification"
-                        execMsg <- fetch arg.executingMessageCid
-                        exercise arg.ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
+                        exercise arg.executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
                             ccvInstanceId = instanceId
-                            ccvOwner = owner
                             versionTag = versionTag
-                            executingMessageCid = arg.executingMessageCid
-                            receiver = execMsg.receiver
-                            caller = arg.caller
+                            caller = owner
 
             crossChainVerifier_calculateFeeImpl self arg = do
                 exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
