@@ -12,7 +12,7 @@ replace (
 
 replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
-replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260209193910-eac8a15b0b35
+replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260209201116-eac8a15b0b35
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
@@ -20,6 +20,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/smartcontractkit/chainlink-deployments-framework v0.79.0
+	github.com/smartcontractkit/go-daml v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 	gopkg.in/yaml.v3 v3.0.1

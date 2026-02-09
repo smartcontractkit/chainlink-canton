@@ -9,7 +9,7 @@ replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-c
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
-replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260209193910-eac8a15b0b35
+replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260209201116-eac8a15b0b35
 
 require (
 	github.com/digital-asset/dazl-client/v8 v8.8.0
@@ -28,6 +28,8 @@ require (
 	github.com/oapi-codegen/runtime v1.1.2 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
+	github.com/smartcontractkit/go-daml v0.0.0-00010101000000-000000000000 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
