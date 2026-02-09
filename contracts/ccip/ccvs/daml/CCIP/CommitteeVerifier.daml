@@ -4,13 +4,11 @@ import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1Wi
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
-import qualified CCIP.CCVRegistry
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
-import qualified CCIP.Tickets
 import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Crypto.DerEncoding
@@ -55,7 +53,6 @@ template CommitteeVerifier
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
                     with
-                        ccvRegistryCid = arg.ccvRegistryCid
                         rmnRemoteCid = arg.rmnRemoteCid
                         executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
@@ -75,12 +72,11 @@ template CommitteeVerifier
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
 
-        -- | Verify an inbound message and issue a CCVVerifyTicket via CCVRegistry.
+        -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
         -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
         -- for signature verification (encoding is deterministic).
-        nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
+        nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
@@ -124,14 +120,11 @@ template CommitteeVerifier
                 assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold)
                     (validSignerCount >= threshold)
 
-                -- Issue verify ticket via CCVRegistry
-                exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
+                -- Append CCV verification to ExecutingMessageV1
+                exercise executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
                     ccvInstanceId = instanceId
-                    ccvOwner = owner
                     versionTag = versionTag
-                    executingMessageCid = executingMessageCid
-                    receiver = execMsg.receiver
-                    caller = caller
+                    caller = owner
 
         -- | Calculate fee for outbound message (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
@@ -155,7 +148,7 @@ template CommitteeVerifier
                     caller = owner
 
         -- | Forward message for verification. Exercises AddVerifierData
-        -- directly on SendingMessageV1 (no CCVRegistry intermediary for outbound).
+        -- directly on SendingMessageV1.
         nonconsuming choice CommitteeVerifier_ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
