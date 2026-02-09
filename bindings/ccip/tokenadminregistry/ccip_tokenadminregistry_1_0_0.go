@@ -103,7 +103,7 @@ func (t TokenAdminRegistry) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenAdminRegistry) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

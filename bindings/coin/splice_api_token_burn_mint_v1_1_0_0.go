@@ -237,5 +237,5 @@ func IBurnMintFactoryInterfaceID() string {
 
 // IBurnMintFactoryInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IBurnMintFactoryInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
 }

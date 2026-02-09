@@ -57,7 +57,7 @@ func (t CoinHolding) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CoinHolding) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Holding", "CoinHolding")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Coin.Holding", "CoinHolding")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -177,7 +177,7 @@ func (t CoinRegistry) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CoinRegistry) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Registry", "CoinRegistry")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Coin.Registry", "CoinRegistry")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -386,7 +386,7 @@ func (t CoinTransferInstruction) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CoinTransferInstruction) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Transfer", "CoinTransferInstruction")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Coin.Transfer", "CoinTransferInstruction")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -579,7 +579,7 @@ func (t MintPreapproval) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t MintPreapproval) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Registry", "MintPreapproval")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Coin.Registry", "MintPreapproval")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -715,7 +715,7 @@ func (t MintRole) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t MintRole) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Registry", "MintRole")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Coin.Registry", "MintRole")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

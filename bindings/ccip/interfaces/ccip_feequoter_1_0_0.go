@@ -207,7 +207,7 @@ func (t FeeQuoter) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t FeeQuoter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

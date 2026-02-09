@@ -660,5 +660,5 @@ func IITokenPoolInterfaceID() string {
 
 // IITokenPoolInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IITokenPoolInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Interfaces.TokenPool", "ITokenPool")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.TokenPool", "ITokenPool")
 }

@@ -178,5 +178,5 @@ func IHoldingInterfaceID() string {
 
 // IHoldingInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IHoldingInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "Splice.Api.Token.HoldingV1", "Holding")
+	return fmt.Sprintf("%s:%s:%s", packageID, "Splice.Api.Token.HoldingV1", "Holding")
 }

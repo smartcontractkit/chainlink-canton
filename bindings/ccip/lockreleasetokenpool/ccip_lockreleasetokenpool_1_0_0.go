@@ -102,7 +102,7 @@ func (t LockReleaseTokenPool) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t LockReleaseTokenPool) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

@@ -249,7 +249,7 @@ func (t OffRamp) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t OffRamp) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
