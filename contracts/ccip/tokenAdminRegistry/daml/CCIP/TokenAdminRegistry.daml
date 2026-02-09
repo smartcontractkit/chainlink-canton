@@ -1,7 +1,7 @@
 module CCIP.TokenAdminRegistry where
 
 import DA.Map qualified as Map
-import DA.Optional qualified as Optional
+import DA.Optional (isSome)
 import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
@@ -25,11 +25,7 @@ template TokenAdminRegistry
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
-            do
-                case Map.lookup instrumentId tokenConfigs of
-                    None -> return None
-                    Some config ->
-                        return (Some config)
+            do pure (Map.lookup instrumentId tokenConfigs)
 
         choice TokenAdminRegistry_SetPool : ContractId TokenAdminRegistry
             with
@@ -104,11 +100,9 @@ template TokenAdminRegistry
                 administrator : Party
                 caller : Party
             controller caller
-            do
-                case Map.lookup instrumentId tokenConfigs of
-                    None -> return False
-                    Some config ->
-                        return (config.admin == Some administrator)
+            do pure (case Map.lookup instrumentId tokenConfigs of
+                    None -> False
+                    Some config -> config.admin == Some administrator)
 
         -- Propose a new administrator for a token.
         -- Can only be called if no admin is currently set.
@@ -136,57 +130,13 @@ template TokenAdminRegistry
                                 updatedMap = Map.insert instrumentId newConfig tokenConfigs
                             create this with tokenConfigs = updatedMap
                         Some config ->
-                            if Optional.isSome config.admin then
+                            if isSome config.admin then
                                 abort "TokenAdminRegistry_ProposeAdministrator: Admin already set"
                             else do
                                 -- Config exists but admin is not set, update it
                                 let updatedConfig = config with pendingAdmin = Some newAdmin
                                     updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
                                 create this with tokenConfigs = updatedMap
-
-        -- | Issue a token send ticket for outbound token transfer.
-        -- Called by a token pool after locking tokens.
-        -- Validates that caller is the registered party for the instrument.
-        nonconsuming choice TokenAdminRegistry_IssueSendTicket : ContractId CCIP.Tickets.TokenSendTicket
-            with
-                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                poolInstanceId : Text
-                sender : Party
-                amount : Numeric 0
-                sourceTokenAddress : BytesHex
-                destTokenAddress : BytesHex
-                tokenReceiver : BytesHex
-                extraData : BytesHex
-                receipt : CCIP.Tickets.Receipt
-                caller : Party
-            controller caller
-            do
-                -- Validate caller is the registered pool owner for this instrument
-                case Map.lookup instrumentId tokenConfigs of
-                    None ->
-                        abort "TokenAdminRegistry_IssueSendTicket: No config for instrument"
-                    Some config ->
-                        case config.tokenPool of
-                            None ->
-                                abort "TokenAdminRegistry_IssueSendTicket: No pool registered for instrument"
-                            Some pool -> do
-                                assertMsg "TokenAdminRegistry_IssueSendTicket: Caller is not the registered pool owner"
-                                    (pool.poolOwner == caller)
-                                assertMsg "TokenAdminRegistry_IssueSendTicket: poolInstanceId does not match registered pool"
-                                    (pool.poolInstanceId == poolInstanceId)
-                                create CCIP.Tickets.TokenSendTicket with
-                                        poolInstanceId = poolInstanceId
-                                        poolOwner = caller
-                                        tokenAdminRegistryInstanceId = instanceId
-                                        ccipOwner = owner
-                                        sender = sender
-                                        instrumentId = instrumentId
-                                        sourceTokenAddress = sourceTokenAddress
-                                        amount = amount
-                                        destTokenAddress = destTokenAddress
-                                        tokenReceiver = tokenReceiver
-                                        extraData = extraData
-                                        receipt = receipt
 
         -- | Issue a token receive ticket for inbound token transfer.
         -- Called by OffRamp after successful message verification.
@@ -242,21 +192,6 @@ template TokenAdminRegistry
                                         (ticket.ccipOwner == owner)
                                     archive ticketCid
 
-        -- | Consume a token send ticket for outbound token transfer.
-        -- Validates the ticket was issued by this TAR instance, then archives it.
-        -- Callers should fetch the ticket beforehand to read its fields
-        -- (ccipOwner is the signatory on TokenSendTicket).
-        nonconsuming choice TokenAdminRegistry_ConsumeSendTicket : ()
-            with
-                ticketCid : ContractId CCIP.Tickets.TokenSendTicket
-            controller owner
-            do
-                ticket <- fetch ticketCid
-                assertMsg "TokenAdminRegistry_ConsumeSendTicket: instanceId mismatch"
-                    (ticket.tokenAdminRegistryInstanceId == instanceId)
-                assertMsg "TokenAdminRegistry_ConsumeSendTicket: owner mismatch"
-                    (ticket.ccipOwner == owner)
-                archive ticketCid
 
 
 -- | Registered pool identity for a token instrument.
@@ -272,5 +207,3 @@ data TokenConfig = TokenConfig
         pendingAdmin : Optional Party
         tokenPool : Optional PoolRegistration
     deriving (Eq, Show)
-
-
