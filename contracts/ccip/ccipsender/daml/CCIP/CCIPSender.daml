@@ -1,0 +1,146 @@
+-- | Sender-side orchestrator for CCIP message sending.
+-- Executes the full outbound flow in a single atomic Daml transaction.
+-- Only `owner` is a signatory; ccipOwner is not a party on this contract.
+module CCIP.CCIPSender where
+
+import DA.Action (foldlA)
+import DA.Crypto.Text (BytesHex)
+import qualified CCIP.Client
+import qualified CCIP.FeeQuoter
+import qualified CCIP.GlobalConfig
+import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
+import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.OnRamp
+import qualified CCIP.PerPartyRouter
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
+import qualified CCIP.TokenAdminRegistry
+
+import qualified Splice.Api.Token.HoldingV1
+
+-- | Per-CCV send input. Pairs a verifier contract (via interface)
+-- with the CCV's raw address and optional per-CCV arguments.
+-- ccvRawAddress is needed because PrepareSend requires the CCV addresses
+-- upfront to compute ccvAndExecutorHash, and the ICrossChainVerifier
+-- interface view does not expose instanceId/owner.
+data CCVSendInput = CCVSendInput
+    with
+        ccvCid : ContractId ICCV.ICrossChainVerifier
+        ccvRawAddress : RawInstanceAddress
+        verifierArgs : BytesHex
+    deriving (Eq, Show)
+
+-- | Token transfer input for outbound sends.
+data TokenTransferInput = TokenTransferInput
+    with
+        tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
+        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+template CCIPSender
+    with
+        owner : Party
+    where
+        signatory owner
+
+        -- | Sends an outbound CCIP message end-to-end.
+        nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult
+            with
+                routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                onRampCid : ContractId CCIP.OnRamp.OnRamp
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+
+                destChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
+                executionGasLimit : Int
+                ccipReceiveGasLimit : Int
+                senderRequiredCCVs : [RawInstanceAddress]
+
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                feeTokenInput : CCIP.Interfaces.TokenPool.TokenInput
+                feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+
+                tokenTransfer : Optional TokenTransferInput
+                ccvSendInputs : [CCVSendInput]
+            controller owner
+            do
+                let (withTokenTransfer, tokenAmount) = case (tokenTransfer, message.tokenAmounts) of
+                        (Some _, ta :: _) -> (True, ta.amount)
+                        _ -> (False, 0.0)
+
+                -- PrepareSend
+                smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
+                    onRampCid
+                    globalConfigCid
+                    tokenAdminRegistryCid
+                    feeQuoterCid
+                    rmnRemoteCid
+                    destChainSelector
+                    receiver = message.receiver
+                    payload = message.payload
+                    executionGasLimit
+                    ccipReceiveGasLimit
+                    senderRequiredCCVs
+                    withTokenTransfer
+                    tokenReceiver = None
+                    feeToken
+
+                -- CalculateFee (CCV + pool, USD cents only)
+                smCid <- foldlA (\cid input ->
+                    exercise input.ccvCid
+                        ICCV.CrossChainVerifier_CalculateFee with
+                            sendingMessageCid = cid
+                            caller = owner
+                    ) smCid ccvSendInputs
+
+                smCid <- case tokenTransfer of
+                    None -> pure smCid
+                    Some tt -> exercise tt.tokenPoolCid
+                        CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
+                            sendingMessageCid = smCid
+                            caller = owner
+
+                -- FinalizeFee (FeeQuoter looks up price internally)
+                smCid <- exercise feeQuoterCid
+                    CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+                        sendingMessageCid = smCid
+                        caller = owner
+
+                -- LockOrBurn
+                smCid <- case tokenTransfer of
+                    None -> pure smCid
+                    Some tt -> do
+                        lockResult <- exercise tt.tokenPoolCid
+                            CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
+                                sendingMessageCid = smCid
+                                tokenInput = tt.tokenInput
+                                senderInputCids = tt.senderInputCids
+                                amount = tokenAmount
+                                rmnRemoteCid
+                                caller = owner
+                        pure lockResult.sendingMessageCid
+
+                -- ForwardToVerifier (verifiers see committed token state)
+                smCid <- foldlA (\cid input ->
+                    exercise input.ccvCid
+                        ICCV.CrossChainVerifier_ForwardToVerifier with
+                            rmnRemoteCid
+                            sendingMessageCid = cid
+                            verifierArgs = input.verifierArgs
+                            caller = owner
+                    ) smCid ccvSendInputs
+
+                -- CCIPSend (collects total fee from sender)
+                exercise routerCid CCIP.PerPartyRouter.CCIPSend with
+                    onRampCid
+                    rmnRemoteCid
+                    globalConfigCid
+                    tokenAdminRegistryCid
+                    sendingMessageCid = smCid
+                    feeTokenInput
+                    feeTokenHoldingCids
