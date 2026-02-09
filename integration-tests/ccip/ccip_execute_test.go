@@ -162,6 +162,7 @@ func hexToBytes(s string) []byte {
 	if err != nil {
 		panic("invalid hex: " + s)
 	}
+
 	return b
 }
 

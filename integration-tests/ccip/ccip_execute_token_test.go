@@ -367,7 +367,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -395,7 +395,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
