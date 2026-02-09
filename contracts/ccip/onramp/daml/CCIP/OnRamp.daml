@@ -139,14 +139,17 @@ template OnRamp
                                     sourceChainSelector = globalConfig.chainSelector
                                     destChainSelector = destChainSelector
                                     sequenceNumber = newSequenceNumber
+                                    -- TODO: there is no executionGasLimit on Canton, investigate
                                     executionGasLimit = 0
                                     ccipReceiveGasLimit = ccipReceiveGasLimit
+                                    -- TODO: investigate finality setting
                                     finality = 2000
                                     ccvAndExecutorHash = ccvAndExecutorHash
                                     onRampAddress = onRampAddr
                                     offRampAddress = destConfig.offRampAddress
                                     sender = senderAddr
                                     receiver = receiver
+                                    -- TODO: executor args
                                     destBlob = ""
                                     tokenTransfer = None
                                     messageData = payload
