@@ -11,11 +11,11 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/deepmap/oapi-codegen/pkg/securityprovider"
-	"github.com/noders-team/go-daml/pkg/auth"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"

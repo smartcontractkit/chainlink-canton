@@ -5,11 +5,11 @@ import (
 	"strconv"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"

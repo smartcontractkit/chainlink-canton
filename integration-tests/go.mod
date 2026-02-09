@@ -6,7 +6,7 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 
 replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
-replace github.com/noders-team/go-daml => github.com/stackman27/go-daml v0.0.0-20260204001938-550ee9d8ab10
+replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260209201116-eac8a15b0b35
 
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
@@ -17,13 +17,13 @@ require (
 	github.com/digital-asset/dazl-client/v8 v8.8.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
-	github.com/noders-team/go-daml v0.6.0
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.92
 	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260202190341-36d42e56bd53
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260122165924-94e0fad14fe8
 	github.com/smartcontractkit/chainlink-deployments-framework v0.79.0
+	github.com/smartcontractkit/go-daml v0.6.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 )
