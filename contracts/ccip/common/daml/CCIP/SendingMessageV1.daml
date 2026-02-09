@@ -11,6 +11,7 @@ import DA.List (dedup)
 import DA.Optional (isNone)
 
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.RawInstanceAddress
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -58,8 +59,8 @@ template SendingMessageV1
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
-        hasTokenTransfer : Bool
-        expectedCCVAddresses : [BytesHex]
+        requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        executorAddress : CCIP.RawInstanceAddress.RawInstanceAddress
 
         -- Raw MessageV1 fields (always populated at PrepareSend)
         sourceChainSelector : Numeric 0
@@ -72,7 +73,7 @@ template SendingMessageV1
         ccvAndExecutorHash : BytesHex
         onRampAddress : BytesHex
         offRampAddress : BytesHex
-        -- Token transfer fields (populated when hasTokenTransfer = True)
+        -- Token transfer fields (populated for token transfers)
         sourcePoolAddress : BytesHex
         sourceTokenAddress : BytesHex
         tokenReceiver : BytesHex
@@ -99,7 +100,6 @@ template SendingMessageV1
 
         verifierData : [VerifierData]
         tokenSendData : Optional TokenSendData
-        tokenPoolCCVsVerified : Bool
 
         observingParties : [Party]
     where
@@ -162,9 +162,9 @@ template SendingMessageV1
                         dedup (observingParties ++ messageSentObservers)
 
         -- Constructs MessageV1 from SendingMessageV1 fields with pool-provided
-        -- destTokenAddress and extraData (destPoolData). Encodes the
-        -- message and computes the final messageId. Only valid when
-        -- hasTokenTransfer = True and message is not yet constructed.
+        -- destTokenAddress and extraData (destPoolData). Merges pool's CCV
+        -- requirements into requiredCCVs and computes ccvAndExecutorHash
+        -- from the unified list. Only valid when message is not yet constructed.
         choice AddTokenSend : ContractId SendingMessageV1
             with
                 poolInstanceId : Text
@@ -174,18 +174,27 @@ template SendingMessageV1
                 destTokenAddress : BytesHex
                 addTokenReceiver : BytesHex
                 extraData : BytesHex
+                poolRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 caller : Party
             controller caller
             do
                 assertMsg "token send already set" (isNone tokenSendData)
                 assertMsg "message already constructed" (isNone message)
-                assertMsg "not a token transfer send" hasTokenTransfer
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
                         destTokenAddress
                         tokenReceiver = addTokenReceiver
                         extraData
+
+                -- Merge pool CCVs with existing required CCVs
+                let finalCCVs = dedup (requiredCCVs ++ poolRequiredCCVs)
+                let ccvHashedAddresses =
+                        map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
+                let executorAddr =
+                        CCIP.RawInstanceAddress.toInstanceAddress executorAddress
+                let finalHash = CCIP.MessageCodecV1.computeCCVAndExecutorHash
+                        ccvHashedAddresses executorAddr
 
                 let tokenTransferV1 = CCIP.MessageCodecV1.TokenTransferV1 with
                         sourcePoolAddress, sourceTokenAddress
@@ -197,7 +206,7 @@ template SendingMessageV1
                         sourceChainSelector, destChainSelector, sequenceNumber
                         executionGasLimit, ccipReceiveGasLimit
                         finality
-                        ccvAndExecutorHash
+                        ccvAndExecutorHash = finalHash
                         onRampAddress, offRampAddress
                         sender = senderAddress
                         receiver
@@ -209,32 +218,12 @@ template SendingMessageV1
                 let msgId = keccak256 encoded
 
                 create this with
+                    requiredCCVs = finalCCVs
+                    ccvAndExecutorHash = finalHash
                     tokenSendData = Some tsd
                     message = Some messageV1
                     encodedMessage = encoded
                     messageId = msgId
-
-        -- Sets tokenPoolCCVsVerified flag after the pool has validated
-        -- that its outbound CCV requirements are covered by verifierData.
-        -- Called directly by the pool (no TAR intermediary needed since
-        -- pool identity is validated against tokenSendData, which was
-        -- set by TAR during AddTokenSend).
-        choice MarkTokenPoolCCVsVerified : ContractId SendingMessageV1
-            with
-                poolInstanceId : Text
-                caller : Party
-            controller caller
-            do
-                assertMsg "token pool CCVs already verified"
-                    (not tokenPoolCCVsVerified)
-                tsd <- case tokenSendData of
-                    None -> abort "no token send data"
-                    Some t -> pure t
-                assertMsg "caller is not the registered pool owner"
-                    (caller == tsd.poolOwner)
-                assertMsg "pool instance id mismatch"
-                    (poolInstanceId == tsd.poolInstanceId)
-                create this with tokenPoolCCVsVerified = True
 
         -- Archives the SendingMessageV1 for a cancelled send.
         -- Returns the token send data so the caller can issue a refund
