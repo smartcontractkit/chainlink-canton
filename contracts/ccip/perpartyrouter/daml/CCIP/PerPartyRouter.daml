@@ -257,8 +257,7 @@ template PerPartyRouter
                     caller = caller
 
 
-        -- | execute an inbound ccip message.
-        -- receiver declares their CCV requirements as a parameter.
+        -- | Execute an inbound CCIP message.
         -- TODO: consider relaxing to allow `controller caller`
         choice Execute : ExecuteResult
             with
@@ -267,8 +266,6 @@ template PerPartyRouter
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-                tokenPoolCCVTicket : Optional (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
                 receiverRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
@@ -295,8 +292,6 @@ template PerPartyRouter
                     rmnRemoteCid = rmnRemoteCid
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
-                    ccvVerifyTickets = ccvVerifyTickets
-                    tokenPoolCCVTicket = tokenPoolCCVTicket
 
                 let newStates = Map.insert result.messageId CCIP.Internal.SUCCESS executionStates
                 routerCid <- create this with executionStates = newStates
@@ -349,20 +344,14 @@ template PerPartyRouter
             with
                 offRampCid : ContractId CCIP.OffRamp.OffRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 receiverRequiredCCVs : [RawInstanceAddress]
                 sourceChainSelector : Numeric 0
-                hasTokenTransfer : Bool
-                instrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
                 exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecute with
                     globalConfigCid = globalConfigCid
-                    tokenAdminRegistryCid = tokenAdminRegistryCid
                     receiverRequiredCCVs = receiverRequiredCCVs
                     sourceChainSelector = sourceChainSelector
-                    hasTokenTransfer = hasTokenTransfer
-                    instrumentId = instrumentId
 
 
 data CCIPSendResult = CCIPSendResult
