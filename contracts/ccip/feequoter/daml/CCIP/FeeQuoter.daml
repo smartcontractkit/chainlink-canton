@@ -10,6 +10,7 @@ import Splice.Api.Token.HoldingV1
 
 import CCIP.Common qualified as Common
 import qualified CCIP.Client
+import qualified CCIP.SendingMessageV1
 
 template FeeQuoter
     with
@@ -49,7 +50,7 @@ template FeeQuoter
                 destChainSelector : Numeric 0
                 caller : Party
             controller caller
-            do 
+            do
                 return (fromSomeNote ("No gas price found for " <> show destChainSelector) (Map.lookup destChainSelector usdPerUnitGasByDestChainSelector))
 
         choice UpdatePrices : ContractId FeeQuoter
@@ -59,7 +60,7 @@ template FeeQuoter
             controller caller
             do
                 -- The caller must be an authorized price updater.
-                assertMsg ("Caller is not an authorized price updater: " <> show caller) (caller `elem` priceUpdaters)  
+                assertMsg ("Caller is not an authorized price updater: " <> show caller) (caller `elem` priceUpdaters)
 
                 now <- getTime
                 let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
@@ -77,7 +78,7 @@ template FeeQuoter
                 message : CCIP.Client.Canton2AnyMessage
                 caller : Party
             controller caller
-            do 
+            do
                 destChainConfig <- exercise self GetDestChainConfig with destChainSelector = destChainSelector, caller = caller
 
                 -- Validate message size
@@ -117,6 +118,28 @@ template FeeQuoter
             controller caller
             do
                 return (0, 0.0, 0.0, 0.0) -- TODO
+
+        -- Looks up the fee token price and premium multiplier from
+        -- internal state, then exercises SendingMessageV1.FinalizeFee
+        -- with ccipOwner authority.
+        nonconsuming choice FeeQuoter_FinalizeFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                caller : Party
+            controller caller
+            do
+                sm <- fetch sendingMessageCid
+                let tokenPrice = fromSomeNote
+                        ("No price found for " <> sm.feeToken.id)
+                        (Map.lookup sm.feeToken usdPerToken)
+                let premiumMultiplier = fromSomeNote
+                        ("Fee token not configured: " <> sm.feeToken.id)
+                        (Map.lookup sm.feeToken feeTokens)
+                exercise sendingMessageCid
+                    CCIP.SendingMessageV1.FinalizeFee with
+                        feeTokenPrice = tokenPrice.price
+                        premiumMultiplier
 
         -- ================================================================
         -- │                         Fee Tokens                           │
@@ -175,11 +198,11 @@ template FeeQuoter
                         assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
                         assertMsg ("unknown chainFamilySelector for destChainSelector: " <> show dcca.destChainSelector) (Common.isKnownChainFamilySelector dcca.destChainConfig.chainFamilySelector)
                     ) destChainConfigArgs
-                
+
                 let newDestChainConfigs = foldl (\acc dcca -> Map.insert dcca.destChainSelector dcca.destChainConfig acc) destChainConfigs destChainConfigArgs
                 create this with destChainConfigs = newDestChainConfigs
-        
-        
+
+
 
 data DestChainConfigArgs = DestChainConfigArgs
     with
@@ -225,7 +248,7 @@ data PriceUpdates = PriceUpdates
 data TokenPriceUpdate = TokenPriceUpdate
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        usdPerToken : Decimal 
+        usdPerToken : Decimal
     deriving (Eq, Show)
 
 data GasPriceUpdate = GasPriceUpdate
