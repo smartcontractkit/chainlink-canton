@@ -57,7 +57,6 @@ template CCIPSender
 
                 destChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
-                executionGasLimit : Int
                 ccipReceiveGasLimit : Int
                 senderRequiredCCVs : [RawInstanceAddress]
 
@@ -83,7 +82,6 @@ template CCIPSender
                     destChainSelector
                     receiver = message.receiver
                     payload = message.payload
-                    executionGasLimit
                     ccipReceiveGasLimit
                     senderRequiredCCVs
                     withTokenTransfer
