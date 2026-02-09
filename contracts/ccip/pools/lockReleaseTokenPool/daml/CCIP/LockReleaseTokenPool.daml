@@ -8,7 +8,6 @@
 module CCIP.LockReleaseTokenPool where
 
 import DA.Crypto.Text (BytesHex)
-import DA.Foldable (forA_)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
@@ -23,7 +22,6 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
@@ -152,10 +150,10 @@ template LockReleaseTokenPool
                         CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
 
-        -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1.
+        -- Declare inbound CCV requirements on ExecutingMessageV1 via TAR.
         -- Validates that the message has a token transfer targeting this pool's instrument,
-        -- then checks the ccvVerifications list against the pool's per-chain inbound CCV
-        -- requirements.
+        -- looks up per-chain CCV requirements, and records them on the executing message.
+        -- OffRamp performs the actual CCV coverage check.
         nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
@@ -166,12 +164,10 @@ template LockReleaseTokenPool
                 execMsg <- fetch executingMessageCid
                 let message = execMsg.message
 
-                -- Must have a token transfer
                 tt <- case message.tokenTransfer of
                     None -> abort "pool: no token transfer in message"
                     Some t -> pure t
 
-                -- Validate destTokenAddress matches this pool's instrumentId
                 let expectedAddr = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
                 assertMsg "pool: destTokenAddress does not match pool instrumentId"
                     (tt.destTokenAddress == expectedAddr)
@@ -180,16 +176,11 @@ template LockReleaseTokenPool
                         None -> []
                         Some config -> config.inboundCCVs
 
-                -- Validate pool's required CCVs against ccvVerifications on ExecutingMessageV1
-                let coveredAddrs = [CCIP.RawInstanceAddress.make v.ccvInstanceId v.ccvOwner | v <- execMsg.ccvVerifications]
-                forA_ requiredAddrs $ \required ->
-                    assertMsg ("pool: missing required CCV " <> show required)
-                        (required `elem` coveredAddrs)
-
                 exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.TokenAdminRegistry_MarkPoolCCVsVerified with
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_SetInboundPoolCCVs with
                         executingMessageCid
                         poolInstanceId = instanceId
+                        poolCCVs = requiredAddrs
                         caller = poolOwner
 
         -- Release tokens by consuming a TokenReceiveTicket via TokenAdminRegistry.
