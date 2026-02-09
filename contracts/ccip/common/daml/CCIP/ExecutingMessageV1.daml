@@ -47,13 +47,15 @@ template ExecutingMessageV1
 
         -- Consumed by OffRamp.ExecuteFromRouter after successful execution,
         -- or for cleanup if Execute never completed.
+        -- TODO: it's possible that CCV verifiers/Token Pool contain state, consider
+        -- only allowing `ccipOwner` to archive.
         choice ExecutingMessageV1_Archive : ()
             with
                 caller : Party
             controller caller
             do
                 assertMsg "executingMessage: caller must be ccipOwner, receiver, or executor"
-                    (caller == ccipOwner || caller `elem` observingParties)
+                    (caller == ccipOwner || caller == receiver || caller == executor)
 
         -- Append a CCV verification record. CCV exercises this after successful
         -- signature verification; ccvOwner = caller is Daml-authenticated.
