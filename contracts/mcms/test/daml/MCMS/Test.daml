@@ -52,11 +52,7 @@ testAll () = script do
   testNonceOrdering
   testRootExpiry
 
-  -- Signatory check tests (security)
-  debug ""
-  debug "--- Signatory Check Tests ---"
-  testSignatoryCheckRejectsWrongOwner
-  testSignatoryCheckAcceptsCorrectOwner
+  -- Note: Signatory check tests are in ExternalTargetTest.daml
 
   debug ""
   debug "=========================================="

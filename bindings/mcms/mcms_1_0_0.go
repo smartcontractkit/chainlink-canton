@@ -256,10 +256,73 @@ func (v ArgValue) GetVariantValue() interface{} {
 
 var _ VARIANT = (*ArgValue)(nil)
 
+// BlockedFunction is a Record type
+type BlockedFunction struct {
+	TargetInstanceId TEXT `json:"targetInstanceId"`
+	FunctionName     TEXT `json:"functionName"`
+}
+
+// ToMap converts BlockedFunction to a map for DAML arguments
+func (t BlockedFunction) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["targetInstanceId"] = string(t.TargetInstanceId)
+
+	m["functionName"] = string(t.FunctionName)
+
+	return m
+}
+
+func (t BlockedFunction) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *BlockedFunction) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// BypasserExecuteParams is a Record type
+type BypasserExecuteParams struct {
+	Calls []TimelockCall `json:"calls"`
+}
+
+// ToMap converts BypasserExecuteParams to a map for DAML arguments
+func (t BypasserExecuteParams) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["calls"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Calls))
+		for _, e := range t.Calls {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t BypasserExecuteParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *BypasserExecuteParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // CanExecuteOp is a Record type
 type CanExecuteOp struct {
-	Submitter PARTY `json:"submitter"`
-	Op        Op    `json:"op"`
+	Submitter  PARTY `json:"submitter"`
+	TargetRole Role  `json:"targetRole"`
+	Op         Op    `json:"op"`
 }
 
 // ToMap converts CanExecuteOp to a map for DAML arguments
@@ -267,6 +330,14 @@ func (t CanExecuteOp) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["submitter"] = t.Submitter.ToMap()
+
+	m["targetRole"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetRole).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetRole
+	}()
 
 	m["op"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -285,6 +356,30 @@ func (t CanExecuteOp) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CanExecuteOp) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// CancelBatchParams is a Record type
+type CancelBatchParams struct {
+	OpId TEXT `json:"opId"`
+}
+
+// ToMap converts CancelBatchParams to a map for DAML arguments
+func (t CancelBatchParams) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["opId"] = string(t.OpId)
+
+	return m
+}
+
+func (t CancelBatchParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *CancelBatchParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -465,70 +560,28 @@ func (t Counter) MCMSReceiverEntrypointWithPackageID(contractID string, packageI
 
 var _ IMCMSReceiver = (*Counter)(nil)
 
-// ExecuteMcmsOp is a Record type
-type ExecuteMcmsOp struct {
-	Submitter PARTY  `json:"submitter"`
-	Op        Op     `json:"op"`
-	OpProof   []TEXT `json:"opProof"`
-}
-
-// ToMap converts ExecuteMcmsOp to a map for DAML arguments
-func (t ExecuteMcmsOp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["submitter"] = t.Submitter.ToMap()
-
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Op).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Op
-	}()
-
-	m["opProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OpProof))
-		for _, e := range t.OpProof {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t ExecuteMcmsOp) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
-}
-
-func (t *ExecuteMcmsOp) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
-}
-
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	Submitter   PARTY         `json:"submitter"`
-	TargetCid   CONTRACT_ID   `json:"targetCid"`
-	Op          Op            `json:"op"`
-	OpProof     []TEXT        `json:"opProof"`
-	ContractIds []CONTRACT_ID `json:"contractIds"`
+	TargetRole Role          `json:"targetRole"`
+	Submitter  PARTY         `json:"submitter"`
+	Op         Op            `json:"op"`
+	OpProof    []TEXT        `json:"opProof"`
+	TargetCids []CONTRACT_ID `json:"targetCids"`
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
 func (t ExecuteOp) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["submitter"] = t.Submitter.ToMap()
-
-	m["targetCid"] = func() interface{} {
+	m["targetRole"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TargetCid).(mapper); ok {
+		if m, ok := any(t.TargetRole).(mapper); ok {
 			return m.toMap()
 		}
-		return t.TargetCid
+		return t.TargetRole
 	}()
+
+	m["submitter"] = t.Submitter.ToMap()
 
 	m["op"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -546,9 +599,9 @@ func (t ExecuteOp) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["contractIds"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ContractIds))
-		for _, e := range t.ContractIds {
+	m["targetCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TargetCids))
+		for _, e := range t.TargetCids {
 			res = append(res, e)
 		}
 		return res
@@ -563,6 +616,62 @@ func (t ExecuteOp) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ExecuteOp) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// ExecuteScheduledBatch is a Record type
+type ExecuteScheduledBatch struct {
+	Submitter   PARTY          `json:"submitter"`
+	OpId        TEXT           `json:"opId"`
+	Calls       []TimelockCall `json:"calls"`
+	Predecessor TEXT           `json:"predecessor"`
+	Salt        TEXT           `json:"salt"`
+	TargetCids  []CONTRACT_ID  `json:"targetCids"`
+}
+
+// ToMap converts ExecuteScheduledBatch to a map for DAML arguments
+func (t ExecuteScheduledBatch) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["opId"] = string(t.OpId)
+
+	m["calls"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Calls))
+		for _, e := range t.Calls {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["predecessor"] = string(t.Predecessor)
+
+	m["salt"] = string(t.Salt)
+
+	m["targetCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.TargetCids))
+		for _, e := range t.TargetCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ExecuteScheduledBatch) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *ExecuteScheduledBatch) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -597,6 +706,54 @@ func (t *ExpiringRoot) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// GetBlockedFunctions is a Record type
+type GetBlockedFunctions struct {
+	Submitter PARTY `json:"submitter"`
+}
+
+// ToMap converts GetBlockedFunctions to a map for DAML arguments
+func (t GetBlockedFunctions) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	return m
+}
+
+func (t GetBlockedFunctions) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *GetBlockedFunctions) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// GetBlockedFunctionsCount is a Record type
+type GetBlockedFunctionsCount struct {
+	Submitter PARTY `json:"submitter"`
+}
+
+// ToMap converts GetBlockedFunctionsCount to a map for DAML arguments
+func (t GetBlockedFunctionsCount) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	return m
+}
+
+func (t GetBlockedFunctionsCount) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *GetBlockedFunctionsCount) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // GetInstanceIdChoice is a Record type
 type GetInstanceIdChoice struct {
 	Viewer PARTY `json:"viewer"`
@@ -621,9 +778,34 @@ func (t *GetInstanceIdChoice) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// GetMinDelay is a Record type
+type GetMinDelay struct {
+	Submitter PARTY `json:"submitter"`
+}
+
+// ToMap converts GetMinDelay to a map for DAML arguments
+func (t GetMinDelay) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	return m
+}
+
+func (t GetMinDelay) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *GetMinDelay) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // GetState is a Record type
 type GetState struct {
-	Submitter PARTY `json:"submitter"`
+	Submitter  PARTY `json:"submitter"`
+	TargetRole Role  `json:"targetRole"`
 }
 
 // ToMap converts GetState to a map for DAML arguments
@@ -631,6 +813,14 @@ func (t GetState) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["submitter"] = t.Submitter.ToMap()
+
+	m["targetRole"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetRole).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetRole
+	}()
 
 	return m
 }
@@ -641,6 +831,33 @@ func (t GetState) MarshalJSON() ([]byte, error) {
 }
 
 func (t *GetState) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// GetTimestamp is a Record type
+type GetTimestamp struct {
+	Submitter PARTY `json:"submitter"`
+	OpId      TEXT  `json:"opId"`
+}
+
+// ToMap converts GetTimestamp to a map for DAML arguments
+func (t GetTimestamp) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["opId"] = string(t.OpId)
+
+	return m
+}
+
+func (t GetTimestamp) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *GetTimestamp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -669,17 +886,125 @@ func (t *GetValue) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// IsOperation is a Record type
+type IsOperation struct {
+	Submitter PARTY `json:"submitter"`
+	OpId      TEXT  `json:"opId"`
+}
+
+// ToMap converts IsOperation to a map for DAML arguments
+func (t IsOperation) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["opId"] = string(t.OpId)
+
+	return m
+}
+
+func (t IsOperation) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *IsOperation) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// IsOperationDone is a Record type
+type IsOperationDone struct {
+	Submitter PARTY `json:"submitter"`
+	OpId      TEXT  `json:"opId"`
+}
+
+// ToMap converts IsOperationDone to a map for DAML arguments
+func (t IsOperationDone) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["opId"] = string(t.OpId)
+
+	return m
+}
+
+func (t IsOperationDone) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *IsOperationDone) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// IsOperationPending is a Record type
+type IsOperationPending struct {
+	Submitter PARTY `json:"submitter"`
+	OpId      TEXT  `json:"opId"`
+}
+
+// ToMap converts IsOperationPending to a map for DAML arguments
+func (t IsOperationPending) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["opId"] = string(t.OpId)
+
+	return m
+}
+
+func (t IsOperationPending) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *IsOperationPending) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// IsOperationReady is a Record type
+type IsOperationReady struct {
+	Submitter PARTY `json:"submitter"`
+	OpId      TEXT  `json:"opId"`
+}
+
+// ToMap converts IsOperationReady to a map for DAML arguments
+func (t IsOperationReady) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	m["opId"] = string(t.OpId)
+
+	return m
+}
+
+func (t IsOperationReady) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *IsOperationReady) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // MCMS is a Template type
 type MCMS struct {
-	Owner        PARTY          `json:"owner"`
-	InstanceId   TEXT           `json:"instanceId"`
-	Role         Role           `json:"role"`
-	ChainId      INT64          `json:"chainId"`
-	McmsId       TEXT           `json:"mcmsId"`
-	Config       MultisigConfig `json:"config"`
-	SeenHashes   GENMAP         `json:"seenHashes"`
-	ExpiringRoot ExpiringRoot   `json:"expiringRoot"`
-	RootMetadata RootMetadata   `json:"rootMetadata"`
+	Owner              PARTY             `json:"owner"`
+	InstanceId         TEXT              `json:"instanceId"`
+	ChainId            INT64             `json:"chainId"`
+	Proposer           RoleState         `json:"proposer"`
+	Canceller          RoleState         `json:"canceller"`
+	Bypasser           RoleState         `json:"bypasser"`
+	MinDelay           RELTIME           `json:"minDelay"`
+	BlockedFunctions   []BlockedFunction `json:"blockedFunctions"`
+	TimelockTimestamps GENMAP            `json:"timelockTimestamps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -702,55 +1027,65 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.Role != "" {
-		args["role"] = func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Role).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Role
-		}()
-	}
-
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["chainId"] = int64(t.ChainId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["mcmsId"] = string(t.McmsId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["config"] = func() interface{} {
+	args["proposer"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Config).(mapper); ok {
+		if m, ok := any(t.Proposer).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Config
+		return t.Proposer
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["seenHashes"] = func() interface{} {
-		if t.SeenHashes == nil {
+	args["canceller"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Canceller).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Canceller
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["bypasser"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Bypasser).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Bypasser
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minDelay"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.MinDelay).(mapper); ok {
+			return m.toMap()
+		}
+		return t.MinDelay
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["blockedFunctions"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.BlockedFunctions))
+		for _, e := range t.BlockedFunctions {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["timelockTimestamps"] = func() interface{} {
+		if t.TimelockTimestamps == nil {
 			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.SeenHashes}
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["expiringRoot"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.ExpiringRoot).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExpiringRoot
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rootMetadata"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.RootMetadata).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RootMetadata
+		return map[string]interface{}{"_type": "genmap", "value": t.TimelockTimestamps}
 	}()
 
 	return &model.CreateCommand{
@@ -769,55 +1104,65 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
 
-	if t.Role != "" {
-		args["role"] = func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
-			if m, ok := any(t.Role).(mapper); ok {
-				return m.toMap()
-			}
-			return t.Role
-		}()
-	}
-
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["chainId"] = int64(t.ChainId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["mcmsId"] = string(t.McmsId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["config"] = func() interface{} {
+	args["proposer"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Config).(mapper); ok {
+		if m, ok := any(t.Proposer).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Config
+		return t.Proposer
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["seenHashes"] = func() interface{} {
-		if t.SeenHashes == nil {
+	args["canceller"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Canceller).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Canceller
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["bypasser"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Bypasser).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Bypasser
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minDelay"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.MinDelay).(mapper); ok {
+			return m.toMap()
+		}
+		return t.MinDelay
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["blockedFunctions"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.BlockedFunctions))
+		for _, e := range t.BlockedFunctions {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["timelockTimestamps"] = func() interface{} {
+		if t.TimelockTimestamps == nil {
 			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.SeenHashes}
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["expiringRoot"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.ExpiringRoot).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExpiringRoot
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rootMetadata"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.RootMetadata).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RootMetadata
+		return map[string]interface{}{"_type": "genmap", "value": t.TimelockTimestamps}
 	}()
 
 	return &model.CreateCommand{
@@ -837,6 +1182,27 @@ func (t *MCMS) UnmarshalJSON(data []byte) error {
 }
 
 // Choice methods for MCMS
+
+// SetConfig exercises the SetConfig choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
+func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
 
 // SetRoot exercises the SetRoot choice on this MCMS contract
 // This method uses the package name in the template ID
@@ -880,44 +1246,23 @@ func (t MCMS) ExecuteOpWithPackageID(contractID string, packageID string, args E
 	}
 }
 
-// ExecuteMcmsOp exercises the ExecuteMcmsOp choice on this MCMS contract
+// ExecuteScheduledBatch exercises the ExecuteScheduledBatch choice on this MCMS contract
 // This method uses the package name in the template ID
-func (t MCMS) ExecuteMcmsOp(contractID string, args ExecuteMcmsOp) *model.ExerciseCommand {
+func (t MCMS) ExecuteScheduledBatch(contractID string, args ExecuteScheduledBatch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "ExecuteMcmsOp",
+		Choice:     "ExecuteScheduledBatch",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecuteMcmsOpWithPackageID exercises the ExecuteMcmsOp choice using the provided package ID instead of package name
-func (t MCMS) ExecuteMcmsOpWithPackageID(contractID string, packageID string, args ExecuteMcmsOp) *model.ExerciseCommand {
+// ExecuteScheduledBatchWithPackageID exercises the ExecuteScheduledBatch choice using the provided package ID instead of package name
+func (t MCMS) ExecuteScheduledBatchWithPackageID(contractID string, packageID string, args ExecuteScheduledBatch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "ExecuteMcmsOp",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfig exercises the SetConfig choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
-func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
+		Choice:     "ExecuteScheduledBatch",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -939,6 +1284,27 @@ func (t MCMS) CanExecuteOpWithPackageID(contractID string, packageID string, arg
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "CanExecuteOp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationReady exercises the IsOperationReady choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) IsOperationReady(contractID string, args IsOperationReady) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationReady",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationReadyWithPackageID exercises the IsOperationReady choice using the provided package ID instead of package name
+func (t MCMS) IsOperationReadyWithPackageID(contractID string, packageID string, args IsOperationReady) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationReady",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -981,6 +1347,153 @@ func (t MCMS) GetStateWithPackageID(contractID string, packageID string, args Ge
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "GetState",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperation exercises the IsOperation choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) IsOperation(contractID string, args IsOperation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperation",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationWithPackageID exercises the IsOperation choice using the provided package ID instead of package name
+func (t MCMS) IsOperationWithPackageID(contractID string, packageID string, args IsOperation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperation",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationPending exercises the IsOperationPending choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) IsOperationPending(contractID string, args IsOperationPending) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationPending",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationPendingWithPackageID exercises the IsOperationPending choice using the provided package ID instead of package name
+func (t MCMS) IsOperationPendingWithPackageID(contractID string, packageID string, args IsOperationPending) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationPending",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationDone exercises the IsOperationDone choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) IsOperationDone(contractID string, args IsOperationDone) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationDone",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsOperationDoneWithPackageID exercises the IsOperationDone choice using the provided package ID instead of package name
+func (t MCMS) IsOperationDoneWithPackageID(contractID string, packageID string, args IsOperationDone) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsOperationDone",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetTimestamp exercises the GetTimestamp choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) GetTimestamp(contractID string, args GetTimestamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetTimestamp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetTimestampWithPackageID exercises the GetTimestamp choice using the provided package ID instead of package name
+func (t MCMS) GetTimestampWithPackageID(contractID string, packageID string, args GetTimestamp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetTimestamp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetMinDelay exercises the GetMinDelay choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) GetMinDelay(contractID string, args GetMinDelay) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetMinDelay",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetMinDelayWithPackageID exercises the GetMinDelay choice using the provided package ID instead of package name
+func (t MCMS) GetMinDelayWithPackageID(contractID string, packageID string, args GetMinDelay) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetMinDelay",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetBlockedFunctions exercises the GetBlockedFunctions choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) GetBlockedFunctions(contractID string, args GetBlockedFunctions) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetBlockedFunctions",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetBlockedFunctionsWithPackageID exercises the GetBlockedFunctions choice using the provided package ID instead of package name
+func (t MCMS) GetBlockedFunctionsWithPackageID(contractID string, packageID string, args GetBlockedFunctions) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetBlockedFunctions",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetBlockedFunctionsCount exercises the GetBlockedFunctionsCount choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) GetBlockedFunctionsCount(contractID string, args GetBlockedFunctionsCount) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetBlockedFunctionsCount",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetBlockedFunctionsCountWithPackageID exercises the GetBlockedFunctionsCount choice using the provided package ID instead of package name
+func (t MCMS) GetBlockedFunctionsCountWithPackageID(contractID string, packageID string, args GetBlockedFunctionsCount) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetBlockedFunctionsCount",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1381,6 +1894,10 @@ func (t *RawSignature) UnmarshalJSON(data []byte) error {
 type Role string
 
 const (
+	RoleBypasser Role = "Bypasser"
+
+	RoleCanceller Role = "Canceller"
+
 	RoleProposer Role = "Proposer"
 )
 
@@ -1406,6 +1923,62 @@ func (e *Role) UnmarshalJSON(data []byte) error {
 }
 
 var _ ENUM = Role("")
+
+// RoleState is a Record type
+type RoleState struct {
+	Config       MultisigConfig `json:"config"`
+	SeenHashes   GENMAP         `json:"seenHashes"`
+	ExpiringRoot ExpiringRoot   `json:"expiringRoot"`
+	RootMetadata RootMetadata   `json:"rootMetadata"`
+}
+
+// ToMap converts RoleState to a map for DAML arguments
+func (t RoleState) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["config"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.Config).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Config
+	}()
+
+	m["seenHashes"] = func() interface{} {
+		if t.SeenHashes == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.SeenHashes}
+	}()
+
+	m["expiringRoot"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExpiringRoot).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExpiringRoot
+	}()
+
+	m["rootMetadata"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RootMetadata).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RootMetadata
+	}()
+
+	return m
+}
+
+func (t RoleState) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *RoleState) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
 
 // RootMetadata is a Record type
 type RootMetadata struct {
@@ -1443,8 +2016,53 @@ func (t *RootMetadata) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// ScheduleBatchParams is a Record type
+type ScheduleBatchParams struct {
+	Calls       []TimelockCall `json:"calls"`
+	Predecessor TEXT           `json:"predecessor"`
+	Salt        TEXT           `json:"salt"`
+	DelaySecs   INT64          `json:"delaySecs"`
+}
+
+// ToMap converts ScheduleBatchParams to a map for DAML arguments
+func (t ScheduleBatchParams) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["calls"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.Calls))
+		for _, e := range t.Calls {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["predecessor"] = string(t.Predecessor)
+
+	m["salt"] = string(t.Salt)
+
+	m["delaySecs"] = int64(t.DelaySecs)
+
+	return m
+}
+
+func (t ScheduleBatchParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *ScheduleBatchParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // SetConfig is a Record type
 type SetConfig struct {
+	TargetRole      Role         `json:"targetRole"`
 	NewSigners      []SignerInfo `json:"newSigners"`
 	NewGroupQuorums []INT64      `json:"newGroupQuorums"`
 	NewGroupParents []INT64      `json:"newGroupParents"`
@@ -1454,6 +2072,14 @@ type SetConfig struct {
 // ToMap converts SetConfig to a map for DAML arguments
 func (t SetConfig) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
+
+	m["targetRole"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetRole).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetRole
+	}()
 
 	m["newSigners"] = func() []interface{} {
 		res := make([]interface{}, 0, len(t.NewSigners))
@@ -1557,6 +2183,7 @@ func (t *SetConfigParams) UnmarshalJSON(data []byte) error {
 
 // SetRoot is a Record type
 type SetRoot struct {
+	TargetRole    Role           `json:"targetRole"`
 	Submitter     PARTY          `json:"submitter"`
 	NewRoot       TEXT           `json:"newRoot"`
 	ValidUntil    TIMESTAMP      `json:"validUntil"`
@@ -1568,6 +2195,14 @@ type SetRoot struct {
 // ToMap converts SetRoot to a map for DAML arguments
 func (t SetRoot) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
+
+	m["targetRole"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TargetRole).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TargetRole
+	}()
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -1643,6 +2278,36 @@ func (t SignerInfo) MarshalJSON() ([]byte, error) {
 }
 
 func (t *SignerInfo) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// TimelockCall is a Record type
+type TimelockCall struct {
+	TargetInstanceId TEXT `json:"targetInstanceId"`
+	FunctionName     TEXT `json:"functionName"`
+	OperationData    TEXT `json:"operationData"`
+}
+
+// ToMap converts TimelockCall to a map for DAML arguments
+func (t TimelockCall) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["targetInstanceId"] = string(t.TargetInstanceId)
+
+	m["functionName"] = string(t.FunctionName)
+
+	m["operationData"] = string(t.OperationData)
+
+	return m
+}
+
+func (t TimelockCall) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *TimelockCall) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }

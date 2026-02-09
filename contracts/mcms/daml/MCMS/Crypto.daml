@@ -2,9 +2,9 @@ module MCMS.Crypto where
 
 import DA.Crypto.Text (BytesHex, keccak256, secp256k1WithEcdsaOnly)
 import DA.Text qualified as T
-import DA.Time (subTime)
-import DA.Date (Month(..), datetime)
-import MCMS.Types
+import DA.Time (subTime, convertRelTimeToMicroseconds, time)
+import DA.Date (Month(..), date)
+import MCMS.Types (Op(..), RootMetadata(..), TimelockCall(..))
 
 -- ===========================================================================
 -- RAW SIGNATURE TYPE
@@ -150,6 +150,55 @@ hashMetadataLeafNative meta =
     keccak256 encoded
 
 -- ===========================================================================
+-- TIMELOCK HASH FUNCTIONS
+-- ===========================================================================
+
+-- opId = keccak256(abi.encode(calls, predecessor, salt))
+hashTimelockOpId : [TimelockCall] -> Text -> Text -> BytesHex
+hashTimelockOpId calls predecessor salt =
+  let
+    -- Encode each call
+    encodedCalls = foldl (<>) "" (map encodeTimelockCall calls)
+    -- Combine with predecessor and salt
+    encoded = encodedCalls <> asciiToHex predecessor <> asciiToHex salt
+  in
+    keccak256 encoded
+
+-- | Encode a single timelock call for hashing
+encodeTimelockCall : TimelockCall -> BytesHex
+encodeTimelockCall call =
+  asciiToHex call.targetInstanceId
+  <> asciiToHex call.functionName
+  <> encodeOperationData call.operationData
+
+-- | Encode operationData for hashing.
+-- If it's valid hex (even length, hex digits only), treat it as raw bytes (already hex).
+-- Otherwise, treat it as ASCII text and hex-encode it.
+encodeOperationData : Text -> BytesHex
+encodeOperationData t =
+  if isValidHex t then t else asciiToHex t
+
+isValidHex : Text -> Bool
+isValidHex t =
+  (T.length t % 2 == 0) && allHexDigits t
+
+allHexDigits : Text -> Bool
+allHexDigits t =
+  if T.length t == 0
+    then True
+    else
+      let c = T.take 1 t
+          rest = T.drop 1 t
+      in isHexDigit c && allHexDigits rest
+
+isHexDigit : Text -> Bool
+isHexDigit c =
+  c == "0" || c == "1" || c == "2" || c == "3" || c == "4" ||
+  c == "5" || c == "6" || c == "7" || c == "8" || c == "9" ||
+  c == "a" || c == "b" || c == "c" || c == "d" || c == "e" || c == "f" ||
+  c == "A" || c == "B" || c == "C" || c == "D" || c == "E" || c == "F"
+
+-- ===========================================================================
 -- MERKLE PROOF VERIFICATION
 -- ===========================================================================
 
@@ -192,8 +241,17 @@ intToHexHelperTop : Int -> BytesHex -> BytesHex
 intToHexHelperTop 0 acc = acc
 intToHexHelperTop x acc = intToHexHelperTop (x / 16) (intToHexDigit (x % 16) <> acc)
 
+-- | Unix epoch (1970-01-01 00:00:00 UTC)
+epoch : Time
+epoch = time (date 1970 Jan 1) 0 0 0
+
+-- | Convert Time to Unix seconds
+timeToUnixSeconds : Time -> Int
+timeToUnixSeconds t = convertRelTimeToMicroseconds (subTime t epoch) / 1_000_000
+
+-- | Convert Time to 32-byte hex (matching ABI encoding of uint32)
 timeToHex : Time -> BytesHex
-timeToHex _ = padLeft32 "0"  -- Placeholder
+timeToHex t = padLeft32 (intToHex (timeToUnixSeconds t))
 
 asciiToHex : Text -> BytesHex
 asciiToHex t = asciiToHexHelperTop t ""

@@ -116,20 +116,29 @@ func TestMCMSOps(t *testing.T) {
 		GroupParents: groupParents,
 	}
 
+	// Create RoleState for each role (multi-role MCMS structure)
+	roleState := mcms.RoleState{
+		Config:       config,
+		SeenHashes:   nil,
+		ExpiringRoot: mcms.ExpiringRoot{},
+		RootMetadata: mcms.RootMetadata{},
+	}
+
 	var mcmsInstanceID contracts.InstanceID
 	t.Run("Deploy", func(t *testing.T) {
 		result, err := cld_ops.ExecuteOperation(bundle, Deploy, deps, contract.DeployInput[mcms.MCMS]{
 			ChainSelector: cantonChain.Selector,
 			ActAs:         []string{primaryParty},
 			Template: mcms.MCMS{
-				Owner:        types.PARTY(primaryParty),
-				Role:         mcms.RoleProposer,
-				ChainId:      types.INT64(chainID),
-				McmsId:       types.TEXT(mcmsID),
-				Config:       config,
-				SeenHashes:   nil,
-				ExpiringRoot: mcms.ExpiringRoot{},
-				RootMetadata: mcms.RootMetadata{},
+				Owner:              types.PARTY(primaryParty),
+				InstanceId:         types.TEXT(mcmsID + "@" + primaryParty),
+				ChainId:            types.INT64(chainID),
+				Proposer:           roleState,
+				Canceller:          roleState,
+				Bypasser:           roleState,
+				MinDelay:           0,
+				BlockedFunctions:   nil,
+				TimelockTimestamps: nil,
 			},
 			OwnerParty: types.PARTY(primaryParty),
 		})
@@ -177,6 +186,7 @@ func TestMCMSOps(t *testing.T) {
 			InstanceAddress: mcmsInstanceID.InstanceAddress(),
 			ActAs:           []string{primaryParty},
 			Args: mcms.SetConfig{
+				TargetRole:      mcms.RoleProposer, // Target the proposer role
 				NewSigners:      newSigners,
 				NewGroupQuorums: newGroupQuorums,
 				NewGroupParents: groupParents,      // Keep same parent structure

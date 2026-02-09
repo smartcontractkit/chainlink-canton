@@ -32,13 +32,13 @@ template MCMSEntrypointEvent
 -- Demonstrates the MCMSReceiver interface for direct MCMS calls
 --
 -- Key fields:
---   - instanceId: Stable identifier (e.g., "counter-prod-v1")
+--   - instanceId: Stable identifier in the format "baseId@partyId"
 --     This doesn't change when contract state updates (unlike ContractId)
 --   - MCMS validates: op.targetInstanceId == instanceId
 template Counter
   with
     owner : Party                              -- Same ccip_owner party as MCMS
-    instanceId : Text                          -- Stable identifier for MCMS targeting
+    instanceId : Text                          -- Stable identifier for MCMS targeting (baseId@partyId)
     value : Int                                -- Current counter value
   where
     signatory owner
@@ -47,7 +47,7 @@ template Counter
     interface instance MCMSReceiver for Counter where
       view = MCMSReceiverView with
         owner
-        instanceId = instanceId <> "@" <> partyToText owner
+        instanceId = instanceId
 
       mcmsEntrypoint functionName operationData contractIds = do
         -- Emit event with contractIds as text (can be verified in transaction events)

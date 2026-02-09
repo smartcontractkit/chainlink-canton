@@ -16,24 +16,51 @@ module MCMS.Main where
 import DA.Map qualified as Map
 import DA.List ((!!))
 import DA.Action (unless)
+import DA.Foldable (forA_)
+import DA.Time (RelTime, seconds, addRelTime)
+import DA.Text (parseInt)
 import DA.Crypto.Text (BytesHex)
-import MCMS.Types (Role(..), SignerInfo(..), MultisigConfig(..), Op(..), RootMetadata(..), ExpiringRoot(..), numGroups, maxNumSigners, roleToText)
+import MCMS.Types
+  ( Role(..)
+  , roleToText
+  , SignerInfo(..)
+  , MultisigConfig(..)
+  , Op(..)
+  , RootMetadata(..)
+  , ExpiringRoot(..)
+  , RoleState(..)
+  , emptyRoleState
+  , numGroups
+  , maxNumSigners
+  , zeroHash
+  , doneTimestamp
+  , TimelockCall(..)
+  , BlockedFunction(..)
+  )
 import MCMS.GroupVoting
 import MCMS.Crypto
 import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), parsePartyIdText)
-import MCMS.Codec (decodeSetConfigParams)
+import MCMS.Codec
+  ( decodeSetConfigParams
+  , decodeBlockedFunction
+  , decodeSelfDispatchSetConfig
+  , decodeScheduleBatchParams
+  , decodeBypasserExecuteParams
+  , decodeCancelBatchParams
+  )
 
 template MCMS
   with
     owner : Party                              -- ccip_owner party
     instanceId : Text                          -- Stable identifier that doesn't change on updates
-    role : Role                                -- Proposer (simplified to single role)
     chainId : Int                              -- Chain ID for validation
-    mcmsId : Text                              -- MCMS instance identifier
-    config : MultisigConfig                    -- Signer configuration
-    seenHashes : Map.Map BytesHex Bool         -- Replay protection
-    expiringRoot : ExpiringRoot                -- Current merkle root
-    rootMetadata : RootMetadata                -- Metadata for current root
+    proposer : RoleState
+    canceller : RoleState
+    bypasser : RoleState
+    -- Timelock configuration
+    minDelay : RelTime                         -- Minimum delay for scheduled operations
+    blockedFunctions : [BlockedFunction]         -- Functions that cannot be scheduled (per-target)
+    timelockTimestamps : Map.Map Text Time     -- opId -> readyTime (or doneTimestamp if done)
   where
     signatory owner
 
@@ -41,6 +68,7 @@ template MCMS
     -- Validates the configuration and optionally clears the root
     choice SetConfig : ContractId MCMS
       with
+        targetRole : Role
         newSigners : [SignerInfo]
         newGroupQuorums : [Int]
         newGroupParents : [Int]
@@ -57,20 +85,25 @@ template MCMS
         -- Validate group tree structure
         assertMsg "E_ROOT_NOT_SELF_PARENT" $ (newGroupParents !! 0) == 0
 
-        -- Optionally clear the root
-        let newExpiringRoot = if clearRoot
-              then expiringRoot with root = ""
-              else expiringRoot
+        let rs = getRoleState targetRole this
 
-        create this with
-          config = newConfig
-          expiringRoot = newExpiringRoot
+        -- Optionally clear the root for the selected role
+        let newExpiringRoot = if clearRoot
+              then rs.expiringRoot with root = ""
+              else rs.expiringRoot
+
+        let newRs = rs with
+              config = newConfig
+              expiringRoot = newExpiringRoot
+
+        create (setRoleState targetRole newRs this)
 
     -- | Set new merkle root with on-chain signature verification
     -- All verification happens on-chain using native keccak256 and secp256k1
     -- ANYONE can submit - security comes from signature verification
     choice SetRoot : ContractId MCMS
       with
+        targetRole : Role
         submitter : Party                      -- Anyone can submit
         newRoot : BytesHex                     -- New merkle root hash
         validUntil : Time                      -- Expiration time
@@ -80,24 +113,26 @@ template MCMS
       controller submitter
       do
         now <- getTime
+        let rs = getRoleState targetRole this
 
         -- 1. Compute signed hash ON-CHAIN using keccak256
         let signedHash = computeSignedHashNative newRoot validUntil
 
         -- 2. Check not seen before (replay prevention)
         assertMsg ("E_ALREADY_SEEN_HASH: " <> signedHash) $
-          not $ Map.member signedHash seenHashes
+          not $ Map.member signedHash rs.seenHashes
 
         -- 3. Validate timestamps
         assertMsg "E_ROOT_EXPIRED" $ now < validUntil
 
-        -- 4. Validate metadata matches this MCMS
+        -- 4. Validate metadata matches this role
         assertMsg ("E_WRONG_CHAIN_ID: expected " <> show chainId) $
           metadata.chainId == chainId
-        assertMsg ("E_WRONG_MULTISIG: expected " <> mcmsId) $
-          metadata.multisigId == mcmsId
-        assertMsg ("E_WRONG_PRE_OP_COUNT: expected " <> show expiringRoot.opCount) $
-          metadata.preOpCount == expiringRoot.opCount
+        let expectedMultisigId = makeMcmsId instanceId targetRole
+        assertMsg ("E_WRONG_MULTISIG: expected " <> expectedMultisigId) $
+          metadata.multisigId == expectedMultisigId
+        assertMsg ("E_WRONG_PRE_OP_COUNT: expected " <> show rs.expiringRoot.opCount) $
+          metadata.preOpCount == rs.expiringRoot.opCount
 
         -- 5. Validate op counts
         assertMsg "E_INVALID_OP_COUNTS" $
@@ -106,7 +141,7 @@ template MCMS
         -- 6. Check pending operations
         unless metadata.overridePreviousRoot $
           assertMsg "E_PENDING_OPS" $
-            expiringRoot.opCount == rootMetadata.postOpCount
+            rs.expiringRoot.opCount == rs.rootMetadata.postOpCount
 
         -- 7. Verify ALL signatures ON-CHAIN using secp256k1
         let validSignerAddrs = verifySignatures signedHash signatures
@@ -120,171 +155,183 @@ template MCMS
 
         -- 9. Verify group voting with validated signer addresses
         let sortedSignerAddrs = sortAddresses validSignerAddrs
-        case verifyGroupVoting sortedSignerAddrs config of
+        case verifyGroupVoting sortedSignerAddrs rs.config of
           Left err -> abort err
           Right () -> pure ()
 
-        -- 10. Update state
-        create this with
-          seenHashes = Map.insert signedHash True seenHashes
-          expiringRoot = ExpiringRoot newRoot validUntil expiringRoot.opCount
-          rootMetadata = metadata
+        -- 10. Update per-role state
+        let newRs = rs with
+              seenHashes = Map.insert signedHash True rs.seenHashes
+              expiringRoot = ExpiringRoot newRoot validUntil rs.expiringRoot.opCount
+              rootMetadata = metadata
+
+        create (setRoleState targetRole newRs this)
 
     -- =========================================================================
-    -- DIRECT EXECUTION (Main Flow)
+    -- EXECUTE OPERATION (Main Entry Point - Dispatcher)
+    -- Like Aptos execute() - single entry point that dispatches to timelock functions
     -- =========================================================================
 
-    -- | Execute an operation directly on a target contract
-    -- This is the main execution flow:
+    -- | Execute an operation (like Aptos's execute() - single entry point)
+    -- This is the main execution flow that dispatches to timelock functions:
     --   1. Validate merkle proof against the root set by SetRoot
-    --   2. Fetch target and verify instanceId matches op.targetInstanceId
-    --   3. Parse partyId from instanceId (format: baseId@partyId) and verify signatory
-    --   4. Call target.mcmsEntrypoint(functionName, operationData, contractIds)
+    --   2. Decode parameters from op.operationData (like Aptos BCS deserialization)
+    --   3. Dispatch based on op.functionName:
+    --      - "schedule_batch" → schedule with delay (Proposer role)
+    --      - "bypasser_execute_batch" → immediate execution (Bypasser role)
+    --      - "cancel_batch" → cancel pending operation (Canceller role)
+    --      - "set_config", "clear_root" → MCMS self-dispatch
     --
     -- ANYONE CAN EXECUTE (with disclosures) - Security comes from:
     --   1. Merkle proof verification (operation was approved by signers)
-    --   2. InstanceId check (target identity matches what was approved)
-    --   3. Signatory check (partyId embedded in instanceId must be a signatory of target)
-    --   Note: Submitter needs disclosures for visibility. Authorization for fetch
-    --   comes from MCMS owner's signatory propagation into the choice body.
+    --   2. Parameters decoded from op.operationData (cryptographically bound)
+    --   3. Role validation (each function requires specific role)
+    --
+    -- Note: targetCids must be passed separately since ContractIds cannot be serialized.
+    --       The calls themselves are validated from op.operationData.
     choice ExecuteOp : ContractId MCMS
       with
+        targetRole : Role
         submitter : Party                          -- Anyone can submit
-        targetCid : ContractId MCMSReceiver        -- Caller provides current ContractId
-        op : Op                                    -- Operation details
+        op : Op                                    -- Operation details (params in operationData)
         opProof : [BytesHex]                       -- Merkle proof
-        contractIds : [ContractId ()]              -- Untyped contract IDs for target to use
+        targetCids : [ContractId MCMSReceiver]     -- For bypasser_execute_batch only (can't be serialized)
       controller submitter
       do
         now <- getTime
+        let rs = getRoleState targetRole this
 
         -- 1. Validate operation targets this MCMS
         assertMsg ("E_WRONG_CHAIN_ID: op targets " <> show op.chainId) $
           op.chainId == chainId
         assertMsg ("E_WRONG_MULTISIG: op targets " <> op.multisigId) $
-          op.multisigId == mcmsId
+          op.multisigId == makeMcmsId instanceId targetRole
 
         -- 2. Check nonce matches current opCount
-        assertMsg ("E_WRONG_NONCE: expected " <> show expiringRoot.opCount <> " got " <> show op.nonce) $
-          op.nonce == expiringRoot.opCount
+        assertMsg ("E_WRONG_NONCE: expected " <> show rs.expiringRoot.opCount <> " got " <> show op.nonce) $
+          op.nonce == rs.expiringRoot.opCount
 
         -- 3. Check root not expired
-        assertMsg "E_ROOT_EXPIRED" $ now <= expiringRoot.validUntil
+        assertMsg "E_ROOT_EXPIRED" $ now <= rs.expiringRoot.validUntil
 
         -- 4. Check we haven't executed all ops for this root
-        assertMsg "E_NO_MORE_OPS" $ expiringRoot.opCount < rootMetadata.postOpCount
+        assertMsg "E_NO_MORE_OPS" $ rs.expiringRoot.opCount < rs.rootMetadata.postOpCount
 
         -- 5. Verify merkle proof ON-CHAIN using keccak256
         let opLeaf = hashOpLeafNative op
         assertMsg "E_INVALID_OP_MERKLE_PROOF" $
-          verifyMerkleProof expiringRoot.root opLeaf opProof
+          verifyMerkleProof rs.expiringRoot.root opLeaf opProof
 
-        -- 6. Fetch target and verify instanceId matches op.targetInstanceId
-        target <- fetch targetCid
-        let targetView = view target
-        assertMsg ("E_WRONG_TARGET: expected " <> op.targetInstanceId <> " got " <> targetView.instanceId) $
-          targetView.instanceId == op.targetInstanceId
-
-        -- 7. Parse partyId from instanceId and verify it's a signatory of the target
-        case parsePartyIdText targetView.instanceId of
-          None -> abort "E_INVALID_INSTANCE_ID_FORMAT: expected baseId@partyId"
-          Some partyIdText ->
-            assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
-              any (\s -> partyToText s == partyIdText) (signatory target)
-
-        -- 8. Call target's mcmsEntrypoint (MCMS is ccip_owner, authority passes through)
-        _ <- exercise targetCid MCMSReceiver_Entrypoint with
-          caller = owner
-          functionName = op.functionName
-          operationData = op.operationData
-          contractIds = contractIds
-
-        -- 9. Increment opCount (operation executed)
-        create this with
-          expiringRoot = expiringRoot with opCount = expiringRoot.opCount + 1
-
-    -- =========================================================================
-    -- SELF-DISPATCH (MCMS Operations)
-    -- =========================================================================
-
-    -- | Execute an operation targeting MCMS itself (dispatch to self)
-    -- Similar to Aptos pattern - validates proof and dispatches internally
-    -- Parameters are decoded from op.operationData (like Aptos BCS deserialization)
-    -- No contractId needed since we're targeting ourselves
-    --
-    -- Supported functions:
-    --   - "set_config": Update signer configuration (params in operationData)
-    --   - "clear_root": Clear the current merkle root (no params needed)
-    --
-    -- ANYONE CAN EXECUTE - Security comes from merkle proof verification:
-    --   1. SetRoot already validated signatures from required signers
-    --   2. SetRoot stored the merkle root on-chain
-    --   3. This function validates the merkle proof against the stored root
-    --   4. operationData is part of the merkle leaf, so it's cryptographically bound
-    choice ExecuteMcmsOp : ContractId MCMS
-      with
-        submitter : Party                          -- Anyone can submit
-        op : Op                                    -- Operation details (params encoded in operationData)
-        opProof : [BytesHex]                       -- Merkle proof
-      controller submitter
-      do
-        now <- getTime
-
-        -- 1. Validate operation targets this MCMS (self-dispatch)
-        assertMsg ("E_WRONG_CHAIN_ID: op targets " <> show op.chainId) $
-          op.chainId == chainId
-        assertMsg ("E_WRONG_MULTISIG: op targets " <> op.multisigId) $
-          op.multisigId == mcmsId
-
-        -- 2. Verify targetInstanceId is "self" or matches mcmsId
-        assertMsg ("E_NOT_SELF_DISPATCH: targetInstanceId must be 'self' or mcmsId") $
-          op.targetInstanceId == "self" || op.targetInstanceId == mcmsId
-
-        -- 3. Check nonce matches current opCount
-        assertMsg ("E_WRONG_NONCE: expected " <> show expiringRoot.opCount <> " got " <> show op.nonce) $
-          op.nonce == expiringRoot.opCount
-
-        -- 4. Check root not expired
-        assertMsg "E_ROOT_EXPIRED" $ now <= expiringRoot.validUntil
-
-        -- 5. Check we haven't executed all ops for this root
-        assertMsg "E_NO_MORE_OPS" $ expiringRoot.opCount < rootMetadata.postOpCount
-
-        -- 6. Verify merkle proof ON-CHAIN using keccak256
-        let opLeaf = hashOpLeafNative op
-        assertMsg "E_INVALID_OP_MERKLE_PROOF" $
-          verifyMerkleProof expiringRoot.root opLeaf opProof
-
-        -- 7. Dispatch to internal admin function based on functionName
-        --    Decode parameters from op.operationData (like Aptos BCS)
+        -- 6. Dispatch based on functionName (like Aptos dispatch_to_timelock)
+        --    Parameters are decoded from op.operationData (like Aptos BCS deserialization)
         case op.functionName of
+          "schedule_batch" -> do
+            assertMsg "E_WRONG_ROLE_FOR_SCHEDULE: must use Proposer" $ targetRole == Proposer
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
+            case decodeScheduleBatchParams op.operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode schedule_batch params"
+              Some params ->
+                scheduleBatchInternal now this rs params.calls params.predecessor params.salt (seconds params.delaySecs)
+
+          "bypasser_execute_batch" -> do
+            assertMsg "E_WRONG_ROLE_FOR_BYPASS: must use Bypasser" $ targetRole == Bypasser
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
+            case decodeBypasserExecuteParams op.operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode bypasser_execute_batch params"
+              Some params ->
+                bypasserExecuteBatchInternal owner this rs params.calls targetCids
+
+          "cancel_batch" -> do
+            assertMsg "E_WRONG_ROLE_FOR_CANCEL: must use Canceller" $ targetRole == Canceller
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
+            case decodeCancelBatchParams op.operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode cancel_batch params"
+              Some params ->
+                cancelBatchInternal this rs params.opId
+
+          -- Self-dispatch: MCMS configuration changes (admin operations)
           "set_config" -> do
-            -- Decode config params from operationData (like Aptos bcs_stream::deserialize)
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
             case decodeSetConfigParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode set_config params"
               Some params -> do
                 let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
-
-                -- Basic validation
                 assertMsg "E_TOO_MANY_SIGNERS" $ length newConfig.signers <= maxNumSigners
                 assertMsg "E_WRONG_QUORUM_LENGTH" $ length newConfig.groupQuorums == numGroups
                 assertMsg "E_WRONG_PARENTS_LENGTH" $ length newConfig.groupParents == numGroups
                 assertMsg "E_ROOT_NOT_SELF_PARENT" $ (newConfig.groupParents !! 0) == 0
-
-                let newExpiringRoot = if params.clearRoot
-                      then expiringRoot with root = "", opCount = expiringRoot.opCount + 1
-                      else expiringRoot with opCount = expiringRoot.opCount + 1
-
-                create this with
-                  config = newConfig
-                  expiringRoot = newExpiringRoot
+                let clearedRoot = if params.clearRoot
+                      then rs.expiringRoot with root = ""
+                      else rs.expiringRoot
+                let newExpiringRoot = clearedRoot with opCount = rs.expiringRoot.opCount + 1
+                let newRs = rs with config = newConfig, expiringRoot = newExpiringRoot
+                create (setRoleState targetRole newRs this)
 
           "clear_root" -> do
-            -- Clear the current merkle root (no params needed)
-            create this with
-              expiringRoot = expiringRoot with root = "", opCount = expiringRoot.opCount + 1
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
+              op.targetInstanceId == instanceId
+            let newRs = rs with
+                  expiringRoot = rs.expiringRoot with root = "", opCount = rs.expiringRoot.opCount + 1
+            create (setRoleState targetRole newRs this)
 
-          _ -> abort $ "E_UNKNOWN_ADMIN_FUNCTION: " <> op.functionName
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> op.functionName
+
+    -- =========================================================================
+    -- TIMELOCK EXECUTION (Post-delay execution)
+    -- =========================================================================
+
+    -- | Execute a scheduled batch after delay has passed
+    -- This is a public entry point - anyone can execute once ready
+    -- (matches Aptos timelock_execute_batch which is also public)
+    choice ExecuteScheduledBatch : ContractId MCMS
+      with
+        submitter : Party                          -- Anyone can execute
+        opId : Text                                -- Operation ID to execute
+        calls : [TimelockCall]                     -- Caller provides (for execution)
+        predecessor : Text                         -- For validation
+        salt : Text                                -- For opId verification
+        targetCids : [ContractId MCMSReceiver]     -- Target contract IDs (only for external calls)
+      controller submitter
+      do
+        now <- getTime
+
+        -- 1. Verify opId matches provided data
+        let computedOpId = hashTimelockOpId calls predecessor salt
+        assertMsg "E_OPID_MISMATCH" $ computedOpId == opId
+
+        -- 2. Lookup in timelockTimestamps
+        case Map.lookup opId timelockTimestamps of
+          None -> abort "E_OPERATION_NOT_FOUND"
+          Some readyTime -> do
+            -- 3. Check not already done
+            assertMsg "E_ALREADY_EXECUTED" $ readyTime /= doneTimestamp
+
+            -- 4. Check ready time has passed
+            assertMsg ("E_NOT_READY: must wait until " <> show readyTime) $
+              now >= readyTime
+
+            -- 5. Check predecessor done (if any)
+            unless (predecessor == zeroHash) $ do
+              case Map.lookup predecessor timelockTimestamps of
+                None -> abort "E_PREDECESSOR_NOT_FOUND"
+                Some predTime ->
+                  assertMsg "E_PREDECESSOR_NOT_DONE" $ predTime == doneTimestamp
+
+            -- 6. Validate external target count
+            let externalCalls = filter (\c -> c.targetInstanceId /= instanceId) calls
+            assertMsg "E_WRONG_TARGET_COUNT" $
+              length targetCids == length externalCalls
+
+            -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
+            (_, finalMcms) <- processCallsLoop owner targetCids this calls 0
+
+            -- 8. Mark as done (set to doneTimestamp)
+            create (finalMcms with
+              timelockTimestamps = Map.insert opId doneTimestamp finalMcms.timelockTimestamps)
 
     -- =========================================================================
     -- View Functions
@@ -294,30 +341,107 @@ template MCMS
     nonconsuming choice CanExecuteOp : Bool
       with
         submitter : Party                      -- Anyone can query
+        targetRole : Role
         op : Op
       controller submitter
       do
         now <- getTime
+        let rs = getRoleState targetRole this
         pure $
           op.chainId == chainId &&
-          op.multisigId == mcmsId &&
-          op.nonce == expiringRoot.opCount &&
-          now <= expiringRoot.validUntil &&
-          expiringRoot.opCount < rootMetadata.postOpCount
+          op.multisigId == makeMcmsId instanceId targetRole &&
+          op.nonce == rs.expiringRoot.opCount &&
+          now <= rs.expiringRoot.validUntil &&
+          rs.expiringRoot.opCount < rs.rootMetadata.postOpCount
 
     -- | Get current state
     nonconsuming choice GetState : MCMSState
       with
         submitter : Party                      -- Anyone can query
+        targetRole : Role
       controller submitter
       do
+        let rs = getRoleState targetRole this
         pure MCMSState with
-          role
-          opCount = expiringRoot.opCount
-          postOpCount = rootMetadata.postOpCount
-          validUntil = expiringRoot.validUntil
-          hasActiveRoot = expiringRoot.root /= ""
-          numSigners = length config.signers
+          role = targetRole
+          opCount = rs.expiringRoot.opCount
+          postOpCount = rs.rootMetadata.postOpCount
+          validUntil = rs.expiringRoot.validUntil
+          hasActiveRoot = rs.expiringRoot.root /= ""
+          numSigners = length rs.config.signers
+
+    -- =========================================================================
+    -- Timelock View Functions
+    -- =========================================================================
+
+    -- | Check if operation exists in timelockTimestamps
+    nonconsuming choice IsOperation : Bool
+      with
+        submitter : Party
+        opId : Text
+      controller submitter
+      do pure $ Map.member opId timelockTimestamps
+
+    -- | Check if operation is pending (scheduled but not done)
+    nonconsuming choice IsOperationPending : Bool
+      with
+        submitter : Party
+        opId : Text
+      controller submitter
+      do
+        case Map.lookup opId timelockTimestamps of
+          None -> pure False
+          Some t -> pure $ t /= doneTimestamp
+
+    -- | Check if operation is ready (delay passed, not done)
+    nonconsuming choice IsOperationReady : Bool
+      with
+        submitter : Party
+        opId : Text
+      controller submitter
+      do
+        now <- getTime
+        case Map.lookup opId timelockTimestamps of
+          None -> pure False
+          Some t -> pure $ t /= doneTimestamp && now >= t
+
+    -- | Check if operation is done
+    nonconsuming choice IsOperationDone : Bool
+      with
+        submitter : Party
+        opId : Text
+      controller submitter
+      do
+        case Map.lookup opId timelockTimestamps of
+          None -> pure False
+          Some t -> pure $ t == doneTimestamp
+
+    -- | Get operation timestamp (None if not found)
+    nonconsuming choice GetTimestamp : Optional Time
+      with
+        submitter : Party
+        opId : Text
+      controller submitter
+      do pure $ Map.lookup opId timelockTimestamps
+
+    -- | Get minimum delay
+    nonconsuming choice GetMinDelay : RelTime
+      with
+        submitter : Party
+      controller submitter
+      do pure minDelay
+
+    nonconsuming choice GetBlockedFunctions : [BlockedFunction]
+      with
+        submitter : Party
+      controller submitter
+      do pure blockedFunctions
+
+    nonconsuming choice GetBlockedFunctionsCount : Int
+      with
+        submitter : Party
+      controller submitter
+      do pure $ length blockedFunctions
 
 -- ===========================================================================
 -- VIEW TYPES
@@ -338,7 +462,193 @@ data MCMSState = MCMSState
 -- HELPER FUNCTIONS
 -- ===========================================================================
 
--- | Create mcmsId from base ID and role
--- e.g., makeMcmsId "mcms-001" Proposer = "mcms-001-proposer"
+-- | Create multisigId from base ID and role
+-- e.g., makeMcmsId "mcms@mcmsPartyId" Proposer = "mcms@mcmsPartyId-proposer"
 makeMcmsId : Text -> Role -> Text
 makeMcmsId baseId r = baseId <> "-" <> roleToText r
+
+-- | Alias emphasizing role-suffixed multisig ids.
+roleMultisigId : Text -> Role -> Text
+roleMultisigId = makeMcmsId
+
+getRoleState : Role -> MCMS -> RoleState
+getRoleState Proposer m = m.proposer
+getRoleState Canceller m = m.canceller
+getRoleState Bypasser m = m.bypasser
+
+setRoleState : Role -> RoleState -> MCMS -> MCMS
+setRoleState Proposer rs m = m with proposer = rs
+setRoleState Canceller rs m = m with canceller = rs
+setRoleState Bypasser rs m = m with bypasser = rs
+
+-- | Execute a self-dispatch call (admin operations routed through timelock)
+-- This function does NOT perform role checks. This is intentional and safe because:
+-- This function is only reachable via two validated paths:
+--
+--    Path A (Scheduled Execution):
+--      ExecuteOp(Proposer, "schedule_batch") → scheduleBatchInternal → [delay passes]
+--      → ExecuteScheduledBatch → processCallsLoop → executeSelfDispatch
+--      Security: Proposer's merkle proof validated the calls at schedule time.
+--
+--    Path B (Bypasser Immediate Execution):
+--      ExecuteOp(Bypasser, "bypasser_execute_batch") → bypasserExecuteBatchInternal
+--      → processCallsLoop → executeSelfDispatch
+--      Security: Bypasser's merkle proof validated the calls.
+--
+-- Supported functions: update_min_delay, block_function, unblock_function,
+--                      set_config, schedule_batch, cancel_batch
+executeSelfDispatch : MCMS -> TimelockCall -> Update MCMS
+executeSelfDispatch mcms call =
+  case call.functionName of
+    "update_min_delay" ->
+      case parseInt call.operationData of
+        None -> abort "E_INVALID_DELAY: operationData must be integer seconds"
+        Some secs -> pure $ mcms with minDelay = seconds secs
+
+    "block_function" ->
+      case decodeBlockedFunction call.operationData of
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode blocked function"
+        Some bf ->
+          if bf `notElem` mcms.blockedFunctions
+          then pure $ mcms with blockedFunctions = bf :: mcms.blockedFunctions
+          else pure mcms
+
+    "unblock_function" ->
+      case decodeBlockedFunction call.operationData of
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode blocked function"
+        Some bf -> pure $ mcms with blockedFunctions = filter (/= bf) mcms.blockedFunctions
+
+    "set_config" ->
+      case decodeSelfDispatchSetConfig call.operationData of
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode set_config params"
+        Some (targetRole, params) -> do
+          let rs = getRoleState targetRole mcms
+          let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
+          assertMsg "E_TOO_MANY_SIGNERS" $ length newConfig.signers <= maxNumSigners
+          assertMsg "E_WRONG_QUORUM_LENGTH" $ length newConfig.groupQuorums == numGroups
+          assertMsg "E_WRONG_PARENTS_LENGTH" $ length newConfig.groupParents == numGroups
+          assertMsg "E_ROOT_NOT_SELF_PARENT" $ (newConfig.groupParents !! 0) == 0
+          let clearedRoot = if params.clearRoot
+                then rs.expiringRoot with root = ""
+                else rs.expiringRoot
+          let newRs = rs with config = newConfig, expiringRoot = clearedRoot
+          pure $ setRoleState targetRole newRs mcms
+
+    "schedule_batch" ->
+      case decodeScheduleBatchParams call.operationData of
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode schedule_batch params"
+        Some params -> do
+          now <- getTime
+          let delay = seconds params.delaySecs
+          assertMsg "E_DELAY_TOO_SHORT" $ delay >= mcms.minDelay
+          forA_ params.calls $ \c ->
+            assertMsg ("E_FUNCTION_BLOCKED: " <> c.targetInstanceId <> ":" <> c.functionName) $
+              BlockedFunction c.targetInstanceId c.functionName `notElem` mcms.blockedFunctions
+          let opId = hashTimelockOpId params.calls params.predecessor params.salt
+          assertMsg "E_ALREADY_SCHEDULED" $
+            not $ Map.member opId mcms.timelockTimestamps
+          let readyTime = addRelTime now delay
+          pure $ mcms with timelockTimestamps = Map.insert opId readyTime mcms.timelockTimestamps
+
+    "cancel_batch" ->
+      case decodeCancelBatchParams call.operationData of
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode cancel_batch params"
+        Some params -> do
+          case Map.lookup params.opId mcms.timelockTimestamps of
+            None -> abort "E_OPERATION_NOT_FOUND"
+            Some readyTime -> do
+              assertMsg "E_ALREADY_EXECUTED" $ readyTime /= doneTimestamp
+              pure $ mcms with timelockTimestamps = Map.delete params.opId mcms.timelockTimestamps
+
+    _ -> abort $ "E_UNKNOWN_SELF_DISPATCH: " <> call.functionName
+
+-- ===========================================================================
+-- INTERNAL DISPATCH HELPERS (called by ExecuteOp)
+-- These perform the core logic without merkle proof verification
+-- (proof is already validated by ExecuteOp before dispatching)
+-- ===========================================================================
+
+-- | Schedule a batch of operations (called by ExecuteOp for Proposer role)
+-- Does NOT verify merkle proof - ExecuteOp already did that
+scheduleBatchInternal : Time -> MCMS -> RoleState -> [TimelockCall] -> Text -> Text -> RelTime -> Update (ContractId MCMS)
+scheduleBatchInternal now mcms rs calls predecessor salt delay = do
+  -- 1. Validate delay meets minimum
+  assertMsg "E_DELAY_TOO_SHORT" $ delay >= mcms.minDelay
+
+  -- 2. Validate no blocked functions in calls (per-target, matching Aptos)
+  forA_ calls $ \call ->
+    assertMsg ("E_FUNCTION_BLOCKED: " <> call.targetInstanceId <> ":" <> call.functionName) $
+      BlockedFunction call.targetInstanceId call.functionName `notElem` mcms.blockedFunctions
+
+  -- 3. Compute opId
+  let opId = hashTimelockOpId calls predecessor salt
+
+  -- 4. Check not already scheduled (on-chain duplicate prevention)
+  assertMsg "E_ALREADY_SCHEDULED" $
+    not $ Map.member opId mcms.timelockTimestamps
+
+  -- 5. Add to map with readyTime + increment proposer opCount
+  let readyTime = addRelTime now delay
+  let newRs = rs with
+        expiringRoot = rs.expiringRoot with opCount = rs.expiringRoot.opCount + 1
+  let updated = setRoleState Proposer newRs mcms
+  create (updated with timelockTimestamps = Map.insert opId readyTime mcms.timelockTimestamps)
+
+-- | Execute a batch immediately via Bypasser (called by ExecuteOp for Bypasser role)
+-- Does NOT verify merkle proof - ExecuteOp already did that
+bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> [ContractId MCMSReceiver] -> Update (ContractId MCMS)
+bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids = do
+  -- 1. Validate external target count
+  let externalCalls = filter (\c -> c.targetInstanceId /= mcms.instanceId) calls
+  assertMsg "E_WRONG_TARGET_COUNT" $
+    length targetCids == length externalCalls
+
+  -- 2. Process all calls (self-dispatch inline, external via MCMSReceiver)
+  (_, finalMcms) <- processCallsLoop ownerParty targetCids mcms calls 0
+
+  -- 3. Increment bypasser opCount
+  let finalRs = getRoleState Bypasser finalMcms
+  let newRs = finalRs with
+        expiringRoot = finalRs.expiringRoot with opCount = finalRs.expiringRoot.opCount + 1
+  create (setRoleState Bypasser newRs finalMcms)
+
+-- | Cancel a pending operation (called by ExecuteOp for Canceller role)
+-- Does NOT verify merkle proof - ExecuteOp already did that
+cancelBatchInternal : MCMS -> RoleState -> Text -> Update (ContractId MCMS)
+cancelBatchInternal mcms rs opIdToCancel = do
+  -- 1. Check operation exists and is pending
+  case Map.lookup opIdToCancel mcms.timelockTimestamps of
+    None -> abort "E_OPERATION_NOT_FOUND"
+    Some readyTime ->
+      assertMsg "E_ALREADY_EXECUTED" $ readyTime /= doneTimestamp
+
+  -- 2. Remove from map (cancel) + increment canceller opCount
+  let newRs = rs with
+        expiringRoot = rs.expiringRoot with opCount = rs.expiringRoot.opCount + 1
+  let updated = setRoleState Canceller newRs mcms
+  create (updated with timelockTimestamps = Map.delete opIdToCancel mcms.timelockTimestamps)
+
+-- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
+processCallsLoop : Party -> [ContractId MCMSReceiver] -> MCMS -> [TimelockCall] -> Int -> Update (Int, MCMS)
+processCallsLoop _ _ mcms [] extIdx = pure (extIdx, mcms)
+processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx
+  | call.targetInstanceId == mcms.instanceId = do
+      newMcms <- executeSelfDispatch mcms call
+      processCallsLoop ownerParty targetCids newMcms rest extIdx
+  | otherwise = do
+      let targetCid = targetCids !! extIdx
+      target <- fetch targetCid
+      let targetView = view target
+      assertMsg ("E_WRONG_TARGET: expected " <> call.targetInstanceId <> " got " <> targetView.instanceId) $
+        targetView.instanceId == call.targetInstanceId
+      case parsePartyIdText targetView.instanceId of
+        None -> abort "E_INVALID_INSTANCE_ID_FORMAT: expected baseId@partyId"
+        Some partyIdText ->
+          assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
+            any (\s -> partyToText s == partyIdText) (signatory target)
+      _ <- exercise targetCid MCMSReceiver_Entrypoint with
+        caller = ownerParty
+        functionName = call.functionName
+        operationData = call.operationData
+        contractIds = []
+      processCallsLoop ownerParty targetCids mcms rest (extIdx + 1)

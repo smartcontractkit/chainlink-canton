@@ -23,9 +23,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[mcms.MCMS]{
 		if template.Owner == "" {
 			return errors.New("owner cannot be empty")
 		}
-		if template.Role == "" {
-			return errors.New("role must be set")
-		}
 		if template.ChainId <= 0 {
 			return errors.New("chain ID must be greater than zero")
 		}
