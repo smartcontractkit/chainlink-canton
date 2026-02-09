@@ -1,11 +1,13 @@
 module CCIP.TokenAdminRegistry where
 
 import DA.Map qualified as Map
-import DA.Optional (isSome)
+import DA.Optional (isSome, fromSomeNote)
 import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
+import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
 
 template TokenAdminRegistry
@@ -192,6 +194,30 @@ template TokenAdminRegistry
                                         (ticket.ccipOwner == owner)
                                     archive ticketCid
 
+        -- | Mark pool CCV verification on an ExecutingMessageV1.
+        nonconsuming choice TokenAdminRegistry_MarkPoolCCVsVerified : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+            with
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+                poolInstanceId : Text
+                caller : Party
+            controller caller
+            do
+                execMsg <- fetch executingMessageCid
+                let tt = fromSomeNote
+                        "TokenAdminRegistry_MarkPoolCCVsVerified: no token transfer in message"
+                        execMsg.message.tokenTransfer
+                let instrumentId = fromSomeNote
+                        "TokenAdminRegistry_MarkPoolCCVsVerified: cannot decode destTokenAddress"
+                        (CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress)
+                config <- case Map.lookup instrumentId tokenConfigs of
+                    None -> abort "TokenAdminRegistry_MarkPoolCCVsVerified: no config for instrument"
+                    Some c -> pure c
+                pool <- case config.tokenPool of
+                    None -> abort "TokenAdminRegistry_MarkPoolCCVsVerified: no pool registered for instrument"
+                    Some p -> pure p
+                assertMsg "TokenAdminRegistry_MarkPoolCCVsVerified: caller is not the registered pool"
+                    (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
+                exercise executingMessageCid CCIP.ExecutingMessageV1.MarkPoolCCVsVerified
 
 
 -- | Registered pool identity for a token instrument.
