@@ -1,12 +1,22 @@
 -- | Executing message contract for inbound CCIP message processing.
--- Created by PrepareExecute, consumed by OffRamp.ExecuteFromRouter.
--- Provides a single source of truth for decoded message and resolved party identities.
+-- Created by PrepareExecute, acts as a collecting contract: CCVs and pools
+-- exercise choices directly on it to record verification state.
+-- Consumed by OffRamp.ExecuteFromRouter after successful execution.
 module CCIP.ExecutingMessageV1 where
 
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
 import qualified CCIP.MessageCodecV1
+
+-- | Record of a CCV verification appended via AddCCVVerification.
+-- The ccvOwner is authenticated by Daml's controller mechanism.
+data CCVVerification = CCVVerification
+    with
+        ccvInstanceId : Text
+        ccvOwner : Party
+        versionTag : BytesHex
+    deriving (Eq, Show)
 
 -- | Build the observer list from receiver, optional token receiver, and executor.
 buildObservingParties : Party -> Optional Party -> Party -> [Party]
@@ -26,6 +36,8 @@ template ExecutingMessageV1
         tokenReceiver : Optional Party
         executor : Party
         observingParties : [Party]
+        ccvVerifications : [CCVVerification]
+        poolCCVsVerified : Bool
     where
         signatory ccipOwner
         observer observingParties
@@ -39,3 +51,26 @@ template ExecutingMessageV1
             do
                 assertMsg "executingMessage: caller must be ccipOwner, receiver, or executor"
                     (caller == ccipOwner || caller `elem` observingParties)
+
+        -- Append a CCV verification record. CCV exercises this after successful
+        -- signature verification; ccvOwner = caller is Daml-authenticated.
+        choice AddCCVVerification : ContractId ExecutingMessageV1
+            with
+                ccvInstanceId : Text
+                versionTag : BytesHex
+                caller : Party
+            controller caller
+            do
+                create this with
+                    ccvVerifications = ccvVerifications ++ [CCVVerification with
+                        ccvInstanceId
+                        ccvOwner = caller
+                        versionTag]
+
+        -- Mark pool CCV requirements as satisfied. Pool exercises this directly.
+        choice MarkPoolCCVsVerified : ContractId ExecutingMessageV1
+            with
+                caller : Party
+            controller caller
+            do
+                create this with poolCCVsVerified = True
