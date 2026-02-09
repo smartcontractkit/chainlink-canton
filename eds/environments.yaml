@@ -11,5 +11,4 @@ environments:
       feeQuoter: "localnet-feequoter"
       ccv: "localnet-ccv"
       tokenAdminRegistry: "localnet-tar"
-      ccvRegistry: "localnet-ccvreg"
       tokenPool: "localnet-tokenpool"
