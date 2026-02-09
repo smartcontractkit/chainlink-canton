@@ -49,20 +49,18 @@ data TokenSendData = TokenSendData
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         amount : Numeric 0
         destTokenAddress : BytesHex
-        tokenReceiver : BytesHex
         extraData : BytesHex
     deriving (Eq, Show)
 
 template SendingMessageV1
     with
+        -- User/OnRamp provided fields, populated at PrepareSend
         ccipOwner : Party
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
         executorAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-
-        -- Raw MessageV1 fields (always populated at PrepareSend)
         sourceChainSelector : Numeric 0
         senderAddress : BytesHex
         receiver : BytesHex
@@ -73,35 +71,38 @@ template SendingMessageV1
         ccvAndExecutorHash : BytesHex
         onRampAddress : BytesHex
         offRampAddress : BytesHex
-        -- Token transfer fields (populated for token transfers)
-        sourcePoolAddress : BytesHex
-        sourceTokenAddress : BytesHex
+        -- Token transfer receiver (populated for token transfers, "" otherwise)
         tokenReceiver : BytesHex
-        tokenAmount : Numeric 0
-
-        -- Constructed message. For message-only: populated at PrepareSend.
-        -- For token transfers: None/"" until AddTokenSend.
-        message : Optional CCIP.MessageCodecV1.MessageV1
-        encodedMessage : BytesHex
-        messageId : BytesHex
-
         feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-
         networkFeeUSDCents : Decimal
+        -- Appended to by AddVerifierData
+        -- TODO: also allow AddTokenSend to add their own observers
+        observingParties : [Party]
+
+        -- Populated by AddCCVFee
         ccvFees : [CCVFee]
+        -- Populated by AddTokenSendFee
         tokenSendFee : Optional TokenSendFee
 
         -- Populated by FinalizeFee (batch conversion from USD to fee
-        -- token units at a single price point). Empty until then.
+        -- token units at a single price point)
         feesFinalized : Bool
         ccvFeeTokenAmounts : [Numeric 0]
         tokenSendFeeTokenAmount : Numeric 0
         networkFeeTokenAmount : Numeric 0
 
-        verifierData : [VerifierData]
+        -- Populated by AddTokenSend
         tokenSendData : Optional TokenSendData
 
-        observingParties : [Party]
+        -- Populated by AddVerifierData
+        verifierData : [VerifierData]
+
+        -- External CCIP message
+        -- For message-only: populated at PrepareSend.
+        -- For token transfers: None/"" until AddTokenSend.
+        message : Optional CCIP.MessageCodecV1.MessageV1
+        encodedMessage : BytesHex
+        messageId : BytesHex
     where
         signatory ccipOwner
         observer observingParties
@@ -172,7 +173,6 @@ template SendingMessageV1
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 amount : Numeric 0
                 destTokenAddress : BytesHex
-                addTokenReceiver : BytesHex
                 extraData : BytesHex
                 poolRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 caller : Party
@@ -183,9 +183,7 @@ template SendingMessageV1
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
-                        destTokenAddress
-                        tokenReceiver = addTokenReceiver
-                        extraData
+                        destTokenAddress, extraData
 
                 -- Merge pool CCVs with existing required CCVs
                 let finalCCVs = dedup (requiredCCVs ++ poolRequiredCCVs)
@@ -196,12 +194,14 @@ template SendingMessageV1
                 let finalHash = CCIP.MessageCodecV1.computeCCVAndExecutorHash
                         ccvHashedAddresses executorAddr
 
+                let sourcePoolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
+                        poolInstanceId poolOwner
+                let sourceTokenAddr = CCIP.MessageCodecV1.encodeInstrumentId
+                        instrumentId
                 let tokenTransferV1 = CCIP.MessageCodecV1.TokenTransferV1 with
-                        sourcePoolAddress, sourceTokenAddress
-                        destTokenAddress = destTokenAddress
-                        tokenReceiver = addTokenReceiver
-                        amount = tokenAmount
-                        extraData = extraData
+                        sourcePoolAddress = sourcePoolAddr
+                        sourceTokenAddress = sourceTokenAddr
+                        destTokenAddress, tokenReceiver, amount, extraData
                 let messageV1 = CCIP.MessageCodecV1.MessageV1 with
                         sourceChainSelector, destChainSelector, sequenceNumber
                         executionGasLimit, ccipReceiveGasLimit
