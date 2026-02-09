@@ -162,7 +162,7 @@ template PerPartyRouter
                     CCIP.SendingMessageV1.FeeTokenAmount with
                         caller = partyOwner
 
-                -- TODO: move to Router
+                -- TODO: move to OnRamp
                 feeChangeCids <- if totalFee > 0.0
                     then do
                         -- TODO: check executeBefore
