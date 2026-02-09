@@ -4,7 +4,7 @@ module CCIP.OnRamp where
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (isSome)
+import DA.Optional (fromOptional)
 
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
@@ -16,17 +16,6 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
-
-
--- | Token transfer parameters for PrepareSendFromRouter.
--- PrepareSend looks up the pool registration from TAR to compute
--- sourcePoolAddress and sourceTokenAddress.
-data TokenTransferParams = TokenTransferParams
-    with
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
-        tokenReceiver : BytesHex
-    deriving (Eq, Show)
 
 
 template OnRamp
@@ -75,7 +64,8 @@ template OnRamp
                 ccipReceiveGasLimit : Int
                 currentSequenceNumber : Numeric 0
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-                tokenTransferParams : Optional TokenTransferParams
+                withTokenTransfer : Bool
+                tokenReceiver : Optional BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller ccipOwner
             do
@@ -119,8 +109,6 @@ template OnRamp
                             else senderRequiredCCVs)
                         ++ destConfig.laneMandatedCCVs)
 
-                let hasTokenTransfer = isSome tokenTransferParams
-
                 -- For message-only sends, compute hash now.
                 -- For token transfers, defer to AddTokenSend (pool adds its CCVs).
                 -- TODO: handle extra args, executor
@@ -128,7 +116,7 @@ template OnRamp
                 let executorAddr = CCIP.RawInstanceAddress.toInstanceAddress
                         destConfig.defaultExecutor
                 let ccvAndExecutorHash =
-                        if hasTokenTransfer then ""
+                        if withTokenTransfer then ""
                         else
                             let ccvHashedAddresses =
                                     map CCIP.RawInstanceAddress.toInstanceAddress resolvedCCVs
@@ -138,31 +126,14 @@ template OnRamp
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
-
-                -- For token transfers, look up pool registration from TAR
-                (theSourcePoolAddress, theSourceTokenAddress, theTokenReceiver, theTokenAmount) <-
-                    case tokenTransferParams of
-                        None -> pure ("", "", "", 0.0)
-                        Some params -> do
-                            configOpt <- exercise tokenAdminRegistryCid
-                                CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
-                                    instrumentId = params.instrumentId
-                                    caller = ccipOwner
-                            pool <- case configOpt of
-                                None -> abort "onramp: no token config for instrument"
-                                Some config -> case config.tokenPool of
-                                    None -> abort "onramp: no pool registered for instrument"
-                                    Some p -> pure p
-                            let poolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
-                                    pool.poolInstanceId pool.poolOwner
-                            let sourceTokenAddr = CCIP.MessageCodecV1.encodeInstrumentId
-                                    params.instrumentId
-                            pure (poolAddr, sourceTokenAddr, params.tokenReceiver, params.amount)
+                let resolvedTokenReceiver = if withTokenTransfer
+                        then fromOptional receiver tokenReceiver
+                        else ""
 
                 -- For message-only sends, construct MessageV1 now.
                 -- For token transfers, defer to AddTokenSend.
                 let (msgOpt, encoded, msgId) =
-                        if hasTokenTransfer
+                        if withTokenTransfer
                         then (None, "", "")
                         else
                             let messageV1 = CCIP.MessageCodecV1.MessageV1 with
@@ -183,7 +154,7 @@ template OnRamp
                                 enc = CCIP.MessageCodecV1.encodeMessageV1 messageV1
                             in (Some messageV1, enc, keccak256 enc)
 
-                let networkFeeUSD = if hasTokenTransfer
+                let networkFeeUSD = if withTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
 
@@ -202,10 +173,7 @@ template OnRamp
                     ccvAndExecutorHash = ccvAndExecutorHash
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
-                    sourcePoolAddress = theSourcePoolAddress
-                    sourceTokenAddress = theSourceTokenAddress
-                    tokenReceiver = theTokenReceiver
-                    tokenAmount = theTokenAmount
+                    tokenReceiver = resolvedTokenReceiver
                     message = msgOpt
                     encodedMessage = encoded
                     messageId = msgId
