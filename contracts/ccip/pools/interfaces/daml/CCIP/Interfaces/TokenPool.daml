@@ -41,10 +41,11 @@ interface ITokenPool where
         controller caller
         do tokenPool_getRequiredCCVsImpl this self arg
 
-    -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1.
+    -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1 via TAR.
     nonconsuming choice TokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             caller : Party
         controller caller
         do tokenPool_verifyInboundCCVsImpl this self arg
