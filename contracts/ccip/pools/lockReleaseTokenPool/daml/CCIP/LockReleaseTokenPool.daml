@@ -107,7 +107,7 @@ template LockReleaseTokenPool
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyInboundCCVs
                     with
                         executingMessageCid = arg.executingMessageCid
-                        ccvVerifyTickets = arg.ccvVerifyTickets
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
@@ -152,14 +152,14 @@ template LockReleaseTokenPool
                         CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
 
-        -- Verify inbound CCVs and issue TokenPoolCCVVerifiedTicket.
+        -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1.
         -- Validates that the message has a token transfer targeting this pool's instrument,
-        -- then fetches each provided ticket to compute its RawInstanceAddress and matches
-        -- against the pool's per-chain inbound CCV requirements.
-        nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
+        -- then checks the ccvVerifications list against the pool's per-chain inbound CCV
+        -- requirements.
+        nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 caller : Party
             controller caller
             do
@@ -176,40 +176,21 @@ template LockReleaseTokenPool
                 assertMsg "pool: destTokenAddress does not match pool instrumentId"
                     (tt.destTokenAddress == expectedAddr)
 
-                -- PrepareExecute guarantees tokenReceiver is set when tokenTransfer exists
-                let tokenReceiverParty = fromSomeNote
-                        "pool: tokenReceiver not set (invariant: PrepareExecute resolves this for token transfers)"
-                        execMsg.tokenReceiver
-
                 let requiredAddrs = case Map.lookup message.sourceChainSelector chainCCVRequirements of
                         None -> []
                         Some config -> config.inboundCCVs
 
-                -- Fetch each ticket, compute its RawInstanceAddress, keep only
-                -- those matching a required CCV.
-                matchedTickets <- forA ccvVerifyTickets $ \ticketCid -> do
-                    ticket <- fetch ticketCid
-                    let addr = CCIP.RawInstanceAddress.make ticket.ccvInstanceId ticket.ccvOwner
-                    pure (ticketCid, addr)
-
-                let selectedTickets =
-                        [ cid | (cid, addr) <- matchedTickets, addr `elem` requiredAddrs ]
-
-                -- Every required CCV must be covered
-                let coveredAddrs = [ addr | (_cid, addr) <- matchedTickets, addr `elem` requiredAddrs ]
+                -- Validate pool's required CCVs against ccvVerifications on ExecutingMessageV1
+                let coveredAddrs = [CCIP.RawInstanceAddress.make v.ccvInstanceId v.ccvOwner | v <- execMsg.ccvVerifications]
                 forA_ requiredAddrs $ \required ->
                     assertMsg ("pool: missing required CCV " <> show required)
                         (required `elem` coveredAddrs)
 
-                create CCIP.Tickets.TokenPoolCCVVerifiedTicket with
-                    poolOwner = poolOwner
-                    poolInstanceId = instanceId
-                    ccipOwner = ccipOwner
-                    receiver = execMsg.receiver
-                    tokenReceiver = tokenReceiverParty
-                    executor = caller
-                    executingMessageCid = executingMessageCid
-                    ccvVerifyTicketCids = selectedTickets
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_MarkPoolCCVsVerified with
+                        executingMessageCid
+                        poolInstanceId = instanceId
+                        caller = poolOwner
 
         -- Release tokens by consuming a TokenReceiveTicket via TokenAdminRegistry.
         -- The TAR validates the ticket was issued by the correct registry instance,
