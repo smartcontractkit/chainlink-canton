@@ -5,7 +5,7 @@ module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
-import qualified CCIP.Client
+import DA.Optional (isSome)
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
@@ -37,6 +37,8 @@ data TokenTransferInput = TokenTransferInput
         tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
         tokenInput : CCIP.Interfaces.TokenPool.TokenInput
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        amount : Numeric 0
+        tokenReceiver : Optional BytesHex
     deriving (Eq, Show)
 
 template CCIPSender
@@ -56,7 +58,8 @@ template CCIPSender
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
 
                 destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
+                receiver : BytesHex
+                payload : BytesHex
                 ccipReceiveGasLimit : Int
                 senderRequiredCCVs : [RawInstanceAddress]
 
@@ -68,9 +71,11 @@ template CCIPSender
                 ccvSendInputs : [CCVSendInput]
             controller owner
             do
-                let (withTokenTransfer, tokenAmount) = case (tokenTransfer, message.tokenAmounts) of
-                        (Some _, ta :: _) -> (True, ta.amount)
-                        _ -> (False, 0.0)
+                let withTokenTransfer = isSome tokenTransfer
+
+                let tokenReceiver = case tokenTransfer of
+                        Some tt -> tt.tokenReceiver
+                        None -> None
 
                 -- PrepareSend
                 smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
@@ -80,12 +85,12 @@ template CCIPSender
                     feeQuoterCid
                     rmnRemoteCid
                     destChainSelector
-                    receiver = message.receiver
-                    payload = message.payload
+                    receiver
+                    payload
                     ccipReceiveGasLimit
                     senderRequiredCCVs
                     withTokenTransfer
-                    tokenReceiver = None
+                    tokenReceiver
                     feeToken
 
                 -- CalculateFee (CCV + pool, USD cents only)
@@ -118,7 +123,7 @@ template CCIPSender
                                 sendingMessageCid = smCid
                                 tokenInput = tt.tokenInput
                                 senderInputCids = tt.senderInputCids
-                                amount = tokenAmount
+                                amount = tt.amount
                                 rmnRemoteCid
                                 caller = owner
                         pure lockResult.sendingMessageCid
