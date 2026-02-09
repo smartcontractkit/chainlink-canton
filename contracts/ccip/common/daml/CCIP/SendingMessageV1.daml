@@ -238,21 +238,24 @@ template SendingMessageV1
                 pure tokenSendData
 
         -- Batch-converts all USD fees to fee token units at a single
-        -- price point. The caller queries FeeQuoter.GetTokenPrice
-        -- and passes the price directly to avoid a circular dependency
-        -- between ccip-common and ccip-feequoter packages.
+        -- price point, applying the fee token's premium multiplier.
+        -- Only exercisable by ccipOwner (via FeeQuoter) to prevent
+        -- untrusted callers from fabricating fee token prices.
         choice FinalizeFee : ContractId SendingMessageV1
             with
                 feeTokenPrice : Decimal
-                caller : Party
-            controller caller
+                premiumMultiplier : Decimal
+            controller ccipOwner
             do
                 assertMsg "fees already finalized" (not feesFinalized)
                 assertMsg "fee token price must be positive"
                     (feeTokenPrice > 0.0)
+                assertMsg "premium multiplier must be positive"
+                    (premiumMultiplier > 0.0)
 
-                let convertUSD usdCents =
-                        intToNumeric (truncate (usdCents / feeTokenPrice))
+                let convertUSD usdCents = intToNumeric
+                        (truncate (usdCents * premiumMultiplier
+                            / feeTokenPrice))
 
                 let ccvAmounts = map
                         (\fee -> convertUSD fee.feeUSDCents) ccvFees
