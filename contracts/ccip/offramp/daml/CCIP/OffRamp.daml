@@ -26,7 +26,6 @@ template OffRamp
         globalConfigInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-        ccvRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
     where
         signatory ccipOwner
 
@@ -120,8 +119,12 @@ template OffRamp
                     tokenReceiver = resolvedTokenReceiver
                     executor = caller
                     observingParties = observers
+                    ccvVerifications = []
+                    poolCCVsVerified = False
 
         -- | Process a CCIP execute request from a PerPartyRouter.
+        -- Reads CCV verifications and pool verification state from the ExecutingMessageV1
+        -- collecting contract.
         nonconsuming choice ExecuteFromRouter : ExecuteFromRouterResult
             with
                 routerPartyOwner : Party
@@ -132,9 +135,6 @@ template OffRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-
-                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-                tokenPoolCCVTicket : Optional (ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket)
 
             controller ccipOwner
             do
@@ -184,17 +184,15 @@ template OffRamp
                         None -> None
                         Some tt -> CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress
 
-                -- Consume tokenPoolCCVTicket if provided
-                poolHasRequirements <- case tokenPoolCCVTicket of
+                -- Validate pool CCV verification when token transfer exists.
+                -- Pool exercises MarkPoolCCVsVerified when called, so if token
+                -- transfer exists the flag must be True.
+                poolHasRequirements <- case execMsg.tokenReceiver of
                     None -> pure False
-                    Some ticketCid -> do
-                        ticket <- fetch ticketCid
-                        assertMsg "offramp: tokenPoolCCVTicket ccipOwner mismatch"
-                            (ticket.ccipOwner == ccipOwner)
-                        assertMsg "offramp: tokenPoolCCVTicket executingMessage mismatch"
-                            (ticket.executingMessageCid == executingMessageCid)
-
-                        -- Validate pool identity against TokenAdminRegistry
+                    Some _ -> do
+                        assertMsg "offramp: pool CCVs not verified for token transfer"
+                            execMsg.poolCCVsVerified
+                        -- Check if pool actually had requirements (for default CCV logic)
                         case optInstrumentId of
                             Some instId -> do
                                 configOpt <- exercise tokenAdminRegistryCid
@@ -202,26 +200,13 @@ template OffRamp
                                         instrumentId = instId
                                         caller = ccipOwner
                                 case configOpt of
-                                    Some config -> do
-                                        pool <- case config.tokenPool of
-                                            Some p -> pure p
-                                            None -> abort "offramp: no pool registered for instrument"
-                                        let registeredPoolAddr = CCIP.RawInstanceAddress.make pool.poolInstanceId pool.poolOwner
-                                        CCIP.RawInstanceAddress.assertEqual
-                                            "offramp: tokenPoolCCVTicket pool instance address mismatch"
-                                            ticket.poolInstanceId ticket.poolOwner
-                                            registeredPoolAddr
+                                    Some config -> case config.tokenPool of
+                                        Some _ -> pure True
+                                        None -> abort "offramp: no pool registered for instrument"
                                     None -> abort "offramp: no token config for instrument"
-                            None -> pure ()
+                            None -> pure False
 
-                        -- Validate that pool's ticket CIDs are a subset of provided ccvVerifyTickets
-                        Foldable.forA_ ticket.ccvVerifyTicketCids $ \poolTicketCid ->
-                            assertMsg "offramp: pool CCV ticket not in provided tickets"
-                                (poolTicketCid `elem` ccvVerifyTickets)
-                        exercise ticketCid CCIP.Tickets.TokenPoolCCVVerifiedTicket_Archive with caller = ccipOwner
-                        pure (not (null ticket.ccvVerifyTicketCids))
-
-                -- Determine if defaults should apply (check raw addresses before conversion)
+                -- Determine if defaults should apply
                 let hasSpecificRequirements =
                         not (null sourceConfig.laneMandatedCCVs) ||
                         not (null receiverRequiredCCVs) ||
@@ -237,19 +222,10 @@ template OffRamp
                 let requiredCCVAddresses = dedup $
                         map CCIP.RawInstanceAddress.toInstanceAddress allRawAddrs
 
-                -- Process CCV verification tickets: validate registry instance address, compute addresses, archive
-                providedCCVAddresses <- forA ccvVerifyTickets $ \ticketCid -> do
-                    ticket <- fetch ticketCid
-                    CCIP.RawInstanceAddress.assertEqual "offramp: ccvverifyticket registry instance address mismatch"
-                        ticket.ccvRegistryInstanceId ticket.ccvRegistryOwner
-                        ccvRegistryInstanceAddress
-                    assertMsg "offramp: ccvverifyticket executingMessage mismatch"
-                        (ticket.executingMessageCid == executingMessageCid)
-                    -- Compute instance address from (instanceId, owner)
-                    let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress ticket.ccvInstanceId ticket.ccvOwner
-                    -- Archive the ticket
-                    exercise ticketCid CCIP.Tickets.CCVVerifyTicket_Archive with caller = ccipOwner
-                    pure ccvAddr
+                -- Compute provided CCV addresses from ExecutingMessageV1's ccvVerifications
+                let providedCCVAddresses =
+                        map (\v -> CCIP.MessageCodecV1.encodeInstanceAddress v.ccvInstanceId v.ccvOwner)
+                            execMsg.ccvVerifications
 
                 -- Validate all required CCVs are covered
                 Foldable.forA_ requiredCCVAddresses $ \requiredAddr ->
