@@ -136,12 +136,6 @@ template LockReleaseTokenPool
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         caller = arg.caller
 
-            tokenPool_verifyOutboundCCVsImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyOutboundCCVs
-                    with
-                        sendingMessageCid = arg.sendingMessageCid
-                        caller = arg.caller
-
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
             with
@@ -324,8 +318,8 @@ template LockReleaseTokenPool
 
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.
-        -- Validates pool's outbound CCV requirements against expectedCCVAddresses
-        -- (intent check; real verification happens at VerifyOutboundCCVs).
+        -- Passes pool's outbound CCV requirements to AddTokenSend for
+        -- merging into the unified requiredCCVs list.
         nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -344,26 +338,15 @@ template LockReleaseTokenPool
                     chainSelector = sendingMsg.destChainSelector
                 assertMsg "LockOrBurn: dest chain is cursed" (not isCursed)
 
-                -- Validate pool's outbound CCV requirements against expected CCVs.
-                -- LockOrBurn precedes ForwardToVerifier, so verifierData is empty.
-                -- This checks intent; actual attestation is verified at VerifyOutboundCCVs.
-                let requiredOutbound = case Map.lookup sendingMsg.destChainSelector chainCCVRequirements of
+                let poolRequiredCCVs = case Map.lookup sendingMsg.destChainSelector chainCCVRequirements of
                         None -> []
                         Some config -> config.outboundCCVs
-                let expectedAddrs = sendingMsg.expectedCCVAddresses
-                forA_ requiredOutbound $ \required ->
-                    let requiredAddr = CCIP.RawInstanceAddress.toInstanceAddress required
-                    in assertMsg ("LockOrBurn: missing required outbound CCV " <> show required)
-                        (requiredAddr `elem` expectedAddrs)
 
                 let destTokenAddr = fromSomeNote
                         "LockOrBurn: no remote token for dest chain"
                         (Map.lookup sendingMsg.destChainSelector remoteTokens)
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
-
-                assertMsg "LockOrBurn: not a token transfer send"
-                    sendingMsg.hasTokenTransfer
 
                 let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
                         values = TextMap.union poolReceiveContext.values tokenInput.extraArgs.context.values
@@ -390,7 +373,8 @@ template LockReleaseTokenPool
                         extraArgs = mergedExtraArgs
 
                 -- Append token send data via TAR (validates registration).
-                -- AddTokenSend constructs MessageV1 from SendingMessageV1 fields.
+                -- AddTokenSend merges poolRequiredCCVs into the unified CCV list
+                -- and constructs MessageV1 from SendingMessageV1 fields.
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSend with
@@ -400,6 +384,7 @@ template LockReleaseTokenPool
                         destTokenAddress = destTokenAddr
                         tokenReceiver = sendingMsg.tokenReceiver
                         extraData = extraData
+                        poolRequiredCCVs = poolRequiredCCVs
                         caller = poolOwner
 
                 case transferResult.output of
@@ -411,34 +396,3 @@ template LockReleaseTokenPool
                             sendingMessageCid = newSendingMessageCid
                     _ -> abort "LockOrBurn: transfer did not complete directly"
 
-        -- Validate pool's outbound CCV requirements against actual verifier
-        -- attestations in SendingMessageV1.verifierData. Called after ForwardToVerifier.
-        nonconsuming choice LockReleaseTokenPool_VerifyOutboundCCVs
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            with
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                caller : Party
-            controller caller
-            do
-                sendingMsg <- fetch sendingMessageCid
-
-                let requiredOutbound = case Map.lookup sendingMsg.destChainSelector
-                        chainCCVRequirements of
-                            None -> []
-                            Some config -> config.outboundCCVs
-                let verifierAddresses = map
-                        (\vd -> CCIP.MessageCodecV1.encodeInstanceAddress
-                            vd.ccvInstanceId vd.ccvOwner)
-                        sendingMsg.verifierData
-                forA_ requiredOutbound $ \required ->
-                    let requiredAddr = CCIP.RawInstanceAddress.toInstanceAddress required
-                    in assertMsg ("VerifyOutboundCCVs: missing required CCV " <> show required)
-                        (requiredAddr `elem` verifierAddresses)
-
-                -- Call MarkTokenPoolCCVsVerified directly (no TAR intermediary).
-                -- Pool identity is validated against tokenSendData, which was
-                -- set by TAR during AddTokenSend.
-                exercise sendingMessageCid
-                    CCIP.SendingMessageV1.MarkTokenPoolCCVsVerified with
-                        poolInstanceId = instanceId
-                        caller = poolOwner
