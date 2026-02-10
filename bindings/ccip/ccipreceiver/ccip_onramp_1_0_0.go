@@ -1,4 +1,4 @@
-package perpartyrouter
+package ccipreceiver
 
 import (
 	"errors"

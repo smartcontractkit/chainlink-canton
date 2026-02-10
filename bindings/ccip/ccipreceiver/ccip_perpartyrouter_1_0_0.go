@@ -1,4 +1,4 @@
-package perpartyrouter
+package ccipreceiver
 
 import (
 	"errors"
@@ -16,33 +16,6 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 )
-
-const PackageName = "ccip-perpartyrouter"
-const SDKVersion = "3.4.10"
-
-type Template interface {
-	CreateCommand() *model.CreateCommand
-	GetTemplateID() string
-}
-
-func argsToMap(args interface{}) map[string]interface{} {
-	if args == nil {
-		return map[string]interface{}{}
-	}
-
-	if m, ok := args.(map[string]interface{}); ok {
-		return m
-	}
-
-	type mapper interface {
-		ToMap() map[string]interface{}
-	}
-	if mapper, ok := args.(mapper); ok {
-		return mapper.ToMap()
-	}
-
-	return map[string]interface{}{"args": args}
-}
 
 // CCIPMessageSent is a Template type
 type CCIPMessageSent struct {

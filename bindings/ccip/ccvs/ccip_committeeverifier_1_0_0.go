@@ -44,16 +44,48 @@ func argsToMap(args interface{}) map[string]interface{} {
 	return map[string]interface{}{"args": args}
 }
 
+// CCVFeeConfig is a Record type
+type CCVFeeConfig struct {
+	FeeUSDCents        NUMERIC `json:"feeUSDCents"`
+	GasForVerification INT64   `json:"gasForVerification"`
+	PayloadSizeBytes   INT64   `json:"payloadSizeBytes"`
+}
+
+// ToMap converts CCVFeeConfig to a map for DAML arguments
+func (t CCVFeeConfig) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["gasForVerification"] = int64(t.GasForVerification)
+
+	m["payloadSizeBytes"] = int64(t.PayloadSizeBytes)
+
+	return m
+}
+
+func (t CCVFeeConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *CCVFeeConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
-	Owner               PARTY  `json:"owner"`
-	InstanceId          TEXT   `json:"instanceId"`
-	CcipOwner           PARTY  `json:"ccipOwner"`
-	VersionTag          TEXT   `json:"versionTag"`
-	MessageSentObserver PARTY  `json:"messageSentObserver"`
-	StorageLocation     TEXT   `json:"storageLocation"`
-	Threshold           INT64  `json:"threshold"`
-	Signers             []TEXT `json:"signers"`
+	InstanceId               TEXT               `json:"instanceId"`
+	Owner                    PARTY              `json:"owner"`
+	CcipOwner                PARTY              `json:"ccipOwner"`
+	VersionTag               TEXT               `json:"versionTag"`
+	MessageSentObserver      PARTY              `json:"messageSentObserver"`
+	StorageLocation          TEXT               `json:"storageLocation"`
+	Threshold                INT64              `json:"threshold"`
+	Signers                  []TEXT             `json:"signers"`
+	RmnRemoteInstanceAddress RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
+	RemoteChainFeeConfigs    GENMAP             `json:"remoteChainFeeConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -71,10 +103,10 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
+	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
@@ -100,6 +132,23 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["rmnRemoteInstanceAddress"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteInstanceAddress
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["remoteChainFeeConfigs"] = func() interface{} {
+		if t.RemoteChainFeeConfigs == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.RemoteChainFeeConfigs}
+	}()
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -111,10 +160,10 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
+	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
@@ -138,6 +187,23 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 			res = append(res, string(e))
 		}
 		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["rmnRemoteInstanceAddress"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteInstanceAddress
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["remoteChainFeeConfigs"] = func() interface{} {
+		if t.RemoteChainFeeConfigs == nil {
+			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+		}
+		return map[string]interface{}{"_type": "genmap", "value": t.RemoteChainFeeConfigs}
 	}()
 
 	return &model.CreateCommand{
@@ -175,6 +241,27 @@ func (t CommitteeVerifier) CommitteeVerifierVerifyMessageWithPackageID(contractI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_VerifyMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierCalculateFee exercises the CommitteeVerifier_CalculateFee choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierCalculateFee(contractID string, args CommitteeVerifierCalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierCalculateFeeWithPackageID exercises the CommitteeVerifier_CalculateFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierCalculateFeeWithPackageID(contractID string, packageID string, args CommitteeVerifierCalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -242,6 +329,27 @@ func (t CommitteeVerifier) CrossChainVerifierVerifyMessageWithPackageID(contract
 	}
 }
 
+// CrossChainVerifierCalculateFee exercises the CrossChainVerifier_CalculateFee choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CrossChainVerifierCalculateFee(contractID string, args CrossChainVerifierCalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		ContractID: contractID,
+		Choice:     "CrossChainVerifier_CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CrossChainVerifierCalculateFeeWithPackageID exercises the CrossChainVerifier_CalculateFee choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractID string, packageID string, args CrossChainVerifierCalculateFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		ContractID: contractID,
+		Choice:     "CrossChainVerifier_CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CrossChainVerifierForwardToVerifier exercises the CrossChainVerifier_ForwardToVerifier choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string, args CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
@@ -267,48 +375,66 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(cont
 
 var _ IICrossChainVerifier = (*CommitteeVerifier)(nil)
 
+// CommitteeVerifierCalculateFee is a Record type
+type CommitteeVerifierCalculateFee struct {
+	SendingMessageCid CONTRACT_ID `json:"sendingMessageCid"`
+	Caller            PARTY       `json:"caller"`
+}
+
+// ToMap converts CommitteeVerifierCalculateFee to a map for DAML arguments
+func (t CommitteeVerifierCalculateFee) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["sendingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CommitteeVerifierCalculateFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *CommitteeVerifierCalculateFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
-	CcvRegistryCid CONTRACT_ID  `json:"ccvRegistryCid"`
-	Message        MessageV1    `json:"message"`
-	MessageId      TEXT         `json:"messageId"`
-	FeeToken       InstrumentId `json:"feeToken"`
-	FeeTokenAmount NUMERIC      `json:"feeTokenAmount"`
-	VerifierArgs   TEXT         `json:"verifierArgs"`
-	Caller         PARTY        `json:"caller"`
+	RmnRemoteCid      CONTRACT_ID `json:"rmnRemoteCid"`
+	SendingMessageCid CONTRACT_ID `json:"sendingMessageCid"`
+	VerifierArgs      TEXT        `json:"verifierArgs"`
+	Caller            PARTY       `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
 func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["ccvRegistryCid"] = func() interface{} {
+	m["rmnRemoteCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.CcvRegistryCid).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.CcvRegistryCid
+		return t.RmnRemoteCid
 	}()
 
-	m["message"] = func() interface{} {
+	m["sendingMessageCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Message).(mapper); ok {
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Message
+		return t.SendingMessageCid
 	}()
-
-	m["messageId"] = string(t.MessageId)
-
-	m["feeToken"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
-	}()
-
-	m["feeTokenAmount"] = t.FeeTokenAmount
 
 	m["verifierArgs"] = string(t.VerifierArgs)
 
@@ -329,39 +455,33 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	CcvRegistryCid  CONTRACT_ID `json:"ccvRegistryCid"`
-	Message         MessageV1   `json:"message"`
-	MessageId       TEXT        `json:"messageId"`
-	VerifierResults TEXT        `json:"verifierResults"`
-	Receiver        PARTY       `json:"receiver"`
-	Caller          PARTY       `json:"caller"`
+	RmnRemoteCid        CONTRACT_ID `json:"rmnRemoteCid"`
+	ExecutingMessageCid CONTRACT_ID `json:"executingMessageCid"`
+	VerifierResults     TEXT        `json:"verifierResults"`
+	Caller              PARTY       `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
 func (t CommitteeVerifierVerifyMessage) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["ccvRegistryCid"] = func() interface{} {
+	m["rmnRemoteCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.CcvRegistryCid).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.CcvRegistryCid
+		return t.RmnRemoteCid
 	}()
 
-	m["message"] = func() interface{} {
+	m["executingMessageCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Message).(mapper); ok {
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Message
+		return t.ExecutingMessageCid
 	}()
-
-	m["messageId"] = string(t.MessageId)
 
 	m["verifierResults"] = string(t.VerifierResults)
-
-	m["receiver"] = t.Receiver.ToMap()
 
 	m["caller"] = t.Caller.ToMap()
 

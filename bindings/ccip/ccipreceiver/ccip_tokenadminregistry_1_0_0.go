@@ -1,4 +1,4 @@
-package onramp
+package ccipreceiver
 
 import (
 	"errors"
