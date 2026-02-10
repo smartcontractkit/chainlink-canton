@@ -117,6 +117,9 @@ testLockOrBurn = script do
         createCmd SendingMessageV1.SendingMessageV1 with
             ccipOwner = ccipOwner
             sender = sender
+            routerInstanceAddress = RawInstanceAddress.make "test-router" sender
+            onRampInstanceAddress = RawInstanceAddress.make "test-onramp" ccipOwner
+            tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
