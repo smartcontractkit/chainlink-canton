@@ -117,6 +117,8 @@ template OffRamp
                     observingParties = observers
                     ccvVerifications = []
                     inboundPoolCCVs = None
+                    offRampInstanceAddress = CCIP.RawInstanceAddress.make instanceId ccipOwner
+                    tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
 
         -- | Process a CCIP execute request from a PerPartyRouter.
         -- Reads CCV verifications and pool verification state from the ExecutingMessageV1
@@ -142,6 +144,8 @@ template OffRamp
                 -- Verify the ExecutingMessageV1 was created by this OffRamp's ccipOwner
                 assertMsg "offramp: executingMessage ccipOwner mismatch"
                     (execMsg.ccipOwner == ccipOwner)
+                CCIP.RawInstanceAddress.assertEqual "offramp: executingMessage offRamp mismatch"
+                    instanceId ccipOwner execMsg.offRampInstanceAddress
 
                 -- Verify receiver matches router's party owner
                 assertMsg "offramp: executingMessage receiver mismatch"
