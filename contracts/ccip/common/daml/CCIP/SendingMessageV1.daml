@@ -54,12 +54,12 @@ data TokenSendData = TokenSendData
 
 template SendingMessageV1
     with
-        -- User/OnRamp provided fields, populated at PrepareSend
-        ccipOwner : Party
-        sender : Party
         routerInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         onRampInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        -- User/OnRamp provided fields, populated at PrepareSend
+        ccipOwner : Party
+        sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
