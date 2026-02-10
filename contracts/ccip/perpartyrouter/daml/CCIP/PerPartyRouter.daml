@@ -118,6 +118,7 @@ template PerPartyRouter
 
                 exercise onRampCid CCIP.OnRamp.PrepareSendFromRouter with
                     routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
                     globalConfigCid
                     tokenAdminRegistryCid
                     feeQuoterCid
@@ -191,6 +192,7 @@ template PerPartyRouter
 
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with
                     routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
                     currentSequenceNumber = currentSeqNum
                     rmnRemoteCid
                     globalConfigCid
@@ -221,6 +223,30 @@ template PerPartyRouter
                     ccipMessageSent = ccipMessageSentCid
                     messageId = sendingMsg.messageId
                     feeChangeCids
+
+        -- | Cancel an in-progress send and reclaim locked tokens.
+        -- Delegates to OnRamp.CancelSendFromRouter which validates identity
+        -- and issues a refund ticket if tokens were locked.
+        nonconsuming choice CancelSend : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
+            with
+                onRampCid : ContractId CCIP.OnRamp.OnRamp
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            controller partyOwner
+            do
+                onRamp <- fetch onRampCid
+                assertMsg "router: onramp ccipowner mismatch"
+                    (onRamp.ccipOwner == ccipOwner)
+
+                sendingMsg <- fetch sendingMessageCid
+                assertMsg "router: sender mismatch"
+                    (sendingMsg.sender == partyOwner)
+
+                exercise onRampCid CCIP.OnRamp.CancelSendFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
+                    sendingMessageCid
+                    tokenAdminRegistryCid
 
         -- | Prepare an inbound message for execution.
         -- Performs early replay check and delegates to OffRamp.PrepareExecute.
