@@ -57,6 +57,9 @@ template SendingMessageV1
         -- User/OnRamp provided fields, populated at PrepareSend
         ccipOwner : Party
         sender : Party
+        routerInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        onRampInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
@@ -224,18 +227,6 @@ template SendingMessageV1
                     message = Some messageV1
                     encodedMessage = encoded
                     messageId = msgId
-
-        -- Archives the SendingMessageV1 for a cancelled send.
-        -- Returns the token send data so the caller can issue a refund
-        -- ticket via TAR. Only needed for non-atomic sends where
-        -- LockOrBurn succeeded but a later phase failed.
-        choice CancelSend : Optional TokenSendData
-            with
-                caller : Party
-            controller caller
-            do
-                assertMsg "only sender can cancel" (caller == sender)
-                pure tokenSendData
 
         -- Batch-converts all USD fees to fee token units at a single
         -- price point, applying the fee token's premium multiplier.
