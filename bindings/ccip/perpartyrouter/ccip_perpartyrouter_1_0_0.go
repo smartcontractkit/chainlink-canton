@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/noders-team/go-daml/pkg/codec"
-	"github.com/noders-team/go-daml/pkg/model"
-	. "github.com/noders-team/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/codec"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -59,7 +59,7 @@ func (t CCIPMessageSent) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CCIPMessageSent) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "CCIPMessageSent")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.PerPartyRouter", "CCIPMessageSent")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -569,7 +569,7 @@ func (t ExecutionStateChanged) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t ExecutionStateChanged) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "ExecutionStateChanged")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.PerPartyRouter", "ExecutionStateChanged")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -929,7 +929,7 @@ func (t PerPartyRouter) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t PerPartyRouter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1175,7 +1175,7 @@ func (t PerPartyRouterFactory) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t PerPartyRouterFactory) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

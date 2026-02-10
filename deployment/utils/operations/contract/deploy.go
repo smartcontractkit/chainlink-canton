@@ -7,11 +7,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/noders-team/go-daml/pkg/service/ledger"
-	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"

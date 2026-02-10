@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/noders-team/go-daml/pkg/model"
-	"github.com/noders-team/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/coin"

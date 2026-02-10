@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/noders-team/go-daml/pkg/codec"
-	"github.com/noders-team/go-daml/pkg/model"
-	. "github.com/noders-team/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/codec"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -102,7 +102,7 @@ func (t LockReleaseTokenPool) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t LockReleaseTokenPool) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name

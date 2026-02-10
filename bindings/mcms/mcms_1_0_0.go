@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/noders-team/go-daml/pkg/codec"
-	"github.com/noders-team/go-daml/pkg/model"
-	. "github.com/noders-team/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/codec"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -398,7 +398,7 @@ func (t Counter) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t Counter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.Counter", "Counter")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1014,7 +1014,7 @@ func (t MCMS) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t MCMS) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS")
+	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.Main", "MCMS")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -1514,7 +1514,7 @@ func (t MCMSEntrypointEvent) GetTemplateID() string {
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t MCMSEntrypointEvent) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent")
+	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -2319,5 +2319,5 @@ func IMCMSReceiverInterfaceID() string {
 
 // IMCMSReceiverInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IMCMSReceiverInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSReceiver", "MCMSReceiver")
+	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.MCMSReceiver", "MCMSReceiver")
 }
