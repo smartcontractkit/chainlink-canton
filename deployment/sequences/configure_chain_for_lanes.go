@@ -1,6 +1,7 @@
 package sequences
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strconv"
 
@@ -63,7 +64,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 			}
 			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
 			for _, onRamp := range remoteConfig.OnRamps {
-				onRamps = append(onRamps, types.TEXT(onRamp))
+				onRamps = append(onRamps, types.TEXT(hex.EncodeToString(onRamp)))
 			}
 			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.UpdateSourceChainConfig{
 				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
