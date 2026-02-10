@@ -41,6 +41,8 @@ template ExecutingMessageV1
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.
         inboundPoolCCVs : Optional [RawInstanceAddress]
+        offRampInstanceAddress : RawInstanceAddress
+        tokenAdminRegistryInstanceAddress : RawInstanceAddress
     where
         signatory ccipOwner
         observer observingParties
