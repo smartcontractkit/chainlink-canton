@@ -24,6 +24,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/rmn"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -139,6 +141,13 @@ func TestDeployChainContracts(t *testing.T) {
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: chainSelector,
 						OnRampAddress: "", // TODO ?
+					},
+				},
+				RMNRemote: sequences.RMNRemoteParams{
+					Template: rmn.RMNRemote{
+						CcipOwner:      "", // Populated by the sequence
+						RmnOwner:       types.PARTY(user.GetPrimaryParty()),
+						CursedSubjects: nil,
 					},
 				},
 			},

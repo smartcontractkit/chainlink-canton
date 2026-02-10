@@ -42,10 +42,11 @@ type DeployParams[ARGS any] struct {
 }
 
 // NewDeploy creates a new deploy operation for the given contract template.
+// The operation's return value is an AddressRef, the Address of which will be a contracts.RawInstanceAddress.
 //
 // InstanceId:
 // The template *must* have an InstanceId field of type types.TEXT.
-// The instance ID is generated using the provided prefix and the owner party, it should not be set by the caller.
+// The instance ID is generated using the provided prefix and a random suffix, it should not be set by the caller.
 func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, dependencies.CantonDeps] {
 	return operations.NewOperation(
 		params.Name,
@@ -53,10 +54,11 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 		params.Description,
 		func(b operations.Bundle, deps dependencies.CantonDeps, input DeployInput[TT]) (datastore.AddressRef, error) {
 			// Generate InstanceID
-			instanceID, err := contracts.NewInstanceID(params.Prefix, string(input.OwnerParty))
+			instanceID, err := contracts.NewInstanceID(params.Prefix)
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to create instance ID: %w", err)
 			}
+			rawInstanceAddress := instanceID.RawInstanceAddress(input.OwnerParty)
 			// Set InstanceID in the template
 			templWithID, err := setInstanceID(input.Template, instanceID)
 			if err != nil {
@@ -108,10 +110,10 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to get deployed contract ID: %w", err)
 			}
-			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps.Chain), "contractID", contractId, "instanceID", instanceID.String(), "instanceAddress", instanceID.InstanceAddress().Hex())
+			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps.Chain), "contractID", contractId, "instanceID", instanceID.String(), "rawInstanceAddress", rawInstanceAddress.String(), "instanceAddress", rawInstanceAddress.InstanceAddress().Hex())
 
 			return datastore.AddressRef{
-				Address:       instanceID.InstanceAddress().Hex(),
+				Address:       rawInstanceAddress.String(),
 				ChainSelector: input.ChainSelector,
 				Type:          datastore.ContractType(params.TypeAndVersion.Type),
 				Version:       &params.TypeAndVersion.Version,

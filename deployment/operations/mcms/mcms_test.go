@@ -124,7 +124,7 @@ func TestMCMSOps(t *testing.T) {
 		RootMetadata: mcms.RootMetadata{},
 	}
 
-	var mcmsInstanceID contracts.InstanceID
+	var mcmsInstanceAddress contracts.RawInstanceAddress
 	t.Run("Deploy", func(t *testing.T) {
 		result, err := cld_ops.ExecuteOperation(bundle, Deploy, deps, contract.DeployInput[mcms.MCMS]{
 			ChainSelector: cantonChain.Selector,
@@ -143,14 +143,9 @@ func TestMCMSOps(t *testing.T) {
 			OwnerParty: types.PARTY(primaryParty),
 		})
 		require.NoError(t, err, "failed to deploy MCMS")
-		mcmsInstanceID = contracts.InstanceID(result.Output.Address)
-		require.Truef(t, mcmsInstanceID.Valid(), "instance ID is not valid: %s", mcmsInstanceID.String())
-		t.Logf("Deployed MCMS, InstanceID: %s", mcmsInstanceID.String())
+		mcmsInstanceAddress = contracts.RawInstanceAddressFromString(result.Output.Address)
+		t.Logf("Deployed MCMS, RawInstanceAddress: %s", mcmsInstanceAddress.String())
 	})
-
-	if !mcmsInstanceID.Valid() {
-		t.Fatalf("instance ID is not valid: %s", mcmsInstanceID.String())
-	}
 
 	t.Run("SetConfig", func(t *testing.T) {
 		// Create updated config with a new signer
@@ -183,7 +178,7 @@ func TestMCMSOps(t *testing.T) {
 
 		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, deps, contract.ChoiceInput[mcms.SetConfig]{
 			ChainSelector:   cantonChain.Selector,
-			InstanceAddress: mcmsInstanceID.InstanceAddress(),
+			InstanceAddress: mcmsInstanceAddress.InstanceAddress(),
 			ActAs:           []string{primaryParty},
 			Args: mcms.SetConfig{
 				TargetRole:      mcms.RoleProposer, // Target the proposer role

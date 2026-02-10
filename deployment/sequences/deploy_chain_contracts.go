@@ -9,6 +9,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/feequoter"
@@ -33,6 +37,10 @@ type CommitteeVerifierParams struct {
 	Template  ccvs.CommitteeVerifier
 }
 
+type RMNRemoteParams struct {
+	Template rmn.RMNRemote
+}
+
 type GlobalConfigParams struct {
 	Template common.GlobalConfig
 }
@@ -41,6 +49,7 @@ type DeployChainContractsParams struct {
 	CCIPOwnerParty     string
 	CommitteeVerifiers []CommitteeVerifierParams
 	GlobalConfig       GlobalConfigParams
+	RMNRemote          RMNRemoteParams
 }
 
 var DeployChainContracts = operations.NewSequence(
@@ -50,19 +59,36 @@ var DeployChainContracts = operations.NewSequence(
 	func(b operations.Bundle, deps dependencies.CantonDeps, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		var results []datastore.AddressRef
 
-		// Deploy FeeQuoter
-		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
+		// Deploy RMNRemote
+		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{deps.Party},
-			Template: feequoter.FeeQuoter{
-				Owner: types.PARTY(input.CCIPOwnerParty),
+			Template: rmn.RMNRemote{
+				RmnOwner:       input.RMNRemote.Template.RmnOwner,
+				CcipOwner:      types.PARTY(input.CCIPOwnerParty),
+				CursedSubjects: input.RMNRemote.Template.CursedSubjects,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
 		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeeQuoter: %w", err)
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote: %w", err)
 		}
-		results = append(results, deployFeeQuoterReport.Output)
+		results = append(results, deployRMNRemoteReport.Output)
+		rmnRemoteRawInstanceAddress := contracts.RawInstanceAddressFromString(deployRMNRemoteReport.Output.Address)
+
+		// Deploy Global Config
+		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
+		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[common.GlobalConfig]{
+			ChainSelector: deps.Chain.Selector,
+			ActAs:         []string{deps.Party},
+			Template:      input.GlobalConfig.Template,
+			OwnerParty:    types.PARTY(input.CCIPOwnerParty),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalConfig: %w", err)
+		}
+		results = append(results, deployGlobalConfigReport.Output)
+		globalConfigRawInstanceAddress := contracts.RawInstanceAddressFromString(deployGlobalConfigReport.Output.Address)
 
 		// Deploy Token Admin Registry
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
@@ -78,13 +104,37 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TokenAdminRegistry: %w", err)
 		}
 		results = append(results, deployTokenAdminRegistryReport.Output)
+		tokenAdminRegistryRawInstanceAddress := contracts.RawInstanceAddressFromString(deployTokenAdminRegistryReport.Output.Address)
+
+		// Deploy FeeQuoter
+		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
+			ChainSelector: deps.Chain.Selector,
+			ActAs:         []string{deps.Party},
+			Template: feequoter.FeeQuoter{
+				Owner:                            types.PARTY(input.CCIPOwnerParty),
+				FeeTokens:                        nil,
+				DestChainConfigs:                 nil,
+				TokenTransferFeeConfigs:          nil,
+				UsdPerUnitGasByDestChainSelector: nil,
+				UsdPerToken:                      nil,
+				PriceUpdaters:                    nil,
+			},
+			OwnerParty: types.PARTY(input.CCIPOwnerParty),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeeQuoter: %w", err)
+		}
+		results = append(results, deployFeeQuoterReport.Output)
 
 		// Deploy OffRamp
 		deployOffRampReport, err := operations.ExecuteOperation(b, offramp.Deploy, deps, contract.DeployInput[offrampBinding.OffRamp]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{deps.Party},
 			Template: offrampBinding.OffRamp{
-				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
+				GlobalConfigInstanceAddress:       offrampBinding.RawInstanceAddress(globalConfigRawInstanceAddress.Binding()),
+				RmnRemoteInstanceAddress:          offrampBinding.RawInstanceAddress(rmnRemoteRawInstanceAddress.Binding()),
+				TokenAdminRegistryInstanceAddress: offrampBinding.RawInstanceAddress(tokenAdminRegistryRawInstanceAddress.Binding()),
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -98,7 +148,10 @@ var DeployChainContracts = operations.NewSequence(
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{deps.Party},
 			Template: onrampBinding.OnRamp{
-				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
+				GlobalConfigInstanceAddress:       onrampBinding.RawInstanceAddress(globalConfigRawInstanceAddress.Binding()),
+				RmnRemoteInstanceAddress:          onrampBinding.RawInstanceAddress(rmnRemoteRawInstanceAddress.Binding()),
+				TokenAdminRegistryInstanceAddress: onrampBinding.RawInstanceAddress(tokenAdminRegistryRawInstanceAddress.Binding()),
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -112,7 +165,8 @@ var DeployChainContracts = operations.NewSequence(
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{deps.Party},
 			Template: perpartyrouter.PerPartyRouterFactory{
-				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:         types.PARTY(input.CCIPOwnerParty),
+				RegisteredRouters: nil,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -127,28 +181,25 @@ var DeployChainContracts = operations.NewSequence(
 			deployCommitteeVerifierReport, err := operations.ExecuteOperation(b, committee_verifier.Deploy, deps, contract.DeployInput[ccvs.CommitteeVerifier]{
 				ChainSelector: deps.Chain.Selector,
 				ActAs:         []string{deps.Party},
-				Template:      committeeVerifier.Template,
-				OwnerParty:    committeeVerifier.Template.Owner,
-				Qualifier:     &committeeVerifier.Qualifier,
+				Template: ccvs.CommitteeVerifier{
+					Owner:                    committeeVerifier.Template.Owner,
+					CcipOwner:                types.PARTY(input.CCIPOwnerParty),
+					VersionTag:               committeeVerifier.Template.VersionTag,
+					MessageSentObserver:      committeeVerifier.Template.MessageSentObserver,
+					StorageLocation:          committeeVerifier.Template.StorageLocation,
+					Threshold:                committeeVerifier.Template.Threshold,
+					Signers:                  committeeVerifier.Template.Signers,
+					RmnRemoteInstanceAddress: ccvs.RawInstanceAddress(rmnRemoteRawInstanceAddress.Binding()),
+					RemoteChainFeeConfigs:    committeeVerifier.Template.RemoteChainFeeConfigs,
+				},
+				OwnerParty: committeeVerifier.Template.Owner,
+				Qualifier:  &committeeVerifier.Qualifier,
 			})
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier #%v: %w", i, err)
 			}
 			results = append(results, deployCommitteeVerifierReport.Output)
 		}
-
-		// Deploy Global Config
-		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
-		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[common.GlobalConfig]{
-			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
-			Template:      input.GlobalConfig.Template,
-			OwnerParty:    types.PARTY(input.CCIPOwnerParty),
-		})
-		if err != nil {
-			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalConfig: %w", err)
-		}
-		results = append(results, deployGlobalConfigReport.Output)
 
 		return sequences.OnChainOutput{
 			Addresses: results,
