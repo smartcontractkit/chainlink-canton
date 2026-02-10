@@ -53,6 +53,7 @@ template OnRamp
         nonconsuming choice PrepareSendFromRouter : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 routerPartyOwner : Party
+                routerInstanceId : Text
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
@@ -163,6 +164,9 @@ template OnRamp
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
                     sender = routerPartyOwner
+                    routerInstanceAddress = CCIP.RawInstanceAddress.make routerInstanceId routerPartyOwner
+                    onRampInstanceAddress = CCIP.RawInstanceAddress.make instanceId ccipOwner
+                    tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
                     destChainSelector
                     sequenceNumber = newSequenceNumber
                     requiredCCVs = resolvedCCVs
@@ -198,6 +202,7 @@ template OnRamp
         nonconsuming choice CCIPSendFromRouter : CCIPSendFromRouterResult
             with
                 routerPartyOwner : Party
+                routerInstanceId : Text
                 currentSequenceNumber : Numeric 0
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
@@ -210,6 +215,8 @@ template OnRamp
                     (sendingMsg.ccipOwner == ccipOwner)
                 assertMsg "sendingMessage sender mismatch"
                     (sendingMsg.sender == routerPartyOwner)
+                CCIP.RawInstanceAddress.assertEqual "router instance mismatch"
+                    routerInstanceId routerPartyOwner sendingMsg.routerInstanceAddress
 
                 theMessage <- case sendingMsg.message of
                     None -> abort "message not yet constructed"
@@ -307,6 +314,50 @@ template OnRamp
                     messageSentObservers =
                         concatMap (.messageSentObservers) sendingMsg.verifierData
                     receipts
+
+        -- Cancel an in-progress send and issue a refund ticket for locked tokens.
+        -- Validates router, OnRamp, and TAR identity before archiving SendingMessageV1.
+        -- sourceChainSelector = 0 avoids false-positive RMN curse checks.
+        nonconsuming choice CancelSendFromRouter : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
+            with
+                routerPartyOwner : Party
+                routerInstanceId : Text
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            controller ccipOwner
+            do
+                sendingMsg <- fetch sendingMessageCid
+                assertMsg "cancelSend: ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == ccipOwner)
+                assertMsg "cancelSend: sender mismatch"
+                    (sendingMsg.sender == routerPartyOwner)
+                CCIP.RawInstanceAddress.assertEqual "cancelSend: router instance mismatch"
+                    routerInstanceId routerPartyOwner sendingMsg.routerInstanceAddress
+                CCIP.RawInstanceAddress.assertEqual "cancelSend: onramp instance mismatch"
+                    instanceId ccipOwner sendingMsg.onRampInstanceAddress
+
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                CCIP.RawInstanceAddress.assertEqual "cancelSend: tar mismatch (onramp)"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner tokenAdminRegistryInstanceAddress
+                CCIP.RawInstanceAddress.assertEqual "cancelSend: tar mismatch (sendingMsg)"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner sendingMsg.tokenAdminRegistryInstanceAddress
+
+                archive sendingMessageCid
+
+                case sendingMsg.tokenSendData of
+                    None -> pure None
+                    Some tsd -> do
+                        ticketCid <- create CCIP.Tickets.TokenReceiveTicket with
+                            ccipOwner
+                            tokenAdminRegistryInstanceId = tokenAdminRegistry.instanceId
+                            poolOwner = tsd.poolOwner
+                            receiver = sendingMsg.sender
+                            tokenReceiver = sendingMsg.sender
+                            instrumentId = tsd.instrumentId
+                            amount = tsd.amount
+                            messageHash = sendingMsg.messageId
+                            sourceChainSelector = 0.0
+                        pure (Some ticketCid)
 
 
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
