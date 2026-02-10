@@ -126,16 +126,18 @@ run_godaml "$DAR_DIR/coin-current.dar" "$COIN_OUTPUT_DIR" "coin" 1
 # CCIP (required)
 # -------------------------
 log_info "Generating CCIP bindings..."
+run_godaml "$DAR_DIR/ccip-receiver-current.dar"             "$CCIP_OUTPUT_DIR/ccipreceiver"         "ccipreceiver"         1
+run_godaml "$DAR_DIR/ccip-sender-current.dar"               "$CCIP_OUTPUT_DIR/ccipsender"           "ccipsender"           1
+run_godaml "$DAR_DIR/ccip-committeeverifier-current.dar"    "$CCIP_OUTPUT_DIR/ccvs"                 "ccvs"                 1
 run_godaml "$DAR_DIR/ccip-common-current.dar"               "$CCIP_OUTPUT_DIR/common"               "common"               1
 run_godaml "$DAR_DIR/ccip-feequoter-current.dar"            "$CCIP_OUTPUT_DIR/feequoter"            "feequoter"            1
-run_godaml "$DAR_DIR/ccip-tokenadminregistry-current.dar"   "$CCIP_OUTPUT_DIR/tokenadminregistry"   "tokenadminregistry"   1
-run_godaml "$DAR_DIR/ccip-receiver-current.dar"             "$CCIP_OUTPUT_DIR/ccipreceiver"         "ccipreceiver"         1
-run_godaml "$DAR_DIR/ccip-committeeverifier-current.dar"    "$CCIP_OUTPUT_DIR/ccvs"                 "ccvs"                 1
-run_godaml "$DAR_DIR/ccip-onramp-current.dar"               "$CCIP_OUTPUT_DIR/onramp"               "onramp"               1
-run_godaml "$DAR_DIR/ccip-offramp-current.dar"              "$CCIP_OUTPUT_DIR/offramp"              "offramp"              1
-run_godaml "$DAR_DIR/ccip-perpartyrouter-current.dar"       "$CCIP_OUTPUT_DIR/perpartyrouter"       "perpartyrouter"       1
 run_godaml "$DAR_DIR/ccip-tokenpool-interfaces-current.dar" "$CCIP_OUTPUT_DIR/interfaces"           "interfaces"           1
 run_godaml "$DAR_DIR/ccip-lockreleasetokenpool-current.dar" "$CCIP_OUTPUT_DIR/lockreleasetokenpool" "lockreleasetokenpool" 1
+run_godaml "$DAR_DIR/ccip-offramp-current.dar"              "$CCIP_OUTPUT_DIR/offramp"              "offramp"              1
+run_godaml "$DAR_DIR/ccip-onramp-current.dar"               "$CCIP_OUTPUT_DIR/onramp"               "onramp"               1
+run_godaml "$DAR_DIR/ccip-perpartyrouter-current.dar"       "$CCIP_OUTPUT_DIR/perpartyrouter"       "perpartyrouter"       1
+run_godaml "$DAR_DIR/ccip-rmn-current.dar"                  "$CCIP_OUTPUT_DIR/rmn"                  "rmn"                  1
+run_godaml "$DAR_DIR/ccip-tokenadminregistry-current.dar"   "$CCIP_OUTPUT_DIR/tokenadminregistry"   "tokenadminregistry"   1
 [ -n "$(find "$CCIP_OUTPUT_DIR" -name "*.go" -type f -print -quit 2>/dev/null)" ] || die "No Go files generated for CCIP"
 
 # -------------------------

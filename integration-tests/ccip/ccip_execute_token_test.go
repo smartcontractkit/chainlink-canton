@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/hex"
@@ -16,36 +15,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/lockreleasetokenpool"
-	offrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/ccip/offramp"
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/perpartyrouter"
-	tokenadminregistryBinding "github.com/smartcontractkit/chainlink-canton/bindings/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
+// encodeInstrumentId encodes an InstrumentId to bytes matching Daml encodeInstrumentId.
+// Format: UTF-8 bytes of "id@admin" (matches Daml's toHex(id <> "@" <> partyToText admin)).
 func encodeInstrumentId(admin, identifier string) []byte {
-	var buf bytes.Buffer
-
-	buf.WriteByte(byte(len(admin)))
-	buf.WriteString(admin)
-	buf.WriteByte(byte(len(identifier)))
-	buf.WriteString(identifier)
-
-	return buf.Bytes()
+	return []byte(identifier + "@" + admin)
 }
 
 // TestLnRTokenPool_FullReceiveFlow tests the complete CCIP inbound token release flow.
 // - Deploy all CCIP contracts including CommitteeVerifier, GlobalConfig, OffRamp, PerPartyRouter
 // - Mint tokens to pool (simulating prior locked tokens)
 // - Build inbound message with TokenTransfer
-// - Generate signatures and call CommitteeVerifier_VerifyMessage to get CCVVerifyTicket
+// - Generate signatures and call CommitteeVerifier_VerifyMessage to append CCV verification
 // - Call PerPartyRouter.Execute to process message and get TokenReceiveTicket
 // - Call TokenPool_ReleaseFromTicket to transfer tokens from pool to receiver
 // - Verify receiver received the tokens
@@ -73,9 +59,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
 	require.NoError(t, err)
+	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
+	require.NoError(t, err)
 
 	// Upload DARs to all participants
-	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, tokenPoolDar, perPartyRouterDar}
+	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, tokenPoolDar, perPartyRouterDar, ccipReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -96,11 +84,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Minted 100 AMT to Pool Owner, Holding CID: %s", poolHoldingCid)
 
-	// Instrument ID for AMT using bindings
-	instrumentIdAmt := tokenadminregistryBinding.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
-		Id:    types.TEXT("Amulet"),
-	}
+	// Instrument ID for AMT
+	instrumentIdAmt := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+		{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: registryAdmin}}},
+		{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "Amulet"}}},
+	}}}}
 
 	// CCV Setup
 	// Generate signer keys for CommitteeVerifier
@@ -115,49 +103,53 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	// Deploy CCVRegistry using bindings
+	// Deploy RMNRemote (required by CommitteeVerifier and PrepareExecute/Execute)
 	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.CCVRegistry", EntityName: "CCVRegistry"},
-					CreateArguments: ledger.ConvertToRecord(common.CCVRegistry{
-						CcipOwner:  types.PARTY(partyCCIP),
-						InstanceId: types.TEXT("test-ccvregistry-receive"),
-					}),
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote"},
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-rmn-receive"}}},
+						{Label: "rmnOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "cursedSubjects", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+					}},
 				}},
 			}},
 			ActAs: []string{partyCCIP},
 		},
 	})
 	require.NoError(t, err)
-	ccvRegistryCid := extractCreatedContractId(res)
-	t.Logf("Deployed CCVRegistry: %s", ccvRegistryCid)
+	rmnRemoteCid := extractCreatedContractId(res)
+	t.Logf("Deployed RMNRemote: %s", rmnRemoteCid)
 
-	// Deploy CommitteeVerifier using bindings
+	// Deploy CommitteeVerifier
 	versionTag := "49ff34ed"
-	ccvId := versionTag + "@" + partyCCIP
-	ccvSignerPubKeysTypes := make([]types.TEXT, len(ccvSignerPubKeys))
-	for i, pk := range ccvSignerPubKeys {
-		ccvSignerPubKeysTypes[i] = types.TEXT(pk)
-	}
+	ccvId := "test-ccv-receive@" + partyCCIP
 	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier"},
-					CreateArguments: ledger.ConvertToRecord(ccvs.CommitteeVerifier{
-						Owner:               types.PARTY(partyCCIP),
-						InstanceId:          types.TEXT("test-ccv-receive"),
-						CcipOwner:           types.PARTY(partyCCIP),
-						VersionTag:          types.TEXT(versionTag),
-						MessageSentObserver: types.PARTY(partyCCIP),
-						StorageLocation:     types.TEXT("ipfs://test-receive"),
-						Threshold:           types.INT64(2),
-						Signers:             ccvSignerPubKeysTypes,
-					}),
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccv-receive"}}},
+						{Label: "versionTag", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: versionTag}}},
+						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "messageSentObserver", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "storageLocation", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "ipfs://test-receive"}}},
+						{Label: "threshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2}}},
+						{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+							{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[0]}},
+							{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[1]}},
+							{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[2]}},
+						}}}}},
+						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						{Label: "remoteChainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+					}},
 				}},
 			}},
 			ActAs: []string{partyCCIP},
@@ -191,7 +183,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 									{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
 									{Label: "onRampAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "0000000000000000000000000000000000000001"}}},
 									{Label: "laneMandatedCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-										{Sum: &apiv2.Value_Text{Text: ccvId}},
+										rawInstanceAddress(ccvId),
 									}}}}},
 									{Label: "defaultCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								}}}},
@@ -207,18 +199,18 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	globalConfigCid := extractCreatedContractId(res)
 	t.Logf("Deployed GlobalConfig: %s", globalConfigCid)
 
-	// Deploy TokenAdminRegistry using bindings
+	// Deploy TokenAdminRegistry
 	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
-					CreateArguments: ledger.ConvertToRecord(tokenadminregistryBinding.TokenAdminRegistry{
-						Owner:        types.PARTY(partyCCIP),
-						InstanceId:   types.TEXT("test-tar-receive"),
-						TokenConfigs: types.GENMAP{},
-					}),
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-tar-receive"}}},
+						{Label: "tokenConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+					}},
 				}},
 			}},
 			ActAs: []string{partyCCIP},
@@ -228,17 +220,20 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	tokenAdminRegistryCid := extractCreatedContractId(res)
 	t.Logf("Deployed TokenAdminRegistry: %s", tokenAdminRegistryCid)
 
-	// Deploy OffRamp using bindings
+	// Deploy OffRamp with instance addresses for GlobalConfig, RMNRemote, TokenAdminRegistry
 	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-offramp", ModuleName: "CCIP.OffRamp", EntityName: "OffRamp"},
-					CreateArguments: ledger.ConvertToRecord(offrampBinding.OffRamp{
-						CcipOwner:  types.PARTY(partyCCIP),
-						InstanceId: types.TEXT("test-offramp-receive"),
-					}),
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-offramp-receive"}}},
+						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "globalConfigInstanceAddress", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
+						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						{Label: "tokenAdminRegistryInstanceAddress", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+					}},
 				}},
 			}},
 			ActAs: []string{partyCCIP},
@@ -248,18 +243,18 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	offRampCid := extractCreatedContractId(res)
 	t.Logf("Deployed OffRamp: %s", offRampCid)
 
-	// Deploy PerPartyRouterFactory using bindings
+	// Deploy PerPartyRouterFactory
 	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					CreateArguments: ledger.ConvertToRecord(perpartyrouter.PerPartyRouterFactory{
-						CcipOwner:         types.PARTY(partyCCIP),
-						InstanceId:        types.TEXT("test-factory-receive"),
-						RegisteredRouters: types.GENMAP{},
-					}),
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-factory-receive"}}},
+						{Label: "registeredRouters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+					}},
 				}},
 			}},
 			ActAs: []string{partyCCIP},
@@ -283,10 +278,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
 					ContractId: disclosedFactory.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
-						PartyOwner: types.PARTY(partyReceiver),
-						InstanceId: types.TEXT("test-router-receiver"),
-					}),
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "partyOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-receiver"}}},
+					}}}},
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
@@ -314,16 +309,24 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool"},
-					CreateArguments: ledger.ConvertToRecord(lockreleasetokenpool.LockReleaseTokenPool{
-						CcipOwner:            types.PARTY(partyCCIP),
-						PoolOwner:            types.PARTY(partyTokenPoolOwner),
-						InstanceId:           types.TEXT("test-pool-receive"),
-						InstrumentId:         lockreleasetokenpool.InstrumentId{Admin: instrumentIdAmt.Admin, Id: instrumentIdAmt.Id},
-						Decimals:             types.INT64(6),
-						ChainCCVRequirements: types.GENMAP{},
-						PoolReceiveContext:   lockreleasetokenpool.ChoiceContext{Values: types.TEXTMAP{}},
-						TransferTimeout:      lockreleasetokenpool.TransferTimeout{RelativeHours: func() *types.INT64 { i := types.INT64(24); return &i }()},
-					}),
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
+						{Label: "instrumentId", Value: instrumentIdAmt},
+						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 6}}},
+						{Label: "chainCCVRequirements", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "chainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "remoteTokens", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
+						}}}}},
+						// Use RelativeHours 24 for Amulet tokens (have expiry constraints)
+						{Label: "transferTimeout", Value: &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+							Constructor: "RelativeHours",
+							Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 24}},
+						}}}},
+					}},
 				}},
 			}},
 			ActAs: []string{partyTokenPoolOwner},
@@ -343,11 +346,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
 					ContractId: tokenAdminRegistryCid,
 					Choice:     "TokenAdminRegistry_ProposeAdministrator",
-					ChoiceArgument: ledger.MapToValue(tokenadminregistryBinding.TokenAdminRegistryProposeAdministrator{
-						InstrumentId: instrumentIdAmt,
-						NewAdmin:     types.PARTY(partyTokenPoolOwner),
-						Caller:       types.PARTY(partyCCIP),
-					}),
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instrumentId", Value: instrumentIdAmt},
+						{Label: "newAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+					}}}},
 				}},
 			}},
 			ActAs: []string{partyCCIP},
@@ -364,7 +367,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -372,10 +375,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
 					ContractId: disclosedTar.ContractId,
 					Choice:     "TokenAdminRegistry_AcceptAdminRole",
-					ChoiceArgument: ledger.MapToValue(tokenadminregistryBinding.TokenAdminRegistryAcceptAdminRole{
-						InstrumentId: instrumentIdAmt,
-						Caller:       types.PARTY(partyTokenPoolOwner),
-					}),
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instrumentId", Value: instrumentIdAmt},
+						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+					}}}},
 				}},
 			}},
 			ActAs:              []string{partyTokenPoolOwner},
@@ -383,8 +386,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	tokenAdminRegistryCid = extractCreatedContractId(res)
-	t.Log("Called AcceptAdminRole, tokenAdminRegistryCid:", tokenAdminRegistryCid)
+	t.Log("Called AcceptAdminRole")
 
 	// Step 3: SetPool
 	time.Sleep(500 * time.Millisecond)
@@ -393,7 +395,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -401,11 +403,14 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
 					ContractId: disclosedTar.ContractId,
 					Choice:     "TokenAdminRegistry_SetPool",
-					ChoiceArgument: ledger.MapToValue(tokenadminregistryBinding.TokenAdminRegistrySetPool{
-						InstrumentId:      instrumentIdAmt,
-						OptTokenPoolOwner: func() *types.PARTY { p := types.PARTY(partyTokenPoolOwner); return &p }(),
-						Caller:            types.PARTY(partyTokenPoolOwner),
-					}),
+					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instrumentId", Value: instrumentIdAmt},
+						{Label: "tokenPool", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+							{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
+						}}}}}}}},
+						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+					}}}},
 				}},
 			}},
 			ActAs:              []string{partyTokenPoolOwner},
@@ -413,8 +418,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	tokenAdminRegistryCid = extractCreatedContractId(res)
-	t.Logf("Called SetPool, TokenAdminRegistry: %s", tokenAdminRegistryCid)
+	t.Log("Called SetPool")
 
 	// Build Message
 	// Encode instrumentId for destTokenAddress
@@ -434,9 +438,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		CCIPReceiveGasLimit: 100000,
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       []byte("0000000000000000000000000000000000000001"),
-		OffRampAddress:      []byte("0000000000000000000000000000000000000002"),
-		Sender:              []byte("0000000000000000000000000000000000000003"),
+		OnRampAddress:       hexToBytes("0000000000000000000000000000000000000001"),
+		OffRampAddress:      hexToBytes("0000000000000000000000000000000000000002"),
+		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),
 		DestBlob:            []byte{},
 		TokenTransfer:       encodedTokenTransfer,
@@ -455,83 +459,77 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	verifierResultsHex := hex.EncodeToString(verifierResults)
 
-	// Call CommitteeVerifier_VerifyMessage to get CCVVerifyTicket
-	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
-	})
-	require.NoError(t, err)
-	disclosedCCVRegistry, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.CCVRegistry", EntityName: "CCVRegistry",
-	})
-	require.NoError(t, err)
-
-	// Build MessageV1 Daml record for CommitteeVerifier using bindings
-	// TokenTransferV1 record
-	tokenTransfer := &ccvs.TokenTransferV1{
-		Amount:             types.NUMERIC(tokenAmount.String()),
-		SourcePoolAddress:  types.TEXT(hex.EncodeToString([]byte(partyTokenPoolOwner))),
-		SourceTokenAddress: types.TEXT(""),
-		DestTokenAddress:   types.TEXT(encodedInstrumentIdHex),
-		TokenReceiver:      types.TEXT(hex.EncodeToString([]byte(partyReceiver))),
-		ExtraData:          types.TEXT(""),
-	}
-
-	// MessageV1 record
-	messageV1 := ccvs.MessageV1{
-		SourceChainSelector: types.NUMERIC("123"),
-		DestChainSelector:   types.NUMERIC("456"),
-		SequenceNumber:      types.NUMERIC("1"),
-		ExecutionGasLimit:   types.INT64(200000),
-		CcipReceiveGasLimit: types.INT64(100000),
-		Finality:            types.INT64(2000),
-		CcvAndExecutorHash:  types.TEXT("0000000000000000000000000000000000000000000000000000000000000000"),
-		OnRampAddress:       types.TEXT(hex.EncodeToString([]byte("0000000000000000000000000000000000000001"))),
-		OffRampAddress:      types.TEXT(hex.EncodeToString([]byte("0000000000000000000000000000000000000002"))),
-		Sender:              types.TEXT(hex.EncodeToString([]byte("0000000000000000000000000000000000000003"))),
-		Receiver:            types.TEXT(hex.EncodeToString(EncodePartyID(partyReceiver))),
-		DestBlob:            types.TEXT(""),
-		TokenTransfer:       tokenTransfer,
-		MessageData:         types.TEXT(""),
-	}
-
+	// Deploy CCIPReceiver for receiver
 	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier"},
-					ContractId: disclosedCCV.ContractId,
-					Choice:     "CommitteeVerifier_VerifyMessage",
-					ChoiceArgument: ledger.MapToValue(ccvs.CommitteeVerifierVerifyMessage{
-						CcvRegistryCid:  types.CONTRACT_ID(disclosedCCVRegistry.ContractId),
-						Message:         messageV1,
-						MessageId:       types.TEXT(messageHashHex),
-						VerifierResults: types.TEXT(verifierResultsHex),
-						Receiver:        types.PARTY(partyReceiver),
-						Caller:          types.PARTY(partyReceiver),
-					}),
+				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+					}},
 				}},
 			}},
-			ActAs:              []string{partyReceiver},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedCCV, disclosedCCVRegistry},
+			ActAs: []string{partyReceiver},
 		},
 	})
 	require.NoError(t, err)
-	ccvVerifyTicketCid := ""
-	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			if e.Created.GetTemplateId().GetEntityName() == "CCVVerifyTicket" {
-				ccvVerifyTicketCid = e.Created.ContractId
-				break
-			}
-		}
-	}
-	require.NotEmpty(t, ccvVerifyTicketCid)
-	t.Logf("Got CCVVerifyTicket: %s", ccvVerifyTicketCid)
+	ccipReceiverCid := extractCreatedContractId(res)
+	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Execute Message
-	// Get all disclosures needed for execute
-	time.Sleep(500 * time.Millisecond)
+	// Get TransferFactory and pool holdings (needed by CCIPReceiver.Execute for token release)
+	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), env.Splice.TransferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
+	require.NoError(t, err)
+
+	poolHoldings, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
+		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, poolHoldings, "Pool should have holdings")
+
+	// Filter for unlocked holdings only (Amulet tokens may be locked until next mining round)
+	var poolHoldingCids []*apiv2.Value
+	var poolHoldingDisclosures []*apiv2.DisclosedContract
+	var lockedCount, unlockedCount int
+	for _, h := range poolHoldings {
+		viewFields := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()
+		lockField := viewFields[3].GetValue()
+		isLocked := lockField.GetOptional().GetValue() != nil
+
+		if isLocked {
+			lockedCount++
+			continue
+		}
+		unlockedCount++
+
+		poolHoldingCids = append(poolHoldingCids, &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: h.GetCreatedEvent().GetContractId()}})
+		poolHoldingDisclosures = append(poolHoldingDisclosures, &apiv2.DisclosedContract{
+			ContractId:       h.GetCreatedEvent().GetContractId(),
+			TemplateId:       h.GetCreatedEvent().GetTemplateId(),
+			CreatedEventBlob: h.GetCreatedEvent().GetCreatedEventBlob(),
+		})
+	}
+	t.Logf("Pool has %d holdings (%d unlocked, %d locked)", len(poolHoldings), unlockedCount, lockedCount)
+
+	if unlockedCount == 0 {
+		t.Skip("SKIPPING: All pool holdings are locked (Amulet tokens are locked until next mining round). " +
+			"This is expected on fresh localnet. Either wait for mining round to complete, or use TestToken instead of Amulet.")
+	}
+
+	// Capture receiver's balance before execute
+	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
+		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
+	})
+	require.NoError(t, err)
+	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
+
+	// Get disclosures for CCIPReceiver.Execute
+	disclosedCCIPReceiver, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
+	})
+	require.NoError(t, err)
 	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
 	})
@@ -548,155 +546,71 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
 	})
 	require.NoError(t, err)
-	disclosedCCVVerifyTicket, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.Tickets", EntityName: "CCVVerifyTicket",
+	disclosedRmnRemote, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote",
 	})
 	require.NoError(t, err)
-
-	// Call PerPartyRouter.Execute
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter"},
-					ContractId: disclosedRouter.ContractId,
-					Choice:     "Execute",
-					ChoiceArgument: ledger.MapToValue(perpartyrouter.Execute{
-						OffRampCid:             types.CONTRACT_ID(disclosedOffRamp.ContractId),
-						GlobalConfigCid:        types.CONTRACT_ID(disclosedGlobalConfig.ContractId),
-						TokenAdminRegistryCid:  types.CONTRACT_ID(disclosedTar.ContractId),
-						EncodedMessage:         types.TEXT(encodedMessageHex),
-						CcvVerifyTickets:       []types.CONTRACT_ID{types.CONTRACT_ID(ccvVerifyTicketCid)},
-						TokenPoolCCVTicket:     nil,
-						ReceiverRequiredCCVIds: []types.TEXT{},
-					}),
-				}},
-			}},
-			ActAs:              []string{partyReceiver},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedCCVVerifyTicket},
-		},
+	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
 	})
 	require.NoError(t, err)
-
-	// Extract TokenReceiveTicket from result
-	tokenReceiveTicketCid := ""
-	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			if e.Created.GetTemplateId().GetEntityName() == "TokenReceiveTicket" {
-				tokenReceiveTicketCid = e.Created.ContractId
-				break
-			}
-		}
-	}
-	require.NotEmpty(t, tokenReceiveTicketCid, "Expected TokenReceiveTicket to be created")
-	t.Logf("Execute completed, TokenReceiveTicket: %s", tokenReceiveTicketCid)
-
-	// Release Tokens from Pool
-	// Get TransferFactory and disclosures for release
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), env.Splice.TransferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
-	require.NoError(t, err)
-
 	disclosedPool, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool",
 	})
 	require.NoError(t, err)
-	disclosedTar, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-	disclosedTokenReceiveTicket, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.Tickets", EntityName: "TokenReceiveTicket",
-	})
-	require.NoError(t, err)
 
-	// Get pool's holdings
-	poolHoldings, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-	require.NotEmpty(t, poolHoldings, "Pool should have holdings")
-
-	// Filter for unlocked holdings only (Amulet tokens may be locked until next mining round)
-	// HoldingV1.view has: owner, instrumentId, amount, lock, meta
-	// lock field (index 3) is Optional Lock - None means unlocked
-	var poolHoldingCids []*apiv2.Value
-	var poolHoldingDisclosures []*apiv2.DisclosedContract
-	var lockedCount, unlockedCount int
-	for _, h := range poolHoldings {
-		// Check if holding is locked by examining the interface view
-		viewFields := h.GetCreatedEvent().GetInterfaceViews()[0].GetViewValue().GetFields()
-		lockField := viewFields[3].GetValue() // lock : Optional Lock
-		isLocked := lockField.GetOptional().GetValue() != nil
-
-		if isLocked {
-			lockedCount++
-			continue
-		}
-		unlockedCount++
-
-		poolHoldingCids = append(poolHoldingCids, &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: h.GetCreatedEvent().GetContractId()}})
-		// Build disclosure for each holding
-		poolHoldingDisclosures = append(poolHoldingDisclosures, &apiv2.DisclosedContract{
-			ContractId:       h.GetCreatedEvent().GetContractId(),
-			TemplateId:       h.GetCreatedEvent().GetTemplateId(),
-			CreatedEventBlob: h.GetCreatedEvent().GetCreatedEventBlob(),
-		})
-	}
-	t.Logf("Pool has %d holdings (%d unlocked, %d locked)", len(poolHoldings), unlockedCount, lockedCount)
-
-	if unlockedCount == 0 {
-		t.Skip("SKIPPING: All pool holdings are locked (Amulet tokens are locked until next mining round). " +
-			"This is expected on fresh localnet. Either wait for mining round to complete, or use TestToken instead of Amulet.")
-	}
-
-	// Build disclosures for release (include pool holdings)
-	releaseDisclosures := slices.Concat(
-		[]*apiv2.DisclosedContract{disclosedPool, disclosedTar, disclosedTokenReceiveTicket},
+	executeDisclosures := slices.Concat(
+		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool},
 		transferFactoryDisclosures,
 		poolHoldingDisclosures,
 	)
 
-	// Capture receiver's balance before release
-	receiverHoldingsBefore, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
-	})
-	require.NoError(t, err)
-	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
-
-	// Call TokenPool_ReleaseFromTicket - receiver triggers their own release
-	// This is the real flow: receiver calls from their participant with their authorization
+	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release in one transaction
 	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenpool-interfaces", ModuleName: "CCIP.Interfaces.TokenPool", EntityName: "ITokenPool"},
-					ContractId: disclosedPool.ContractId,
-					Choice:     "TokenPool_ReleaseFromTicket",
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					ContractId: ccipReceiverCid,
+					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "tokenReceiveTicketCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: tokenReceiveTicketCid}}},
+						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
+						{Label: "offRampCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: offRampCid}}},
+						{Label: "globalConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: globalConfigCid}}},
 						{Label: "tokenAdminRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTar.ContractId}}},
-						{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}}},
-							{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "context", Value: choiceContext},
-								{Label: "meta", Value: emptyMetadata},
+						{Label: "rmnRemoteCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: rmnRemoteCid}}},
+						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
+						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedPool.ContractId}}},
+							{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+							{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}}},
+								{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+									{Label: "context", Value: choiceContext},
+									{Label: "meta", Value: emptyMetadata},
+								}}}}},
+								{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: poolHoldingCids}}}},
 							}}}}},
-							{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: poolHoldingCids}}}},
+						}}}}}}}},
+						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}}},
+								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
+							}}}},
 						}}}}},
-						{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}}}},
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
-			DisclosedContracts: releaseDisclosures,
+			DisclosedContracts: executeDisclosures,
 		},
 	})
 	require.NoError(t, err)
+	t.Log("CCIPReceiver.Execute completed")
 
-	// Determine if transfer completed directly or created a pending TransferInstruction.
-	// Amulet transfers without receiver preapproval create a pending AmuletTransferInstruction.
+	// Check for pending AmuletTransferInstruction (Amulet transfers without receiver preapproval)
 	var pendingTransferInstructionCid string
 	var releaseCompleted bool
 	for _, event := range res.GetTransaction().GetEvents() {
@@ -713,12 +627,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// If pending, receiver must accept the TransferInstruction to complete the transfer
 	if !releaseCompleted && pendingTransferInstructionCid != "" {
-		// Brief delay for contract propagation before querying
 		time.Sleep(500 * time.Millisecond)
 
-		// Fetch fresh accept context - OpenMiningRound changes every round so we must get
-		// current disclosures immediately before exercising the accept choice.
-		// https://github.com/hyperledger-labs/splice/blob/9a40442f3cf09d19285f8466f35ebaa07a4e5d58/daml/splice-amulet/daml/Splice/Amulet/TwoStepTransfer.daml#L124
 		acceptContextResp, err := env.Splice.TransferInstructionClient.GetTransferInstructionAcceptContextWithResponse(t.Context(), pendingTransferInstructionCid, transferInstructionV1.GetChoiceContextRequest{})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, acceptContextResp.StatusCode(), "Failed to get accept context: %s", string(acceptContextResp.Body))
@@ -798,22 +708,20 @@ func extractCreatedContractId(res *apiv2.SubmitAndWaitForTransactionResponse) st
 	return ""
 }
 
-// buildTokenTransferV1 builds the encoded token transfer bytes for the message
+// buildTokenTransferV1 builds the encoded token transfer bytes for the message.
+// tokenReceiver is keccak256-hashed to match Daml encodePartyAddress.
 func buildTokenTransferV1(amount *big.Int, sourcePoolOwner, destTokenAddressHex, tokenReceiverParty string) *TokenTransferV1 {
 	sourcePoolAddress := []byte(sourcePoolOwner)
 	sourceTokenAddress := []byte{} // Empty for Canton
 
-	// Decode destTokenAddress from hex
 	destTokenAddress, _ := hex.DecodeString(destTokenAddressHex)
-
-	tokenReceiver := []byte(tokenReceiverParty)
 
 	return &TokenTransferV1{
 		Amount:             amount,
 		SourcePoolAddress:  sourcePoolAddress,
 		SourceTokenAddress: sourceTokenAddress,
 		DestTokenAddress:   destTokenAddress,
-		TokenReceiver:      tokenReceiver,
+		TokenReceiver:      EncodePartyID(tokenReceiverParty),
 		ExtraData:          []byte{},
 	}
 }

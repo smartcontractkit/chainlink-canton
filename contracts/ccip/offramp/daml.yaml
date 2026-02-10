@@ -13,4 +13,5 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - ../common/.daml/dist/ccip-common-1.0.0.dar
+  - ../rmn/.daml/dist/ccip-rmn-1.0.0.dar
   - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-1.0.0.dar

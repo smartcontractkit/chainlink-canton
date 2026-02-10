@@ -1,4 +1,4 @@
-package lockreleasetokenpool
+package ccipreceiver
 
 import (
 	"errors"
@@ -12,9 +12,11 @@ import (
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
 )
 
 // ApplyDestChainConfigUpdates is a Record type
@@ -190,8 +192,8 @@ func (t *DestChainConfigArgs) UnmarshalJSON(data []byte) error {
 
 // FeeQuoter is a Template type
 type FeeQuoter struct {
-	Owner                            PARTY   `json:"owner"`
 	InstanceId                       TEXT    `json:"instanceId"`
+	Owner                            PARTY   `json:"owner"`
 	FeeTokens                        GENMAP  `json:"feeTokens"`
 	DestChainConfigs                 GENMAP  `json:"destChainConfigs"`
 	TokenTransferFeeConfigs          GENMAP  `json:"tokenTransferFeeConfigs"`
@@ -215,10 +217,10 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
+	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() interface{} {
@@ -280,10 +282,10 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
+	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() interface{} {
@@ -415,27 +417,6 @@ func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string
 	}
 }
 
-// GetValidatedFee exercises the GetValidatedFee choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) GetValidatedFee(contractID string, args GetValidatedFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetValidatedFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetValidatedFeeWithPackageID exercises the GetValidatedFee choice using the provided package ID instead of package name
-func (t FeeQuoter) GetValidatedFeeWithPackageID(contractID string, packageID string, args GetValidatedFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetValidatedFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
@@ -457,23 +438,23 @@ func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, 
 	}
 }
 
-// FeeQuoterQuoteGasForExec exercises the FeeQuoter_QuoteGasForExec choice on this FeeQuoter contract
+// FeeQuoterFinalizeFee exercises the FeeQuoter_FinalizeFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterQuoteGasForExec(contractID string, args FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
+func (t FeeQuoter) FeeQuoterFinalizeFee(contractID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "FeeQuoter_QuoteGasForExec",
+		Choice:     "FeeQuoter_FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// FeeQuoterQuoteGasForExecWithPackageID exercises the FeeQuoter_QuoteGasForExec choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterQuoteGasForExecWithPackageID(contractID string, packageID string, args FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
+// FeeQuoterFinalizeFeeWithPackageID exercises the FeeQuoter_FinalizeFee choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterFinalizeFeeWithPackageID(contractID string, packageID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "FeeQuoter_QuoteGasForExec",
+		Choice:     "FeeQuoter_FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -604,6 +585,39 @@ func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, p
 	}
 }
 
+// FeeQuoterFinalizeFee is a Record type
+type FeeQuoterFinalizeFee struct {
+	SendingMessageCid CONTRACT_ID `json:"sendingMessageCid"`
+	Caller            PARTY       `json:"caller"`
+}
+
+// ToMap converts FeeQuoterFinalizeFee to a map for DAML arguments
+func (t FeeQuoterFinalizeFee) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["sendingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterFinalizeFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *FeeQuoterFinalizeFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // FeeQuoterGetTokenTransferFee is a Record type
 type FeeQuoterGetTokenTransferFee struct {
 	DestChainSelector NUMERIC      `json:"destChainSelector"`
@@ -636,48 +650,6 @@ func (t FeeQuoterGetTokenTransferFee) MarshalJSON() ([]byte, error) {
 }
 
 func (t *FeeQuoterGetTokenTransferFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
-}
-
-// FeeQuoterQuoteGasForExec is a Record type
-type FeeQuoterQuoteGasForExec struct {
-	DestChainSelector NUMERIC      `json:"destChainSelector"`
-	NonCalldataGas    INT64        `json:"nonCalldataGas"`
-	CalldataSize      INT64        `json:"calldataSize"`
-	FeeToken          InstrumentId `json:"feeToken"`
-	Caller            PARTY        `json:"caller"`
-}
-
-// ToMap converts FeeQuoterQuoteGasForExec to a map for DAML arguments
-func (t FeeQuoterQuoteGasForExec) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["nonCalldataGas"] = int64(t.NonCalldataGas)
-
-	m["calldataSize"] = int64(t.CalldataSize)
-
-	m["feeToken"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t FeeQuoterQuoteGasForExec) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
-}
-
-func (t *FeeQuoterQuoteGasForExec) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -882,42 +854,6 @@ func (t GetTokenPrice) MarshalJSON() ([]byte, error) {
 }
 
 func (t *GetTokenPrice) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
-}
-
-// GetValidatedFee is a Record type
-type GetValidatedFee struct {
-	DestChainSelector NUMERIC           `json:"destChainSelector"`
-	Message           Canton2AnyMessage `json:"message"`
-	Caller            PARTY             `json:"caller"`
-}
-
-// ToMap converts GetValidatedFee to a map for DAML arguments
-func (t GetValidatedFee) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["message"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Message
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t GetValidatedFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
-}
-
-func (t *GetValidatedFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }

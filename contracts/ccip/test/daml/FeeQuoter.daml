@@ -6,7 +6,6 @@ import DA.Assert
 import DA.Map qualified as Map
 
 import CCIP.FeeQuoter
-import qualified CCIP.Client
 
 import Splice.Api.Token.HoldingV1
 
@@ -183,35 +182,5 @@ setup = script do
                         destChainSelector = destChainSelector1
                         destChainConfig = invalidDestChainConfig)
                 ]
-
-    -- check GetValidatedFee to dest chain 1
-    result <- submit owner do
-        exerciseCmd fq GetValidatedFee with
-            destChainSelector = destChainSelector1
-            message = CCIP.Client.Canton2AnyMessage with
-                receiver = "0xReceiverAddress"
-                payload = "Test message payload"
-                feeToken = instrumentIdLINK
-                extraArgs = ""
-                tokenAmounts = []
-            caller = owner
-    -- LINK: 20.00, networkFeeUSD: 1.0 => 0.05 LINK
-    debug ("GetValidatedFee result: " <> show result)
-    result === 0.05
-
-    -- check GetValidatedFee to dest chain 2
-    result <- submit owner do
-        exerciseCmd fq GetValidatedFee with
-            destChainSelector = destChainSelector2
-            message = CCIP.Client.Canton2AnyMessage with
-                receiver = "0xReceiverAddress"
-                payload = "Test message payload"
-                feeToken = instrumentIdUSDC
-                extraArgs = ""
-                tokenAmounts = []
-            caller = owner
-    -- USDC: 1.00, networkFeeUSD: 0.5 => 0.5 USDC
-    debug ("GetValidatedFee result: " <> show result)
-    result === 0.5
 
     pure()

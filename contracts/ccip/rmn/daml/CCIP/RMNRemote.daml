@@ -1,0 +1,211 @@
+-- | RMN (Risk Management Network) for Canton CCIP.
+-- Provides emergency stop capability via curse mechanism matching EVM RMNRemote.sol.
+module CCIP.RMNRemote where
+
+import DA.Crypto.Text (BytesHex)
+import DA.List (elem, notElem, filter)
+import DA.Text qualified as Text
+
+
+-- Global curse subject matching EVM: bytes16(uint128(0x01000000000000000000000000000001))
+globalCurseSubject : BytesHex
+globalCurseSubject = "01000000000000000000000000000001"
+
+-- Convert chain selector to 16-byte curse subject matching EVM: bytes16(uint128(chainSelector))
+chainSelectorToSubject : Numeric 0 -> BytesHex
+chainSelectorToSubject chainSelector =
+    let decStr = numericToDecimalString chainSelector
+        hexStr = decimalStringToHex decStr
+    in padLeft 32 "0" hexStr
+
+-- Helper to convert Numeric 0 to decimal string (removes .0 suffix)
+numericToDecimalString : Numeric 0 -> Text
+numericToDecimalString n =
+    let str = show n
+    in if Text.isSuffixOf ".0" str
+       then Text.take (Text.length str - 2) str
+       else str
+
+-- Helper to pad string on left
+padLeft : Int -> Text -> Text -> Text
+padLeft targetLen padChar str =
+    let currentLen = Text.length str
+        paddingNeeded = targetLen - currentLen
+    in if paddingNeeded <= 0
+       then str
+       else replicateText paddingNeeded padChar <> str
+
+-- Replicate a text string n times
+replicateText : Int -> Text -> Text
+replicateText n t =
+    if n <= 0 then ""
+    else t <> replicateText (n - 1) t
+
+-- Convert decimal string to hexadecimal string
+decimalStringToHex : Text -> Text
+decimalStringToHex "0" = "0"
+decimalStringToHex decStr =
+    let digits = parseDigits decStr []
+        hexResult = bigIntToHex digits
+    in if Text.length hexResult == 0 then "0" else hexResult
+
+-- Parse decimal digits from text
+parseDigits : Text -> [Int] -> [Int]
+parseDigits str acc =
+    if Text.length str == 0 then reverse acc
+    else
+        let firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
+                "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
+                _ -> error ("Invalid digit: " <> firstChar)
+        in parseDigits rest (digit :: acc)
+
+-- Convert big integer (list of decimal digits) to hex string
+bigIntToHex : [Int] -> Text
+bigIntToHex digits = bigIntToHexHelper digits ""
+
+bigIntToHexHelper : [Int] -> Text -> Text
+bigIntToHexHelper [] acc = acc
+bigIntToHexHelper ds acc =
+    case divideDigitsByBase ds 16 of
+        ([], 0) -> acc
+        ([], remainder) -> digitToHex remainder <> acc
+        (quotient, remainder) -> bigIntToHexHelper quotient (digitToHex remainder <> acc)
+
+-- Divide list of digits by base, return (quotient digits, remainder)
+divideDigitsByBase : [Int] -> Int -> ([Int], Int)
+divideDigitsByBase digits base = divideHelper digits base 0 []
+
+divideHelper : [Int] -> Int -> Int -> [Int] -> ([Int], Int)
+divideHelper [] _base carry quotientAcc = (reverse quotientAcc, carry)
+divideHelper (d :: ds) base carry quotientAcc =
+    let dividend = carry * 10 + d
+        newQuotient = dividend / base
+        newRemainder = dividend % base
+    in if newQuotient == 0 && null quotientAcc
+       then divideHelper ds base newRemainder quotientAcc
+       else divideHelper ds base newRemainder (newQuotient :: quotientAcc)
+
+-- Convert single digit (0-15) to hex character
+digitToHex : Int -> Text
+digitToHex n = case n of
+    0 -> "0"; 1 -> "1"; 2 -> "2"; 3 -> "3"; 4 -> "4"
+    5 -> "5"; 6 -> "6"; 7 -> "7"; 8 -> "8"; 9 -> "9"
+    10 -> "a"; 11 -> "b"; 12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
+    _ -> error ("Invalid hex digit: " <> show n)
+
+
+-- | RMN contract providing curse capability for emergency stops.
+-- Separate rmnOwner party allows independent control from ccipOwner.
+template RMNRemote
+    with
+        instanceId : Text              -- Unique identifier for this RMN instance
+        rmnOwner : Party               -- Party controlling curse operations
+        ccipOwner : Party              -- For deployment association/validation
+        cursedSubjects : [BytesHex]    -- Currently cursed subjects (global or chain-specific)
+    where
+        signatory rmnOwner
+        observer ccipOwner
+
+        -- Check if globally cursed (party-as-parameter pattern for open access)
+        nonconsuming choice IsCursed : Bool
+            with
+                caller : Party
+            controller caller
+            do pure (globalCurseSubject `elem` cursedSubjects)
+
+        -- Check if cursed for specific chain (global OR chain-specific)
+        nonconsuming choice IsCursedForChain : Bool
+            with
+                caller : Party
+                chainSelector : Numeric 0
+            controller caller
+            do
+                let chainSubject = chainSelectorToSubject chainSelector
+                pure (globalCurseSubject `elem` cursedSubjects
+                      || chainSubject `elem` cursedSubjects)
+
+        -- Get all cursed subjects
+        nonconsuming choice GetCursedSubjects : [BytesHex]
+            with
+                caller : Party
+            controller caller
+            do pure cursedSubjects
+
+        -- Curse a subject (only rmnOwner)
+        choice Curse : ContractId RMNRemote
+            with
+                subject : BytesHex
+            controller rmnOwner
+            do
+                assertMsg "rmn: subject already cursed" (subject `notElem` cursedSubjects)
+                create this with cursedSubjects = subject :: cursedSubjects
+
+        -- Uncurse a subject (only rmnOwner)
+        choice Uncurse : ContractId RMNRemote
+            with
+                subject : BytesHex
+            controller rmnOwner
+            do
+                assertMsg "rmn: subject not cursed" (subject `elem` cursedSubjects)
+                create this with cursedSubjects = filter (/= subject) cursedSubjects
+
+        -- Curse globally (convenience choice)
+        choice CurseGlobal : ContractId RMNRemote
+            controller rmnOwner
+            do
+                assertMsg "rmn: already globally cursed" (globalCurseSubject `notElem` cursedSubjects)
+                create this with cursedSubjects = globalCurseSubject :: cursedSubjects
+
+        -- Uncurse globally (convenience choice)
+        choice UncurseGlobal : ContractId RMNRemote
+            controller rmnOwner
+            do
+                assertMsg "rmn: not globally cursed" (globalCurseSubject `elem` cursedSubjects)
+                create this with cursedSubjects = filter (/= globalCurseSubject) cursedSubjects
+
+        -- Curse a specific chain (convenience choice)
+        choice CurseChain : ContractId RMNRemote
+            with
+                chainSelector : Numeric 0
+            controller rmnOwner
+            do
+                let subject = chainSelectorToSubject chainSelector
+                assertMsg "rmn: chain already cursed" (subject `notElem` cursedSubjects)
+                create this with cursedSubjects = subject :: cursedSubjects
+
+        -- Uncurse a specific chain (convenience choice)
+        choice UncurseChain : ContractId RMNRemote
+            with
+                chainSelector : Numeric 0
+            controller rmnOwner
+            do
+                let subject = chainSelectorToSubject chainSelector
+                assertMsg "rmn: chain not cursed" (subject `elem` cursedSubjects)
+                create this with cursedSubjects = filter (/= subject) cursedSubjects
+
+        -- Curse multiple subjects atomically
+        choice CurseMultiple : ContractId RMNRemote
+            with
+                subjects : [BytesHex]
+            controller rmnOwner
+            do
+                create this with cursedSubjects = subjects ++ cursedSubjects
+
+        -- Uncurse multiple subjects atomically
+        choice UncurseMultiple : ContractId RMNRemote
+            with
+                subjects : [BytesHex]
+            controller rmnOwner
+            do
+                create this with cursedSubjects = filter (`notElem` subjects) cursedSubjects
+
+        -- Update ccipOwner (for deployment migrations)
+        choice UpdateCCIPOwner : ContractId RMNRemote
+            with
+                newCCIPOwner : Party
+            controller rmnOwner
+            do
+                create this with ccipOwner = newCCIPOwner

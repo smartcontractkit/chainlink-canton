@@ -1,0 +1,86 @@
+-- | Executing message contract for inbound CCIP message processing.
+-- Created by PrepareExecute, acts as a collecting contract: CCVs and pools
+-- exercise choices directly on it to record verification state.
+-- Consumed by OffRamp.ExecuteFromRouter after successful execution.
+module CCIP.ExecutingMessageV1 where
+
+import DA.Crypto.Text (BytesHex)
+import DA.List (dedup)
+
+import qualified CCIP.MessageCodecV1
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+
+-- | Record of a CCV verification appended via AddCCVVerification.
+-- The ccvOwner is authenticated by Daml's controller mechanism.
+data CCVVerification = CCVVerification
+    with
+        ccvInstanceId : Text
+        ccvOwner : Party
+        versionTag : BytesHex
+    deriving (Eq, Show)
+
+-- | Build the observer list from receiver, optional token receiver, and executor.
+buildObservingParties : Party -> Optional Party -> Party -> [Party]
+buildObservingParties receiver tokenReceiver executor =
+    dedup $
+        [receiver, executor]
+        ++ case tokenReceiver of
+            Some p -> [p]
+            None -> []
+
+template ExecutingMessageV1
+    with
+        ccipOwner : Party
+        message : CCIP.MessageCodecV1.MessageV1
+        messageId : BytesHex
+        receiver : Party
+        tokenReceiver : Optional Party
+        executor : Party
+        observingParties : [Party]
+        ccvVerifications : [CCVVerification]
+        -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
+        -- None = pool hasn't been called; Some [] = called, no requirements.
+        inboundPoolCCVs : Optional [RawInstanceAddress]
+        offRampInstanceAddress : RawInstanceAddress
+        tokenAdminRegistryInstanceAddress : RawInstanceAddress
+    where
+        signatory ccipOwner
+        observer observingParties
+
+        -- Consumed by OffRamp.ExecuteFromRouter after successful execution,
+        -- or for cleanup if Execute never completed.
+        -- TODO: it's possible that CCV verifiers/Token Pool contain state, consider
+        -- only allowing `ccipOwner` to archive.
+        choice ExecutingMessageV1_Archive : ()
+            with
+                caller : Party
+            controller caller
+            do
+                assertMsg "executingMessage: caller must be ccipOwner, receiver, or executor"
+                    (caller == ccipOwner || caller == receiver || caller == executor)
+
+        -- Append a CCV verification record. CCV exercises this after successful
+        -- signature verification; ccvOwner = caller is Daml-authenticated.
+        choice AddCCVVerification : ContractId ExecutingMessageV1
+            with
+                ccvInstanceId : Text
+                versionTag : BytesHex
+                caller : Party
+            controller caller
+            do
+                create this with
+                    ccvVerifications = ccvVerifications ++ [CCVVerification with
+                        ccvInstanceId
+                        ccvOwner = caller
+                        versionTag]
+
+        -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner,
+        -- authorized through TAR's signatory context when pool calls
+        -- TokenAdminRegistry_SetInboundPoolCCVs. OffRamp verifies coverage.
+        choice SetInboundPoolCCVs : ContractId ExecutingMessageV1
+            with
+                poolCCVs : [RawInstanceAddress]
+            controller ccipOwner
+            do
+                assertMsg "setInboundPoolCCVs: already set" (inboundPoolCCVs == None)
+                create this with inboundPoolCCVs = Some poolCCVs

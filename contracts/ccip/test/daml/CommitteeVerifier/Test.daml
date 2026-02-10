@@ -4,83 +4,113 @@ import Daml.Script
 
 import DA.Crypto.Text (keccak256)
 import DA.Foldable (forA_)
+import DA.Map qualified as Map
 import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
-import CCIP.CCVRegistry qualified as CCVRegistry
+import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.RawInstanceAddress
+import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
 
+-- | Helper to create a fresh ExecutingMessageV1 for each test.
+-- AddCCVVerification is a consuming choice, so each successful verify
+-- consumes the contract.
+createExecMsg : Party -> Script (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
+createExecMsg owner = submit owner do
+    createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
+        ccipOwner = owner
+        message = PayloadBuilder.testMessage1
+        messageId = keccak256 PayloadBuilder.testMessage1Encoded
+        receiver = owner
+        tokenReceiver = None
+        executor = owner
+        observingParties = [owner]
+        ccvVerifications = []
+        inboundPoolCCVs = None
+        offRampInstanceAddress = CCIP.RawInstanceAddress.make "test-offramp" owner
+        tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make "test-tar" owner
+
 setup = script do
     owner <- allocateParty "owner"
+    rmnOwner <- allocateParty "rmn-owner"
 
     let msg = PayloadBuilder.testMessage1
     let encodedMsg = PayloadBuilder.testMessage1Encoded
-    debug ("Encoded message: " <> encodedMsg)
-    let preimage = CommitteeVerifier.versionTagV1_7_0 <> encodedMsg
-    debug ("Preimage for hashing: " <> preimage)
-    let hashedMsg = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> encodedMsg)
-    debug ("Hashed message: " <> hashedMsg)
+    let messageId = keccak256 encodedMsg
+    debug ("messageId: " <> messageId)
+    let signedHash = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> messageId)
+    debug ("signedHash: " <> signedHash)
 
-    ccvRegistry <- submit owner do
-        createCmd CCVRegistry.CCVRegistry with
+    let rmnInstanceId = "test-rmn"
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
             ccipOwner = owner
-            instanceId = "test-ccvregistry"
+            cursedSubjects = []
+
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Validate signatures individually
+    executingMessageCid <- createExecMsg owner
     forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
-        let verified = CommitteeVerifier.validateSignature hashedMsg pubKey r s
+        let verified = CommitteeVerifier.validateSignature signedHash pubKey r s
         assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
-
 
 
     debug ("===== Test1 =====")
     -- single signer, threshold 1
+    executingMessageCid <- createExecMsg owner
     let indices1 = [0]
     let pubKeys1 = PayloadBuilder.getPubkeysForIndices indices1
     let verifierResults1 = PayloadBuilder.getVerifierResultsForIndices indices1
     ccv1 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv1"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 1
             signers = pubKeys1
-    submit owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults1
-            receiver = owner
             caller = owner
     debug ("===== Passed Test1 =====")
 
     debug ("===== Test2 =====")
     -- multiple signers, threshold 3
+    executingMessageCid <- createExecMsg owner
     let indices2 = [0, 1, 2, 3, 4]
     let pubKeys2 = PayloadBuilder.getPubkeysForIndices indices2
     let verifierResults2 = PayloadBuilder.getVerifierResultsForIndices indices2
     ccv2 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv2"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 3
             signers = pubKeys2
-    submit owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults2
-            receiver = owner
             caller = owner
     debug ("===== Passed Test2 =====")
 
@@ -91,37 +121,40 @@ setup = script do
     let verifierResults3 = PayloadBuilder.getVerifierResultsForIndices indices3
     ccv3 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv3"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 20
             signers = pubKeys3
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test3 =====")
 
     debug ("===== Test4 =====")
     -- submit with invalid signatures, threshold of 3 met, should fail
+    executingMessageCid <- createExecMsg owner
     let pubKeys4 = PayloadBuilder.getPubkeysForIndices [0, 2, 4, 6, 8, 10]
     let verifierResults4 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
     ccv4 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv4"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 3
             signers = pubKeys4
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults4
-            receiver = owner
             caller = owner
     debug ("===== Passed Test4 =====")
 
@@ -131,21 +164,21 @@ setup = script do
     let verifierResults5 = PayloadBuilder.getVerifierResultsForIndices [5, 6, 7, 8, 9]
     ccv5 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv5"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 4
             signers = pubKeys5
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults5
-            receiver = owner
             caller = owner
     debug ("===== Passed Test5 =====")
 
@@ -155,21 +188,21 @@ setup = script do
     let verifierResults6 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 0]
     ccv6 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv6"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 3
             signers = pubKeys6
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults = verifierResults6
-            receiver = owner
             caller = owner
     debug ("===== Passed Test6 =====")
 
@@ -177,28 +210,32 @@ setup = script do
     -- try to create without any signers, should fail
     ccv7 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv7"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 0
             signers = []
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test7 =====")
 
     debug ("===== Test8 =====")
     -- try to create without a storage location, should fail
     ccv8 <- submitMustFail owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv8"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = ""
             threshold = 1
             signers = PayloadBuilder.getPubkeysForIndices [0]
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test8 =====")
 
     debug ("===== Test9 =====")
@@ -206,46 +243,42 @@ setup = script do
     let pubKeys9 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
     ccv9 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
-            owner = owner
             instanceId = "test-ccv9"
+            owner = owner
             versionTag = CommitteeVerifier.versionTagV1_7_0
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
             threshold = 2
             signers = pubKeys9
-    submitMustFail owner do
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults =
                 "01234567" <> -- invalid version tag
                 "0004" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
-            receiver = owner
             caller = owner
-    submitMustFail owner do
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "ffff" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
-            receiver = owner
             caller = owner
-    submitMustFail owner do
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            ccvRegistryCid = ccvRegistry
-            message = msg
-            messageId = hashedMsg
+            rmnRemoteCid = rmnRemote
+            executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
-            receiver = owner
             caller = owner
 
     debug ("===== Passed Test9 =====")

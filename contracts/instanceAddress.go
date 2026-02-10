@@ -6,12 +6,35 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+	"golang.org/x/crypto/sha3"
+
+	ccip_common "github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 )
 
 // InstanceAddressLength is the length in bytes of an InstanceAddress.
 const InstanceAddressLength = 32
 
-// InstanceAddress represents the 32 byte Keccak256 hash of an instance ID.
+type RawInstanceAddress string
+
+func RawInstanceAddressFromString(s string) RawInstanceAddress { return RawInstanceAddress(s) }
+
+func (r RawInstanceAddress) String() string { return string(r) }
+
+func (r RawInstanceAddress) InstanceAddress() InstanceAddress {
+	h := sha3.NewLegacyKeccak256()
+	h.Write([]byte(r))
+
+	return InstanceAddress(h.Sum(nil))
+}
+
+func (r RawInstanceAddress) Binding() ccip_common.RawInstanceAddress {
+	return ccip_common.RawInstanceAddress{
+		Unpack: types.TEXT(r),
+	}
+}
+
+// InstanceAddress represents the 32 byte Keccak256 hash of an instance ID + owner party.
 type InstanceAddress [InstanceAddressLength]byte
 
 // BytesToInstanceAddress converts a byte slice to an InstanceAddress.

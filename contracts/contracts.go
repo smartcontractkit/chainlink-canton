@@ -18,6 +18,7 @@ const (
 	MCMSTest = Package("mcms-test")
 
 	CCIPCommon               = Package("ccip-common")
+	CCIPSender               = Package("ccip-sender")
 	CCIPReceiver             = Package("ccip-receiver")
 	CCIPCommitteeVerifier    = Package("ccip-committeeverifier")
 	CCIPFeeQuoter            = Package("ccip-feequoter")
@@ -27,6 +28,7 @@ const (
 	CCIPPoolInterfaces       = Package("ccip-tokenpool-interfaces")
 	CCIPLockReleaseTokenPool = Package("ccip-lockreleasetokenpool")
 	CCIPPerPartyRouter       = Package("ccip-perpartyrouter")
+	CCIPRMN                  = Package("ccip-rmn")
 	CCIPTest                 = Package("ccip-test")
 )
 
@@ -39,6 +41,7 @@ var Versions map[Package][]string = map[Package][]string{
 	MCMSTest: []string{"1.0.0", CurrentVersion},
 
 	CCIPCommon:               []string{"1.0.0", CurrentVersion},
+	CCIPSender:               []string{"1.0.0", CurrentVersion},
 	CCIPReceiver:             []string{"1.0.0", CurrentVersion},
 	CCIPCommitteeVerifier:    []string{"1.0.0", CurrentVersion},
 	CCIPFeeQuoter:            []string{"1.0.0", CurrentVersion},
@@ -48,6 +51,7 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPPoolInterfaces:       []string{"1.0.0", CurrentVersion},
 	CCIPLockReleaseTokenPool: []string{"1.0.0", CurrentVersion},
 	CCIPPerPartyRouter:       []string{"1.0.0", CurrentVersion},
+	CCIPRMN:                  []string{"1.0.0", CurrentVersion},
 	CCIPTest:                 []string{"1.0.0", CurrentVersion},
 }
 

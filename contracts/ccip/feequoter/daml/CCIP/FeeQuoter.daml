@@ -4,17 +4,17 @@ import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
 import DA.Map qualified as Map
 import DA.Optional
-import DA.Text qualified as Text
 
 import Splice.Api.Token.HoldingV1
 
 import CCIP.Common qualified as Common
-import qualified CCIP.Client
+import qualified CCIP.SendingMessageV1
 
+-- TODO: double check and readd fee/price quoting
 template FeeQuoter
     with
-        owner : Party
         instanceId : Text
+        owner : Party
 
         -- | Set of fee tokens that can be used to pay for fees. The values of the map are the fee multipliers which
         -- | can be used to set a premium or discount for a specific fee token.
@@ -49,7 +49,7 @@ template FeeQuoter
                 destChainSelector : Numeric 0
                 caller : Party
             controller caller
-            do 
+            do
                 return (fromSomeNote ("No gas price found for " <> show destChainSelector) (Map.lookup destChainSelector usdPerUnitGasByDestChainSelector))
 
         choice UpdatePrices : ContractId FeeQuoter
@@ -59,7 +59,7 @@ template FeeQuoter
             controller caller
             do
                 -- The caller must be an authorized price updater.
-                assertMsg ("Caller is not an authorized price updater: " <> show caller) (caller `elem` priceUpdaters)  
+                assertMsg ("Caller is not an authorized price updater: " <> show caller) (caller `elem` priceUpdaters)
 
                 now <- getTime
                 let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
@@ -69,27 +69,6 @@ template FeeQuoter
         -- ================================================================
         -- │                         Fee Quoting                          │
         -- ================================================================
-
-        -- deprecated
-        nonconsuming choice GetValidatedFee : Decimal
-            with
-                destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
-                caller : Party
-            controller caller
-            do 
-                destChainConfig <- exercise self GetDestChainConfig with destChainSelector = destChainSelector, caller = caller
-
-                -- Validate message size
-                let messageSize = Text.length message.payload + Text.length message.extraArgs
-                assertMsg ("Message size exceeds maxDataBytes for destChainSelector " <> show destChainSelector <> ": " <> show messageSize <> " > " <> show destChainConfig.maxDataBytes) (messageSize <= destChainConfig.maxDataBytes)
-
-                -- Calculate fee components
-                let networkFee = destChainConfig.networkFeeUSD
-                feeTokenPrice <- exercise self GetTokenPrice with instrumentId = message.feeToken, caller = caller
-                let fee = networkFee / feeTokenPrice.price
-
-                return fee
 
         nonconsuming choice FeeQuoter_GetTokenTransferFee : (Decimal, Int, Int)
             with
@@ -107,16 +86,27 @@ template FeeQuoter
                         let defaultConfig = fromSomeNote "No dest chain configs available" (Map.lookup destChainSelector destChainConfigs)
                         return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
 
-        nonconsuming choice FeeQuoter_QuoteGasForExec : (Int, Decimal, Decimal, Decimal)
+        -- Looks up the fee token price and premium multiplier from
+        -- internal state, then exercises SendingMessageV1.FinalizeFee
+        -- with ccipOwner authority.
+        nonconsuming choice FeeQuoter_FinalizeFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                destChainSelector : Numeric 0
-                nonCalldataGas : Int
-                calldataSize : Int
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 caller : Party
             controller caller
             do
-                return (0, 0.0, 0.0, 0.0) -- TODO
+                sm <- fetch sendingMessageCid
+                let tokenPrice = fromSomeNote
+                        ("No price found for " <> sm.feeToken.id)
+                        (Map.lookup sm.feeToken usdPerToken)
+                let premiumMultiplier = fromSomeNote
+                        ("Fee token not configured: " <> sm.feeToken.id)
+                        (Map.lookup sm.feeToken feeTokens)
+                exercise sendingMessageCid
+                    CCIP.SendingMessageV1.FinalizeFee with
+                        feeTokenPrice = tokenPrice.price
+                        premiumMultiplier
 
         -- ================================================================
         -- │                         Fee Tokens                           │
@@ -175,11 +165,11 @@ template FeeQuoter
                         assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
                         assertMsg ("unknown chainFamilySelector for destChainSelector: " <> show dcca.destChainSelector) (Common.isKnownChainFamilySelector dcca.destChainConfig.chainFamilySelector)
                     ) destChainConfigArgs
-                
+
                 let newDestChainConfigs = foldl (\acc dcca -> Map.insert dcca.destChainSelector dcca.destChainConfig acc) destChainConfigs destChainConfigArgs
                 create this with destChainConfigs = newDestChainConfigs
-        
-        
+
+
 
 data DestChainConfigArgs = DestChainConfigArgs
     with
@@ -225,7 +215,7 @@ data PriceUpdates = PriceUpdates
 data TokenPriceUpdate = TokenPriceUpdate
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        usdPerToken : Decimal 
+        usdPerToken : Decimal
     deriving (Eq, Show)
 
 data GasPriceUpdate = GasPriceUpdate

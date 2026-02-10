@@ -9,7 +9,9 @@ module CCIP.MessageCodecV1
   , encodeUint64
   , encodeUint256
   , encodeInstrumentId
-  , encodePartyId
+  , encodePartyAddress
+  , encodeInstanceAddress
+  , computeCCVAndExecutorHash
   , extractBytes
   , decodeMessageV1
   , decodeTokenTransfer
@@ -19,7 +21,6 @@ module CCIP.MessageCodecV1
   , decodeUint64
   , decodeUint256
   , decodeInstrumentId
-  , decodePartyId
   , messageId
   ) where
 
@@ -141,14 +142,8 @@ encodeTokenTransferV1 tokenTransfer =
 
 encodeInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
 encodeInstrumentId instrumentId =
-    let
-        partyId = encodePartyId instrumentId.admin
-        id = DA.Crypto.Text.toHex instrumentId.id
-    in
-        (fromSome (encodeUint8 (byteCount partyId)))
-        <> partyId
-        <> (fromSome (encodeUint8 (byteCount id)))
-        <> id
+    let combined = instrumentId.id <> "@" <> partyToText instrumentId.admin
+    in DA.Crypto.Text.toHex combined
 
 encodeUint8 : Int -> Optional BytesHex
 encodeUint8 n =
@@ -174,7 +169,7 @@ encodeUint16 n =
 
 encodeUint32 : Int -> Optional BytesHex
 encodeUint32 n =
-    let 
+    let
         -- Maximum value for uint32: 2^32 - 1 = 4294967295
         maxUint32 = 4294967295
     in
@@ -185,26 +180,26 @@ encodeUint32 n =
 
 -- Convert a Numeric 0 to a hex-encoded uint64 (8 bytes)
 encodeUint64 : Numeric 0 -> Optional BytesHex
-encodeUint64 n = 
-    let 
+encodeUint64 n =
+    let
         -- Maximum value for uint64: 2^64 - 1 = 18446744073709551615
         maxUint64 = 18446744073709551615.0
     in
         if n < 0.0 || n > maxUint64
         then None
         else
-            let 
+            let
                 -- Convert numeric to string to preserve full precision
                 numStr = show n
-                
+
                 -- Remove decimal point if present (since it's Numeric 0, should be whole number)
-                intStr = if Text.isSuffixOf ".0" numStr 
-                         then Text.take (Text.length numStr - 2) numStr 
+                intStr = if Text.isSuffixOf ".0" numStr
+                         then Text.take (Text.length numStr - 2) numStr
                          else numStr
-                
+
                 -- Convert decimal string to hex without precision loss
                 hexStr = decimalStringToHex intStr
-                
+
                 -- Pad to 16 hex characters (8 bytes) with leading zeros
                 paddedHex = padLeft 16 "0" hexStr
             in
@@ -212,31 +207,67 @@ encodeUint64 n =
 
 -- Convert a Numeric 0 to a hex-encoded uint256 (32 bytes)
 encodeUint256 : Numeric 0 -> Optional BytesHex
-encodeUint256 n = 
+encodeUint256 n =
     if n < 0.0 then None
     else
         let
             -- Convert numeric to string to preserve full precision
             numStr = show n
-            
+
             -- Remove decimal point if present (since it's Numeric 0, should be whole number)
-            intStr = if Text.isSuffixOf ".0" numStr 
-                        then Text.take (Text.length numStr - 2) numStr 
+            intStr = if Text.isSuffixOf ".0" numStr
+                        then Text.take (Text.length numStr - 2) numStr
                         else numStr
-            
+
             -- Convert decimal string to hex without precision loss
             hexStr = decimalStringToHex intStr
-            
+
             -- Pad to 64 hex characters (32 bytes) with leading zeros
             paddedHex = padLeft 64 "0" hexStr
         in
             Some paddedHex
 
-encodePartyId : Party -> BytesHex
-encodePartyId party =
-    let partyText = partyToText party
+-- Compute 32-byte party address from Party.
+-- Returns keccak256(partyToText(party)) for privacy-preserving cross-chain addressing.
+encodePartyAddress : Party -> BytesHex
+encodePartyAddress party =
+    let partyHex = DA.Crypto.Text.toHex (partyToText party)
+    in keccak256 partyHex
+
+-- Compute 32-byte instance address from instanceId and owner.
+-- Returns keccak256(instanceId + "@" + partyId) for privacy-preserving contract addressing.
+-- The "@" separator ensures uniqueness and prevents ambiguity between different (instanceId, owner) pairs.
+encodeInstanceAddress : Text -> Party -> BytesHex
+encodeInstanceAddress instId owner =
+    let combined = instId <> "@" <> partyToText owner
+        combinedHex = DA.Crypto.Text.toHex combined
+    in keccak256 combinedHex
+
+-- Compute ccvAndExecutorHash using chain-agnostic format.
+-- Format: keccak256(addressLength || ccv1 || ccv2 || ... || executor)
+-- For Canton: addressLength = 32 (1 byte), each address is 32 bytes.
+-- This matches the offchain ComputeCCVAndExecutorHash which derives length from executor.
+computeCCVAndExecutorHash : [BytesHex] -> BytesHex -> BytesHex
+computeCCVAndExecutorHash ccvInstanceAddresses executorInstanceAddress =
+    let
+        -- Validate executor is 32 bytes
+        _ = if byteCount executorInstanceAddress /= 32
+            then error ("computeCCVAndExecutorHash: executor must be 32 bytes, got " <> show (byteCount executorInstanceAddress))
+            else ()
+
+        -- Validate all CCV addresses are 32 bytes
+        validateAddr addr =
+            if byteCount addr /= 32
+            then error ("computeCCVAndExecutorHash: CCV address must be 32 bytes, got " <> show (byteCount addr))
+            else addr
+        validCCVs = map validateAddr ccvInstanceAddresses
+
+        -- Encode: 1 byte length prefix (32) + all CCVs + executor
+        lengthPrefix = fromSome (encodeUint8 32)
+        encodedCCVs = foldl (<>) "" validCCVs
+        encoded = lengthPrefix <> encodedCCVs <> executorInstanceAddress
     in
-        DA.Crypto.Text.toHex partyText
+        keccak256 encoded
 
 -- Helpers
 
@@ -246,11 +277,11 @@ compareWithMaxUint256 n =
     let
         -- Maximum value for uint256 as string
         maxUint256String = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
-        
+
         -- Convert input to string
         numStr = show n
-        intStr = if Text.isSuffixOf ".0" numStr 
-                 then Text.take (Text.length numStr - 2) numStr 
+        intStr = if Text.isSuffixOf ".0" numStr
+                 then Text.take (Text.length numStr - 2) numStr
                  else numStr
     in
         compareDecimalStrings intStr maxUint256String
@@ -263,19 +294,19 @@ compareDecimalStrings str1 str2 =
         len2 = Text.length str2
     in
         (
-            (len1 > len2) || 
-            ((len1 >= len2) && 
+            (len1 > len2) ||
+            ((len1 >= len2) &&
             (str1 > str2)))  -- Same length, can use lexicographic comparison
 
 
 
-        
+
 
 -- Helper to parse digits from a text string
 parseDigits : Text -> [Int] -> [Int]
 parseDigits str acc =
     if Text.length str == 0 then reverse acc
-    else 
+    else
         let
             firstChar = Text.take 1 str
             rest = Text.drop 1 str
@@ -297,11 +328,11 @@ parseDigits str acc =
 -- Convert decimal string to hexadecimal string (preserves full precision)
 decimalStringToHex : Text -> Text
 decimalStringToHex "0" = "0"
-decimalStringToHex decStr = 
+decimalStringToHex decStr =
     let
         -- Convert decimal string to list of digits
         decimalDigits = parseDigits decStr []
-        
+
         -- Convert to hex using repeated division by 16
         hexResult = bigIntToHex decimalDigits
     in
@@ -314,7 +345,7 @@ divideDigitsByBase digits base = divideDigitsByBaseHelper digits base 0 []
 -- Helper function for digit division
 divideDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> ([Int], Int)
 divideDigitsByBaseHelper [] base carry quotientAcc = (reverse quotientAcc, carry)
-divideDigitsByBaseHelper (d :: ds) base carry quotientAcc = 
+divideDigitsByBaseHelper (d :: ds) base carry quotientAcc =
     let
         dividend = carry * 10 + d
         newQuotient = dividend / base
@@ -331,7 +362,7 @@ bigIntToHex digits = bigIntToHexHelper digits ""
 -- Helper for bigIntToHex
 bigIntToHexHelper : [Int] -> Text -> Text
 bigIntToHexHelper [] acc = acc
-bigIntToHexHelper ds acc = 
+bigIntToHexHelper ds acc =
     case divideDigitsByBase ds 16 of
         ([], 0) -> acc
         ([], remainder) -> digitToHex remainder <> acc
@@ -341,7 +372,7 @@ bigIntToHexHelper ds acc =
 digitToHex : Int -> Text
 digitToHex n = case n of
     0 -> "0"
-    1 -> "1" 
+    1 -> "1"
     2 -> "2"
     3 -> "3"
     4 -> "4"
@@ -361,7 +392,7 @@ digitToHex n = case n of
 -- Helper function to pad a string with a character on the left
 padLeft : Int -> Text -> Text -> Text
 padLeft targetLength padString str =
-    let 
+    let
         currentLength = Text.length str
         paddingNeeded = targetLength - currentLength
     in
@@ -379,32 +410,32 @@ padHelper n padStr =
 -- ===================================================
 
 decodeUint8 : BytesHex -> Optional Int
-decodeUint8 hex = 
+decodeUint8 hex =
     if byteCount hex /= 1 then None
     else DA.Crypto.Text.fromHex hex
 
 decodeUint16 : BytesHex -> Optional Int
-decodeUint16 hex = 
+decodeUint16 hex =
     if byteCount hex /= 2 then None
     else DA.Crypto.Text.fromHex hex
 
 decodeUint32 : BytesHex -> Optional Int
-decodeUint32 hex = 
+decodeUint32 hex =
     if byteCount hex /= 4 then None
     else DA.Crypto.Text.fromHex hex
 
 decodeUint64 : BytesHex -> Optional (Numeric 0)
-decodeUint64 hex = 
+decodeUint64 hex =
     if byteCount hex /= 8 then None
-    else 
+    else
         case hexToDecimalString hex of
             Some decStr -> Some (parseDecimal decStr)
             None -> None
 
 decodeUint256 : BytesHex -> Optional (Numeric 0)
-decodeUint256 hex = 
+decodeUint256 hex =
     if byteCount hex /= 32 then None
-    else 
+    else
         case hexToDecimalString hex of
             Some decStr -> Some (parseDecimal decStr)
             None -> None
@@ -412,42 +443,24 @@ decodeUint256 hex =
 decodeInstrumentId : BytesHex -> Optional Splice.Api.Token.HoldingV1.InstrumentId
 decodeInstrumentId encoded =
     do
-        -- Extract partyId length (1 byte)
-        partyIdLenHex <- extractBytes encoded 0 1
-        partyIdLen <- decodeUint8 partyIdLenHex
-        
-        -- Extract partyId hex
-        partyIdHex <- extractBytes encoded 1 partyIdLen
-        
-        -- Decode partyId
-        admin <- decodePartyId partyIdHex
-        
-        -- Extract id length (1 byte)
-        idLenHex <- extractBytes encoded (1 + partyIdLen) 1
-        idLen <- decodeUint8 idLenHex
-        
-        -- Extract id hex
-        idHex <- extractBytes encoded (2 + partyIdLen) idLen
-        
-        -- Decode id from hex to Int
-        id <- DA.Crypto.Text.fromHex idHex
-        
-        return Splice.Api.Token.HoldingV1.InstrumentId
-            { admin = admin
-            , id = id
-            }
-
-decodePartyId : BytesHex -> Optional Party
-decodePartyId hex =
-    let partyText = fromSome(DA.Crypto.Text.fromHex hex)
-    in
-        partyFromText partyText
+        -- Decode hex to text (format: id@party)
+        combined <- DA.Crypto.Text.fromHex encoded
+        -- Find the "@" separator
+        let parts = Text.splitOn "@" combined
+        case parts of
+            [idText, partyText] -> do
+                admin <- partyFromText partyText
+                return Splice.Api.Token.HoldingV1.InstrumentId
+                    { admin = admin
+                    , id = idText
+                    }
+            _ -> None
 
 -- Helpers
 
 -- Convert hex string to decimal string
 hexToDecimalString : BytesHex -> Optional Text
-hexToDecimalString hex = 
+hexToDecimalString hex =
     let
         -- Convert hex to list of digits
         hexDigits = hexStringToDigits hex []
@@ -460,7 +473,7 @@ hexToDecimalString hex =
 hexStringToDigits : Text -> [Int] -> Optional [Int]
 hexStringToDigits str acc =
     if Text.length str == 0 then Some acc
-    else 
+    else
         let
             firstChar = Text.take 1 str
             rest = Text.drop 1 str
@@ -495,7 +508,7 @@ hexStringToDigits str acc =
 
 -- Convert hex digits to decimal string
 hexDigitsToDecimal : [Int] -> Text
-hexDigitsToDecimal digits = 
+hexDigitsToDecimal digits =
     let
         -- Convert Int digit to Numeric 0 directly without using intToNumeric
         digitToNumeric : Int -> Numeric 0
@@ -517,7 +530,7 @@ hexDigitsToDecimal digits =
             14 -> 14.0
             15 -> 15.0
             _ -> 0.0 -- Should not happen for hex digits
-        
+
         result = foldl (\acc d -> acc * 16.0 + digitToNumeric d) (0.0 : Numeric 0) digits
         resultStr = show result
         -- Remove ".0" suffix if present
@@ -534,7 +547,7 @@ multiplyDigitsByBase digits base = multiplyDigitsByBaseHelper (reverse digits) b
 -- Helper for multiplyDigitsByBase
 multiplyDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> [Int]
 multiplyDigitsByBaseHelper [] base carry acc = if carry == 0 then reverse acc else reverse (carry :: acc)
-multiplyDigitsByBaseHelper (d :: ds) base carry acc = 
+multiplyDigitsByBaseHelper (d :: ds) base carry acc =
     let
         product = d * base + carry
         newDigit = product % 10
@@ -545,7 +558,7 @@ multiplyDigitsByBaseHelper (d :: ds) base carry acc =
 -- Multiply decimal string by 16
 multiplyDecimalBy16 : Text -> Text
 multiplyDecimalBy16 "0" = "0"
-multiplyDecimalBy16 decStr = 
+multiplyDecimalBy16 decStr =
     let
         digits = parseDecimalDigits decStr []
         result = multiplyDigitsByBase digits 16
@@ -555,21 +568,21 @@ multiplyDecimalBy16 decStr =
 -- Add two lists of digits with carry
 addDigitLists : [Int] -> [Int] -> Int -> [Int]
 addDigitLists [] [] carry = if carry == 0 then [] else [carry]
-addDigitLists (d1 :: ds1) [] carry = 
+addDigitLists (d1 :: ds1) [] carry =
     let
         sum = d1 + carry
         newDigit = sum % 10
         newCarry = sum / 10
     in
         newDigit :: addDigitLists ds1 [] newCarry
-addDigitLists [] (d2 :: ds2) carry = 
+addDigitLists [] (d2 :: ds2) carry =
     let
         sum = d2 + carry
         newDigit = sum % 10
         newCarry = sum / 10
     in
         newDigit :: addDigitLists [] ds2 newCarry
-addDigitLists (d1 :: ds1) (d2 :: ds2) carry = 
+addDigitLists (d1 :: ds1) (d2 :: ds2) carry =
     let
         sum = d1 + d2 + carry
         newDigit = sum % 10
@@ -579,7 +592,7 @@ addDigitLists (d1 :: ds1) (d2 :: ds2) carry =
 
 -- Add two decimal strings
 addDecimalStrings : Text -> Text -> Text
-addDecimalStrings str1 str2 = 
+addDecimalStrings str1 str2 =
     let
         digits1 = reverse (parseDecimalDigits str1 [])
         digits2 = reverse (parseDecimalDigits str2 [])
@@ -591,7 +604,7 @@ addDecimalStrings str1 str2 =
 parseDecimalDigits : Text -> [Int] -> [Int]
 parseDecimalDigits str acc =
     if Text.length str == 0 then reverse acc
-    else 
+    else
         let
             firstChar = Text.take 1 str
             rest = Text.drop 1 str
@@ -613,7 +626,7 @@ parseDecimalDigits str acc =
 -- Convert list of digits back to decimal string
 digitsToDecimalString : [Int] -> Text
 digitsToDecimalString [] = "0"
-digitsToDecimalString digits = 
+digitsToDecimalString digits =
     let
         digitToChar d = case d of
             0 -> "0"
@@ -632,9 +645,9 @@ digitsToDecimalString digits =
 
 -- Parse decimal string to Numeric 0
 parseDecimal : Text -> Numeric 0
-parseDecimal str = 
+parseDecimal str =
     if Text.length str == 0 then 0.0
-    else 
+    else
         let
             len = Text.length str
             lastChar = Text.take 1 (Text.drop (len - 1) str)

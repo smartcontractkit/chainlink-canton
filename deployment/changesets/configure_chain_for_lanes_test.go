@@ -25,6 +25,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/rmn"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -148,6 +150,13 @@ func TestConfigureChainForLanes(t *testing.T) {
 						OnRampAddress: "", // TODO ?
 					},
 				},
+				RMNRemote: sequences.RMNRemoteParams{
+					Template: rmn.RMNRemote{
+						CcipOwner:      "", // Populated by the sequence
+						RmnOwner:       types.PARTY(user.GetPrimaryParty()),
+						CursedSubjects: nil,
+					},
+				},
 			},
 		},
 	})
@@ -181,10 +190,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 		Config: ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
 				ChainSelector:      chainSelector,
-				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
-				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
-				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
-				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
+				GlobalConfig:       contracts.RawInstanceAddressFromString(globalConfig.Address).InstanceAddress(),
+				FeeQuoter:          contracts.RawInstanceAddressFromString(feeQuoter.Address).InstanceAddress(),
+				OnRamp:             contracts.RawInstanceAddressFromString(onRamp.Address).InstanceAddress(),
+				OffRamp:            contracts.RawInstanceAddressFromString(offRamp.Address).InstanceAddress(),
 				CommitteeVerifiers: nil,
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
 					chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {
