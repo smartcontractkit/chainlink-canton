@@ -9,6 +9,7 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RawInstanceAddress
 import qualified CCIP.Tickets
 
 template TokenAdminRegistry
@@ -207,6 +208,10 @@ template TokenAdminRegistry
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+                assertMsg "TAR: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
+                CCIP.RawInstanceAddress.assertEqual "TAR: instance address mismatch"
+                    instanceId owner execMsg.tokenAdminRegistryInstanceAddress
+
                 let tt = fromSomeNote
                         "TokenAdminRegistry_SetInboundPoolCCVs: no token transfer in message"
                         execMsg.message.tokenTransfer
