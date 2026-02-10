@@ -347,16 +347,15 @@ template OnRamp
                 case sendingMsg.tokenSendData of
                     None -> pure None
                     Some tsd -> do
-                        ticketCid <- create CCIP.Tickets.TokenReceiveTicket with
-                            ccipOwner
-                            tokenAdminRegistryInstanceId = tokenAdminRegistry.instanceId
-                            poolOwner = tsd.poolOwner
-                            receiver = sendingMsg.sender
-                            tokenReceiver = sendingMsg.sender
-                            instrumentId = tsd.instrumentId
-                            amount = tsd.amount
-                            messageHash = sendingMsg.messageId
-                            sourceChainSelector = 0.0
+                        ticketCid <- exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
+                                instrumentId = tsd.instrumentId
+                                poolOwner = tsd.poolOwner
+                                receiver = sendingMsg.sender
+                                tokenReceiver = sendingMsg.sender
+                                amount = tsd.amount
+                                messageHash = sendingMsg.messageId
+                                sourceChainSelector = 0.0
                         pure (Some ticketCid)
 
 
