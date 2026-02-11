@@ -2,7 +2,6 @@ package changesets
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strconv"
 	"sync"
 	"testing"
@@ -25,11 +24,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/rmn"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
@@ -120,7 +119,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
 	}
 	versionTag := "49ff34ed"
-	ccvID := versionTag + "@" + user.GetPrimaryParty()
+	ccvQualifier := "default"
 
 	// Deploy Chain Contracts
 	out, err := DeployChainContracts{}.Apply(*env, CantonCSDeps[DeployChainContractsConfig]{
@@ -141,6 +140,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							Threshold:           2,
 							Signers:             ccvSignerPubKeys,
 						},
+						Qualifier: ccvQualifier,
 					},
 				},
 				GlobalConfig: sequences.GlobalConfigParams{
@@ -168,7 +168,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 	addresses := env.DataStore.Addresses().Filter()
 	for i, address := range addresses {
-		fmt.Printf("Deployed Address %d: ChainSelector=%d, Type=%s, Version=%s, Address=%s, Qualifier=%s\n", i, address.ChainSelector, address.Type, address.Version, address.Address, address.Qualifier)
+		t.Logf("Deployed Address %d: ChainSelector=%d, Type=%s, Version=%s, Address=%s, Qualifier=%s, Labels=%s\n", i, address.ChainSelector, address.Type, address.Version, address.Address, address.Qualifier, address.Labels.String())
 	}
 
 	// Resolve contracts
@@ -180,6 +180,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 	require.NoError(t, err, "failed to get OnRamp address")
 	offRamp, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, datastore.ContractType(offramp.ContractType), offramp.Version, ""))
 	require.NoError(t, err, "failed to get OffRamp address")
+	committeeVerifier, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
+	require.NoError(t, err, "failed to get CommitteeVerifier address")
 
 	// Configure Chain for Lanes
 	out, err = ConfigureChainForLanes{}.Apply(*env, CantonCSDeps[ConfigureChainForLanesConfig]{
@@ -195,13 +197,13 @@ func TestConfigureChainForLanes(t *testing.T) {
 				OnRamp:             contracts.RawInstanceAddressFromString(onRamp.Address).InstanceAddress(),
 				OffRamp:            contracts.RawInstanceAddressFromString(offRamp.Address).InstanceAddress(),
 				CommitteeVerifiers: nil,
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {
 						AllowTrafficFrom:         true,
 						OnRamps:                  [][]byte{[]byte("")},
 						OffRamp:                  nil,
 						DefaultInboundCCVs:       nil,
-						LaneMandatedInboundCCVs:  []string{ccvID},
+						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])},
 						DefaultOutboundCCVs:      nil,
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",
