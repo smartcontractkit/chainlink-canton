@@ -190,6 +190,7 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
+	InstanceId   TEXT                 `json:"instanceId"`
 	Owner        PARTY                `json:"owner"`
 	RequiredCCVs []RawInstanceAddress `json:"requiredCCVs"`
 }
@@ -207,6 +208,9 @@ func (t CCIPReceiver) GetTemplateIDWithPackageID(packageID string) string {
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -234,6 +238,9 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
 	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
