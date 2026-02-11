@@ -42,6 +42,7 @@ var CreateRouter = contract.NewExercise(contract.ExerciseParams[perpartyrouter.C
 		if input.PartyOwner == "" {
 			return errors.New("router owner cannot be empty")
 		}
+
 		return nil
 	},
 	Template: perpartyrouter.PerPartyRouterFactory{},
