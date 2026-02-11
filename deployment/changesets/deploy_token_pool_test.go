@@ -1,9 +1,13 @@
 package changesets
 
 import (
+	"context"
+	"errors"
+	"io"
 	"sync"
 	"testing"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -20,10 +24,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
+// TestDeployTokenPool deploys TAR, then runs DeployTokenPool (deploy pool + register with TAR in one changeset),
+// then verifies TAR config by querying GetTokenConfig and asserting tokenPoolOwner is set.
 func TestDeployTokenPool(t *testing.T) {
 	t.Parallel()
 
@@ -46,18 +57,22 @@ func TestDeployTokenPool(t *testing.T) {
 	userManagementServiceClient := admin.NewUserManagementServiceClient(ledgerApiClient)
 
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get ccip-common dar file")
+	require.NoError(t, err)
+	tarDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
+	require.NoError(t, err)
 	poolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
-	require.NoError(t, err, "failed to get lockreleasetokenpool dar file")
-	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+	require.NoError(t, err)
+	uploadResp, err := packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars: []*participantv30.UploadDarRequest_UploadDarData{
 			{Bytes: commonDar},
+			{Bytes: tarDar},
 			{Bytes: poolDar},
 		},
 		VetAllPackages:     true,
 		SynchronizeVetting: true,
 	})
 	require.NoError(t, err, "failed to upload dar files")
+	darIds := uploadResp.GetDarIds()
 
 	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
 		UserId: "user-participant1",
@@ -72,6 +87,29 @@ func TestDeployTokenPool(t *testing.T) {
 		logger.Test(t),
 		reporter,
 	)
+	cantonChain := bc.(*canton.Chain)
+	deps := dependencies.CantonDeps{
+		Chain:                *cantonChain,
+		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
+		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
+		Party:                party,
+	}
+
+	// Deploy TAR so we have an instance address for register-with-TAR
+	tarAddrRef, err := cld_ops.ExecuteOperation(bundle, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
+		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
+		ActAs:         []string{party},
+		Template: tokenadminregistry.TokenAdminRegistry{
+			Owner:        types.PARTY(party),
+			InstanceId:   "",
+			TokenConfigs: types.GENMAP{},
+		},
+		OwnerParty: types.PARTY(party),
+	})
+	require.NoError(t, err, "deploy TAR")
+	require.NotEmpty(t, tarAddrRef.Output.Address, "TAR address")
+	tarInstanceAddr := contracts.HexToInstanceAddress(tarAddrRef.Output.Address)
+
 	env := &cldf.Environment{
 		Logger:           logger.Test(t),
 		GetContext:       t.Context,
@@ -80,27 +118,121 @@ func TestDeployTokenPool(t *testing.T) {
 		OperationsBundle: bundle,
 	}
 
-	config := CantonCSDeps[DeployTokenPoolConfig]{
+	instrumentId := lockreleasetokenpool.InstrumentId{
+		Admin: types.PARTY(party),
+		Id:    types.TEXT("AMT"),
+	}
+
+	// Deploy pool and register with TAR in one changeset
+	_, err = (DeployTokenPool{}).Apply(*env, CantonCSDeps[DeployTokenPoolConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,
 		UserName:      user.GetId(),
 		Party:         party,
 		Config: DeployTokenPoolConfig{
-			CcipOwner: party,
-			PoolOwner: party,
-			InstrumentId: lockreleasetokenpool.InstrumentId{
-				Admin: types.PARTY(party),
-				Id:    types.TEXT("AMT"),
-			},
-			Decimals:  6,
-			Qualifier: "AMT",
+			CcipOwner:                         party,
+			PoolOwner:                         party,
+			InstrumentId:                      instrumentId,
+			Decimals:                          6,
+			Qualifier:                         "AMT",
+			TokenAdminRegistryInstanceAddress: &tarInstanceAddr,
 		},
+	})
+	require.NoError(t, err, "deploy token pool and register with TAR")
+
+	// Verify TAR config: fetch TAR from ACS and unmarshal with UnmarshalActiveContract (uses UnmarshalCreatedEvent)
+	tar, err := findTARByInstanceAddress(t.Context(), deps.StateServiceClient, party, darIds[1])
+	require.NoError(t, err, "find TAR contract in ACS")
+
+	// TokenConfigs is GENMAP (map); values are map[string]interface{} with string party IDs. Check correct owner.
+	var found bool
+	for _, v := range tar.TokenConfigs {
+		m, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		tokenPoolOwnerStr := optionalPartyStringFromMap(m, "tokenPoolOwner")
+		if tokenPoolOwnerStr == "" {
+			continue
+		}
+		require.Equal(t, party, tokenPoolOwnerStr, "TAR token config tokenPoolOwner should match pool owner")
+		found = true
+		break
 	}
+	require.True(t, found, "TAR should have a TokenConfig with tokenPoolOwner set (pool registered)")
+}
 
-	deployTokenPool := DeployTokenPool{}
+// optionalPartyStringFromMap gets an optional party from a map: either direct string or {"value": "<party>"}.
+func optionalPartyStringFromMap(m map[string]interface{}, key string) string {
+	raw, ok := m[key]
+	if !ok || raw == nil {
+		return ""
+	}
+	if s, ok := raw.(string); ok {
+		return s
+	}
+	if opt, ok := raw.(map[string]interface{}); ok {
+		if v, ok := opt["value"]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
+}
 
-	output, err := deployTokenPool.Apply(*env, config)
-	require.NoError(t, err)
-	addresses := output.DataStore.Addresses().Filter()
-	require.NotEmpty(t, addresses)
+// findTARByInstanceAddress streams GetActiveContracts for TokenAdminRegistry and returns the ActiveContract whose instanceId matches the given instance address.
+func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServiceClient, party string, packageId string) (*tokenadminregistry.TokenAdminRegistry, error) {
+	ledgerEndResp, err := stateClient.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+	if err != nil {
+		return nil, err
+	}
+	stream, err := stateClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: ledgerEndResp.GetOffset(),
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				party: {
+					Cumulative: []*apiv2.CumulativeFilter{{
+						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+							TemplateFilter: &apiv2.TemplateFilter{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  packageId,
+									ModuleName: "CCIP.TokenAdminRegistry",
+									EntityName: "TokenAdminRegistry",
+								},
+								IncludeCreatedEventBlob: true,
+							},
+						},
+					}},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer stream.CloseSend()
+	for {
+		ac, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		c, ok := ac.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
+		if !ok {
+			continue
+		}
+
+		if c.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName() != bindings.GetEntityName(tokenadminregistry.TokenAdminRegistry{}.GetTemplateID()) {
+			continue
+		}
+		tar, err := bindings.UnmarshalActiveContract[tokenadminregistry.TokenAdminRegistry](c)
+		if err != nil {
+			return nil, err
+		}
+		if tar != nil {
+			return tar, nil
+		}
+	}
+	return nil, errors.New("no active TAR contract found for instance address")
 }

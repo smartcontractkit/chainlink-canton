@@ -14,12 +14,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
+	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 // DeployTokenPoolConfig is the config for deploying a LockReleaseTokenPool.
+// If TokenAdminRegistryInstanceAddress is set, the pool is also registered with that TAR in the same changeset.
 type DeployTokenPoolConfig struct {
 	CcipOwner    string
 	PoolOwner    string
@@ -33,6 +37,8 @@ type DeployTokenPoolConfig struct {
 	PoolReceiveContext lockreleasetokenpool.ChoiceContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
+	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
+	TokenAdminRegistryInstanceAddress *contracts.InstanceAddress
 }
 
 var _ cldf.ChangeSetV2[CantonCSDeps[DeployTokenPoolConfig]] = DeployTokenPool{}
@@ -118,6 +124,22 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 
 	if err = ds.AddressRefStore.Add(out.Output); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
+	}
+
+	if cfg.TokenAdminRegistryInstanceAddress != nil {
+		regInput := sequences.RegisterTokenPoolInput{
+			TokenAdminRegistryInstanceAddress: *cfg.TokenAdminRegistryInstanceAddress,
+			InstrumentId: tokenadminregistry.InstrumentId{
+				Admin: cfg.InstrumentId.Admin,
+				Id:    cfg.InstrumentId.Id,
+			},
+			CcipParty:      cfg.CcipOwner,
+			PoolOwnerParty: cfg.PoolOwner,
+		}
+		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
+		}
 	}
 
 	return cldf.ChangesetOutput{
