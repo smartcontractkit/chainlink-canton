@@ -124,7 +124,7 @@ func TestMCMSOps(t *testing.T) {
 		RootMetadata: mcms.RootMetadata{},
 	}
 
-	var mcmsInstanceAddress contracts.RawInstanceAddress
+	var mcmsInstanceAddress contracts.InstanceAddress
 	t.Run("Deploy", func(t *testing.T) {
 		result, err := cld_ops.ExecuteOperation(bundle, Deploy, deps, contract.DeployInput[mcms.MCMS]{
 			ChainSelector: cantonChain.Selector,
@@ -143,8 +143,8 @@ func TestMCMSOps(t *testing.T) {
 			OwnerParty: types.PARTY(primaryParty),
 		})
 		require.NoError(t, err, "failed to deploy MCMS")
-		mcmsInstanceAddress = contracts.RawInstanceAddressFromString(result.Output.Address)
-		t.Logf("Deployed MCMS, RawInstanceAddress: %s", mcmsInstanceAddress.String())
+		mcmsInstanceAddress = contracts.HexToInstanceAddress(result.Output.Address)
+		t.Logf("Deployed MCMS, InstanceAddress: %s", mcmsInstanceAddress.String())
 	})
 
 	t.Run("SetConfig", func(t *testing.T) {
@@ -178,7 +178,7 @@ func TestMCMSOps(t *testing.T) {
 
 		result, err := cld_ops.ExecuteOperation(bundle, SetConfig, deps, contract.ChoiceInput[mcms.SetConfig]{
 			ChainSelector:   cantonChain.Selector,
-			InstanceAddress: mcmsInstanceAddress.InstanceAddress(),
+			InstanceAddress: mcmsInstanceAddress,
 			ActAs:           []string{primaryParty},
 			Args: mcms.SetConfig{
 				TargetRole:      mcms.RoleProposer, // Target the proposer role

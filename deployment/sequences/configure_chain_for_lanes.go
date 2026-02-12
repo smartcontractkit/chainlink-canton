@@ -37,7 +37,7 @@ type ConfigureChainForLanesInput struct {
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
 	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
 	// The configuration for each remote chain that we want to connect to.
-	RemoteChains map[uint64]adapters.RemoteChainConfig[[]byte, string]
+	RemoteChains map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]
 }
 
 var ConfigureChainForLanes = operations.NewSequence(
@@ -70,7 +70,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
 				Config: common.SourceChainConfig{
 					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
-					OnRampAddress:    onRamps[0], // TODO: currently only support one onRamp
+					OnRampAddress:    onRamps[0], // TODO: currently only supports one onRamp
 					LaneMandatedCCVs: laneMandatedInboundCCVs,
 					DefaultCCVs:      defaultInboundCCVs,
 				},
