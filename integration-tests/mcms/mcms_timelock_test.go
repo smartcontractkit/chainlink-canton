@@ -332,17 +332,6 @@ func createMCMSMultiRole(
 	// Convert to apiv2.Record using bindings
 	createArgs := ledger.ConvertToRecord(mcmsTemplate)
 
-	for _, field := range createArgs.Fields {
-		if field.Label == "minDelay" {
-			field.Value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-				Fields: []*apiv2.RecordField{
-					{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: minDelayMicros}}},
-				},
-			}}}
-			break
-		}
-	}
-
 	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
