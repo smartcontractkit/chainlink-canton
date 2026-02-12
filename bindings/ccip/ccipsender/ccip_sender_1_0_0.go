@@ -48,7 +48,8 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // CCIPSender is a Template type
 type CCIPSender struct {
-	Owner PARTY `json:"owner"`
+	InstanceId TEXT  `json:"instanceId"`
+	Owner      PARTY `json:"owner"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -66,6 +67,9 @@ func (t CCIPSender) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
 	return &model.CreateCommand{
@@ -77,6 +81,9 @@ func (t CCIPSender) CreateCommand() *model.CreateCommand {
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t CCIPSender) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
 	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()

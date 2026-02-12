@@ -29,3 +29,22 @@ var Deploy = contract.NewDeploy(contract.DeployParams[perpartyrouter.PerPartyRou
 	PackageName: string(contracts.CCIPPerPartyRouter),
 	Prefix:      "perpartyrouterfactory",
 })
+
+var CreateRouter = contract.NewExercise(contract.ExerciseParams[perpartyrouter.CreateRouter]{
+	Name:         "canton/ccip/per_party_router_factory/create_router",
+	Version:      Version,
+	Description:  "Creates a new PerPartyRouter using the PerPartyRouterFactory",
+	ContractType: ContractType,
+	Validate: func(input perpartyrouter.CreateRouter) error {
+		if input.InstanceId == "" {
+			return errors.New("instance ID cannot be empty")
+		}
+		if input.PartyOwner == "" {
+			return errors.New("router owner cannot be empty")
+		}
+
+		return nil
+	},
+	Template: perpartyrouter.PerPartyRouterFactory{},
+	Method:   perpartyrouter.PerPartyRouterFactory{}.CreateRouter,
+})

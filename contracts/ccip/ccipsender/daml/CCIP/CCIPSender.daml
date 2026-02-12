@@ -43,6 +43,7 @@ data TokenTransferInput = TokenTransferInput
 
 template CCIPSender
     with
+        instanceId : Text
         owner : Party
     where
         signatory owner
