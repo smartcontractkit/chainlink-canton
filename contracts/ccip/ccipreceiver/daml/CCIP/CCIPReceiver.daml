@@ -40,6 +40,7 @@ data TokenTransferInput = TokenTransferInput
 
 template CCIPReceiver
     with
+        instanceId : Text
         owner : Party
         -- Receiver's required CCV instance addresses, analogous to
         -- IAny2EVMMessageReceiverV2.getCCVs() in the EVM implementation.

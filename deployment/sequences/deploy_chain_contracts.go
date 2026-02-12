@@ -57,7 +57,7 @@ var DeployChainContracts = operations.NewSequence(
 	semver.MustParse("1.7.0"),
 	"Deploys all required contracts for CCIP 1.7.0 to a Canton chain",
 	func(b operations.Bundle, deps dependencies.CantonDeps, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
-		var results []datastore.AddressRef
+		var addresses []datastore.AddressRef
 
 		// Deploy RMNRemote
 		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
@@ -73,8 +73,11 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote: %w", err)
 		}
-		results = append(results, deployRMNRemoteReport.Output)
-		rmnRemoteRawInstanceAddress := contracts.RawInstanceAddressFromString(deployRMNRemoteReport.Output.Address)
+		addresses = append(addresses, deployRMNRemoteReport.Output)
+		rmnRemoteRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployRMNRemoteReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse RMNRemote raw instance address: %w", err)
+		}
 
 		// Deploy Global Config
 		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
@@ -87,8 +90,11 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalConfig: %w", err)
 		}
-		results = append(results, deployGlobalConfigReport.Output)
-		globalConfigRawInstanceAddress := contracts.RawInstanceAddressFromString(deployGlobalConfigReport.Output.Address)
+		addresses = append(addresses, deployGlobalConfigReport.Output)
+		globalConfigRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployGlobalConfigReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse GlobalConfig raw instance address: %w", err)
+		}
 
 		// Deploy Token Admin Registry
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
@@ -103,8 +109,11 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TokenAdminRegistry: %w", err)
 		}
-		results = append(results, deployTokenAdminRegistryReport.Output)
-		tokenAdminRegistryRawInstanceAddress := contracts.RawInstanceAddressFromString(deployTokenAdminRegistryReport.Output.Address)
+		addresses = append(addresses, deployTokenAdminRegistryReport.Output)
+		tokenAdminRegistryRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployTokenAdminRegistryReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse TokenAdminRegistry raw instance address: %w", err)
+		}
 
 		// Deploy FeeQuoter
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
@@ -124,7 +133,7 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeeQuoter: %w", err)
 		}
-		results = append(results, deployFeeQuoterReport.Output)
+		addresses = append(addresses, deployFeeQuoterReport.Output)
 
 		// Deploy OffRamp
 		deployOffRampReport, err := operations.ExecuteOperation(b, offramp.Deploy, deps, contract.DeployInput[offrampBinding.OffRamp]{
@@ -141,7 +150,7 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OffRamp: %w", err)
 		}
-		results = append(results, deployOffRampReport.Output)
+		addresses = append(addresses, deployOffRampReport.Output)
 
 		// Deploy OnRamp
 		deployOnRampReport, err := operations.ExecuteOperation(b, onramp.Deploy, deps, contract.DeployInput[onrampBinding.OnRamp]{
@@ -158,7 +167,7 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OnRamp: %w", err)
 		}
-		results = append(results, deployOnRampReport.Output)
+		addresses = append(addresses, deployOnRampReport.Output)
 
 		// Deploy PerPartyRouterFactory
 		deployPerPartyRouterFactoryReport, err := operations.ExecuteOperation(b, per_party_router_factory.Deploy, deps, contract.DeployInput[perpartyrouter.PerPartyRouterFactory]{
@@ -173,7 +182,7 @@ var DeployChainContracts = operations.NewSequence(
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy PerPartyRouterFactory: %w", err)
 		}
-		results = append(results, deployPerPartyRouterFactoryReport.Output)
+		addresses = append(addresses, deployPerPartyRouterFactoryReport.Output)
 
 		// Deploy Committee Verifiers
 		for i, committeeVerifier := range input.CommitteeVerifiers {
@@ -198,11 +207,11 @@ var DeployChainContracts = operations.NewSequence(
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier #%v: %w", i, err)
 			}
-			results = append(results, deployCommitteeVerifierReport.Output)
+			addresses = append(addresses, deployCommitteeVerifierReport.Output)
 		}
 
 		return sequences.OnChainOutput{
-			Addresses: results,
+			Addresses: addresses,
 		}, nil
 	},
 )

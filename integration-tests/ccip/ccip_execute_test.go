@@ -314,7 +314,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Log("Deployed CCIP chain contracts:")
 	addresses := cldfEnv.DataStore.Addresses().Filter()
 	for i, address := range addresses {
-		t.Logf("Deployed Address %d: ChainSelector=%d, Type=%s, Version=%s, Address=%s, Qualifier=%s\n", i, address.ChainSelector, address.Type, address.Version, address.Address, address.Qualifier)
+		t.Logf("Deployed Address %d: ChainSelector=%d, Type=%s, Version=%s, Address=%s, Qualifier=%s, Labels=%s\n", i, address.ChainSelector, address.Type, address.Version, address.Address, address.Qualifier, address.Labels.String())
 	}
 
 	// Resolve contracts
@@ -330,6 +330,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
 
 	// Deploy and configure lane
+	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
+	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
 		ChainSelector: env.Selector,
@@ -338,18 +340,18 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Config: changesets.ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
 				ChainSelector:      env.Selector,
-				GlobalConfig:       contracts.RawInstanceAddressFromString(globalConfig.Address).InstanceAddress(),
-				FeeQuoter:          contracts.RawInstanceAddressFromString(feeQuoter.Address).InstanceAddress(),
-				OnRamp:             contracts.RawInstanceAddressFromString(onRamp.Address).InstanceAddress(),
-				OffRamp:            contracts.RawInstanceAddressFromString(offRamp.Address).InstanceAddress(),
+				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
 				CommitteeVerifiers: nil,
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, string]{
+				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					remoteSelector: {
 						AllowTrafficFrom:         true,
 						OnRamps:                  [][]byte{[]byte("0000000000000000000000000000000000000001")},
 						OffRamp:                  nil,
 						DefaultInboundCCVs:       nil,
-						LaneMandatedInboundCCVs:  []string{committeeVerifier.Address},
+						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						DefaultOutboundCCVs:      nil,
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",
@@ -443,6 +445,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}},

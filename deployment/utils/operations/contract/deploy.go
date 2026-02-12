@@ -113,7 +113,8 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 			b.Logger.Debugw(fmt.Sprintf("Deployed %s to %s", params.TypeAndVersion, deps.Chain), "contractID", contractId, "instanceID", instanceID.String(), "rawInstanceAddress", rawInstanceAddress.String(), "instanceAddress", rawInstanceAddress.InstanceAddress().Hex())
 
 			return datastore.AddressRef{
-				Address:       rawInstanceAddress.String(),
+				Address:       rawInstanceAddress.InstanceAddress().String(),
+				Labels:        datastore.NewLabelSet(rawInstanceAddress.String()),
 				ChainSelector: input.ChainSelector,
 				Type:          datastore.ContractType(params.TypeAndVersion.Type),
 				Version:       &params.TypeAndVersion.Version,
