@@ -6,7 +6,7 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 
 replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
-replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260209201116-eac8a15b0b35
+replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260212010319-eefec8925e3c
 
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7

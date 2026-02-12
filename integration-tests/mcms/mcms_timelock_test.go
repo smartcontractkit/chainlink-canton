@@ -9,7 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
@@ -259,77 +262,75 @@ func createMCMSMultiRole(
 	t.Helper()
 	instanceID := fmt.Sprintf("%s@%s", baseMcmsID, owner)
 
-	// Build signer info values
-	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
+	// Convert to bindings types for CreateArguments
+	// Convert SignerInfo
+	signers := make([]mcms.SignerInfo, len(config.Signers))
 	for i, si := range config.Signers {
-		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "signerAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: si.SignerAddress}}},
-				{Label: "signerIndex", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerIndex)}}},
-				{Label: "signerGroup", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(si.SignerGroup)}}},
-			},
-		}}}
+		signers[i] = mcms.SignerInfo{
+			SignerAddress: types.TEXT(si.SignerAddress),
+			SignerIndex:   types.INT64(si.SignerIndex),
+			SignerGroup:   types.INT64(si.SignerGroup),
+		}
 	}
 
-	groupQuorumValues := make([]*apiv2.Value, NumGroups)
-	groupParentValues := make([]*apiv2.Value, NumGroups)
+	// Convert GroupQuorums and GroupParents
+	groupQuorums := make([]types.INT64, NumGroups)
+	groupParents := make([]types.INT64, NumGroups)
 	for i := range NumGroups {
-		groupQuorumValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupQuorums[i])}}
-		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
+		groupQuorums[i] = types.INT64(config.GroupQuorums[i])
+		groupParents[i] = types.INT64(config.GroupParents[i])
 	}
 
-	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
-	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
-	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "root", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-			{Label: "validUntil", Value: epochTime},
-			{Label: "opCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-		},
-	}}}
-	emptyRootMetadata := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-		},
-	}}}
-
-	configValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signerInfoValues}}}},
-			{Label: "groupQuorums", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupQuorumValues}}}},
-			{Label: "groupParents", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: groupParentValues}}}},
-		},
-	}}}
-
-	roleStateValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "config", Value: configValue},
-			{Label: "seenHashes", Value: emptyMap},
-			{Label: "expiringRoot", Value: emptyExpiringRoot},
-			{Label: "rootMetadata", Value: emptyRootMetadata},
-		},
-	}}}
-
-	minDelayValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: minDelayMicros}}},
-		},
-	}}}
-
-	blockedFuncValues := make([]*apiv2.Value, 0, len(blockedFunctions))
-	for _, bf := range blockedFunctions {
-		blockedFuncValues = append(blockedFuncValues, &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: bf.TargetInstanceId}}},
-				{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: bf.FunctionName}}},
-			},
-		}}})
+	// Build MultisigConfig
+	multisigConfig := mcms.MultisigConfig{
+		Signers:      signers,
+		GroupQuorums: groupQuorums,
+		GroupParents: groupParents,
 	}
-	blockedFunctionsValue := &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: blockedFuncValues}}}
+
+	// Build empty RoleState
+	var validUntil types.TIMESTAMP
+	emptyRoleState := mcms.RoleState{
+		Config:     multisigConfig,
+		SeenHashes: types.GENMAP{},
+		ExpiringRoot: mcms.ExpiringRoot{
+			Root:       types.TEXT(""),
+			ValidUntil: validUntil,
+			OpCount:    types.INT64(0),
+		},
+		RootMetadata: mcms.RootMetadata{
+			ChainId:              types.INT64(0),
+			MultisigId:           types.TEXT(""),
+			PreOpCount:           types.INT64(0),
+			PostOpCount:          types.INT64(0),
+			OverridePreviousRoot: types.BOOL(false),
+		},
+	}
+
+	// Convert BlockedFunction
+	blockedFuncs := make([]mcms.BlockedFunction, len(blockedFunctions))
+	for i, bf := range blockedFunctions {
+		blockedFuncs[i] = mcms.BlockedFunction{
+			TargetInstanceId: types.TEXT(bf.TargetInstanceId),
+			FunctionName:     types.TEXT(bf.FunctionName),
+		}
+	}
+
+	// Build MCMS template using bindings
+	mcmsTemplate := mcms.MCMS{
+		Owner:              types.PARTY(owner),
+		InstanceId:         types.TEXT(instanceID),
+		ChainId:            types.INT64(chainID),
+		Proposer:           emptyRoleState,
+		Canceller:          emptyRoleState,
+		Bypasser:           emptyRoleState,
+		MinDelay:           types.RELTIME(minDelayMicros),
+		BlockedFunctions:   blockedFuncs,
+		TimelockTimestamps: types.GENMAP{},
+	}
+
+	// Convert to apiv2.Record using bindings
+	createArgs := ledger.ConvertToRecord(mcmsTemplate)
 
 	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -342,17 +343,7 @@ func createMCMSMultiRole(
 							ModuleName: "MCMS.Main",
 							EntityName: "MCMS",
 						},
-						CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-							{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}}},
-							{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: chainID}}},
-							{Label: "proposer", Value: roleStateValue},
-							{Label: "canceller", Value: roleStateValue},
-							{Label: "bypasser", Value: roleStateValue},
-							{Label: "minDelay", Value: minDelayValue},
-							{Label: "blockedFunctions", Value: blockedFunctionsValue},
-							{Label: "timelockTimestamps", Value: emptyMap},
-						}},
+						CreateArguments: createArgs,
 					},
 				},
 			}},
