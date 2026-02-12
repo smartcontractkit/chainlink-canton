@@ -50,3 +50,17 @@ jobs:
         run: |
           cd deployment/changesets
           go test -v -count 1 -timeout 20m -run TestDeployCoin ./...
+  test-deploy-tps:
+    name: TestDeployTokenPool
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Run Go tests
+        run: |
+          cd deployment/changesets
+          go test -v -count 1 -timeout 20m -run TestDeployTokenPool ./...
