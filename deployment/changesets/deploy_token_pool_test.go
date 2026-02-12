@@ -107,7 +107,6 @@ func TestDeployTokenPool(t *testing.T) {
 	})
 	require.NoError(t, err, "deploy TAR")
 	require.NotEmpty(t, tarAddrRef.Output.Address, "TAR address")
-	tarRawInstanceAddress := contracts.RawInstanceAddressFromString(tarAddrRef.Output.Address)
 
 	env := &cldf.Environment{
 		Logger:           logger.Test(t),
@@ -129,12 +128,12 @@ func TestDeployTokenPool(t *testing.T) {
 		UserName:      user.GetId(),
 		Party:         party,
 		Config: DeployTokenPoolConfig{
-			CcipOwner:                            party,
-			PoolOwner:                            party,
-			InstrumentId:                         instrumentId,
-			Decimals:                             6,
-			Qualifier:                            "AMT",
-			TokenAdminRegistryRawInstanceAddress: tarRawInstanceAddress,
+			CcipOwner:                         party,
+			PoolOwner:                         party,
+			InstrumentId:                      instrumentId,
+			Decimals:                          6,
+			Qualifier:                         "AMT",
+			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tarAddrRef.Output.Address),
 		},
 	})
 	require.NoError(t, err, "deploy token pool and register with TAR")

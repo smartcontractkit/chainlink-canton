@@ -38,7 +38,7 @@ type DeployTokenPoolConfig struct {
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
-	TokenAdminRegistryRawInstanceAddress contracts.RawInstanceAddress
+	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
 }
 
 var _ cldf.ChangeSetV2[CantonCSDeps[DeployTokenPoolConfig]] = DeployTokenPool{}
@@ -128,7 +128,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 
 	regInput := sequences.RegisterTokenPoolInput{
-		TokenAdminRegistryRawInstanceAddress: cfg.TokenAdminRegistryRawInstanceAddress,
+		TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
 		InstrumentId: tokenadminregistry.InstrumentId{
 			Admin: cfg.InstrumentId.Admin,
 			Id:    cfg.InstrumentId.Id,
