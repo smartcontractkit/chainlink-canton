@@ -26,8 +26,9 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 		if template.Decimals < 0 {
 			return errors.New("decimals cannot be negative")
 		}
+
 		return nil
 	},
 	PackageName: string(contracts.CCIPLockReleaseTokenPool),
-	Prefix:     "lockreleasetokenpool",
+	Prefix:      "lockreleasetokenpool",
 })

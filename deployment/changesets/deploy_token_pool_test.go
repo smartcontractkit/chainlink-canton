@@ -147,13 +147,13 @@ func TestDeployTokenPool(t *testing.T) {
 	// poolOwner is nested: config.data["tokenPool"].data["poolOwner"] (or tokenPool may be under "value" if optional).
 	var found bool
 	for _, v := range tar.TokenConfigs {
-		configMap, ok := v.(map[string]interface{})
+		configMap, ok := v.(map[string]any)
 		if !ok {
 			continue
 		}
 		// Unmarshaled form may wrap fields in "data"
 		m := configMap
-		if data, ok := configMap["data"].(map[string]interface{}); ok {
+		if data, ok := configMap["data"].(map[string]any); ok {
 			m = data
 		}
 		tokenPoolRaw, ok := m["tokenPool"]
@@ -161,21 +161,21 @@ func TestDeployTokenPool(t *testing.T) {
 			continue
 		}
 		// Optional: {"_type": "optional", "value": <PoolRegistration map>}
-		var tokenPoolMap map[string]interface{}
-		if opt, ok := tokenPoolRaw.(map[string]interface{}); ok {
+		var tokenPoolMap map[string]any
+		if opt, ok := tokenPoolRaw.(map[string]any); ok {
 			if val, has := opt["value"]; has && val != nil {
-				tokenPoolMap, _ = val.(map[string]interface{})
+				tokenPoolMap, _ = val.(map[string]any)
 			}
 		}
 		if tokenPoolMap == nil {
-			tokenPoolMap, _ = tokenPoolRaw.(map[string]interface{})
+			tokenPoolMap, _ = tokenPoolRaw.(map[string]any)
 		}
 		if tokenPoolMap == nil {
 			continue
 		}
 		// poolOwner may be under tokenPool.data when unmarshaled
 		tokenPoolData := tokenPoolMap
-		if data, ok := tokenPoolMap["data"].(map[string]interface{}); ok {
+		if data, ok := tokenPoolMap["data"].(map[string]any); ok {
 			tokenPoolData = data
 		}
 		poolOwnerStr := optionalPartyStringFromMap(tokenPoolData, "poolOwner")
@@ -184,13 +184,14 @@ func TestDeployTokenPool(t *testing.T) {
 		}
 		require.Equal(t, party, poolOwnerStr, "TAR token config tokenPool.poolOwner should match pool owner")
 		found = true
+
 		break
 	}
 	require.True(t, found, "TAR should have a TokenConfig with tokenPool.poolOwner set (pool registered)")
 }
 
 // optionalPartyStringFromMap gets an optional party from a map: either direct string or {"value": "<party>"}.
-func optionalPartyStringFromMap(m map[string]interface{}, key string) string {
+func optionalPartyStringFromMap(m map[string]any, key string) string {
 	raw, ok := m[key]
 	if !ok || raw == nil {
 		return ""
@@ -198,13 +199,14 @@ func optionalPartyStringFromMap(m map[string]interface{}, key string) string {
 	if s, ok := raw.(string); ok {
 		return s
 	}
-	if opt, ok := raw.(map[string]interface{}); ok {
+	if opt, ok := raw.(map[string]any); ok {
 		if v, ok := opt["value"]; ok {
 			if s, ok := v.(string); ok {
 				return s
 			}
 		}
 	}
+
 	return ""
 }
 
@@ -262,5 +264,6 @@ func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServic
 			return tar, nil
 		}
 	}
+
 	return nil, errors.New("no active TAR contract found for instance address")
 }

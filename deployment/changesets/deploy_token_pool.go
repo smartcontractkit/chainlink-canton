@@ -53,6 +53,7 @@ func (d DeployTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCS
 	if len(chain.Participants) < config.Participant {
 		return fmt.Errorf("participant index %d out of range for canton chain %d with %d participants", config.Participant, config.ChainSelector, len(chain.Participants))
 	}
+
 	return nil
 }
 
