@@ -1,14 +1,14 @@
 // Tool to generate ECDSA secp256k1 test signatures for Daml tests.
-// Usage: go run scripts/gen_test_signatures/main.go <hex-encoded-preimage>
+// Usage: go run scripts/gen_test_signatures/main.go <hex-encoded-message>
 //
-// The preimage should be: versionTag || encodedMessage
-// For CCIP: "49ff34ed" || encodedMessageV1
+// The input should be the encoded message (without version tag).
+// Matches EVM: signers sign keccak256(versionTag || messageId)
+// where messageId = keccak256(encodedMessage).
 //
 // Outputs Daml code with:
 // - 20 public keys (uncompressed, 65 bytes each, starting with 04)
 // - 20 r values (32 bytes each)
 // - 20 s values (32 bytes each)
-// - The keccak256 hash of the input preimage
 
 package main
 
@@ -24,19 +24,26 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: go run main.go <hex-encoded-preimage>")
+		log.Fatal("Usage: go run main.go <hex-encoded-message>")
 	}
 
-	preimageHex := os.Args[1]
-	preimageBytes, err := hex.DecodeString(preimageHex)
+	encodedMsgHex := os.Args[1]
+	encodedMsgBytes, err := hex.DecodeString(encodedMsgHex)
 	if err != nil {
-		log.Fatalf("Failed to decode preimage: %v", err)
+		log.Fatalf("Failed to decode encoded message: %v", err)
 	}
 
-	// Compute keccak256 hash of the preimage
-	hash := crypto.Keccak256(preimageBytes)
-	fmt.Printf("-- Hash of preimage: %s\n", hex.EncodeToString(hash))
-	fmt.Printf("-- Preimage length: %d bytes\n\n", len(preimageBytes))
+	versionTag, _ := hex.DecodeString("49ff34ed")
+
+	// Compute messageId = keccak256(encodedMessage)
+	messageId := crypto.Keccak256(encodedMsgBytes)
+	fmt.Printf("-- messageId (keccak256 of encoded message): %s\n", hex.EncodeToString(messageId))
+
+	// Compute signedHash = keccak256(versionTag || messageId)
+	preimage := append(versionTag, messageId...)
+	hash := crypto.Keccak256(preimage)
+	fmt.Printf("-- signedHash (keccak256 of versionTag || messageId): %s\n", hex.EncodeToString(hash))
+	fmt.Printf("-- Encoded message length: %d bytes\n\n", len(encodedMsgBytes))
 
 	numKeys := 20
 

@@ -12,9 +12,11 @@ import (
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
 )
 
 // IBurnMintFactory is a DAML interface

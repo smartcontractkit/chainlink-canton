@@ -1,123 +1,36 @@
--- | ticket contracts for cross-participant ccip communication.
+-- | Ticket contracts for cross-participant CCIP communication.
 module CCIP.Tickets where
 
 import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.CCVId
-import qualified CCIP.MessageCodecV1
 
+-- | Issuer type for receipts.
+data IssuerType
+    = IssuerType_CCV      -- Cross-chain verifier
+    | IssuerType_Pool     -- Token pool
+    | IssuerType_Network  -- Network/protocol fee
+    deriving (Eq, Show)
 
 -- | Fee/gas accounting for a single entity (CCV, pool, executor, or network).
--- Matches EVM Receipt structure for cross-chain fee transparency.
 data Receipt = Receipt
     with
-        issuer : Text              -- CCV ID (e.g., "49ff34ed@party"), pool ID, or "network"
-        destGasLimit : Int         -- Gas allocated for dest chain execution
-        destBytesOverhead : Int    -- Data availability overhead in bytes
-        feeTokenAmount : Numeric 0 -- Fee amount in fee token units
-        extraArgs : BytesHex       -- Entity-specific arguments
+        issuerType : IssuerType        -- Type of issuer
+        issuerAddress : BytesHex       -- 32-byte instance address
+        versionTag : Optional BytesHex -- 4-byte version tag for CCVs, None for pools/network
+        destGasLimit : Int             -- Gas allocated for dest chain execution
+        destBytesOverhead : Int        -- Data availability overhead in bytes
+        feeTokenAmount : Numeric 0     -- Fee amount in fee token units
+        extraArgs : BytesHex           -- Entity-specific arguments
     deriving (Eq, Show)
 
 
--- | ticket issued by tokenpool (via TokenAdminRegistry) after locking tokens for outbound transfer.
-template TokenSendTicket
-    with
-        poolOwner : Party
-        ccipOwner : Party
-        sender : Party
-
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-
-        sourceTokenAddress : BytesHex
-        amount : Numeric 0
-        destTokenAddress : BytesHex
-        tokenReceiver : BytesHex
-        extraData : BytesHex
-        receipt : Receipt  -- Fee/gas contribution from pool
-    where
-        signatory poolOwner
-        observer ccipOwner, sender
-
-        choice TokenSendTicket_Consume : (CCIP.MessageCodecV1.TokenTransferV1, Receipt)
-            controller ccipOwner
-            do
-                let tokenTransfer = CCIP.MessageCodecV1.TokenTransferV1 with
-                        amount = amount
-                        sourcePoolAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
-                        sourceTokenAddress = sourceTokenAddress
-                        destTokenAddress = destTokenAddress
-                        tokenReceiver = tokenReceiver
-                        extraData = extraData
-                pure (tokenTransfer, receipt)
-
-
--- | ticket issued by the ccv (via CCVRegistry) for outbound attestation.
-template CCVTicket
-    with
-        ccvId : CCIP.CCVId.CCVId         -- Full CCV identifier (versionTag@partyId)
-        ccvOwner : Party
-        ccipOwner : Party
-        sender : Party
-
-        verifierBlob : BytesHex
-        messageSentObservers : [Party]
-        receipt : Receipt  -- Fee/gas contribution from this CCV
-    where
-        signatory ccvOwner
-        observer ccipOwner, sender
-
-        choice CCVTicket_Consume : (CCIP.CCVId.CCVId, BytesHex, [Party], Receipt)
-            controller ccipOwner
-            do pure (ccvId, verifierBlob, messageSentObservers, receipt)
-
-
--- | ticket issued by ccv (via CCVRegistry) after verifying an inbound message.
-template CCVVerifyTicket
-    with
-        ccvId : CCIP.CCVId.CCVId         -- Full CCV identifier (versionTag@partyId)
-        ccvOwner : Party
-        ccipOwner : Party
-        caller : Party
-
-        messageHash : BytesHex
-
-        sourceChainSelector : Numeric 0
-        sequenceNumber : Numeric 0
-    where
-        signatory ccvOwner
-        observer ccipOwner, caller
-
-        choice CCVVerifyTicket_Consume : CCIP.CCVId.CCVId
-            controller ccipOwner
-            do pure ccvId
-
-
--- | ticket issued by tokenpool after verifying its required CCVs for inbound transfer.
--- Passed to PerPartyRouter.Execute to prove pool's CCV requirements are satisfied.
-template TokenPoolCCVVerifiedTicket
-    with
-        poolOwner : Party
-        ccipOwner : Party
-        receiver : Party
-        messageHash : BytesHex
-        sourceChainSelector : Numeric 0
-        verifiedCCVIds : [CCIP.CCVId.CCVId]
-    where
-        signatory poolOwner
-        observer ccipOwner, receiver
-
-        choice TokenPoolCCVVerifiedTicket_Consume : [CCIP.CCVId.CCVId]
-            controller ccipOwner
-            do pure verifiedCCVIds
-
-
--- | ticket issued by OffRamp after successful message verification.
--- Consumed by tokenpool to authorize token release.
+-- | Ticket issued by OffRamp (via TokenAdminRegistry) after successful message verification.
 template TokenReceiveTicket
     with
-        ccipOwner : Party           -- Signatory - proves OffRamp authorized this
+        ccipOwner : Party
+        tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
         poolOwner : Party           -- Observer - pool that should release
         receiver : Party            -- Message receiver (observer)
         tokenReceiver : Party       -- Who gets the tokens (may differ from receiver)
@@ -130,7 +43,3 @@ template TokenReceiveTicket
     where
         signatory ccipOwner
         observer poolOwner, receiver, tokenReceiver
-
-        choice TokenReceiveTicket_Consume : ()
-            controller poolOwner
-            do pure ()

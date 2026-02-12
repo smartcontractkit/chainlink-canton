@@ -19,7 +19,7 @@ setup = script do
     let encodeMax8 = MessageCodecV1.encodeUint8 255
     let encodeOverflow8 = MessageCodecV1.encodeUint8 256
     let encodeNegative8 = MessageCodecV1.encodeUint8 (-1)
-    
+
     encodeZero8 === Some "00"
     encodeMax8 === Some "ff"
     encodeOverflow8 === None
@@ -30,7 +30,7 @@ setup = script do
     let encodeMax16 = MessageCodecV1.encodeUint16 65535
     let encodeOverflow16 = MessageCodecV1.encodeUint16 65536
     let encodeNegative16 = MessageCodecV1.encodeUint16 (-1)
-    
+
     encodeZero16 === Some "0000"
     encodeMax16 === Some "ffff"
     encodeOverflow16 === None
@@ -41,7 +41,7 @@ setup = script do
     let encodeMax32 = MessageCodecV1.encodeUint32 4294967295
     let encodeOverflow32 = MessageCodecV1.encodeUint32 4294967296
     let encodeNegative32 = MessageCodecV1.encodeUint32 (-1)
-    
+
     encodeZero32 === Some "00000000"
     encodeMax32 === Some "ffffffff"
     encodeOverflow32 === None
@@ -52,7 +52,7 @@ setup = script do
     let encodeMax64 = MessageCodecV1.encodeUint64 18446744073709551615.0
     let encodeOverflow64 = MessageCodecV1.encodeUint64 18446744073709551616.0
     let encodeNegative64 = MessageCodecV1.encodeUint64 (-1.0)
-    
+
     encodeZero64 === Some "0000000000000000"
     encodeMax64 === Some "ffffffffffffffff"
     encodeOverflow64 === None
@@ -62,7 +62,7 @@ setup = script do
     let encodeZero256 = MessageCodecV1.encodeUint256 0.0
     let encodeSmall256 = MessageCodecV1.encodeUint256 1000000.0
     let encodeNegative256 = MessageCodecV1.encodeUint256 (-1.0)
-    
+
     encodeZero256 === Some "0000000000000000000000000000000000000000000000000000000000000000"
     encodeSmall256 === Some "00000000000000000000000000000000000000000000000000000000000f4240"
     encodeNegative256 === None
@@ -71,10 +71,15 @@ setup = script do
     debug ("--- InstrumentId Encoding Test ---")
     party <- allocateParty "testParty"
 
-    let encodedPartyId = MessageCodecV1.encodePartyId party
-    let decodedPartyId = fromSome (MessageCodecV1.decodePartyId encodedPartyId)
-    decodedPartyId === party
+    -- Test encodePartyAddress produces 32-byte hash
+    let partyAddr = MessageCodecV1.encodePartyAddress party
+    Text.length partyAddr === 64  -- 32 bytes = 64 hex chars
 
+    -- Test encodeInstanceAddress produces 32-byte hash
+    let instanceAddr = MessageCodecV1.encodeInstanceAddress "test-instance" party
+    Text.length instanceAddr === 64  -- 32 bytes = 64 hex chars
+
+    -- Test InstrumentId round-trip with new id@party format
     let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = party
             id = "LINK"
@@ -120,10 +125,10 @@ setup = script do
 
     -- Test uint8 decoding
     let test8_0 = MessageCodecV1.decodeUint8 "00"
-    let test8_1 = MessageCodecV1.decodeUint8 "01" 
+    let test8_1 = MessageCodecV1.decodeUint8 "01"
     let test8_255 = MessageCodecV1.decodeUint8 "ff"
     let test8_invalid = MessageCodecV1.decodeUint8 "0000" -- wrong length
-    
+
     test8_0 === Some 0
     test8_1 === Some 1
     test8_255 === Some 255
@@ -136,7 +141,7 @@ setup = script do
     let test16_256 = MessageCodecV1.decodeUint16 "0100"
     let test16_max = MessageCodecV1.decodeUint16 "ffff"
     let test16_invalid = MessageCodecV1.decodeUint16 "00" -- wrong length
-    
+
     test16_0 === Some 0
     test16_1 === Some 1
     test16_256 === Some 256
@@ -150,7 +155,7 @@ setup = script do
     let test32_65536 = MessageCodecV1.decodeUint32 "00010000"
     let test32_max = MessageCodecV1.decodeUint32 "ffffffff"
     let test32_invalid = MessageCodecV1.decodeUint32 "0000" -- wrong length
-    
+
     test32_0 === Some 0
     test32_1 === Some 1
     test32_65536 === Some 65536
@@ -166,7 +171,7 @@ setup = script do
     let test64_65536 = MessageCodecV1.decodeUint64 "0000000000010000"
     let test64_max = MessageCodecV1.decodeUint64 "ffffffffffffffff"
     let test64_invalid = MessageCodecV1.decodeUint64 "00000000" -- wrong length
-    
+
     test64_0 === Some 0.0
     test64_1 === Some 1.0
     test64_16 === Some 16.0
@@ -181,7 +186,7 @@ setup = script do
     let test256_1 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000001"
     let test256_max64 = MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
     let test256_invalid = MessageCodecV1.decodeUint256 "0000000000000000" -- wrong length
-    
+
     test256_0 === Some 0.0
     test256_1 === Some 1.0
     test256_max64 === Some 18446744073709551615.0

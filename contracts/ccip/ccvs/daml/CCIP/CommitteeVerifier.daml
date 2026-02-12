@@ -1,14 +1,14 @@
 module CCIP.CommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1WithEcdsaOnly)
+import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
-import qualified Splice.Api.Token.HoldingV1
-
-import qualified CCIP.CCVId
-import qualified CCIP.CCVRegistry
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.Tickets
+import qualified CCIP.RawInstanceAddress
+import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Crypto.DerEncoding
@@ -18,10 +18,19 @@ versionTagV1_7_0 : BytesHex = "49ff34ed"
 signature_length : Int = 64
 signature_component_length : Int = 32
 
+-- | Per-chain fee config for outbound fee calculation.
+-- Mirrors EVM's BaseVerifier.s_remoteChainConfigs.
+data CCVFeeConfig = CCVFeeConfig
+    with
+        feeUSDCents : Decimal
+        gasForVerification : Int
+        payloadSizeBytes : Int
+    deriving (Eq, Show)
+
 template CommitteeVerifier
     with
-        owner : Party
         instanceId : Text
+        owner : Party
 
         ccipOwner : Party
         versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")
@@ -30,6 +39,8 @@ template CommitteeVerifier
 
         threshold : Int
         signers : [BytesHex]
+        rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        remoteChainFeeConfigs : Map.Map (Numeric 0) CCVFeeConfig
     where
         signatory owner
         ensure storageLocation /= "" && threshold > 0 && length signers >= threshold && versionTag /= ""
@@ -42,35 +53,48 @@ template CommitteeVerifier
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
                     with
-                        ccvRegistryCid = arg.ccvRegistryCid
-                        message = arg.message
-                        messageId = arg.messageId
+                        rmnRemoteCid = arg.rmnRemoteCid
+                        executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
-                        receiver = arg.receiver
+                        caller = arg.caller
+
+            crossChainVerifier_calculateFeeImpl self arg = do
+                exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_CalculateFee
+                    with
+                        sendingMessageCid = arg.sendingMessageCid
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
                     with
-                        ccvRegistryCid = arg.ccvRegistryCid
-                        message = arg.message
-                        messageId = arg.messageId
-                        feeToken = arg.feeToken
-                        feeTokenAmount = arg.feeTokenAmount
+                        rmnRemoteCid = arg.rmnRemoteCid
+                        sendingMessageCid = arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
 
-        -- | Verify an inbound message and issue a CCVVerifyTicket via CCVRegistry.
-        nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.Tickets.CCVVerifyTicket
+        -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
+        -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
+        -- for signature verification (encoding is deterministic).
+        nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
-                message : CCIP.MessageCodecV1.MessageV1
-                messageId : BytesHex
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
-                receiver : Party
                 caller : Party
             controller caller
             do
+                execMsg <- fetch executingMessageCid
+                let message = execMsg.message
+
+                -- Validate RMN instance and check source chain curse
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = owner
+                    chainSelector = message.sourceChainSelector
+                assertMsg "verifier: source chain is cursed" (not isCursed)
+
                 -- Verify version tag matches
                 let verifierVersion = fromSomeNote "Failed to extract verifier version" (CCIP.MessageCodecV1.extractBytes verifierResults 0 (byteCount versionTag))
                 assertMsg "Invalid CCV Version" (verifierVersion == versionTag)
@@ -80,72 +104,81 @@ template CommitteeVerifier
                 let numberOfSignatures = signatureLength / signature_length
                 assertMsg "Insufficient signatures provided" (numberOfSignatures >= threshold)
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
-                -- split signatureData into r and s components
                 let signatures = parseSignatures signatureData
 
-                -- calculate the signed hash
-                let signedHash = keccak256 (versionTag <> (CCIP.MessageCodecV1.encodeMessageV1 message))
+                -- Matches EVM: signers sign keccak256(versionTag ++ messageHash)
+                let signedHash = keccak256 (versionTag <> execMsg.messageId)
 
-                -- verify signatures
+                -- Verify signatures
                 let validSigners = findValidSigners signedHash signatures signers
                 let validSignerCount = countValidSigners validSigners
 
-                -- check that number of valid signers == numer of signatures provided
-                -- if it isn't this either means duplicate signatures or signatures from non-signers have been provided
+                -- Check that number of valid signers == number of signatures provided
                 assertMsg "Invalid signatures detected" (validSignerCount == numberOfSignatures)
 
                 -- Check threshold requirement
                 assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold)
                     (validSignerCount >= threshold)
 
-                -- Calculate message hash for the ticket
-                let messageHash = keccak256 (CCIP.MessageCodecV1.encodeMessageV1 message)
+                -- Append CCV verification to ExecutingMessageV1
+                exercise executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+                    ccvInstanceId = instanceId
+                    versionTag = versionTag
+                    caller = owner
 
-                -- Issue verify ticket via CCVRegistry
-                -- CCVRegistry extracts version tag from first 4 bytes of verifierResults
-                exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueVerifyTicket with
-                    ccvOwner = owner
-                    verifierResults = verifierResults  -- Contains version tag in first 4 bytes
-                    messageHash = messageHash
-                    sourceChainSelector = message.sourceChainSelector
-                    sequenceNumber = message.sequenceNumber
-                    receiver = receiver
-
-        -- | Forward message for verification and issue a CCVTicket via CCVRegistry.
-        nonconsuming choice CommitteeVerifier_ForwardToVerifier : ContractId CCIP.Tickets.CCVTicket
+        -- | Calculate fee for outbound message (USD cents only).
+        -- Reads destChainSelector from SendingMessageV1, looks up per-chain
+        -- fee config, appends fee via AddCCVFee.
+        nonconsuming choice CommitteeVerifier_CalculateFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                ccvRegistryCid : ContractId CCIP.CCVRegistry.CCVRegistry
-                message : CCIP.MessageCodecV1.MessageV1
-                messageId : BytesHex
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-                feeTokenAmount : Decimal
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                caller : Party
+            controller caller
+            do
+                sendingMsg <- fetch sendingMessageCid
+                let feeConfig = fromSomeNote "no fee config for dest chain"
+                        (Map.lookup sendingMsg.destChainSelector remoteChainFeeConfigs)
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                    ccvInstanceId = instanceId
+                    feeUSDCents = feeConfig.feeUSDCents
+                    destGasLimit = feeConfig.gasForVerification
+                    destBytesOverhead = feeConfig.payloadSizeBytes
+                    caller = owner
+
+        -- | Forward message for verification. Exercises AddVerifierData
+        -- directly on SendingMessageV1.
+        nonconsuming choice CommitteeVerifier_ForwardToVerifier
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 verifierArgs : BytesHex
                 caller : Party
             controller caller
             do
-                -- Build verifierBlob with version tag as first 4 bytes
-                let verifierBlob = versionTag  -- In simple case, blob is just version tag
+                sendingMsg <- fetch sendingMessageCid
 
-                -- Build stub Receipt (fee details TBD)
-                let ccvId = CCIP.CCVId.makeCCVId versionTag owner
-                let receipt = CCIP.Tickets.Receipt with
-                        issuer = ccvId
-                        destGasLimit = 0
-                        destBytesOverhead = 0
-                        feeTokenAmount = 0.0
-                        extraArgs = ""
+                -- Validate RMN instance and check destination chain curse
+                rmnRemote <- fetch rmnRemoteCid
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = owner
+                    chainSelector = sendingMsg.destChainSelector
+                assertMsg "verifier: destination chain is cursed" (not isCursed)
 
-                -- Issue CCV ticket via CCVRegistry
-                -- CCVRegistry extracts version tag from first 4 bytes of verifierBlob
-                exercise ccvRegistryCid CCIP.CCVRegistry.CCVRegistry_IssueCCVTicket with
-                    ccvOwner = owner
-                    verifierBlob = verifierBlob  -- Contains version tag in first 4 bytes
+                let verifierBlob = versionTag
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
+                    ccvInstanceId = instanceId
+                    versionTag = versionTag
+                    verifierBlob = verifierBlob
                     messageSentObservers = [messageSentObserver]
-                    sender = caller
-                    receipt = receipt
+                    caller = owner
 
 
--- Parse signature data into a list of (r, s) tuples
 parseSignatures : BytesHex -> [(BytesHex, BytesHex)]
 parseSignatures signatureData =
     let dataLength = byteCount signatureData
@@ -153,7 +186,6 @@ parseSignatures signatureData =
     in
         map (extractRSComponents signatureData) [0 .. numSignatures - 1]
 
--- Extract r and s components from a single signature at the given index
 extractRSComponents : BytesHex -> Int -> (BytesHex, BytesHex)
 extractRSComponents signatureData index =
     let offset = index * signature_length
@@ -170,23 +202,14 @@ validateSignature messageHash publicKey r s =
   in
     secp256k1WithEcdsaOnly derSignature messageHash derPublicKey
 
--- Find valid signers by checking each signature against all signers
--- Returns a map of valid signers (using list of tuples as map representation)
 findValidSigners : BytesHex -> [(BytesHex, BytesHex)] -> [BytesHex] -> [(BytesHex, Bool)]
 findValidSigners messageHash signatures signerKeys =
     map (\signer -> (signer, isValidSigner messageHash signatures signer)) signerKeys
 
--- Check if a signer is valid by testing if any signature matches this signer
 isValidSigner : BytesHex -> [(BytesHex, BytesHex)] -> BytesHex -> Bool
 isValidSigner messageHash signatures signerKey =
     any (uncurry (validateSignature messageHash signerKey)) signatures
 
--- Count the number of valid signers
 countValidSigners : [(BytesHex, Bool)] -> Int
 countValidSigners validSignersMap =
     length (filter snd validSignersMap)
-
--- Get list of valid signer keys
-getValidSignerKeys : [(BytesHex, Bool)] -> [BytesHex]
-getValidSignerKeys validSignersMap =
-    map fst (filter snd validSignersMap)

@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -199,19 +200,22 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 				continue
 			}
 
+			// Get signatory of contract and compute instance address, then compare with the provided instance address
 			instanceID := contracts.InstanceID(contractInstanceId)
-			if !instanceID.Valid() {
-				logger.Debugw("Skipping contract with invalid instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "instanceId", contractInstanceId)
+			signatories := c.ActiveContract.GetCreatedEvent().GetSignatories()
+			if len(signatories) != 1 {
+				logger.Debugw("Skipping contract with unexpected number of signatories", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "numSignatories", len(signatories))
 				continue
 			}
+			gotAddress := instanceID.RawInstanceAddress(types.PARTY(signatories[0])).InstanceAddress()
 
-			if instanceAddress != instanceID.InstanceAddress() {
+			if instanceAddress != gotAddress {
 				logger.Debugw("Skipping contract with different instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "instanceId", contractInstanceId)
 				continue
 			}
 
 			if contractID != "" {
-				return "", fmt.Errorf("multiple active contracts found for InstanceID %s", instanceID.String())
+				return "", fmt.Errorf("multiple active contracts found for InstanceAddress %s", instanceAddress.String())
 			}
 			contractID = c.ActiveContract.GetCreatedEvent().ContractId
 		}

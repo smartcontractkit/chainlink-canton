@@ -12,9 +12,11 @@ import (
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
 )
 
 // IITokenPool is a DAML interface
@@ -26,77 +28,24 @@ type IITokenPool interface {
 	// TokenPoolGetRequiredCCVs executes the TokenPool_GetRequiredCCVs choice
 	TokenPoolGetRequiredCCVs(contractID string, args TokenPoolGetRequiredCCVs) *model.ExerciseCommand
 
-	// TokenPoolVerifyCCVs executes the TokenPool_VerifyCCVs choice
-	TokenPoolVerifyCCVs(contractID string, args TokenPoolVerifyCCVs) *model.ExerciseCommand
+	// TokenPoolVerifyInboundCCVs executes the TokenPool_VerifyInboundCCVs choice
+	TokenPoolVerifyInboundCCVs(contractID string, args TokenPoolVerifyInboundCCVs) *model.ExerciseCommand
 
 	// TokenPoolReleaseFromTicket executes the TokenPool_ReleaseFromTicket choice
 	TokenPoolReleaseFromTicket(contractID string, args TokenPoolReleaseFromTicket) *model.ExerciseCommand
 
 	// TokenPoolLockOrBurn executes the TokenPool_LockOrBurn choice
 	TokenPoolLockOrBurn(contractID string, args TokenPoolLockOrBurn) *model.ExerciseCommand
-}
 
-// FeeInput is a Record type
-type FeeInput struct {
-	InstrumentId     InstrumentId  `json:"instrumentId"`
-	TransferFactory  CONTRACT_ID   `json:"transferFactory"`
-	ExtraArgs        ExtraArgs     `json:"extraArgs"`
-	InputHoldingCids []CONTRACT_ID `json:"inputHoldingCids"`
-}
-
-// ToMap converts FeeInput to a map for DAML arguments
-func (t FeeInput) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
-
-	m["transferFactory"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TransferFactory).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TransferFactory
-	}()
-
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.ExtraArgs).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExtraArgs
-	}()
-
-	m["inputHoldingCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.InputHoldingCids))
-		for _, e := range t.InputHoldingCids {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t FeeInput) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
-}
-
-func (t *FeeInput) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	// TokenPoolCalculateFee executes the TokenPool_CalculateFee choice
+	TokenPoolCalculateFee(contractID string, args TokenPoolCalculateFee) *model.ExerciseCommand
 }
 
 // LockOrBurnResult is a Record type
 type LockOrBurnResult struct {
-	PoolChangeCids   []CONTRACT_ID `json:"poolChangeCids"`
-	SenderChangeCids []CONTRACT_ID `json:"senderChangeCids"`
+	PoolChangeCids    []CONTRACT_ID `json:"poolChangeCids"`
+	SenderChangeCids  []CONTRACT_ID `json:"senderChangeCids"`
+	SendingMessageCid CONTRACT_ID   `json:"sendingMessageCid"`
 }
 
 // ToMap converts LockOrBurnResult to a map for DAML arguments
@@ -117,6 +66,14 @@ func (t LockOrBurnResult) ToMap() map[string]interface{} {
 			res = append(res, e)
 		}
 		return res
+	}()
+
+	m["sendingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
 	}()
 
 	return m
@@ -363,6 +320,39 @@ func (t *TokenPoolView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// TokenPoolCalculateFee is a Record type
+type TokenPoolCalculateFee struct {
+	SendingMessageCid CONTRACT_ID `json:"sendingMessageCid"`
+	Caller            PARTY       `json:"caller"`
+}
+
+// ToMap converts TokenPoolCalculateFee to a map for DAML arguments
+func (t TokenPoolCalculateFee) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["sendingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenPoolCalculateFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *TokenPoolCalculateFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector NUMERIC           `json:"remoteChainSelector"`
@@ -410,29 +400,24 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
 
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
-	DestChainSelector     NUMERIC           `json:"destChainSelector"`
-	Message               Canton2AnyMessage `json:"message"`
-	TokenInput            TokenInput        `json:"tokenInput"`
-	FeeInput              FeeInput          `json:"feeInput"`
-	SenderInputCids       []CONTRACT_ID     `json:"senderInputCids"`
-	OnRampCid             CONTRACT_ID       `json:"onRampCid"`
-	FeeQuoterCid          CONTRACT_ID       `json:"feeQuoterCid"`
-	TokenAdminRegistryCid CONTRACT_ID       `json:"tokenAdminRegistryCid"`
-	Caller                PARTY             `json:"caller"`
+	SendingMessageCid CONTRACT_ID   `json:"sendingMessageCid"`
+	TokenInput        TokenInput    `json:"tokenInput"`
+	SenderInputCids   []CONTRACT_ID `json:"senderInputCids"`
+	Amount            NUMERIC       `json:"amount"`
+	RmnRemoteCid      CONTRACT_ID   `json:"rmnRemoteCid"`
+	Caller            PARTY         `json:"caller"`
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
 func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["message"] = func() interface{} {
+	m["sendingMessageCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.Message).(mapper); ok {
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Message
+		return t.SendingMessageCid
 	}()
 
 	m["tokenInput"] = func() interface{} {
@@ -443,14 +428,6 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
 		return t.TokenInput
 	}()
 
-	m["feeInput"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.FeeInput).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeInput
-	}()
-
 	m["senderInputCids"] = func() []interface{} {
 		res := make([]interface{}, 0, len(t.SenderInputCids))
 		for _, e := range t.SenderInputCids {
@@ -459,28 +436,14 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["onRampCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.OnRampCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.OnRampCid
-	}()
+	m["amount"] = t.Amount
 
-	m["feeQuoterCid"] = func() interface{} {
+	m["rmnRemoteCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.FeeQuoterCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
+		return t.RmnRemoteCid
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -502,6 +465,7 @@ func (t *TokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
 type TokenPoolReleaseFromTicket struct {
 	TokenReceiveTicketCid CONTRACT_ID `json:"tokenReceiveTicketCid"`
 	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          CONTRACT_ID `json:"rmnRemoteCid"`
 	TokenInput            TokenInput  `json:"tokenInput"`
 	Caller                PARTY       `json:"caller"`
 }
@@ -524,6 +488,14 @@ func (t TokenPoolReleaseFromTicket) ToMap() map[string]interface{} {
 			return m.toMap()
 		}
 		return t.TokenAdminRegistryCid
+	}()
+
+	m["rmnRemoteCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
 	}()
 
 	m["tokenInput"] = func() interface{} {
@@ -549,47 +521,44 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// TokenPoolVerifyCCVs is a Record type
-type TokenPoolVerifyCCVs struct {
-	CcvVerifyTickets    []CONTRACT_ID `json:"ccvVerifyTickets"`
-	MessageHash         TEXT          `json:"messageHash"`
-	SourceChainSelector NUMERIC       `json:"sourceChainSelector"`
-	Amount              NUMERIC       `json:"amount"`
-	Receiver            PARTY         `json:"receiver"`
-	Caller              PARTY         `json:"caller"`
+// TokenPoolVerifyInboundCCVs is a Record type
+type TokenPoolVerifyInboundCCVs struct {
+	ExecutingMessageCid   CONTRACT_ID `json:"executingMessageCid"`
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+	Caller                PARTY       `json:"caller"`
 }
 
-// ToMap converts TokenPoolVerifyCCVs to a map for DAML arguments
-func (t TokenPoolVerifyCCVs) ToMap() map[string]interface{} {
+// ToMap converts TokenPoolVerifyInboundCCVs to a map for DAML arguments
+func (t TokenPoolVerifyInboundCCVs) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
-	m["ccvVerifyTickets"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CcvVerifyTickets))
-		for _, e := range t.CcvVerifyTickets {
-			res = append(res, e)
+	m["executingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
 		}
-		return res
+		return t.ExecutingMessageCid
 	}()
 
-	m["messageHash"] = string(t.MessageHash)
-
-	m["sourceChainSelector"] = t.SourceChainSelector
-
-	m["amount"] = t.Amount
-
-	m["receiver"] = t.Receiver.ToMap()
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
 
-func (t TokenPoolVerifyCCVs) MarshalJSON() ([]byte, error) {
+func (t TokenPoolVerifyInboundCCVs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-func (t *TokenPoolVerifyCCVs) UnmarshalJSON(data []byte) error {
+func (t *TokenPoolVerifyInboundCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }

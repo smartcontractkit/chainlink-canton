@@ -26,7 +26,6 @@ type ContractIdentifiers struct {
 	FeeQuoter          string `yaml:"feeQuoter"`
 	CCV                string `yaml:"ccv"`
 	TokenAdminRegistry string `yaml:"tokenAdminRegistry"`
-	CCVRegistry        string `yaml:"ccvRegistry"`
 	TokenPool          string `yaml:"tokenPool"`
 }
 

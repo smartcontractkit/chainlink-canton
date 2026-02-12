@@ -8,9 +8,8 @@
 module CCIP.LockReleaseTokenPool where
 
 import DA.Crypto.Text (BytesHex)
-import DA.Foldable (forA_)
-import DA.List (dedupSort, head)
 import qualified DA.Map as Map
+import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
 import DA.Time (time, addRelTime, hours)
@@ -19,12 +18,12 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
-import qualified CCIP.CCVId
-import qualified CCIP.Client
-import qualified CCIP.FeeQuoter
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.OnRamp
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
@@ -45,23 +44,37 @@ data TransferTimeout
 -- | Per-chain CCV requirements for the pool.
 -- This partially matches the EVM pattern in AdvancedPoolHooks.sol which is primarily based on chain selector:
 -- https://github.com/smartcontractkit/chainlink-ccip/blob/afc2e9e58c953fbdeee724ac5fae021155ca6325/chains/evm/contracts/pools/AdvancedPoolHooks.sol#L235
--- Users that require more expressiveness can implement or modify LockReleaseTokenPool_GetRequiredCCVs below directly.
 data ChainCCVConfig = ChainCCVConfig
     with
-        inboundCCVs : [CCIP.CCVId.CCVId]   -- Required CCVs for incoming transfers
-        outboundCCVs : [CCIP.CCVId.CCVId]  -- Required CCVs for outgoing transfers
+        inboundCCVs : [RawInstanceAddress]   -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]  -- Required CCVs for outgoing transfers
+    deriving (Eq, Show)
+
+-- | Per-chain fee config for outbound pool fee calculation.
+data PoolFeeConfig = PoolFeeConfig
+    with
+        feeUSDCents : Decimal
+        destGasOverhead : Int
+        destBytesOverhead : Int
     deriving (Eq, Show)
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
+-- Performs best-effort RMN curse checks via disclosed RMNRemote contract.
+-- The pool cannot validate the RMN instance address (not a stakeholder);
+-- OnRamp/OffRamp/PrepareExecute perform the authoritative identity + curse checks.
 template LockReleaseTokenPool
     with
+        instanceId : Text  -- Unique identifier for this pool instance
         ccipOwner : Party
         poolOwner : Party
-        instanceId : Text  -- Unique identifier for this pool instance
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
         -- CCV requirements per remote chain selector
         chainCCVRequirements : Map.Map (Numeric 0) ChainCCVConfig
+        -- Fee config per remote chain selector
+        chainFeeConfigs : Map.Map (Numeric 0) PoolFeeConfig
+        -- Destination token address per remote chain, matching EVM's getRemoteToken()
+        remoteTokens : Map.Map (Numeric 0) BytesHex
         -- Context merged into extraArgs for transfers TO the pool (LockOrBurn).
         -- For tokens following Splice patterns (e.g., Amulet), this should contain
         -- the pool's preapproval CID under the key the TransferFactory expects
@@ -88,14 +101,11 @@ template LockReleaseTokenPool
                         direction = arg.direction
                         caller = arg.caller
 
-            tokenPool_verifyCCVsImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyCCVs
+            tokenPool_verifyInboundCCVsImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyInboundCCVs
                     with
-                        ccvVerifyTickets = arg.ccvVerifyTickets
-                        messageHash = arg.messageHash
-                        sourceChainSelector = arg.sourceChainSelector
-                        amount = arg.amount
-                        receiver = arg.receiver
+                        executingMessageCid = arg.executingMessageCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
@@ -103,24 +113,28 @@ template LockReleaseTokenPool
                     with
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         tokenInput = arg.tokenInput
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_LockOrBurn
                     with
-                        destChainSelector = arg.destChainSelector
-                        message = arg.message
+                        sendingMessageCid = arg.sendingMessageCid
                         tokenInput = arg.tokenInput
-                        feeInput = arg.feeInput
                         senderInputCids = arg.senderInputCids
-                        onRampCid = arg.onRampCid
-                        feeQuoterCid = arg.feeQuoterCid
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        amount = arg.amount
+                        rmnRemoteCid = arg.rmnRemoteCid
                         caller = arg.caller
 
-        -- Get required CCVs based on chain and direction.
-        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [CCIP.CCVId.CCVId]
+            tokenPool_calculateFeeImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_CalculateFee
+                    with
+                        sendingMessageCid = arg.sendingMessageCid
+                        caller = arg.caller
+
+        -- Get required CCV raw instance addresses based on chain and direction.
+        nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
             with
                 remoteChainSelector : Numeric 0
                 amount : Numeric 0
@@ -136,65 +150,73 @@ template LockReleaseTokenPool
                         CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
 
-        -- Verify CCVs and issue TokenPoolCCVVerifiedTicket.
-        nonconsuming choice LockReleaseTokenPool_VerifyCCVs : ContractId CCIP.Tickets.TokenPoolCCVVerifiedTicket
+        -- Declare inbound CCV requirements on ExecutingMessageV1 via TAR.
+        -- Validates that the message has a token transfer targeting this pool's instrument,
+        -- looks up per-chain CCV requirements, and records them on the executing message.
+        -- OffRamp performs the actual CCV coverage check.
+        nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                ccvVerifyTickets : [ContractId CCIP.Tickets.CCVVerifyTicket]
-                messageHash : BytesHex
-                sourceChainSelector : Numeric 0
-                amount : Numeric 0
-                receiver : Party
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                -- Get required CCVs for inbound
-                let requiredCCVIds = case Map.lookup sourceChainSelector chainCCVRequirements of
+                execMsg <- fetch executingMessageCid
+                let message = execMsg.message
+
+                tt <- case message.tokenTransfer of
+                    None -> abort "pool: no token transfer in message"
+                    Some t -> pure t
+
+                let expectedAddr = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+                assertMsg "pool: destTokenAddress does not match pool instrumentId"
+                    (tt.destTokenAddress == expectedAddr)
+
+                let requiredAddrs = case Map.lookup message.sourceChainSelector chainCCVRequirements of
                         None -> []
                         Some config -> config.inboundCCVs
 
-                -- Fetch all provided tickets and extract their CCVIds
-                providedCCVIds <- forA ccvVerifyTickets \ticketCid -> do
-                    ticket <- fetch ticketCid
-                    -- Validate ticket is for this message
-                    assertMsg "CCVVerifyTicket messageHash mismatch" (ticket.messageHash == messageHash)
-                    assertMsg "CCVVerifyTicket sourceChainSelector mismatch" (ticket.sourceChainSelector == sourceChainSelector)
-                    pure ticket.ccvId
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_SetInboundPoolCCVs with
+                        executingMessageCid
+                        poolInstanceId = instanceId
+                        poolCCVs = requiredAddrs
+                        caller = poolOwner
 
-                -- Validate all required CCVs are present
-                forA_ requiredCCVIds \requiredId ->
-                    assertMsg ("missing required pool CCV: " <> show requiredId)
-                        (requiredId `elem` providedCCVIds)
-
-                -- Issue TokenPoolCCVVerifiedTicket
-                create CCIP.Tickets.TokenPoolCCVVerifiedTicket with
-                    poolOwner = poolOwner
-                    ccipOwner = ccipOwner
-                    receiver = receiver
-                    messageHash = messageHash
-                    sourceChainSelector = sourceChainSelector
-                    verifiedCCVIds = dedupSort providedCCVIds
-
-        -- Release tokens by consuming a TokenReceiveTicket.
-        -- Transfers tokens from pool to receiver via TransferFactory.
-        -- Can be called by anyone with a valid ticket.
+        -- Release tokens by consuming a TokenReceiveTicket via TokenAdminRegistry.
+        -- The TAR validates the ticket was issued by the correct registry instance,
+        -- the pool is the registered pool for the instrument, and archives the ticket
+        -- atomically. If any check fails, the entire transaction rolls back.
         nonconsuming choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
             controller caller
             do
-                -- Fetch and validate the ticket
+                -- Best-effort RMN curse check for the source chain (matches EVM
+                -- TokenPool._validateReleaseOrMint). The pool cannot validate
+                -- the RMN instance address (not a stakeholder); PrepareExecute
+                -- performs the authoritative identity + curse check.
                 ticket <- fetch tokenReceiveTicketCid
-                assertMsg "TokenReceiveTicket instrumentId mismatch" (ticket.instrumentId == instrumentId)
-                assertMsg "TokenReceiveTicket poolOwner mismatch" (ticket.poolOwner == poolOwner)
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = poolOwner
+                    chainSelector = ticket.sourceChainSelector
+                assertMsg "ReleaseFromTicket: source chain is cursed" (not isCursed)
 
-                -- Validate caller is authorized
-                assertMsg "ReleaseFromTicket: caller must be tokenReceiver" (caller == ticket.tokenReceiver)
+                assertMsg "ReleaseFromTicket: caller must be tokenReceiver"
+                    (caller == ticket.tokenReceiver)
 
-                -- Consume the ticket (poolOwner authorization propagates from this choice's controller)
-                exercise tokenReceiveTicketCid CCIP.Tickets.TokenReceiveTicket_Consume
+                -- Consume ticket via TAR. The TAR validates the ticket was issued by
+                -- the correct registry instance and archives it. The TAR is not fetchable
+                -- by the pool (visibility), but the caller discloses it.
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_ConsumeReceiveTicket with
+                        ticketCid = tokenReceiveTicketCid
+                        instrumentId = instrumentId
+                        caller = poolOwner
 
                 -- Transfer tokens from pool to receiver via TransferFactory.
                 -- If receiver has preapproval, completes immediately. Otherwise creates pending
@@ -220,7 +242,6 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = tokenInput.extraArgs
 
-                -- Return transfer result
                 case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids ->
                         pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
@@ -242,40 +263,69 @@ template LockReleaseTokenPool
             do
                 create this with chainCCVRequirements = newChainCCVRequirements
 
-        -- Lock tokens for outbound transfer and issue TokenSendTicket.
-        -- Transfers tokens from caller to pool via TransferFactory.
+        -- Calculate fee for outbound token transfer (USD cents only).
+        -- Reads destChainSelector from SendingMessageV1, looks up per-chain
+        -- fee config, appends fee directly to SendingMessageV1.
+        nonconsuming choice LockReleaseTokenPool_CalculateFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                caller : Party
+            controller caller
+            do
+                sendingMsg <- fetch sendingMessageCid
+                let feeConfig = fromSomeNote "no pool fee config for dest chain"
+                        (Map.lookup sendingMsg.destChainSelector chainFeeConfigs)
+
+                exercise sendingMessageCid
+                    CCIP.SendingMessageV1.AddTokenSendFee with
+                        poolInstanceId = instanceId
+                        poolOwner = poolOwner
+                        feeUSDCents = feeConfig.feeUSDCents
+                        destGasOverhead = feeConfig.destGasOverhead
+                        destBytesOverhead = feeConfig.destBytesOverhead
+                        caller = poolOwner
+
+        -- Lock tokens for outbound transfer and append token send data.
+        -- Reads from SendingMessageV1 instead of taking separate params.
+        -- Passes pool's outbound CCV requirements to AddTokenSend for
+        -- merging into the unified requiredCCVs list.
         nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
-                destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
-                feeInput : CCIP.Interfaces.TokenPool.FeeInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-                onRampCid : ContractId CCIP.OnRamp.OnRamp
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                amount : Numeric 0
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 caller : Party
             controller caller, poolOwner
             do
-                -- Find token amount for this pool's instrument
-                let matchingAmounts = filter (\ta -> ta.instrumentId == instrumentId) message.tokenAmounts
-                assertMsg "LockOrBurn: no matching token amount for this pool's instrument"
-                    (not (null matchingAmounts))
-                let tokenAmount = head matchingAmounts
+                sendingMsg <- fetch sendingMessageCid
 
-                -- Merge pool's receive context into extraArgs. For Splice-pattern tokens,
-                -- this injects the pool's preapproval CID so TransferFactory can complete
-                -- the transfer directly without creating a pending TransferInstruction.
+                -- Best-effort RMN curse check
+                isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
+                    caller = poolOwner
+                    chainSelector = sendingMsg.destChainSelector
+                assertMsg "LockOrBurn: dest chain is cursed" (not isCursed)
+
+                let poolRequiredCCVs = case Map.lookup sendingMsg.destChainSelector chainCCVRequirements of
+                        None -> []
+                        Some config -> config.outboundCCVs
+
+                let destTokenAddr = fromSomeNote
+                        "LockOrBurn: no remote token for dest chain"
+                        (Map.lookup sendingMsg.destChainSelector remoteTokens)
+
+                let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
+
                 let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
                         values = TextMap.union poolReceiveContext.values tokenInput.extraArgs.context.values
                 let mergedExtraArgs = tokenInput.extraArgs with context = mergedContext
-
-                -- Transfer tokens from caller to pool via TransferFactory.
                 now <- getTime
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = intToDecimal (truncate tokenAmount.amount)
+                let amountDecimal : Decimal = intToDecimal (truncate amount)
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
@@ -292,34 +342,27 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
-                -- Build receipt identifying this pool instance.
-                -- Format: "pool:{instanceId}:{poolOwner}:{instrumentId}"
-                let poolReceipt = CCIP.Tickets.Receipt with
-                        issuer = "pool:" <> instanceId
-                            <> ":" <> CCIP.MessageCodecV1.encodePartyId poolOwner
-                            <> ":" <> CCIP.MessageCodecV1.encodeInstrumentId instrumentId
-                        destGasLimit = 0
-                        destBytesOverhead = 0
-                        feeTokenAmount = 0.0
-                        extraArgs = ""
-
-                -- Issue TokenSendTicket via TokenAdminRegistry
-                _tokenSendTicket <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueSendTicket
-                    with
-                        instrumentId = instrumentId
-                        sender = caller
-                        amount = tokenAmount.amount
-                        sourceTokenAddress = CCIP.MessageCodecV1.encodePartyId poolOwner
-                        destTokenAddress = ""
-                        tokenReceiver = message.receiver
-                        extraData = ""
-                        receipt = poolReceipt
+                -- AddTokenSend merges poolRequiredCCVs into the unified CCV list
+                -- and constructs MessageV1 from SendingMessageV1 fields.
+                -- OnRamp cross-validates pool identity against TAR at CCIPSend.
+                let extraData = fromOptional "" destPoolData
+                newSendingMessageCid <- exercise sendingMessageCid
+                    CCIP.SendingMessageV1.AddTokenSend with
+                        poolInstanceId = instanceId
                         poolOwner = poolOwner
+                        instrumentId = instrumentId
+                        amount = amount
+                        destTokenAddress = destTokenAddr
+                        extraData = extraData
+                        poolRequiredCCVs = poolRequiredCCVs
+                        caller = poolOwner
 
-                -- Return actual transfer results
                 case transferResult.output of
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids ->
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
+                            receiverCids ->
                         pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
                             poolChangeCids = receiverCids ++ tokenInput.tokenPoolHoldings
                             senderChangeCids = transferResult.senderChangeCids
+                            sendingMessageCid = newSendingMessageCid
                     _ -> abort "LockOrBurn: transfer did not complete directly"
+

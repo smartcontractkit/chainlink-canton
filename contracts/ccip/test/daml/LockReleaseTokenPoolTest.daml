@@ -8,11 +8,12 @@ import DA.List (head)
 import DA.Map qualified as Map
 import DA.Optional
 
-import CCIP.Client qualified as Client
-import CCIP.FeeQuoter qualified as FeeQuoter
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
-import CCIP.OnRamp qualified as OnRamp
+import CCIP.MessageCodecV1 qualified as MessageCodecV1
+import CCIP.RawInstanceAddress qualified as RawInstanceAddress
+import CCIP.RMNRemote qualified as RMNRemote
+import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import CCIP.Tickets qualified as Tickets
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 
@@ -25,20 +26,32 @@ import TestToken qualified
 -- | Test LockOrBurn transfers tokens from sender to pool.
 testLockOrBurn = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     poolOwner <- allocateParty "pool-owner"
     sender <- allocateParty "sender"
 
     let destChainSelector : Numeric 0 = 456.0
+    let sourceChainSelector : Numeric 0 = 123.0
+    let rmnInstanceId = "test-rmn"
+    let tokenAdminRegistryInstanceId = "test-tar"
 
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "TestToken"
 
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
+
     -- Deploy TokenAdminRegistry and register pool
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             owner = ccipOwner
-            instanceId = "test-tar"
+            instanceId = tokenAdminRegistryInstanceId
             tokenConfigs = Map.empty
 
     tokenAdminRegistry <- submit ccipOwner do
@@ -57,7 +70,9 @@ testLockOrBurn = script do
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
             instrumentId = testInstrumentId
-            optTokenPoolOwner = Some poolOwner
+            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = "test-lock-release-pool"
             caller = poolOwner
 
     -- Create sender's token holding (10 tokens)
@@ -80,25 +95,8 @@ testLockOrBurn = script do
             admin = ccipOwner
             preapprovalCid = Some poolPreapproval
 
-    -- Deploy OnRamp and FeeQuoter stubs
-    onRamp <- submit ccipOwner do
-        createCmd OnRamp.OnRamp with
-            ccipOwner = ccipOwner
-            instanceId = "test-onramp"
-
-    feeQuoter <- submit ccipOwner do
-        createCmd FeeQuoter.FeeQuoter with
-            owner = ccipOwner
-            instanceId = "test-feequoter"
-            feeTokens = Map.empty
-            destChainConfigs = Map.empty
-            tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.empty
-            priceUpdaters = []
-
-    -- Deploy LockReleaseTokenPool with empty receive context
-    -- (TestTransferFactory uses its own preapproval field, not extraArgs lookup)
+    -- Deploy LockReleaseTokenPool with dest chain config
+    let destTokenAddr = "0000000000000000000000000000000000000099"
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -107,18 +105,50 @@ testLockOrBurn = script do
             instrumentId = testInstrumentId
             decimals = 6
             chainCCVRequirements = Map.empty
+            chainFeeConfigs = Map.empty
+            remoteTokens = Map.fromList [(destChainSelector, destTokenAddr)]
             poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
-    -- Build message with token amount (5 tokens)
-    let message = Client.Canton2AnyMessage with
+    -- Create SendingMessageV1 with token transfer fields.
+    -- LockOrBurn reads dest chain, token amount, and receiver from here.
+    let senderAddr = MessageCodecV1.encodePartyAddress sender
+    sendingMessageCid <- submit ccipOwner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            ccipOwner = ccipOwner
+            sender = sender
+            routerInstanceAddress = RawInstanceAddress.make "test-router" sender
+            onRampInstanceAddress = RawInstanceAddress.make "test-onramp" ccipOwner
+            tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "default-executor" ccipOwner
+            sourceChainSelector = sourceChainSelector
+            senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"
             payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000002"
+            tokenReceiver = "0000000000000000000000000000000000000001"
+            message = None
+            encodedMessage = ""
+            messageId = ""
             feeToken = testInstrumentId
-            extraArgs = ""
-            tokenAmounts = [Client.TokenAmount with
-                instrumentId = testInstrumentId
-                amount = 5000000.0]
+            networkFeeUSDCents = 0.0
+            ccvFees = []
+            tokenSendFee = None
+            feesFinalized = False
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            verifierData = []
+            tokenSendData = None
+            observingParties = [sender]
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -127,33 +157,24 @@ testLockOrBurn = script do
                 meta = MetadataV1.emptyMetadata
             tokenPoolHoldings = []
 
-    let feeInput = ITokenPool.FeeInput with
-            instrumentId = testInstrumentId
-            transferFactory = toInterfaceContractId transferFactory
-            extraArgs = MetadataV1.ExtraArgs with
-                context = MetadataV1.emptyChoiceContext
-                meta = MetadataV1.emptyMetadata
-            inputHoldingCids = []
-
     -- Disclose contracts
     disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Call LockOrBurn
     result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
                       <> disclose disclosedPool <> disclose disclosedTar
-                      <> disclose disclosedFactory <> disclose disclosedPreapproval) do
+                      <> disclose disclosedFactory <> disclose disclosedPreapproval
+                      <> disclose disclosedRmn) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
-            destChainSelector = destChainSelector
-            message = message
+            sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
-            feeInput = feeInput
             senderInputCids = [toInterfaceContractId senderHolding]
-            onRampCid = onRamp
-            feeQuoterCid = feeQuoter
-            tokenAdminRegistryCid = tokenAdminRegistry
+            amount = 5000000.0
+            rmnRemoteCid = rmnRemote
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -178,10 +199,12 @@ testLockOrBurn = script do
 -- | Test ReleaseFromTicket transfers tokens from pool to receiver.
 testReleaseFromTicket = script do
     ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
     poolOwner <- allocateParty "pool-owner"
     receiver <- allocateParty "receiver"
 
     let sourceChainSelector : Numeric 0 = 123.0
+    let tokenAdminRegistryInstanceId = "test-tar-release"
 
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -207,12 +230,41 @@ testReleaseFromTicket = script do
             admin = ccipOwner
             preapprovalCid = Some receiverPreapproval
 
-    -- Deploy TokenAdminRegistry
+    -- Deploy TokenAdminRegistry and register pool
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
             owner = ccipOwner
-            instanceId = "test-tar"
+            instanceId = tokenAdminRegistryInstanceId
             tokenConfigs = Map.empty
+
+    tokenAdminRegistry <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+            instrumentId = testInstrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+
+    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+            instrumentId = testInstrumentId
+            caller = poolOwner
+
+    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+            instrumentId = testInstrumentId
+            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = "test-lock-release-pool"
+            caller = poolOwner
+
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = "test-rmn-release"
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            cursedSubjects = []
 
     -- Deploy LockReleaseTokenPool
     tokenPool <- submit poolOwner do
@@ -223,12 +275,15 @@ testReleaseFromTicket = script do
             instrumentId = testInstrumentId
             decimals = 6
             chainCCVRequirements = Map.empty
+            chainFeeConfigs = Map.empty
+            remoteTokens = Map.empty
             poolReceiveContext = MetadataV1.emptyChoiceContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
-    -- Create TokenReceiveTicket (simulating what OffRamp creates)
-    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
+    -- Create TokenReceiveTicket (simulating what OffRamp creates via TAR)
+    tokenReceiveTicket <- submit ccipOwner do
         createCmd Tickets.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
             poolOwner = poolOwner
             receiver = receiver
@@ -249,14 +304,16 @@ testReleaseFromTicket = script do
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Call ReleaseFromTicket
     result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
                       <> disclose disclosedTar <> disclose disclosedFactory
-                      <> disclose disclosedPreapproval) do
+                      <> disclose disclosedPreapproval <> disclose disclosedRmn) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = rmnRemote
             tokenInput = tokenInput
             caller = receiver
 

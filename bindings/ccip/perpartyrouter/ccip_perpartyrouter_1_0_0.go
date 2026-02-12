@@ -12,9 +12,11 @@ import (
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
 )
 
 const PackageName = "ccip-perpartyrouter"
@@ -222,15 +224,12 @@ func (t *CCIPMessageSentEvent) UnmarshalJSON(data []byte) error {
 // CCIPSend is a Record type
 type CCIPSend struct {
 	OnRampCid             CONTRACT_ID   `json:"onRampCid"`
+	RmnRemoteCid          CONTRACT_ID   `json:"rmnRemoteCid"`
 	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
 	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	DestChainSelector     NUMERIC       `json:"destChainSelector"`
-	Receiver              TEXT          `json:"receiver"`
-	Payload               TEXT          `json:"payload"`
-	ExecutionGasLimit     INT64         `json:"executionGasLimit"`
-	CcipReceiveGasLimit   INT64         `json:"ccipReceiveGasLimit"`
-	TokenSendTicket       *CONTRACT_ID  `json:"tokenSendTicket"`
-	CcvTickets            []CONTRACT_ID `json:"ccvTickets"`
+	SendingMessageCid     CONTRACT_ID   `json:"sendingMessageCid"`
+	FeeTokenInput         TokenInput    `json:"feeTokenInput"`
+	FeeTokenHoldingCids   []CONTRACT_ID `json:"feeTokenHoldingCids"`
 }
 
 // ToMap converts CCIPSend to a map for DAML arguments
@@ -243,6 +242,14 @@ func (t CCIPSend) ToMap() map[string]interface{} {
 			return m.toMap()
 		}
 		return t.OnRampCid
+	}()
+
+	m["rmnRemoteCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
 	}()
 
 	m["globalConfigCid"] = func() interface{} {
@@ -261,30 +268,25 @@ func (t CCIPSend) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["receiver"] = string(t.Receiver)
-
-	m["payload"] = string(t.Payload)
-
-	m["executionGasLimit"] = int64(t.ExecutionGasLimit)
-
-	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	if t.TokenSendTicket != nil {
-		m["tokenSendTicket"] = map[string]interface{}{
-			"_type": "optional",
-			"value": *t.TokenSendTicket,
+	m["sendingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
 		}
-	} else {
-		m["tokenSendTicket"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
+		return t.SendingMessageCid
+	}()
 
-	m["ccvTickets"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CcvTickets))
-		for _, e := range t.CcvTickets {
+	m["feeTokenInput"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeTokenInput).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeTokenInput
+	}()
+
+	m["feeTokenHoldingCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.FeeTokenHoldingCids))
+		for _, e := range t.FeeTokenHoldingCids {
 			res = append(res, e)
 		}
 		return res
@@ -305,9 +307,10 @@ func (t *CCIPSend) UnmarshalJSON(data []byte) error {
 
 // CCIPSendResult is a Record type
 type CCIPSendResult struct {
-	Router          CONTRACT_ID `json:"router"`
-	CcipMessageSent CONTRACT_ID `json:"ccipMessageSent"`
-	MessageId       TEXT        `json:"messageId"`
+	Router          CONTRACT_ID   `json:"router"`
+	CcipMessageSent CONTRACT_ID   `json:"ccipMessageSent"`
+	MessageId       TEXT          `json:"messageId"`
+	FeeChangeCids   []CONTRACT_ID `json:"feeChangeCids"`
 }
 
 // ToMap converts CCIPSendResult to a map for DAML arguments
@@ -332,6 +335,14 @@ func (t CCIPSendResult) ToMap() map[string]interface{} {
 
 	m["messageId"] = string(t.MessageId)
 
+	m["feeChangeCids"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.FeeChangeCids))
+		for _, e := range t.FeeChangeCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
 	return m
 }
 
@@ -341,6 +352,54 @@ func (t CCIPSendResult) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CCIPSendResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// CancelSend is a Record type
+type CancelSend struct {
+	OnRampCid             CONTRACT_ID `json:"onRampCid"`
+	SendingMessageCid     CONTRACT_ID `json:"sendingMessageCid"`
+	TokenAdminRegistryCid CONTRACT_ID `json:"tokenAdminRegistryCid"`
+}
+
+// ToMap converts CancelSend to a map for DAML arguments
+func (t CancelSend) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["onRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OnRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRampCid
+	}()
+
+	m["sendingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	return m
+}
+
+func (t CancelSend) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *CancelSend) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
@@ -413,18 +472,25 @@ func (t *CreateRouterResult) UnmarshalJSON(data []byte) error {
 
 // Execute is a Record type
 type Execute struct {
-	OffRampCid             CONTRACT_ID   `json:"offRampCid"`
-	GlobalConfigCid        CONTRACT_ID   `json:"globalConfigCid"`
-	TokenAdminRegistryCid  CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	EncodedMessage         TEXT          `json:"encodedMessage"`
-	CcvVerifyTickets       []CONTRACT_ID `json:"ccvVerifyTickets"`
-	TokenPoolCCVTicket     *CONTRACT_ID  `json:"tokenPoolCCVTicket"`
-	ReceiverRequiredCCVIds []TEXT        `json:"receiverRequiredCCVIds"`
+	RmnRemoteCid          CONTRACT_ID          `json:"rmnRemoteCid"`
+	OffRampCid            CONTRACT_ID          `json:"offRampCid"`
+	GlobalConfigCid       CONTRACT_ID          `json:"globalConfigCid"`
+	TokenAdminRegistryCid CONTRACT_ID          `json:"tokenAdminRegistryCid"`
+	ExecutingMessageCid   CONTRACT_ID          `json:"executingMessageCid"`
+	ReceiverRequiredCCVs  []RawInstanceAddress `json:"receiverRequiredCCVs"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
 func (t Execute) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
+
+	m["rmnRemoteCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
 
 	m["offRampCid"] = func() interface{} {
 		type mapper interface{ toMap() map[string]interface{} }
@@ -450,31 +516,23 @@ func (t Execute) ToMap() map[string]interface{} {
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["encodedMessage"] = string(t.EncodedMessage)
-
-	m["ccvVerifyTickets"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CcvVerifyTickets))
-		for _, e := range t.CcvVerifyTickets {
-			res = append(res, e)
+	m["executingMessageCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
 		}
-		return res
+		return t.ExecutingMessageCid
 	}()
 
-	if t.TokenPoolCCVTicket != nil {
-		m["tokenPoolCCVTicket"] = map[string]interface{}{
-			"_type": "optional",
-			"value": *t.TokenPoolCCVTicket,
-		}
-	} else {
-		m["tokenPoolCCVTicket"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
-
-	m["receiverRequiredCCVIds"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ReceiverRequiredCCVIds))
-		for _, e := range t.ReceiverRequiredCCVIds {
-			res = append(res, string(e))
+	m["receiverRequiredCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.ReceiverRequiredCCVs))
+		for _, e := range t.ReceiverRequiredCCVs {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -723,13 +781,10 @@ func (t *GetExecutionState) UnmarshalJSON(data []byte) error {
 
 // GetRequiredCCVsForExecute2 is a Record type
 type GetRequiredCCVsForExecute2 struct {
-	OffRampCid            CONTRACT_ID   `json:"offRampCid"`
-	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
-	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs  []TEXT        `json:"receiverRequiredCCVs"`
-	SourceChainSelector   NUMERIC       `json:"sourceChainSelector"`
-	HasTokenTransfer      BOOL          `json:"hasTokenTransfer"`
-	InstrumentId          *InstrumentId `json:"instrumentId"`
+	OffRampCid           CONTRACT_ID          `json:"offRampCid"`
+	GlobalConfigCid      CONTRACT_ID          `json:"globalConfigCid"`
+	ReceiverRequiredCCVs []RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  NUMERIC              `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
@@ -752,36 +807,20 @@ func (t GetRequiredCCVsForExecute2) ToMap() map[string]interface{} {
 		return t.GlobalConfigCid
 	}()
 
-	m["tokenAdminRegistryCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
 	m["receiverRequiredCCVs"] = func() []interface{} {
 		res := make([]interface{}, 0, len(t.ReceiverRequiredCCVs))
 		for _, e := range t.ReceiverRequiredCCVs {
-			res = append(res, string(e))
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
 
 	m["sourceChainSelector"] = t.SourceChainSelector
-
-	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
-
-	if t.InstrumentId != nil {
-		m["instrumentId"] = map[string]interface{}{
-			"_type": "optional",
-			"value": *t.InstrumentId,
-		}
-	} else {
-		m["instrumentId"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
 
 	return m
 }
@@ -798,12 +837,9 @@ func (t *GetRequiredCCVsForExecute2) UnmarshalJSON(data []byte) error {
 
 // GetRequiredCCVsForSend2 is a Record type
 type GetRequiredCCVsForSend2 struct {
-	OnRampCid             CONTRACT_ID   `json:"onRampCid"`
-	GlobalConfigCid       CONTRACT_ID   `json:"globalConfigCid"`
-	TokenAdminRegistryCid CONTRACT_ID   `json:"tokenAdminRegistryCid"`
-	DestChainSelector     NUMERIC       `json:"destChainSelector"`
-	HasTokenTransfer      BOOL          `json:"hasTokenTransfer"`
-	InstrumentId          *InstrumentId `json:"instrumentId"`
+	OnRampCid         CONTRACT_ID `json:"onRampCid"`
+	GlobalConfigCid   CONTRACT_ID `json:"globalConfigCid"`
+	DestChainSelector NUMERIC     `json:"destChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
@@ -826,28 +862,7 @@ func (t GetRequiredCCVsForSend2) ToMap() map[string]interface{} {
 		return t.GlobalConfigCid
 	}()
 
-	m["tokenAdminRegistryCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
 	m["destChainSelector"] = t.DestChainSelector
-
-	m["hasTokenTransfer"] = bool(t.HasTokenTransfer)
-
-	if t.InstrumentId != nil {
-		m["instrumentId"] = map[string]interface{}{
-			"_type": "optional",
-			"value": *t.InstrumentId,
-		}
-	} else {
-		m["instrumentId"] = map[string]interface{}{
-			"_type": "optional",
-		}
-	}
 
 	return m
 }
@@ -915,9 +930,9 @@ func (t *HasRouter) UnmarshalJSON(data []byte) error {
 
 // PerPartyRouter is a Template type
 type PerPartyRouter struct {
+	InstanceId              TEXT   `json:"instanceId"`
 	CcipOwner               PARTY  `json:"ccipOwner"`
 	PartyOwner              PARTY  `json:"partyOwner"`
-	InstanceId              TEXT   `json:"instanceId"`
 	OutboundSequenceNumbers GENMAP `json:"outboundSequenceNumbers"`
 	ExecutionStates         GENMAP `json:"executionStates"`
 }
@@ -937,13 +952,13 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["partyOwner"] = t.PartyOwner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() interface{} {
@@ -972,13 +987,13 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["partyOwner"] = t.PartyOwner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() interface{} {
@@ -1056,6 +1071,27 @@ func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID strin
 	}
 }
 
+// PrepareExecute exercises the PrepareExecute choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) PrepareExecute(contractID string, args PrepareExecute2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareExecuteWithPackageID exercises the PrepareExecute choice using the provided package ID instead of package name
+func (t PerPartyRouter) PrepareExecuteWithPackageID(contractID string, packageID string, args PrepareExecute2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Execute exercises the Execute choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) Execute(contractID string, args Execute) *model.ExerciseCommand {
@@ -1119,6 +1155,48 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 	}
 }
 
+// PrepareSend exercises the PrepareSend choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) PrepareSend(contractID string, args PrepareSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareSendWithPackageID exercises the PrepareSend choice using the provided package ID instead of package name
+func (t PerPartyRouter) PrepareSendWithPackageID(contractID string, packageID string, args PrepareSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "PrepareSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CancelSend exercises the CancelSend choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) CancelSend(contractID string, args CancelSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "CancelSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CancelSendWithPackageID exercises the CancelSend choice using the provided package ID instead of package name
+func (t PerPartyRouter) CancelSendWithPackageID(contractID string, packageID string, args CancelSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "CancelSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
@@ -1163,8 +1241,8 @@ func (t PerPartyRouter) GetRequiredCCVsForExecuteWithPackageID(contractID string
 
 // PerPartyRouterFactory is a Template type
 type PerPartyRouterFactory struct {
-	CcipOwner         PARTY  `json:"ccipOwner"`
 	InstanceId        TEXT   `json:"instanceId"`
+	CcipOwner         PARTY  `json:"ccipOwner"`
 	RegisteredRouters GENMAP `json:"registeredRouters"`
 }
 
@@ -1183,10 +1261,10 @@ func (t PerPartyRouterFactory) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccipOwner"] = t.CcipOwner.ToMap()
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
+	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registeredRouters"] = func() interface{} {
@@ -1207,10 +1285,10 @@ func (t PerPartyRouterFactory) CreateCommandWithPackageID(packageID string) *mod
 	args := make(map[string]interface{})
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccipOwner"] = t.CcipOwner.ToMap()
+	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
+	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registeredRouters"] = func() interface{} {
@@ -1299,4 +1377,180 @@ func (t PerPartyRouterFactory) HasRouterWithPackageID(contractID string, package
 		Choice:     "HasRouter",
 		Arguments:  argsToMap(args),
 	}
+}
+
+// PrepareExecute2 is a Record type
+type PrepareExecute2 struct {
+	OffRampCid         CONTRACT_ID `json:"offRampCid"`
+	RmnRemoteCid       CONTRACT_ID `json:"rmnRemoteCid"`
+	EncodedMessage     TEXT        `json:"encodedMessage"`
+	ReceiverParty      PARTY       `json:"receiverParty"`
+	TokenReceiverParty *PARTY      `json:"tokenReceiverParty"`
+	Caller             PARTY       `json:"caller"`
+}
+
+// ToMap converts PrepareExecute2 to a map for DAML arguments
+func (t PrepareExecute2) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["offRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OffRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRampCid
+	}()
+
+	m["rmnRemoteCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["receiverParty"] = t.ReceiverParty.ToMap()
+
+	if t.TokenReceiverParty != nil {
+		m["tokenReceiverParty"] = map[string]interface{}{
+			"_type": "optional",
+			"value": (*t.TokenReceiverParty).ToMap(),
+		}
+	} else {
+		m["tokenReceiverParty"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t PrepareExecute2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *PrepareExecute2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// PrepareSend is a Record type
+type PrepareSend struct {
+	OnRampCid             CONTRACT_ID          `json:"onRampCid"`
+	GlobalConfigCid       CONTRACT_ID          `json:"globalConfigCid"`
+	TokenAdminRegistryCid CONTRACT_ID          `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          CONTRACT_ID          `json:"feeQuoterCid"`
+	RmnRemoteCid          CONTRACT_ID          `json:"rmnRemoteCid"`
+	DestChainSelector     NUMERIC              `json:"destChainSelector"`
+	Receiver              TEXT                 `json:"receiver"`
+	Payload               TEXT                 `json:"payload"`
+	CcipReceiveGasLimit   INT64                `json:"ccipReceiveGasLimit"`
+	SenderRequiredCCVs    []RawInstanceAddress `json:"senderRequiredCCVs"`
+	WithTokenTransfer     BOOL                 `json:"withTokenTransfer"`
+	TokenReceiver         *TEXT                `json:"tokenReceiver"`
+	FeeToken              InstrumentId         `json:"feeToken"`
+}
+
+// ToMap converts PrepareSend to a map for DAML arguments
+func (t PrepareSend) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["onRampCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.OnRampCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRampCid
+	}()
+
+	m["globalConfigCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["feeQuoterCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["rmnRemoteCid"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["senderRequiredCCVs"] = func() []interface{} {
+		res := make([]interface{}, 0, len(t.SenderRequiredCCVs))
+		for _, e := range t.SenderRequiredCCVs {
+			type mapper interface{ toMap() map[string]interface{} }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["withTokenTransfer"] = bool(t.WithTokenTransfer)
+
+	if t.TokenReceiver != nil {
+		m["tokenReceiver"] = map[string]interface{}{
+			"_type": "optional",
+			"value": string(*t.TokenReceiver),
+		}
+	} else {
+		m["tokenReceiver"] = map[string]interface{}{
+			"_type": "optional",
+		}
+	}
+
+	m["feeToken"] = func() interface{} {
+		type mapper interface{ toMap() map[string]interface{} }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	return m
+}
+
+func (t PrepareSend) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+func (t *PrepareSend) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
 }
