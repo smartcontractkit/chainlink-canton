@@ -29,3 +29,39 @@ var Deploy = contract.NewDeploy(contract.DeployParams[tokenadminregistry.TokenAd
 	PackageName: string(contracts.CCIPTokenAdminRegistry),
 	Prefix:      "tokenadminregistry",
 })
+
+var ProposeAdministrator = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.TokenAdminRegistryProposeAdministrator]{
+	Name:         "canton/ccip/token_admin_registry/propose_administrator",
+	Version:      Version,
+	Description:  "Proposes a new administrator for a token in the TokenAdminRegistry",
+	ContractType: ContractType,
+	Validate: func(input tokenadminregistry.TokenAdminRegistryProposeAdministrator) error {
+		return nil
+	},
+	Template: tokenadminregistry.TokenAdminRegistry{},
+	Method:   tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryProposeAdministrator,
+})
+
+var AcceptAdminRole = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.TokenAdminRegistryAcceptAdminRole]{
+	Name:         "canton/ccip/token_admin_registry/accept_admin_role",
+	Version:      Version,
+	Description:  "Accepts the admin role for a token in the TokenAdminRegistry",
+	ContractType: ContractType,
+	Validate: func(input tokenadminregistry.TokenAdminRegistryAcceptAdminRole) error {
+		return nil
+	},
+	Template: tokenadminregistry.TokenAdminRegistry{},
+	Method:   tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistryAcceptAdminRole,
+})
+
+var SetPool = contract.NewExercise(contract.ExerciseParams[tokenadminregistry.TokenAdminRegistrySetPool]{
+	Name:         "canton/ccip/token_admin_registry/set_pool",
+	Version:      Version,
+	Description:  "Sets the token pool owner for a token in the TokenAdminRegistry",
+	ContractType: ContractType,
+	Validate: func(input tokenadminregistry.TokenAdminRegistrySetPool) error {
+		return nil
+	},
+	Template: tokenadminregistry.TokenAdminRegistry{},
+	Method:   tokenadminregistry.TokenAdminRegistry{}.TokenAdminRegistrySetPool,
+})
