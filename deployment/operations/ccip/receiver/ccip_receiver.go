@@ -29,3 +29,15 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccipreceiver.CCIPReceiver]
 	PackageName: string(contracts.CCIPReceiver),
 	Prefix:      "ccipreceiver",
 })
+
+var Execute = contract.NewExercise(contract.ExerciseParams[ccipreceiver.Execute2]{
+	Name:         "canton/ccip/receiver/execute",
+	Version:      Version,
+	Description:  "Calls the Execute choice on a CCIP Receiver contract",
+	ContractType: ContractType,
+	Validate: func(input ccipreceiver.Execute2) error {
+		return nil
+	},
+	Template: ccipreceiver.CCIPReceiver{},
+	Method:   ccipreceiver.CCIPReceiver{}.Execute,
+})
