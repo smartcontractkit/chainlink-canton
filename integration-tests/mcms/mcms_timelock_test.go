@@ -10,7 +10,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
-	. "github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -267,18 +267,18 @@ func createMCMSMultiRole(
 	signers := make([]mcms.SignerInfo, len(config.Signers))
 	for i, si := range config.Signers {
 		signers[i] = mcms.SignerInfo{
-			SignerAddress: TEXT(si.SignerAddress),
-			SignerIndex:   INT64(si.SignerIndex),
-			SignerGroup:   INT64(si.SignerGroup),
+			SignerAddress: types.TEXT(si.SignerAddress),
+			SignerIndex:   types.INT64(si.SignerIndex),
+			SignerGroup:   types.INT64(si.SignerGroup),
 		}
 	}
 
 	// Convert GroupQuorums and GroupParents
-	groupQuorums := make([]INT64, NumGroups)
-	groupParents := make([]INT64, NumGroups)
+	groupQuorums := make([]types.INT64, NumGroups)
+	groupParents := make([]types.INT64, NumGroups)
 	for i := range NumGroups {
-		groupQuorums[i] = INT64(config.GroupQuorums[i])
-		groupParents[i] = INT64(config.GroupParents[i])
+		groupQuorums[i] = types.INT64(config.GroupQuorums[i])
+		groupParents[i] = types.INT64(config.GroupParents[i])
 	}
 
 	// Build MultisigConfig
@@ -289,21 +289,21 @@ func createMCMSMultiRole(
 	}
 
 	// Build empty RoleState
-	var validUntil TIMESTAMP
+	var validUntil types.TIMESTAMP
 	emptyRoleState := mcms.RoleState{
 		Config:     multisigConfig,
-		SeenHashes: GENMAP{},
+		SeenHashes: types.GENMAP{},
 		ExpiringRoot: mcms.ExpiringRoot{
-			Root:       TEXT(""),
+			Root:       types.TEXT(""),
 			ValidUntil: validUntil,
-			OpCount:    INT64(0),
+			OpCount:    types.INT64(0),
 		},
 		RootMetadata: mcms.RootMetadata{
-			ChainId:              INT64(0),
-			MultisigId:           TEXT(""),
-			PreOpCount:           INT64(0),
-			PostOpCount:          INT64(0),
-			OverridePreviousRoot: BOOL(false),
+			ChainId:              types.INT64(0),
+			MultisigId:           types.TEXT(""),
+			PreOpCount:           types.INT64(0),
+			PostOpCount:          types.INT64(0),
+			OverridePreviousRoot: types.BOOL(false),
 		},
 	}
 
@@ -311,22 +311,22 @@ func createMCMSMultiRole(
 	blockedFuncs := make([]mcms.BlockedFunction, len(blockedFunctions))
 	for i, bf := range blockedFunctions {
 		blockedFuncs[i] = mcms.BlockedFunction{
-			TargetInstanceId: TEXT(bf.TargetInstanceId),
-			FunctionName:     TEXT(bf.FunctionName),
+			TargetInstanceId: types.TEXT(bf.TargetInstanceId),
+			FunctionName:     types.TEXT(bf.FunctionName),
 		}
 	}
 
 	// Build MCMS template using bindings
 	mcmsTemplate := mcms.MCMS{
-		Owner:              PARTY(owner),
-		InstanceId:         TEXT(instanceID),
-		ChainId:            INT64(chainID),
+		Owner:              types.PARTY(owner),
+		InstanceId:         types.TEXT(instanceID),
+		ChainId:            types.INT64(chainID),
 		Proposer:           emptyRoleState,
 		Canceller:          emptyRoleState,
 		Bypasser:           emptyRoleState,
-		MinDelay:           RELTIME(minDelayMicros),
+		MinDelay:           types.RELTIME(minDelayMicros),
 		BlockedFunctions:   blockedFuncs,
-		TimelockTimestamps: GENMAP{},
+		TimelockTimestamps: types.GENMAP{},
 	}
 
 	// Convert to apiv2.Record using bindings
