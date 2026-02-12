@@ -13,6 +13,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	"github.com/smartcontractkit/go-daml/pkg/bind"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
 )
 
 // ===========================================================================
@@ -80,6 +85,125 @@ type BlockedFunction struct {
 
 // ZeroHash represents "no predecessor" in timelock operations
 const ZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
+
+// ===========================================================================
+// TYPE CONVERSION HELPERS (local <-> generated mcms bindings)
+// ===========================================================================
+
+// ToMCMSTimelockCall converts local TimelockCall to generated mcms.TimelockCall
+func ToMCMSTimelockCall(call TimelockCall) mcms.TimelockCall {
+	return mcms.TimelockCall{
+		TargetInstanceId: types.TEXT(call.TargetInstanceId),
+		FunctionName:     types.TEXT(call.FunctionName),
+		OperationData:    types.TEXT(call.OperationData),
+	}
+}
+
+// ToMCMSTimelockCalls converts a slice of local TimelockCall to mcms.TimelockCall
+func ToMCMSTimelockCalls(calls []TimelockCall) []mcms.TimelockCall {
+	result := make([]mcms.TimelockCall, len(calls))
+	for i, call := range calls {
+		result[i] = ToMCMSTimelockCall(call)
+	}
+
+	return result
+}
+
+// FromMCMSTimelockCall converts mcms.TimelockCall to local TimelockCall
+func FromMCMSTimelockCall(call mcms.TimelockCall) TimelockCall {
+	return TimelockCall{
+		TargetInstanceId: string(call.TargetInstanceId),
+		FunctionName:     string(call.FunctionName),
+		OperationData:    string(call.OperationData),
+	}
+}
+
+// FromMCMSTimelockCalls converts a slice of mcms.TimelockCall to local TimelockCall
+func FromMCMSTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
+	result := make([]TimelockCall, len(calls))
+	for i, call := range calls {
+		result[i] = FromMCMSTimelockCall(call)
+	}
+
+	return result
+}
+
+// NewMCMSEncoder creates an MCMS encoder for the given package ID.
+// Usage: encoder := NewMCMSEncoder(mcmsPkgID)
+//
+//	choice, _ := encoder.ScheduleBatch(params)
+//	proposal.AddOperation(instanceID, choice.Choice, choice.OperationData)
+func NewMCMSEncoder(pkgID string) mcms.MCMSEncoder {
+	return mcms.NewContract(pkgID, "MCMS.Main", "MCMS").Encoder()
+}
+
+// MustEncodeScheduleBatch encodes ScheduleBatchParams and returns the full EncodedChoice.
+// Panics on error. Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeScheduleBatch(encoder mcms.MCMSEncoder, params mcms.ScheduleBatchParams) *bind.EncodedChoice {
+	choice, err := encoder.ScheduleBatch(params)
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode ScheduleBatchParams: %v", err))
+	}
+
+	return choice
+}
+
+// MustEncodeCancelBatch encodes CancelBatchParams and returns the full EncodedChoice.
+// Panics on error. Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeCancelBatch(encoder mcms.MCMSEncoder, params mcms.CancelBatchParams) *bind.EncodedChoice {
+	choice, err := encoder.CancelBatch(params)
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode CancelBatchParams: %v", err))
+	}
+
+	return choice
+}
+
+// MustEncodeBypasserExecute encodes BypasserExecuteBatchParams and returns the full EncodedChoice.
+// Panics on error. Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeBypasserExecuteBatch(encoder mcms.MCMSEncoder, params mcms.BypasserExecuteBatchParams) *bind.EncodedChoice {
+	choice, err := encoder.BypasserExecuteBatch(params)
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode BypasserExecuteBatchParams: %v", err))
+	}
+
+	return choice
+}
+
+// Legacy functions - kept for compatibility but prefer the encoder pattern above
+
+// MustEncodeScheduleBatchParams encodes ScheduleBatchParams using generated bindings, panics on error
+// Deprecated: Use MustEncodeScheduleBatch with an encoder instead
+func MustEncodeScheduleBatchParams(params mcms.ScheduleBatchParams) string {
+	encoded, err := params.MarshalHex()
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode ScheduleBatchParams: %v", err))
+	}
+
+	return encoded
+}
+
+// MustEncodeCancelBatchParams encodes CancelBatchParams using generated bindings, panics on error
+// Deprecated: Use MustEncodeCancelBatch with an encoder instead
+func MustEncodeCancelBatchParams(params mcms.CancelBatchParams) string {
+	encoded, err := params.MarshalHex()
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode CancelBatchParams: %v", err))
+	}
+
+	return encoded
+}
+
+// MustEncodeBypasserExecuteBatchParams encodes BypasserExecuteBatchParams using generated bindings, panics on error
+// Deprecated: Use MustEncodeBypasserExecute with an encoder instead
+func MustEncodeBypasserExecuteBatchParams(params mcms.BypasserExecuteBatchParams) string {
+	encoded, err := params.MarshalHex()
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode BypasserExecuteBatchParams: %v", err))
+	}
+
+	return encoded
+}
 
 // MCMSRootMetadata matches Canton RootMetadata
 type MCMSRootMetadata struct {
@@ -933,8 +1057,8 @@ type ScheduleBatchParams struct {
 	DelaySecs   int    // additional delay in seconds
 }
 
-// BypasserExecuteParams matches Canton MCMS.Codec.BypasserExecuteParams
-type BypasserExecuteParams struct {
+// BypasserExecuteBatchParams matches Canton MCMS.Codec.BypasserExecuteBatchParams
+type BypasserExecuteBatchParams struct {
 	Calls []TimelockCall
 }
 
@@ -970,11 +1094,11 @@ func encodeTimelockCall(call TimelockCall) []byte {
 }
 
 // EncodeScheduleBatchParams encodes ScheduleBatchParams to hex bytes
-// Format: numCalls (1 byte) + calls + encodeText(predecessor) + encodeText(salt) + uint32(delaySecs)
+// Format: numCalls (1 byte) + calls + encodeText(predecessor) + encodeText(salt) + int64(delaySecs)
 // Matches Canton MCMS.Codec.encodeScheduleBatchParams
 func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
-	// Estimate size: 1 (numCalls) + calls + predecessor + salt + 4 (delay)
-	estimatedSize := 1 + len(params.Predecessor) + 1 + len(params.Salt) + 1 + 4
+	// Estimate size: 1 (numCalls) + calls + predecessor + salt + 8 (delay as int64)
+	estimatedSize := 1 + len(params.Predecessor) + 1 + len(params.Salt) + 1 + 8
 	for _, call := range params.Calls {
 		estimatedSize += 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
 	}
@@ -992,18 +1116,18 @@ func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
 	// Encode salt (text)
 	buf = append(buf, encodeText(params.Salt)...)
 
-	// Encode delaySecs (4 bytes, big-endian)
-	delayBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(delayBytes, uint32(params.DelaySecs)) //nolint:gosec
+	// Encode delaySecs (8 bytes, big-endian INT64 to match DAML INT type)
+	delayBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(delayBytes, uint64(params.DelaySecs)) //nolint:gosec
 	buf = append(buf, delayBytes...)
 
 	return hex.EncodeToString(buf)
 }
 
-// EncodeBypasserExecuteParams encodes BypasserExecuteParams to hex bytes
+// EncodeBypasserExecuteBatchParams encodes BypasserExecuteBatchParams to hex bytes
 // Format: numCalls (1 byte) + encoded calls
-// Matches Canton MCMS.Codec.encodeBypasserExecuteParams
-func EncodeBypasserExecuteParams(params BypasserExecuteParams) string {
+// Matches Canton MCMS.Codec.encodeBypasserExecuteBatchParams
+func EncodeBypasserExecuteBatchParams(params BypasserExecuteBatchParams) string {
 	// Estimate size: 1 (numCalls) + calls
 	estimatedSize := 1
 	for _, call := range params.Calls {

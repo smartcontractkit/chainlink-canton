@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 const PackageName = "mcms"
@@ -115,6 +117,18 @@ func (t *APSetConfig) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes APSetConfig to hex string (Canton MCMS format)
+func (t APSetConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes APSetConfig from hex string (Canton MCMS format)
+func (t *APSetConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AdminParams is a variant/union type
 type AdminParams struct {
 	APSetConfig *SET  `json:"AP_SetConfig,omitempty"`
@@ -131,6 +145,18 @@ func (v AdminParams) MarshalJSON() ([]byte, error) {
 func (v *AdminParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
+}
+
+// MarshalHex encodes AdminParams to hex string (Canton MCMS format)
+func (v AdminParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes AdminParams from hex string (Canton MCMS format)
+func (v *AdminParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -183,6 +209,18 @@ func (t *ArchiveMCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ArchiveMCMSEntrypointEvent to hex string (Canton MCMS format)
+func (t ArchiveMCMSEntrypointEvent) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ArchiveMCMSEntrypointEvent from hex string (Canton MCMS format)
+func (t *ArchiveMCMSEntrypointEvent) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ArgValue is a variant/union type
 type ArgValue struct {
 	AVText  *TEXT      `json:"AV_Text,omitempty"`
@@ -202,6 +240,18 @@ func (v ArgValue) MarshalJSON() ([]byte, error) {
 func (v *ArgValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
+}
+
+// MarshalHex encodes ArgValue to hex string (Canton MCMS format)
+func (v ArgValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes ArgValue from hex string (Canton MCMS format)
+func (v *ArgValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -285,13 +335,25 @@ func (t *BlockedFunction) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// BypasserExecuteParams is a Record type
-type BypasserExecuteParams struct {
+// MarshalHex encodes BlockedFunction to hex string (Canton MCMS format)
+func (t BlockedFunction) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BlockedFunction from hex string (Canton MCMS format)
+func (t *BlockedFunction) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// BypasserExecuteBatchParams is a Record type
+type BypasserExecuteBatchParams struct {
 	Calls []TimelockCall `json:"calls"`
 }
 
-// ToMap converts BypasserExecuteParams to a map for DAML arguments
-func (t BypasserExecuteParams) ToMap() map[string]interface{} {
+// ToMap converts BypasserExecuteBatchParams to a map for DAML arguments
+func (t BypasserExecuteBatchParams) ToMap() map[string]interface{} {
 	m := make(map[string]interface{})
 
 	m["calls"] = func() []interface{} {
@@ -310,14 +372,26 @@ func (t BypasserExecuteParams) ToMap() map[string]interface{} {
 	return m
 }
 
-func (t BypasserExecuteParams) MarshalJSON() ([]byte, error) {
+func (t BypasserExecuteBatchParams) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-func (t *BypasserExecuteParams) UnmarshalJSON(data []byte) error {
+func (t *BypasserExecuteBatchParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes BypasserExecuteBatchParams to hex string (Canton MCMS format)
+func (t BypasserExecuteBatchParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BypasserExecuteBatchParams from hex string (Canton MCMS format)
+func (t *BypasserExecuteBatchParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // CanExecuteOp is a Record type
@@ -362,6 +436,18 @@ func (t *CanExecuteOp) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CanExecuteOp to hex string (Canton MCMS format)
+func (t CanExecuteOp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CanExecuteOp from hex string (Canton MCMS format)
+func (t *CanExecuteOp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CancelBatchParams is a Record type
 type CancelBatchParams struct {
 	OpId TEXT `json:"opId"`
@@ -384,6 +470,18 @@ func (t CancelBatchParams) MarshalJSON() ([]byte, error) {
 func (t *CancelBatchParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes CancelBatchParams to hex string (Canton MCMS format)
+func (t CancelBatchParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CancelBatchParams from hex string (Canton MCMS format)
+func (t *CancelBatchParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Counter is a Template type
@@ -449,6 +547,18 @@ func (t Counter) MarshalJSON() ([]byte, error) {
 func (t *Counter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes Counter to hex string (Canton MCMS format)
+func (t Counter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Counter from hex string (Canton MCMS format)
+func (t *Counter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for Counter
@@ -622,6 +732,18 @@ func (t *ExecuteOp) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ExecuteOp to hex string (Canton MCMS format)
+func (t ExecuteOp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecuteOp from hex string (Canton MCMS format)
+func (t *ExecuteOp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecuteScheduledBatch is a Record type
 type ExecuteScheduledBatch struct {
 	Submitter   PARTY          `json:"submitter"`
@@ -678,6 +800,18 @@ func (t *ExecuteScheduledBatch) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ExecuteScheduledBatch to hex string (Canton MCMS format)
+func (t ExecuteScheduledBatch) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecuteScheduledBatch from hex string (Canton MCMS format)
+func (t *ExecuteScheduledBatch) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExpiringRoot is a Record type
 type ExpiringRoot struct {
 	Root       TEXT      `json:"root"`
@@ -708,6 +842,18 @@ func (t *ExpiringRoot) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ExpiringRoot to hex string (Canton MCMS format)
+func (t ExpiringRoot) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExpiringRoot from hex string (Canton MCMS format)
+func (t *ExpiringRoot) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetBlockedFunctions is a Record type
 type GetBlockedFunctions struct {
 	Submitter PARTY `json:"submitter"`
@@ -730,6 +876,18 @@ func (t GetBlockedFunctions) MarshalJSON() ([]byte, error) {
 func (t *GetBlockedFunctions) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetBlockedFunctions to hex string (Canton MCMS format)
+func (t GetBlockedFunctions) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetBlockedFunctions from hex string (Canton MCMS format)
+func (t *GetBlockedFunctions) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // GetBlockedFunctionsCount is a Record type
@@ -756,6 +914,18 @@ func (t *GetBlockedFunctionsCount) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetBlockedFunctionsCount to hex string (Canton MCMS format)
+func (t GetBlockedFunctionsCount) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetBlockedFunctionsCount from hex string (Canton MCMS format)
+func (t *GetBlockedFunctionsCount) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetInstanceIdChoice is a Record type
 type GetInstanceIdChoice struct {
 	Viewer PARTY `json:"viewer"`
@@ -780,6 +950,18 @@ func (t *GetInstanceIdChoice) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetInstanceIdChoice to hex string (Canton MCMS format)
+func (t GetInstanceIdChoice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetInstanceIdChoice from hex string (Canton MCMS format)
+func (t *GetInstanceIdChoice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetMinDelay is a Record type
 type GetMinDelay struct {
 	Submitter PARTY `json:"submitter"`
@@ -802,6 +984,18 @@ func (t GetMinDelay) MarshalJSON() ([]byte, error) {
 func (t *GetMinDelay) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetMinDelay to hex string (Canton MCMS format)
+func (t GetMinDelay) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetMinDelay from hex string (Canton MCMS format)
+func (t *GetMinDelay) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // GetState is a Record type
@@ -837,6 +1031,18 @@ func (t *GetState) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetState to hex string (Canton MCMS format)
+func (t GetState) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetState from hex string (Canton MCMS format)
+func (t *GetState) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetTimestamp is a Record type
 type GetTimestamp struct {
 	Submitter PARTY `json:"submitter"`
@@ -864,6 +1070,18 @@ func (t *GetTimestamp) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetTimestamp to hex string (Canton MCMS format)
+func (t GetTimestamp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetTimestamp from hex string (Canton MCMS format)
+func (t *GetTimestamp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetValue is a Record type
 type GetValue struct {
 	Viewer PARTY `json:"viewer"`
@@ -886,6 +1104,18 @@ func (t GetValue) MarshalJSON() ([]byte, error) {
 func (t *GetValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetValue to hex string (Canton MCMS format)
+func (t GetValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetValue from hex string (Canton MCMS format)
+func (t *GetValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // IsOperation is a Record type
@@ -915,6 +1145,18 @@ func (t *IsOperation) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes IsOperation to hex string (Canton MCMS format)
+func (t IsOperation) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsOperation from hex string (Canton MCMS format)
+func (t *IsOperation) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IsOperationDone is a Record type
 type IsOperationDone struct {
 	Submitter PARTY `json:"submitter"`
@@ -940,6 +1182,18 @@ func (t IsOperationDone) MarshalJSON() ([]byte, error) {
 func (t *IsOperationDone) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes IsOperationDone to hex string (Canton MCMS format)
+func (t IsOperationDone) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsOperationDone from hex string (Canton MCMS format)
+func (t *IsOperationDone) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // IsOperationPending is a Record type
@@ -969,6 +1223,18 @@ func (t *IsOperationPending) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes IsOperationPending to hex string (Canton MCMS format)
+func (t IsOperationPending) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsOperationPending from hex string (Canton MCMS format)
+func (t *IsOperationPending) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IsOperationReady is a Record type
 type IsOperationReady struct {
 	Submitter PARTY `json:"submitter"`
@@ -994,6 +1260,18 @@ func (t IsOperationReady) MarshalJSON() ([]byte, error) {
 func (t *IsOperationReady) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes IsOperationReady to hex string (Canton MCMS format)
+func (t IsOperationReady) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsOperationReady from hex string (Canton MCMS format)
+func (t *IsOperationReady) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // MCMS is a Template type
@@ -1181,6 +1459,18 @@ func (t MCMS) MarshalJSON() ([]byte, error) {
 func (t *MCMS) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes MCMS to hex string (Canton MCMS format)
+func (t MCMS) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMS from hex string (Canton MCMS format)
+func (t *MCMS) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for MCMS
@@ -1591,6 +1881,18 @@ func (t *MCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes MCMSEntrypointEvent to hex string (Canton MCMS format)
+func (t MCMSEntrypointEvent) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMSEntrypointEvent from hex string (Canton MCMS format)
+func (t *MCMSEntrypointEvent) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for MCMSEntrypointEvent
 
 // Archive exercises the Archive choice on this MCMSEntrypointEvent contract
@@ -1662,6 +1964,18 @@ func (t *MCMSReceiverView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes MCMSReceiverView to hex string (Canton MCMS format)
+func (t MCMSReceiverView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMSReceiverView from hex string (Canton MCMS format)
+func (t *MCMSReceiverView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
 	Caller        PARTY         `json:"caller"`
@@ -1701,6 +2015,18 @@ func (t *MCMSReceiverEntrypoint) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes MCMSReceiverEntrypoint to hex string (Canton MCMS format)
+func (t MCMSReceiverEntrypoint) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMSReceiverEntrypoint from hex string (Canton MCMS format)
+func (t *MCMSReceiverEntrypoint) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSReceiverGetInstanceId is a Record type
 type MCMSReceiverGetInstanceId struct {
 	C PARTY `json:"c"`
@@ -1723,6 +2049,18 @@ func (t MCMSReceiverGetInstanceId) MarshalJSON() ([]byte, error) {
 func (t *MCMSReceiverGetInstanceId) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes MCMSReceiverGetInstanceId to hex string (Canton MCMS format)
+func (t MCMSReceiverGetInstanceId) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMSReceiverGetInstanceId from hex string (Canton MCMS format)
+func (t *MCMSReceiverGetInstanceId) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // MCMSState is a Record type
@@ -1768,6 +2106,18 @@ func (t MCMSState) MarshalJSON() ([]byte, error) {
 func (t *MCMSState) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes MCMSState to hex string (Canton MCMS format)
+func (t MCMSState) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMSState from hex string (Canton MCMS format)
+func (t *MCMSState) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // MultisigConfig is a Record type
@@ -1823,6 +2173,18 @@ func (t *MultisigConfig) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes MultisigConfig to hex string (Canton MCMS format)
+func (t MultisigConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MultisigConfig from hex string (Canton MCMS format)
+func (t *MultisigConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Op is a Record type
 type Op struct {
 	ChainId          INT64 `json:"chainId"`
@@ -1862,6 +2224,18 @@ func (t *Op) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes Op to hex string (Canton MCMS format)
+func (t Op) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Op from hex string (Canton MCMS format)
+func (t *Op) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RawSignature is a Record type
 type RawSignature struct {
 	PublicKey TEXT `json:"publicKey"`
@@ -1890,6 +2264,18 @@ func (t RawSignature) MarshalJSON() ([]byte, error) {
 func (t *RawSignature) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes RawSignature to hex string (Canton MCMS format)
+func (t RawSignature) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RawSignature from hex string (Canton MCMS format)
+func (t *RawSignature) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Role is an enum type
@@ -1922,6 +2308,18 @@ func (e Role) MarshalJSON() ([]byte, error) {
 func (e *Role) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, e)
+}
+
+// MarshalHex encodes Role to hex string (Canton MCMS format)
+func (e Role) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes Role from hex string (Canton MCMS format)
+func (e *Role) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
 }
 
 var _ ENUM = Role("")
@@ -1982,6 +2380,18 @@ func (t *RoleState) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes RoleState to hex string (Canton MCMS format)
+func (t RoleState) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RoleState from hex string (Canton MCMS format)
+func (t *RoleState) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RootMetadata is a Record type
 type RootMetadata struct {
 	ChainId              INT64 `json:"chainId"`
@@ -2016,6 +2426,18 @@ func (t RootMetadata) MarshalJSON() ([]byte, error) {
 func (t *RootMetadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes RootMetadata to hex string (Canton MCMS format)
+func (t RootMetadata) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RootMetadata from hex string (Canton MCMS format)
+func (t *RootMetadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ScheduleBatchParams is a Record type
@@ -2060,6 +2482,18 @@ func (t ScheduleBatchParams) MarshalJSON() ([]byte, error) {
 func (t *ScheduleBatchParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes ScheduleBatchParams to hex string (Canton MCMS format)
+func (t ScheduleBatchParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ScheduleBatchParams from hex string (Canton MCMS format)
+func (t *ScheduleBatchParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // SetConfig is a Record type
@@ -2127,6 +2561,18 @@ func (t *SetConfig) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes SetConfig to hex string (Canton MCMS format)
+func (t SetConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetConfig from hex string (Canton MCMS format)
+func (t *SetConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetConfigParams is a Record type
 type SetConfigParams struct {
 	Signers      []SignerInfo `json:"signers"`
@@ -2181,6 +2627,18 @@ func (t SetConfigParams) MarshalJSON() ([]byte, error) {
 func (t *SetConfigParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes SetConfigParams to hex string (Canton MCMS format)
+func (t SetConfigParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetConfigParams from hex string (Canton MCMS format)
+func (t *SetConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // SetRoot is a Record type
@@ -2254,6 +2712,18 @@ func (t *SetRoot) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes SetRoot to hex string (Canton MCMS format)
+func (t SetRoot) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetRoot from hex string (Canton MCMS format)
+func (t *SetRoot) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SignerInfo is a Record type
 type SignerInfo struct {
 	SignerAddress TEXT  `json:"signerAddress"`
@@ -2282,6 +2752,18 @@ func (t SignerInfo) MarshalJSON() ([]byte, error) {
 func (t *SignerInfo) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes SignerInfo to hex string (Canton MCMS format)
+func (t SignerInfo) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SignerInfo from hex string (Canton MCMS format)
+func (t *SignerInfo) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TimelockCall is a Record type
@@ -2314,6 +2796,18 @@ func (t *TimelockCall) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TimelockCall to hex string (Canton MCMS format)
+func (t TimelockCall) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TimelockCall from hex string (Canton MCMS format)
+func (t *TimelockCall) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IMCMSReceiverInterfaceID returns the interface ID for the IMCMSReceiver interface using the package name
 func IMCMSReceiverInterfaceID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSReceiver", "MCMSReceiver")
@@ -2323,3 +2817,152 @@ func IMCMSReceiverInterfaceID() string {
 func IMCMSReceiverInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.MCMSReceiver", "MCMSReceiver")
 }
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	BypasserExecuteBatch(args BypasserExecuteBatchParams) (*bind.EncodedChoice, error)
+	CanExecuteOp(args CanExecuteOp) (*bind.EncodedChoice, error)
+	CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, error)
+	ExecuteOp(args ExecuteOp) (*bind.EncodedChoice, error)
+	ExecuteScheduledBatch(args ExecuteScheduledBatch) (*bind.EncodedChoice, error)
+	GetBlockedFunctions(args GetBlockedFunctions) (*bind.EncodedChoice, error)
+	GetBlockedFunctionsCount(args GetBlockedFunctionsCount) (*bind.EncodedChoice, error)
+	GetInstanceIdChoice(args GetInstanceIdChoice) (*bind.EncodedChoice, error)
+	GetMinDelay(args GetMinDelay) (*bind.EncodedChoice, error)
+	GetState(args GetState) (*bind.EncodedChoice, error)
+	GetTimestamp(args GetTimestamp) (*bind.EncodedChoice, error)
+	GetValue(args GetValue) (*bind.EncodedChoice, error)
+	IsOperation(args IsOperation) (*bind.EncodedChoice, error)
+	IsOperationDone(args IsOperationDone) (*bind.EncodedChoice, error)
+	IsOperationPending(args IsOperationPending) (*bind.EncodedChoice, error)
+	IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, error)
+	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
+	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
+	SetRoot(args SetRoot) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// BypasserExecuteBatch encodes parameters for the BypasserExecuteBatch choice.
+func (e *encoder) BypasserExecuteBatch(args BypasserExecuteBatchParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("BypasserExecuteBatch", args)
+}
+
+// CanExecuteOp encodes parameters for the CanExecuteOp choice.
+func (e *encoder) CanExecuteOp(args CanExecuteOp) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CanExecuteOp", args)
+}
+
+// CancelBatch encodes parameters for the CancelBatch choice.
+func (e *encoder) CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CancelBatch", args)
+}
+
+// ExecuteOp encodes parameters for the ExecuteOp choice.
+func (e *encoder) ExecuteOp(args ExecuteOp) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ExecuteOp", args)
+}
+
+// ExecuteScheduledBatch encodes parameters for the ExecuteScheduledBatch choice.
+func (e *encoder) ExecuteScheduledBatch(args ExecuteScheduledBatch) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ExecuteScheduledBatch", args)
+}
+
+// GetBlockedFunctions encodes parameters for the GetBlockedFunctions choice.
+func (e *encoder) GetBlockedFunctions(args GetBlockedFunctions) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetBlockedFunctions", args)
+}
+
+// GetBlockedFunctionsCount encodes parameters for the GetBlockedFunctionsCount choice.
+func (e *encoder) GetBlockedFunctionsCount(args GetBlockedFunctionsCount) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetBlockedFunctionsCount", args)
+}
+
+// GetInstanceIdChoice encodes parameters for the GetInstanceIdChoice choice.
+func (e *encoder) GetInstanceIdChoice(args GetInstanceIdChoice) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetInstanceIdChoice", args)
+}
+
+// GetMinDelay encodes parameters for the GetMinDelay choice.
+func (e *encoder) GetMinDelay(args GetMinDelay) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetMinDelay", args)
+}
+
+// GetState encodes parameters for the GetState choice.
+func (e *encoder) GetState(args GetState) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetState", args)
+}
+
+// GetTimestamp encodes parameters for the GetTimestamp choice.
+func (e *encoder) GetTimestamp(args GetTimestamp) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetTimestamp", args)
+}
+
+// GetValue encodes parameters for the GetValue choice.
+func (e *encoder) GetValue(args GetValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetValue", args)
+}
+
+// IsOperation encodes parameters for the IsOperation choice.
+func (e *encoder) IsOperation(args IsOperation) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("IsOperation", args)
+}
+
+// IsOperationDone encodes parameters for the IsOperationDone choice.
+func (e *encoder) IsOperationDone(args IsOperationDone) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("IsOperationDone", args)
+}
+
+// IsOperationPending encodes parameters for the IsOperationPending choice.
+func (e *encoder) IsOperationPending(args IsOperationPending) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("IsOperationPending", args)
+}
+
+// IsOperationReady encodes parameters for the IsOperationReady choice.
+func (e *encoder) IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("IsOperationReady", args)
+}
+
+// ScheduleBatch encodes parameters for the ScheduleBatch choice.
+func (e *encoder) ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ScheduleBatch", args)
+}
+
+// SetConfig encodes parameters for the SetConfig choice.
+func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetConfig", args)
+}
+
+// SetRoot encodes parameters for the SetRoot choice.
+func (e *encoder) SetRoot(args SetRoot) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetRoot", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

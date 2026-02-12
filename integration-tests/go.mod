@@ -6,8 +6,6 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 
 replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
 
-replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260212010319-eefec8925e3c
-
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
@@ -18,12 +16,13 @@ require (
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.34.0
+	github.com/shopspring/decimal v1.4.0
 	github.com/smartcontractkit/chain-selectors v1.0.92
 	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260206205333-9187f22f0a04
 	github.com/smartcontractkit/chainlink-common v0.9.6-0.20260122165924-94e0fad14fe8
 	github.com/smartcontractkit/chainlink-deployments-framework v0.79.0
-	github.com/smartcontractkit/go-daml v0.6.0
+	github.com/smartcontractkit/go-daml v0.0.0-20260212213928-4ad0234af788
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
 )
@@ -164,7 +163,6 @@ require (
 	github.com/scylladb/go-reflectx v1.0.1 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/shirou/gopsutil/v4 v4.25.9 // indirect
-	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20251212131933-e5e85d6fa4d3 // indirect

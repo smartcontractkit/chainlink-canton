@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // ExecuteFromRouter is a Record type
@@ -93,6 +95,18 @@ func (t *ExecuteFromRouter) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ExecuteFromRouter to hex string (Canton MCMS format)
+func (t ExecuteFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecuteFromRouter from hex string (Canton MCMS format)
+func (t *ExecuteFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
 	MessageId           TEXT         `json:"messageId"`
@@ -144,6 +158,18 @@ func (t *ExecuteFromRouterResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ExecuteFromRouterResult to hex string (Canton MCMS format)
+func (t ExecuteFromRouterResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecuteFromRouterResult from hex string (Canton MCMS format)
+func (t *ExecuteFromRouterResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
 	GlobalConfigCid      CONTRACT_ID          `json:"globalConfigCid"`
@@ -189,6 +215,18 @@ func (t GetRequiredCCVsForExecute) MarshalJSON() ([]byte, error) {
 func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetRequiredCCVsForExecute to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForExecute) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsForExecute from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // OffRamp is a Template type
@@ -304,6 +342,18 @@ func (t OffRamp) MarshalJSON() ([]byte, error) {
 func (t *OffRamp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes OffRamp to hex string (Canton MCMS format)
+func (t OffRamp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes OffRamp from hex string (Canton MCMS format)
+func (t *OffRamp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for OffRamp
@@ -441,4 +491,16 @@ func (t PrepareExecute) MarshalJSON() ([]byte, error) {
 func (t *PrepareExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes PrepareExecute to hex string (Canton MCMS format)
+func (t PrepareExecute) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareExecute from hex string (Canton MCMS format)
+func (t *PrepareExecute) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }

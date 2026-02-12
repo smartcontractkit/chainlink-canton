@@ -57,7 +57,7 @@ jobs:
           echo "Building godaml from source..."
           git clone https://github.com/smartcontractkit/go-daml.git /tmp/go-daml
           cd /tmp/go-daml
-          git checkout eefec8925e3c06a6fe0e8cd5c0b531127b85a970
+          git checkout 1ed60c9b3092242c64b2634db6ef5f1a3416de02
 
           MAIN_DIRS="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | sed '/^$/d' || true)"
           MAIN_DIR="$(echo "$MAIN_DIRS" | grep -E '/cmd/|/cli/' | head -n 1 || true)"

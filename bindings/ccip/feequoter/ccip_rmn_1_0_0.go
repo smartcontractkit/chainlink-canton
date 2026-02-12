@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // Curse is a Record type
@@ -43,6 +45,18 @@ func (t *Curse) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes Curse to hex string (Canton MCMS format)
+func (t Curse) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Curse from hex string (Canton MCMS format)
+func (t *Curse) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CurseChain is a Record type
 type CurseChain struct {
 	ChainSelector NUMERIC `json:"chainSelector"`
@@ -67,6 +81,18 @@ func (t *CurseChain) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CurseChain to hex string (Canton MCMS format)
+func (t CurseChain) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CurseChain from hex string (Canton MCMS format)
+func (t *CurseChain) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CurseGlobal is a Record type
 type CurseGlobal struct {
 }
@@ -85,6 +111,18 @@ func (t CurseGlobal) MarshalJSON() ([]byte, error) {
 func (t *CurseGlobal) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes CurseGlobal to hex string (Canton MCMS format)
+func (t CurseGlobal) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CurseGlobal from hex string (Canton MCMS format)
+func (t *CurseGlobal) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // CurseMultiple is a Record type
@@ -117,6 +155,18 @@ func (t *CurseMultiple) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CurseMultiple to hex string (Canton MCMS format)
+func (t CurseMultiple) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CurseMultiple from hex string (Canton MCMS format)
+func (t *CurseMultiple) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetCursedSubjects is a Record type
 type GetCursedSubjects struct {
 	Caller PARTY `json:"caller"`
@@ -141,6 +191,18 @@ func (t *GetCursedSubjects) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetCursedSubjects to hex string (Canton MCMS format)
+func (t GetCursedSubjects) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetCursedSubjects from hex string (Canton MCMS format)
+func (t *GetCursedSubjects) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IsCursed is a Record type
 type IsCursed struct {
 	Caller PARTY `json:"caller"`
@@ -163,6 +225,18 @@ func (t IsCursed) MarshalJSON() ([]byte, error) {
 func (t *IsCursed) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes IsCursed to hex string (Canton MCMS format)
+func (t IsCursed) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsCursed from hex string (Canton MCMS format)
+func (t *IsCursed) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // IsCursedForChain is a Record type
@@ -190,6 +264,18 @@ func (t IsCursedForChain) MarshalJSON() ([]byte, error) {
 func (t *IsCursedForChain) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes IsCursedForChain to hex string (Canton MCMS format)
+func (t IsCursedForChain) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsCursedForChain from hex string (Canton MCMS format)
+func (t *IsCursedForChain) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // RMNRemote is a Template type
@@ -274,6 +360,18 @@ func (t RMNRemote) MarshalJSON() ([]byte, error) {
 func (t *RMNRemote) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes RMNRemote to hex string (Canton MCMS format)
+func (t RMNRemote) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RMNRemote from hex string (Canton MCMS format)
+func (t *RMNRemote) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for RMNRemote
@@ -575,6 +673,18 @@ func (t *Uncurse) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes Uncurse to hex string (Canton MCMS format)
+func (t Uncurse) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Uncurse from hex string (Canton MCMS format)
+func (t *Uncurse) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UncurseChain is a Record type
 type UncurseChain struct {
 	ChainSelector NUMERIC `json:"chainSelector"`
@@ -599,6 +709,18 @@ func (t *UncurseChain) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes UncurseChain to hex string (Canton MCMS format)
+func (t UncurseChain) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UncurseChain from hex string (Canton MCMS format)
+func (t *UncurseChain) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UncurseGlobal is a Record type
 type UncurseGlobal struct {
 }
@@ -617,6 +739,18 @@ func (t UncurseGlobal) MarshalJSON() ([]byte, error) {
 func (t *UncurseGlobal) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes UncurseGlobal to hex string (Canton MCMS format)
+func (t UncurseGlobal) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UncurseGlobal from hex string (Canton MCMS format)
+func (t *UncurseGlobal) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // UncurseMultiple is a Record type
@@ -649,6 +783,18 @@ func (t *UncurseMultiple) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes UncurseMultiple to hex string (Canton MCMS format)
+func (t UncurseMultiple) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UncurseMultiple from hex string (Canton MCMS format)
+func (t *UncurseMultiple) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UpdateCCIPOwner is a Record type
 type UpdateCCIPOwner struct {
 	NewCCIPOwner PARTY `json:"newCCIPOwner"`
@@ -671,4 +817,16 @@ func (t UpdateCCIPOwner) MarshalJSON() ([]byte, error) {
 func (t *UpdateCCIPOwner) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes UpdateCCIPOwner to hex string (Canton MCMS format)
+func (t UpdateCCIPOwner) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdateCCIPOwner from hex string (Canton MCMS format)
+func (t *UpdateCCIPOwner) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }

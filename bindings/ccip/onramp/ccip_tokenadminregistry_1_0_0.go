@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // PoolRegistration is a Record type
@@ -44,6 +46,18 @@ func (t PoolRegistration) MarshalJSON() ([]byte, error) {
 func (t *PoolRegistration) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes PoolRegistration to hex string (Canton MCMS format)
+func (t PoolRegistration) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PoolRegistration from hex string (Canton MCMS format)
+func (t *PoolRegistration) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenAdminRegistry is a Template type
@@ -119,6 +133,18 @@ func (t TokenAdminRegistry) MarshalJSON() ([]byte, error) {
 func (t *TokenAdminRegistry) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistry to hex string (Canton MCMS format)
+func (t TokenAdminRegistry) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistry from hex string (Canton MCMS format)
+func (t *TokenAdminRegistry) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for TokenAdminRegistry
@@ -366,6 +392,18 @@ func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenAdminRegistryAcceptAdminRole to hex string (Canton MCMS format)
+func (t TokenAdminRegistryAcceptAdminRole) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryAcceptAdminRole from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryConsumeReceiveTicket is a Record type
 type TokenAdminRegistryConsumeReceiveTicket struct {
 	TicketCid    CONTRACT_ID  `json:"ticketCid"`
@@ -408,6 +446,18 @@ func (t *TokenAdminRegistryConsumeReceiveTicket) UnmarshalJSON(data []byte) erro
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenAdminRegistryConsumeReceiveTicket to hex string (Canton MCMS format)
+func (t TokenAdminRegistryConsumeReceiveTicket) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryConsumeReceiveTicket from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryConsumeReceiveTicket) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryGetTokenConfig is a Record type
 type TokenAdminRegistryGetTokenConfig struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
@@ -439,6 +489,18 @@ func (t TokenAdminRegistryGetTokenConfig) MarshalJSON() ([]byte, error) {
 func (t *TokenAdminRegistryGetTokenConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryGetTokenConfig to hex string (Canton MCMS format)
+func (t TokenAdminRegistryGetTokenConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryGetTokenConfig from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryGetTokenConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenAdminRegistryIsAdministrator is a Record type
@@ -475,6 +537,18 @@ func (t TokenAdminRegistryIsAdministrator) MarshalJSON() ([]byte, error) {
 func (t *TokenAdminRegistryIsAdministrator) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryIsAdministrator to hex string (Canton MCMS format)
+func (t TokenAdminRegistryIsAdministrator) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryIsAdministrator from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryIsAdministrator) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenAdminRegistryIssueReceiveTicket is a Record type
@@ -525,6 +599,18 @@ func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalJSON(data []byte) error 
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenAdminRegistryIssueReceiveTicket to hex string (Canton MCMS format)
+func (t TokenAdminRegistryIssueReceiveTicket) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryIssueReceiveTicket from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryProposeAdministrator is a Record type
 type TokenAdminRegistryProposeAdministrator struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
@@ -559,6 +645,18 @@ func (t TokenAdminRegistryProposeAdministrator) MarshalJSON() ([]byte, error) {
 func (t *TokenAdminRegistryProposeAdministrator) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryProposeAdministrator to hex string (Canton MCMS format)
+func (t TokenAdminRegistryProposeAdministrator) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryProposeAdministrator from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryProposeAdministrator) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenAdminRegistrySetInboundPoolCCVs is a Record type
@@ -611,6 +709,18 @@ func (t *TokenAdminRegistrySetInboundPoolCCVs) UnmarshalJSON(data []byte) error 
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenAdminRegistrySetInboundPoolCCVs to hex string (Canton MCMS format)
+func (t TokenAdminRegistrySetInboundPoolCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistrySetInboundPoolCCVs from hex string (Canton MCMS format)
+func (t *TokenAdminRegistrySetInboundPoolCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistrySetPool is a Record type
 type TokenAdminRegistrySetPool struct {
 	InstrumentId InstrumentId      `json:"instrumentId"`
@@ -656,6 +766,18 @@ func (t *TokenAdminRegistrySetPool) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenAdminRegistrySetPool to hex string (Canton MCMS format)
+func (t TokenAdminRegistrySetPool) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistrySetPool from hex string (Canton MCMS format)
+func (t *TokenAdminRegistrySetPool) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryTransferAdminRole is a Record type
 type TokenAdminRegistryTransferAdminRole struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
@@ -690,6 +812,18 @@ func (t TokenAdminRegistryTransferAdminRole) MarshalJSON() ([]byte, error) {
 func (t *TokenAdminRegistryTransferAdminRole) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryTransferAdminRole to hex string (Canton MCMS format)
+func (t TokenAdminRegistryTransferAdminRole) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryTransferAdminRole from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryTransferAdminRole) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenConfig is a Record type
@@ -747,4 +881,16 @@ func (t TokenConfig) MarshalJSON() ([]byte, error) {
 func (t *TokenConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenConfig to hex string (Canton MCMS format)
+func (t TokenConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenConfig from hex string (Canton MCMS format)
+func (t *TokenConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }

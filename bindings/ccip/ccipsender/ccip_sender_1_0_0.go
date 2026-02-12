@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 const PackageName = "ccip-sender"
@@ -104,6 +106,18 @@ func (t *CCIPSender) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CCIPSender to hex string (Canton MCMS format)
+func (t CCIPSender) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPSender from hex string (Canton MCMS format)
+func (t *CCIPSender) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for CCIPSender
 
 // Archive exercises the Archive choice on this CCIPSender contract
@@ -188,6 +202,18 @@ func (t CCVSendInput) MarshalJSON() ([]byte, error) {
 func (t *CCVSendInput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes CCVSendInput to hex string (Canton MCMS format)
+func (t CCVSendInput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCVSendInput from hex string (Canton MCMS format)
+func (t *CCVSendInput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Send is a Record type
@@ -344,6 +370,18 @@ func (t *Send) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes Send to hex string (Canton MCMS format)
+func (t Send) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Send from hex string (Canton MCMS format)
+func (t *Send) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
 	TokenPoolCid    CONTRACT_ID   `json:"tokenPoolCid"`
@@ -406,3 +444,56 @@ func (t *TokenTransferInput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
+
+// MarshalHex encodes TokenTransferInput to hex string (Canton MCMS format)
+func (t TokenTransferInput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenTransferInput from hex string (Canton MCMS format)
+func (t *TokenTransferInput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	Send(args Send) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// Send encodes parameters for the Send choice.
+func (e *encoder) Send(args Send) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Send", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // IHolding is a DAML interface
@@ -83,6 +85,18 @@ func (t *HoldingView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes HoldingView to hex string (Canton MCMS format)
+func (t HoldingView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes HoldingView from hex string (Canton MCMS format)
+func (t *HoldingView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // InstrumentId is a Record type
 type InstrumentId struct {
 	Admin PARTY `json:"admin"`
@@ -108,6 +122,18 @@ func (t InstrumentId) MarshalJSON() ([]byte, error) {
 func (t *InstrumentId) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes InstrumentId to hex string (Canton MCMS format)
+func (t InstrumentId) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes InstrumentId from hex string (Canton MCMS format)
+func (t *InstrumentId) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Lock is a Record type
@@ -171,6 +197,18 @@ func (t Lock) MarshalJSON() ([]byte, error) {
 func (t *Lock) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes Lock to hex string (Canton MCMS format)
+func (t Lock) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Lock from hex string (Canton MCMS format)
+func (t *Lock) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // IHoldingInterfaceID returns the interface ID for the IHolding interface using the package name

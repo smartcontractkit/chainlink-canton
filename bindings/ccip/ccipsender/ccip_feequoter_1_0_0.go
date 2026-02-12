@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // ApplyDestChainConfigUpdates is a Record type
@@ -52,6 +54,18 @@ func (t ApplyDestChainConfigUpdates) MarshalJSON() ([]byte, error) {
 func (t *ApplyDestChainConfigUpdates) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes ApplyDestChainConfigUpdates to hex string (Canton MCMS format)
+func (t ApplyDestChainConfigUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyDestChainConfigUpdates from hex string (Canton MCMS format)
+func (t *ApplyDestChainConfigUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ApplyFeeTokenUpdates is a Record type
@@ -106,6 +120,18 @@ func (t *ApplyFeeTokenUpdates) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ApplyFeeTokenUpdates to hex string (Canton MCMS format)
+func (t ApplyFeeTokenUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyFeeTokenUpdates from hex string (Canton MCMS format)
+func (t *ApplyFeeTokenUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DestChainConfig2 is a Record type
 type DestChainConfig2 struct {
 	IsEnabled                   BOOL    `json:"isEnabled"`
@@ -157,6 +183,18 @@ func (t *DestChainConfig2) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes DestChainConfig2 to hex string (Canton MCMS format)
+func (t DestChainConfig2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DestChainConfig2 from hex string (Canton MCMS format)
+func (t *DestChainConfig2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DestChainConfigArgs is a Record type
 type DestChainConfigArgs struct {
 	DestChainSelector NUMERIC          `json:"destChainSelector"`
@@ -188,6 +226,18 @@ func (t DestChainConfigArgs) MarshalJSON() ([]byte, error) {
 func (t *DestChainConfigArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes DestChainConfigArgs to hex string (Canton MCMS format)
+func (t DestChainConfigArgs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DestChainConfigArgs from hex string (Canton MCMS format)
+func (t *DestChainConfigArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // FeeQuoter is a Template type
@@ -350,6 +400,18 @@ func (t FeeQuoter) MarshalJSON() ([]byte, error) {
 func (t *FeeQuoter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes FeeQuoter to hex string (Canton MCMS format)
+func (t FeeQuoter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoter from hex string (Canton MCMS format)
+func (t *FeeQuoter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for FeeQuoter
@@ -618,6 +680,18 @@ func (t *FeeQuoterFinalizeFee) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes FeeQuoterFinalizeFee to hex string (Canton MCMS format)
+func (t FeeQuoterFinalizeFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterFinalizeFee from hex string (Canton MCMS format)
+func (t *FeeQuoterFinalizeFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FeeQuoterGetTokenTransferFee is a Record type
 type FeeQuoterGetTokenTransferFee struct {
 	DestChainSelector NUMERIC      `json:"destChainSelector"`
@@ -654,6 +728,18 @@ func (t *FeeQuoterGetTokenTransferFee) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes FeeQuoterGetTokenTransferFee to hex string (Canton MCMS format)
+func (t FeeQuoterGetTokenTransferFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterGetTokenTransferFee from hex string (Canton MCMS format)
+func (t *FeeQuoterGetTokenTransferFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FeeTokenArgs is a Record type
 type FeeTokenArgs struct {
 	InstrumentId      InstrumentId `json:"instrumentId"`
@@ -687,6 +773,18 @@ func (t *FeeTokenArgs) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes FeeTokenArgs to hex string (Canton MCMS format)
+func (t FeeTokenArgs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeTokenArgs from hex string (Canton MCMS format)
+func (t *FeeTokenArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GasPriceUpdate is a Record type
 type GasPriceUpdate struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
@@ -712,6 +810,18 @@ func (t GasPriceUpdate) MarshalJSON() ([]byte, error) {
 func (t *GasPriceUpdate) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GasPriceUpdate to hex string (Canton MCMS format)
+func (t GasPriceUpdate) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GasPriceUpdate from hex string (Canton MCMS format)
+func (t *GasPriceUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // GetDestChainConfig2 is a Record type
@@ -741,6 +851,18 @@ func (t *GetDestChainConfig2) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetDestChainConfig2 to hex string (Canton MCMS format)
+func (t GetDestChainConfig2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetDestChainConfig2 from hex string (Canton MCMS format)
+func (t *GetDestChainConfig2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetDestinationChainGasPrice is a Record type
 type GetDestinationChainGasPrice struct {
 	DestChainSelector NUMERIC `json:"destChainSelector"`
@@ -768,6 +890,18 @@ func (t *GetDestinationChainGasPrice) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetDestinationChainGasPrice to hex string (Canton MCMS format)
+func (t GetDestinationChainGasPrice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetDestinationChainGasPrice from hex string (Canton MCMS format)
+func (t *GetDestinationChainGasPrice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetFeeTokens is a Record type
 type GetFeeTokens struct {
 	Caller PARTY `json:"caller"`
@@ -790,6 +924,18 @@ func (t GetFeeTokens) MarshalJSON() ([]byte, error) {
 func (t *GetFeeTokens) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetFeeTokens to hex string (Canton MCMS format)
+func (t GetFeeTokens) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFeeTokens from hex string (Canton MCMS format)
+func (t *GetFeeTokens) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // GetPremiumMultiplierWeiPerEth is a Record type
@@ -825,6 +971,18 @@ func (t *GetPremiumMultiplierWeiPerEth) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes GetPremiumMultiplierWeiPerEth to hex string (Canton MCMS format)
+func (t GetPremiumMultiplierWeiPerEth) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetPremiumMultiplierWeiPerEth from hex string (Canton MCMS format)
+func (t *GetPremiumMultiplierWeiPerEth) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetTokenPrice is a Record type
 type GetTokenPrice struct {
 	InstrumentId InstrumentId `json:"instrumentId"`
@@ -856,6 +1014,18 @@ func (t GetTokenPrice) MarshalJSON() ([]byte, error) {
 func (t *GetTokenPrice) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetTokenPrice to hex string (Canton MCMS format)
+func (t GetTokenPrice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetTokenPrice from hex string (Canton MCMS format)
+func (t *GetTokenPrice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // PriceUpdates is a Record type
@@ -907,6 +1077,18 @@ func (t *PriceUpdates) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes PriceUpdates to hex string (Canton MCMS format)
+func (t PriceUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PriceUpdates from hex string (Canton MCMS format)
+func (t *PriceUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TimestampedPrice is a Record type
 type TimestampedPrice struct {
 	Price     NUMERIC   `json:"price"`
@@ -932,6 +1114,18 @@ func (t TimestampedPrice) MarshalJSON() ([]byte, error) {
 func (t *TimestampedPrice) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TimestampedPrice to hex string (Canton MCMS format)
+func (t TimestampedPrice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TimestampedPrice from hex string (Canton MCMS format)
+func (t *TimestampedPrice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenPriceUpdate is a Record type
@@ -967,6 +1161,18 @@ func (t *TokenPriceUpdate) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenPriceUpdate to hex string (Canton MCMS format)
+func (t TokenPriceUpdate) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPriceUpdate from hex string (Canton MCMS format)
+func (t *TokenPriceUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenTransferFeeConfig is a Record type
 type TokenTransferFeeConfig struct {
 	FeeUSD            NUMERIC `json:"feeUSD"`
@@ -995,6 +1201,18 @@ func (t TokenTransferFeeConfig) MarshalJSON() ([]byte, error) {
 func (t *TokenTransferFeeConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenTransferFeeConfig to hex string (Canton MCMS format)
+func (t TokenTransferFeeConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenTransferFeeConfig from hex string (Canton MCMS format)
+func (t *TokenTransferFeeConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // UpdatePrices is a Record type
@@ -1028,4 +1246,16 @@ func (t UpdatePrices) MarshalJSON() ([]byte, error) {
 func (t *UpdatePrices) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes UpdatePrices to hex string (Canton MCMS format)
+func (t UpdatePrices) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdatePrices from hex string (Canton MCMS format)
+func (t *UpdatePrices) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }

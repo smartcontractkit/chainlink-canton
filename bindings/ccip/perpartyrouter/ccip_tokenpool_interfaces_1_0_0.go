@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // IITokenPool is a DAML interface
@@ -89,6 +91,18 @@ func (t *LockOrBurnResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes LockOrBurnResult to hex string (Canton MCMS format)
+func (t LockOrBurnResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockOrBurnResult from hex string (Canton MCMS format)
+func (t *LockOrBurnResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ReleaseOrMintResult is a Record type
 type ReleaseOrMintResult struct {
 	Output         ReleaseOrMintResultOutput `json:"output"`
@@ -128,6 +142,18 @@ func (t *ReleaseOrMintResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ReleaseOrMintResult to hex string (Canton MCMS format)
+func (t ReleaseOrMintResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ReleaseOrMintResult from hex string (Canton MCMS format)
+func (t *ReleaseOrMintResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ReleaseOrMintResultCompleted is a Record type
 type ReleaseOrMintResultCompleted struct {
 	ReceiverHoldingCids []CONTRACT_ID `json:"receiverHoldingCids"`
@@ -158,6 +184,18 @@ func (t *ReleaseOrMintResultCompleted) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ReleaseOrMintResultCompleted to hex string (Canton MCMS format)
+func (t ReleaseOrMintResultCompleted) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ReleaseOrMintResultCompleted from hex string (Canton MCMS format)
+func (t *ReleaseOrMintResultCompleted) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ReleaseOrMintResultOutput is a variant/union type
 type ReleaseOrMintResultOutput struct {
 	ReleaseOrMintResultPending   *ReleaseOrMintResultPending   `json:"ReleaseOrMintResult_Pending,omitempty"`
@@ -174,6 +212,18 @@ func (v ReleaseOrMintResultOutput) MarshalJSON() ([]byte, error) {
 func (v *ReleaseOrMintResultOutput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
+}
+
+// MarshalHex encodes ReleaseOrMintResultOutput to hex string (Canton MCMS format)
+func (v ReleaseOrMintResultOutput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes ReleaseOrMintResultOutput from hex string (Canton MCMS format)
+func (v *ReleaseOrMintResultOutput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -236,6 +286,18 @@ func (t *ReleaseOrMintResultPending) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ReleaseOrMintResultPending to hex string (Canton MCMS format)
+func (t ReleaseOrMintResultPending) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ReleaseOrMintResultPending from hex string (Canton MCMS format)
+func (t *ReleaseOrMintResultPending) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenInput is a Record type
 type TokenInput struct {
 	TransferFactory   CONTRACT_ID   `json:"transferFactory"`
@@ -284,6 +346,18 @@ func (t *TokenInput) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenInput to hex string (Canton MCMS format)
+func (t TokenInput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenInput from hex string (Canton MCMS format)
+func (t *TokenInput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenPoolView is a Record type
 type TokenPoolView struct {
 	Owner        PARTY        `json:"owner"`
@@ -320,6 +394,18 @@ func (t *TokenPoolView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenPoolView to hex string (Canton MCMS format)
+func (t TokenPoolView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolView from hex string (Canton MCMS format)
+func (t *TokenPoolView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
 	SendingMessageCid CONTRACT_ID `json:"sendingMessageCid"`
@@ -351,6 +437,18 @@ func (t TokenPoolCalculateFee) MarshalJSON() ([]byte, error) {
 func (t *TokenPoolCalculateFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenPoolCalculateFee to hex string (Canton MCMS format)
+func (t TokenPoolCalculateFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolCalculateFee from hex string (Canton MCMS format)
+func (t *TokenPoolCalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenPoolGetRequiredCCVs is a Record type
@@ -396,6 +494,18 @@ func (t TokenPoolGetRequiredCCVs) MarshalJSON() ([]byte, error) {
 func (t *TokenPoolGetRequiredCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes TokenPoolGetRequiredCCVs to hex string (Canton MCMS format)
+func (t TokenPoolGetRequiredCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolGetRequiredCCVs from hex string (Canton MCMS format)
+func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenPoolLockOrBurn is a Record type
@@ -461,6 +571,18 @@ func (t *TokenPoolLockOrBurn) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenPoolLockOrBurn to hex string (Canton MCMS format)
+func (t TokenPoolLockOrBurn) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolLockOrBurn from hex string (Canton MCMS format)
+func (t *TokenPoolLockOrBurn) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenPoolReleaseFromTicket is a Record type
 type TokenPoolReleaseFromTicket struct {
 	TokenReceiveTicketCid CONTRACT_ID `json:"tokenReceiveTicketCid"`
@@ -521,6 +643,18 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenPoolReleaseFromTicket to hex string (Canton MCMS format)
+func (t TokenPoolReleaseFromTicket) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolReleaseFromTicket from hex string (Canton MCMS format)
+func (t *TokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenPoolVerifyInboundCCVs is a Record type
 type TokenPoolVerifyInboundCCVs struct {
 	ExecutingMessageCid   CONTRACT_ID `json:"executingMessageCid"`
@@ -563,6 +697,18 @@ func (t *TokenPoolVerifyInboundCCVs) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes TokenPoolVerifyInboundCCVs to hex string (Canton MCMS format)
+func (t TokenPoolVerifyInboundCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolVerifyInboundCCVs from hex string (Canton MCMS format)
+func (t *TokenPoolVerifyInboundCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferDirection is an enum type
 type TransferDirection string
 
@@ -591,6 +737,18 @@ func (e TransferDirection) MarshalJSON() ([]byte, error) {
 func (e *TransferDirection) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, e)
+}
+
+// MarshalHex encodes TransferDirection to hex string (Canton MCMS format)
+func (e TransferDirection) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes TransferDirection from hex string (Canton MCMS format)
+func (e *TransferDirection) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
 }
 
 var _ ENUM = TransferDirection("")

@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/mcms"
@@ -104,11 +104,11 @@ func TestMCMS_Execute(t *testing.T) {
 }
 
 // testExecuteOpFlow tests the complete MCMS execute flow with direct invocation:
-// 3. Create proposal with "increment" operation
+// 3. Create proposal with "Increment" operation
 // 4. Sign with 2 signers
 // 5. SetRoot with real signatures
 // 6. ExecuteOp - direct call to Counter via MCMSReceiver interface
-// 7. Verify counter value incremented
+// 7. Verify counter value Incremented
 func testExecuteOpFlow(
 	t *testing.T,
 	mcmsPkgID string,
@@ -118,6 +118,9 @@ func testExecuteOpFlow(
 	participant testhelpers.Participant,
 	ccipOwnerParty string,
 ) {
+	// Create MCMS encoder for this package
+	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
+
 	// ========================
 	// |   Contract Constants |
 	// ========================
@@ -285,24 +288,24 @@ func testExecuteOpFlow(
 	// |   3. Build Proposal  |
 	// ========================
 
-	t.Log("Building proposal for bypasser_execute_batch...")
+	t.Log("Building proposal for BypasserExecuteBatch...")
 
-	// Build bypasser_execute_batch proposal
-	// The proposal targets MCMS itself with "bypasser_execute_batch" function
-	// The actual Counter.increment call is encoded in operationData
-	bypasserParams := BypasserExecuteParams{
-		Calls: []TimelockCall{
+	// Build BypasserExecuteBatch proposal
+	// The proposal targets MCMS itself with "BypasserExecuteBatch" function
+	// The actual Counter.Increment call is encoded in operationData
+	bypasserParams := mcms.BypasserExecuteBatchParams{
+		Calls: []mcms.TimelockCall{
 			{
-				TargetInstanceId: counterInstanceId,
-				FunctionName:     "increment",
-				OperationData:    "",
+				TargetInstanceId: types.TEXT(counterInstanceId),
+				FunctionName:     types.TEXT("Increment"),
+				OperationData:    types.TEXT(""),
 			},
 		},
 	}
-	encodedBypasserParams := EncodeBypasserExecuteParams(bypasserParams)
+	bypasserChoice := MustEncodeBypasserExecuteBatch(mcmsEncoder, bypasserParams)
 
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceId, "bypasser_execute_batch", encodedBypasserParams)
+	proposal.AddOperation(mcmsInstanceId, bypasserChoice.Choice, bypasserChoice.OperationData)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -519,8 +522,8 @@ func testExecuteOpFlow(
 	// Verify MCMSEntrypointEvent was emitted with correct data
 	require.True(t, eventFound, "MCMSEntrypointEvent should be emitted by Counter.mcmsEntrypoint")
 	assert.Equal(t, counterInstanceId, eventInstanceId, "Event instanceId should match Counter instanceId")
-	assert.Equal(t, "increment", eventFunctionName, "Event functionName should be 'increment'")
-	assert.Empty(t, eventOperationData, "Event operationData should be empty for increment")
+	assert.Equal(t, "Increment", eventFunctionName, "Event functionName should be 'Increment'")
+	assert.Empty(t, eventOperationData, "Event operationData should be empty for Increment")
 
 	// Note: contractIds is now empty in the current contract implementation
 	t.Logf("MCMSEntrypointEvent verified: instanceId=%s, functionName=%s, contractIdsAsText=%v",
@@ -561,7 +564,7 @@ func testExecuteOpFlow(
 	t.Log("Summary:")
 	t.Log("  1. Created MCMS with 2-of-3 config")
 	t.Log("  2. Created Counter contract (implements MCMSReceiver)")
-	t.Log("  3. Built proposal with 'increment' operation targeting instanceId")
+	t.Log("  3. Built proposal with 'Increment' operation targeting instanceId")
 	t.Log("  4. Signed with 2 signers (real ECDSA signatures)")
 	t.Log("  5. SetRoot with on-chain verification")
 	t.Log("  6. ExecuteOp - MCMS directly calls Counter.MCMSReceiver_Entrypoint")
@@ -679,7 +682,7 @@ func testSignatureVerificationFails(
 
 	// Build a valid proposal
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation("counter", "increment", "")
+	proposal.AddOperation("counter", "Increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -881,7 +884,7 @@ func testReplayProtection(
 
 	// Build proposal
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation("counter", "increment", "")
+	proposal.AddOperation("counter", "Increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -1132,7 +1135,7 @@ func testExecuteMCMSOp(
 	// |   2. Build Proposal  |
 	// ========================
 
-	t.Log("Building MCMS proposal (set_config targeting 'self')...")
+	t.Log("Building MCMS proposal (SetConfig targeting 'self')...")
 
 	// Prepare new config params (change from 2-of-3 to 1-of-3)
 	newQuorums := make([]int, NumGroups)
@@ -1147,12 +1150,12 @@ func testExecuteMCMSOp(
 		ClearRoot:    false,
 	}
 	encodedParams := EncodeSetConfigParams(setConfigParams)
-	t.Logf("Encoded set_config params: %s... (%d bytes)", encodedParams[:min(40, len(encodedParams))], len(encodedParams)/2)
+	t.Logf("Encoded SetConfig params: %s... (%d bytes)", encodedParams[:min(40, len(encodedParams))], len(encodedParams)/2)
 
 	// Build proposal with MCMS operation targeting this MCMS instanceId
 	// operationData contains the encoded params (like Aptos)
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceId, "set_config", encodedParams) // Params encoded in operationData
+	proposal.AddOperation(mcmsInstanceId, "SetConfig", encodedParams) // Params encoded in operationData
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -1451,7 +1454,7 @@ func testExecuteMCMSOp(
 	t.Log("✓ ExecuteMcmsOp test completed successfully!")
 	t.Log("Summary:")
 	t.Log("  1. Created MCMS with 2-of-3 config")
-	t.Log("  2. Built MCMS proposal with set_config targeting 'self'")
+	t.Log("  2. Built MCMS proposal with SetConfig targeting 'self'")
 	t.Log("  3. Signed with 2 signers")
 	t.Log("  4. SetRoot with on-chain verification")
 	t.Log("  5. ExecuteMcmsOp - self-dispatch to change config")
@@ -1477,6 +1480,9 @@ func testSignatoryCheck(
 	ccipParticipant, _ testhelpers.Participant,
 	ccipOwnerParty, _ string,
 ) {
+	// Create MCMS encoder for this package
+	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
+
 	// ========================
 	// |   Contract Constants |
 	// ========================
@@ -1631,22 +1637,22 @@ func testSignatoryCheck(
 	// |   3. Build Proposal  |
 	// ========================
 
-	t.Log("Building bypasser_execute_batch proposal targeting the counter...")
+	t.Log("Building BypasserExecuteBatch proposal targeting the counter...")
 
-	// Build bypasser_execute_batch proposal with "increment" call
-	bypasserParams := BypasserExecuteParams{
-		Calls: []TimelockCall{
+	// Build BypasserExecuteBatch proposal with "Increment" call
+	bypasserParams := mcms.BypasserExecuteBatchParams{
+		Calls: []mcms.TimelockCall{
 			{
-				TargetInstanceId: counterInstanceId,
-				FunctionName:     "increment",
-				OperationData:    "",
+				TargetInstanceId: types.TEXT(counterInstanceId),
+				FunctionName:     types.TEXT("Increment"),
+				OperationData:    types.TEXT(""),
 			},
 		},
 	}
-	encodedBypasserParams := EncodeBypasserExecuteParams(bypasserParams)
+	bypasserChoice := MustEncodeBypasserExecuteBatch(mcmsEncoder, bypasserParams)
 
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceId, "bypasser_execute_batch", encodedBypasserParams)
+	proposal.AddOperation(mcmsInstanceId, bypasserChoice.Choice, bypasserChoice.OperationData)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -1809,7 +1815,7 @@ func testSignatoryCheck(
 	})
 	require.NoError(t, err, "ExecuteOp should succeed when MCMS owner is a signatory of target")
 
-	// Verify counter was incremented
+	// Verify counter was Incremented
 	var counterValue int64 = -1
 	for _, event := range executeOpRes.GetTransaction().GetEvents() {
 		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.Counter{}.GetTemplateID()) {
@@ -1821,7 +1827,7 @@ func testSignatoryCheck(
 			}
 		}
 	}
-	require.Equal(t, int64(1), counterValue, "Counter should be incremented to 1")
+	require.Equal(t, int64(1), counterValue, "Counter should be Incremented to 1")
 
 	t.Log("✓ Signatory check test completed successfully!")
 	t.Log("Summary:")
@@ -1892,7 +1898,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	// In Daml sandbox (daml test), allocateParty "ccip_owner" → partyToText = "ccip_owner-9cefe94d"
 	// The suffix is deterministic in the sandbox based on the hint string.
 	proposal := NewMCMSProposal(chainId, mcmsId, 0, false)
-	proposal.AddOperation("counter@ccip_owner-9cefe94d", "increment", "")
+	proposal.AddOperation("counter@ccip_owner-9cefe94d", "Increment", "")
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -2032,7 +2038,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("")
 
 	// ======================================================================
-	// Additional vectors for Daml tests: schedule_batch + bypasser_execute_batch
+	// Additional vectors for Daml tests: ScheduleBatch + BypasserExecuteBatch
 	// ======================================================================
 
 	baseMcmsId = "mcms-daml-test"
@@ -2040,25 +2046,25 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	proposerMultisigId := MakeMcmsId(timelockInstanceId, MCMSRoleProposer)
 	bypasserMultisigId := MakeMcmsId(timelockInstanceId, MCMSRoleBypasser)
 
-	// Create inner calls for schedule_batch - these are the operations to be timelocked
-	scheduleInnerCalls := []TimelockCall{
+	// Create inner calls for ScheduleBatch - these are the operations to be timelocked
+	scheduleInnerCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: timelockInstanceId,
-			FunctionName:     "update_min_delay",
-			OperationData:    "120", // new min delay of 120 seconds
+			TargetInstanceId: types.TEXT(timelockInstanceId),
+			FunctionName:     types.TEXT("UpdateMinDelay"),
+			OperationData:    types.TEXT("120"), // new min delay of 120 seconds
 		},
 	}
-	scheduleParams := ScheduleBatchParams{
+	scheduleParams := mcms.ScheduleBatchParams{
 		Calls:       scheduleInnerCalls,
-		Predecessor: ZeroHash, // no predecessor
-		Salt:        "test-schedule-salt-1",
-		DelaySecs:   0, // use minimum delay
+		Predecessor: types.TEXT(ZeroHash), // no predecessor
+		Salt:        types.TEXT("test-schedule-salt-1"),
+		DelaySecs:   types.INT64(0), // use minimum delay
 	}
-	encodedScheduleParams := EncodeScheduleBatchParams(scheduleParams)
+	encodedScheduleParams := MustEncodeScheduleBatchParams(scheduleParams)
 
-	// Proposer root authorizing schedule_batch (self)
+	// Proposer root authorizing ScheduleBatch (self)
 	scheduleProposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
-		AddOperation(timelockInstanceId, "schedule_batch", encodedScheduleParams).
+		AddOperation(timelockInstanceId, "ScheduleBatch", encodedScheduleParams).
 		Build()
 	scheduleRoot := scheduleProposal.GetRoot()
 	scheduleMetadataProof, err := scheduleProposal.GetMetadataProof()
@@ -2069,7 +2075,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("-- ===========================================================================")
-	t.Log("-- TIMELOCK SELF-DISPATCH VECTORS (Proposer -> schedule_batch)")
+	t.Log("-- TIMELOCK SELF-DISPATCH VECTORS (Proposer -> ScheduleBatch)")
 	t.Log("-- Copy/paste into FlowTest.daml")
 	t.Log("-- ===========================================================================")
 	t.Log("")
@@ -2172,22 +2178,22 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	}
 	t.Log("")
 
-	// Create inner calls for bypasser_execute_batch - operations to execute immediately
-	bypasserInnerCalls := []TimelockCall{
+	// Create inner calls for BypasserExecuteBatch - operations to execute immediately
+	bypasserInnerCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: timelockInstanceId,
-			FunctionName:     "update_min_delay",
-			OperationData:    "300", // new min delay of 300 seconds
+			TargetInstanceId: types.TEXT(timelockInstanceId),
+			FunctionName:     types.TEXT("UpdateMinDelay"),
+			OperationData:    types.TEXT("300"), // new min delay of 300 seconds
 		},
 	}
-	bypasserParams := BypasserExecuteParams{
+	bypasserParams := mcms.BypasserExecuteBatchParams{
 		Calls: bypasserInnerCalls,
 	}
-	encodedBypasserParams := EncodeBypasserExecuteParams(bypasserParams)
+	encodedBypasserParams := MustEncodeBypasserExecuteBatchParams(bypasserParams)
 
-	// Bypasser root authorizing bypasser_execute_batch (self)
+	// Bypasser root authorizing BypasserExecuteBatch (self)
 	bypasserProposal := NewMCMSProposal(chainId, bypasserMultisigId, 0, false).
-		AddOperation(timelockInstanceId, "bypasser_execute_batch", encodedBypasserParams).
+		AddOperation(timelockInstanceId, "BypasserExecuteBatch", encodedBypasserParams).
 		Build()
 	bypasserRoot := bypasserProposal.GetRoot()
 	bypasserMetadataProof, err := bypasserProposal.GetMetadataProof()
@@ -2198,7 +2204,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("-- ===========================================================================")
-	t.Log("-- BYPASSER SELF-DISPATCH VECTORS (Bypasser -> bypasser_execute_batch)")
+	t.Log("-- BYPASSER SELF-DISPATCH VECTORS (Bypasser -> BypasserExecuteBatch)")
 	t.Log("-- Copy/paste into FlowTest.daml")
 	t.Log("-- ===========================================================================")
 	t.Log("")
@@ -2307,21 +2313,21 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 
 	counterInstanceId := "counter@ccip_owner-9cefe94d"
 
-	// Bypasser op with external call to Counter (increment)
-	externalBypasserCalls := []TimelockCall{
+	// Bypasser op with external call to Counter (Increment)
+	externalBypasserCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: counterInstanceId,
-			FunctionName:     "increment",
-			OperationData:    "",
+			TargetInstanceId: types.TEXT(counterInstanceId),
+			FunctionName:     types.TEXT("Increment"),
+			OperationData:    types.TEXT(""),
 		},
 	}
-	externalBypasserParams := BypasserExecuteParams{
+	externalBypasserParams := mcms.BypasserExecuteBatchParams{
 		Calls: externalBypasserCalls,
 	}
-	encodedExternalBypasserParams := EncodeBypasserExecuteParams(externalBypasserParams)
+	encodedExternalBypasserParams := MustEncodeBypasserExecuteBatchParams(externalBypasserParams)
 
 	externalBypasserProposal := NewMCMSProposal(chainId, bypasserMultisigId, 0, false).
-		AddOperation(timelockInstanceId, "bypasser_execute_batch", encodedExternalBypasserParams).
+		AddOperation(timelockInstanceId, "BypasserExecuteBatch", encodedExternalBypasserParams).
 		Build()
 	externalBypasserRoot := externalBypasserProposal.GetRoot()
 	externalBypasserMetadataProof, err := externalBypasserProposal.GetMetadataProof()
@@ -2332,7 +2338,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("-- ===========================================================================")
-	t.Log("-- EXTERNAL CALL VECTORS (Bypasser -> bypasser_execute_batch -> Counter)")
+	t.Log("-- EXTERNAL CALL VECTORS (Bypasser -> BypasserExecuteBatch -> Counter)")
 	t.Log("-- Copy/paste into ExternalTargetTest.daml")
 	t.Log("-- ===========================================================================")
 	t.Log("")
@@ -2416,24 +2422,24 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("  ]")
 	t.Log("")
 
-	// Scheduled external call vectors (Proposer -> schedule_batch -> Counter)
-	externalScheduleCalls := []TimelockCall{
+	// Scheduled external call vectors (Proposer -> ScheduleBatch -> Counter)
+	externalScheduleCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: counterInstanceId,
-			FunctionName:     "increment",
-			OperationData:    "",
+			TargetInstanceId: types.TEXT(counterInstanceId),
+			FunctionName:     types.TEXT("Increment"),
+			OperationData:    types.TEXT(""),
 		},
 	}
-	externalScheduleParams := ScheduleBatchParams{
+	externalScheduleParams := mcms.ScheduleBatchParams{
 		Calls:       externalScheduleCalls,
-		Predecessor: ZeroHash,
-		Salt:        "test-external-schedule-salt-1",
-		DelaySecs:   0,
+		Predecessor: types.TEXT(ZeroHash),
+		Salt:        types.TEXT("test-external-schedule-salt-1"),
+		DelaySecs:   types.INT64(0),
 	}
-	encodedExternalScheduleParams := EncodeScheduleBatchParams(externalScheduleParams)
+	encodedExternalScheduleParams := MustEncodeScheduleBatchParams(externalScheduleParams)
 
 	externalScheduleProposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
-		AddOperation(timelockInstanceId, "schedule_batch", encodedExternalScheduleParams).
+		AddOperation(timelockInstanceId, "ScheduleBatch", encodedExternalScheduleParams).
 		Build()
 	externalScheduleRoot := externalScheduleProposal.GetRoot()
 	externalScheduleMetadataProof, err := externalScheduleProposal.GetMetadataProof()
@@ -2444,7 +2450,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("-- ===========================================================================")
-	t.Log("-- SCHEDULED EXTERNAL CALL VECTORS (Proposer -> schedule_batch -> Counter)")
+	t.Log("-- SCHEDULED EXTERNAL CALL VECTORS (Proposer -> ScheduleBatch -> Counter)")
 	t.Log("-- Copy/paste into ExternalTargetTest.daml")
 	t.Log("-- ===========================================================================")
 	t.Log("")
@@ -2582,7 +2588,7 @@ func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 	// Build proposal with MCMS operation targeting instanceId
 	// operationData contains the encoded params
 	proposal := NewMCMSProposal(chainId, mcmsId, 0, false)
-	proposal.AddOperation(mcmsOpInstanceId, "set_config", encodedParams)
+	proposal.AddOperation(mcmsOpInstanceId, "SetConfig", encodedParams)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -2871,14 +2877,14 @@ func TestMCMS_GenerateTimelockTestValues(t *testing.T) {
 		t.Log("")
 	}
 
-	// Proposer schedule_batch proposal
+	// Proposer ScheduleBatch proposal
 	t.Log("-- ===========================================================================")
 	t.Log("-- PROPOSER SCHEDULE_BATCH VECTORS")
 	t.Log("-- ===========================================================================")
 	t.Log("")
 	proposerMsId := MakeMcmsId(timelockInstanceId, MCMSRoleProposer)
 	scheduleProposal := NewMCMSProposal(chainId, proposerMsId, 0, false).
-		AddOperation(timelockInstanceId, "schedule_batch", "").
+		AddOperation(timelockInstanceId, "ScheduleBatch", "").
 		Build()
 	printProposal("timelockSchedule", scheduleProposal)
 
@@ -2889,7 +2895,7 @@ func TestMCMS_GenerateTimelockTestValues(t *testing.T) {
 	t.Log("")
 	bypasserMsId := MakeMcmsId(timelockInstanceId, MCMSRoleBypasser)
 	bypasserProposal := NewMCMSProposal(chainId, bypasserMsId, 0, false).
-		AddOperation(timelockInstanceId, "bypasser_execute_batch", "").
+		AddOperation(timelockInstanceId, "BypasserExecuteBatch", "").
 		Build()
 	printProposal("timelockBypasser", bypasserProposal)
 

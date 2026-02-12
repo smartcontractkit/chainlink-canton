@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // CCIPSendFromRouter is a Record type
@@ -85,6 +87,18 @@ func (t *CCIPSendFromRouter) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CCIPSendFromRouter to hex string (Canton MCMS format)
+func (t CCIPSendFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPSendFromRouter from hex string (Canton MCMS format)
+func (t *CCIPSendFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CCIPSendFromRouterResult is a Record type
 type CCIPSendFromRouterResult struct {
 	VerifierBlobs        []TEXT    `json:"verifierBlobs"`
@@ -138,6 +152,18 @@ func (t *CCIPSendFromRouterResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CCIPSendFromRouterResult to hex string (Canton MCMS format)
+func (t CCIPSendFromRouterResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPSendFromRouterResult from hex string (Canton MCMS format)
+func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CancelSendFromRouter is a Record type
 type CancelSendFromRouter struct {
 	RouterPartyOwner      PARTY       `json:"routerPartyOwner"`
@@ -183,6 +209,18 @@ func (t *CancelSendFromRouter) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes CancelSendFromRouter to hex string (Canton MCMS format)
+func (t CancelSendFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CancelSendFromRouter from hex string (Canton MCMS format)
+func (t *CancelSendFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
 	GlobalConfigCid   CONTRACT_ID `json:"globalConfigCid"`
@@ -214,6 +252,18 @@ func (t GetRequiredCCVsForSend) MarshalJSON() ([]byte, error) {
 func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes GetRequiredCCVsForSend to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForSend) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsForSend from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // OnRamp is a Template type
@@ -348,6 +398,18 @@ func (t OnRamp) MarshalJSON() ([]byte, error) {
 func (t *OnRamp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes OnRamp to hex string (Canton MCMS format)
+func (t OnRamp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes OnRamp from hex string (Canton MCMS format)
+func (t *OnRamp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for OnRamp
@@ -571,4 +633,16 @@ func (t PrepareSendFromRouter) MarshalJSON() ([]byte, error) {
 func (t *PrepareSendFromRouter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes PrepareSendFromRouter to hex string (Canton MCMS format)
+func (t PrepareSendFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareSendFromRouter from hex string (Canton MCMS format)
+func (t *PrepareSendFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }

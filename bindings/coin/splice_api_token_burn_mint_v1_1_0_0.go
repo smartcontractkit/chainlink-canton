@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // IBurnMintFactory is a DAML interface
@@ -63,6 +65,18 @@ func (t BurnMintFactoryView) MarshalJSON() ([]byte, error) {
 func (t *BurnMintFactoryView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes BurnMintFactoryView to hex string (Canton MCMS format)
+func (t BurnMintFactoryView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryView from hex string (Canton MCMS format)
+func (t *BurnMintFactoryView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // BurnMintFactoryBurnMint is a Record type
@@ -139,6 +153,18 @@ func (t *BurnMintFactoryBurnMint) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes BurnMintFactoryBurnMint to hex string (Canton MCMS format)
+func (t BurnMintFactoryBurnMint) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryBurnMint from hex string (Canton MCMS format)
+func (t *BurnMintFactoryBurnMint) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // BurnMintFactoryBurnMintResult is a Record type
 type BurnMintFactoryBurnMintResult struct {
 	OutputCids []CONTRACT_ID `json:"outputCids"`
@@ -169,6 +195,18 @@ func (t *BurnMintFactoryBurnMintResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes BurnMintFactoryBurnMintResult to hex string (Canton MCMS format)
+func (t BurnMintFactoryBurnMintResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryBurnMintResult from hex string (Canton MCMS format)
+func (t *BurnMintFactoryBurnMintResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // BurnMintFactoryPublicFetch is a Record type
 type BurnMintFactoryPublicFetch struct {
 	ExpectedAdmin PARTY `json:"expectedAdmin"`
@@ -194,6 +232,18 @@ func (t BurnMintFactoryPublicFetch) MarshalJSON() ([]byte, error) {
 func (t *BurnMintFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes BurnMintFactoryPublicFetch to hex string (Canton MCMS format)
+func (t BurnMintFactoryPublicFetch) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryPublicFetch from hex string (Canton MCMS format)
+func (t *BurnMintFactoryPublicFetch) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // BurnMintOutput is a Record type
@@ -230,6 +280,18 @@ func (t BurnMintOutput) MarshalJSON() ([]byte, error) {
 func (t *BurnMintOutput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes BurnMintOutput to hex string (Canton MCMS format)
+func (t BurnMintOutput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintOutput from hex string (Canton MCMS format)
+func (t *BurnMintOutput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // IBurnMintFactoryInterfaceID returns the interface ID for the IBurnMintFactory interface using the package name

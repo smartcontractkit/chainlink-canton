@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 // IAnyContract is a DAML interface
@@ -46,6 +48,18 @@ func (t *AnyContractView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes AnyContractView to hex string (Canton MCMS format)
+func (t AnyContractView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AnyContractView from hex string (Canton MCMS format)
+func (t *AnyContractView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AnyValue is a variant/union type
 type AnyValue struct {
 	AVText       *TEXT        `json:"AV_Text,omitempty"`
@@ -71,6 +85,18 @@ func (v AnyValue) MarshalJSON() ([]byte, error) {
 func (v *AnyValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
+}
+
+// MarshalHex encodes AnyValue to hex string (Canton MCMS format)
+func (v AnyValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes AnyValue from hex string (Canton MCMS format)
+func (v *AnyValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -205,6 +231,18 @@ func (t *ChoiceContext) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ChoiceContext to hex string (Canton MCMS format)
+func (t ChoiceContext) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ChoiceContext from hex string (Canton MCMS format)
+func (t *ChoiceContext) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ChoiceExecutionMetadata is a Record type
 type ChoiceExecutionMetadata struct {
 	Meta Metadata `json:"meta"`
@@ -233,6 +271,18 @@ func (t ChoiceExecutionMetadata) MarshalJSON() ([]byte, error) {
 func (t *ChoiceExecutionMetadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes ChoiceExecutionMetadata to hex string (Canton MCMS format)
+func (t ChoiceExecutionMetadata) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ChoiceExecutionMetadata from hex string (Canton MCMS format)
+func (t *ChoiceExecutionMetadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ExtraArgs is a Record type
@@ -274,6 +324,18 @@ func (t *ExtraArgs) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
+// MarshalHex encodes ExtraArgs to hex string (Canton MCMS format)
+func (t ExtraArgs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExtraArgs from hex string (Canton MCMS format)
+func (t *ExtraArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Metadata is a Record type
 type Metadata struct {
 	Values TEXTMAP `json:"values"`
@@ -302,6 +364,18 @@ func (t Metadata) MarshalJSON() ([]byte, error) {
 func (t *Metadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
+}
+
+// MarshalHex encodes Metadata to hex string (Canton MCMS format)
+func (t Metadata) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Metadata from hex string (Canton MCMS format)
+func (t *Metadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // IAnyContractInterfaceID returns the interface ID for the IAnyContract interface using the package name

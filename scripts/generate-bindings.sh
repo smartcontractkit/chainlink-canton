@@ -81,7 +81,7 @@ run_godaml() {
   tmp="$(mktemp)"
 
   set +e
-  "$GODAML_BIN" --dar "$dar" --output "$out" --go_package "$pkg" >"$tmp" 2>&1
+  "$GODAML_BIN" --dar "$dar" --output "$out" --go_package "$pkg" --hex-encoder >"$tmp" 2>&1
   local rc=$?
   set -e
 
