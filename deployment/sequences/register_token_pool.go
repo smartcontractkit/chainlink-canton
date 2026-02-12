@@ -18,9 +18,11 @@ import (
 // RegisterTokenPoolInput is the input for registering a token pool with the TokenAdminRegistry.
 type RegisterTokenPoolInput struct {
 	// TokenAdminRegistryInstanceAddress is the instance address of the TokenAdminRegistry contract.
-	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
+	TokenAdminRegistryRawInstanceAddress contracts.RawInstanceAddress
 	// InstrumentId identifies the token (admin party + token id).
 	InstrumentId tokenadminregistry.InstrumentId
+	// PoolInstanceID is the instance ID of the token pool.
+	PoolInstanceID string
 	// CcipParty is the CCIP owner party (acts on ProposeAdministrator).
 	CcipParty string
 	// PoolOwnerParty is the token pool owner party (acts on AcceptAdminRole and SetPool).
@@ -35,7 +37,6 @@ var RegisterTokenPool = operations.NewSequence(
 )
 
 func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input RegisterTokenPoolInput) (sequences.OnChainOutput, error) {
-	tarAddr := input.TokenAdminRegistryInstanceAddress
 	instrumentId := input.InstrumentId
 	ccipParty := input.CcipParty
 	poolOwnerParty := input.PoolOwnerParty
@@ -43,7 +44,7 @@ func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input 
 	// Step 1: ProposeAdministrator (CCIP acts)
 	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistryProposeAdministrator]{
 		ChainSelector:   deps.Chain.Selector,
-		InstanceAddress: tarAddr,
+		InstanceAddress: input.TokenAdminRegistryRawInstanceAddress.InstanceAddress(),
 		ActAs:           []string{ccipParty},
 		Args: tokenadminregistry.TokenAdminRegistryProposeAdministrator{
 			InstrumentId: instrumentId,
@@ -58,7 +59,7 @@ func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input 
 	// Step 2: AcceptAdminRole (pool owner acts). Exercise resolves current TAR contract by InstanceAddress.
 	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistryAcceptAdminRole]{
 		ChainSelector:   deps.Chain.Selector,
-		InstanceAddress: tarAddr,
+		InstanceAddress: input.TokenAdminRegistryRawInstanceAddress.InstanceAddress(),
 		ActAs:           []string{poolOwnerParty},
 		Args: tokenadminregistry.TokenAdminRegistryAcceptAdminRole{
 			InstrumentId: instrumentId,
@@ -73,12 +74,15 @@ func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input 
 	poolOwnerPartyTyped := types.PARTY(poolOwnerParty)
 	_, err = operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistrySetPool]{
 		ChainSelector:   deps.Chain.Selector,
-		InstanceAddress: tarAddr,
+		InstanceAddress: input.TokenAdminRegistryRawInstanceAddress.InstanceAddress(),
 		ActAs:           []string{poolOwnerParty},
 		Args: tokenadminregistry.TokenAdminRegistrySetPool{
-			InstrumentId:      instrumentId,
-			OptTokenPoolOwner: &poolOwnerPartyTyped,
-			Caller:            types.PARTY(poolOwnerParty),
+			InstrumentId: instrumentId,
+			TokenPool: &tokenadminregistry.PoolRegistration{
+				PoolOwner:      poolOwnerPartyTyped,
+				PoolInstanceId: types.TEXT(input.PoolInstanceID),
+			},
+			Caller: types.PARTY(poolOwnerParty),
 		},
 	})
 	if err != nil {

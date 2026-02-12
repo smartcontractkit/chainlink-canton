@@ -62,7 +62,7 @@ func TestDeployTokenPool(t *testing.T) {
 	require.NoError(t, err)
 	poolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
 	require.NoError(t, err)
-	uploadResp, err := packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars: []*participantv30.UploadDarRequest_UploadDarData{
 			{Bytes: commonDar},
 			{Bytes: tarDar},
@@ -72,7 +72,6 @@ func TestDeployTokenPool(t *testing.T) {
 		SynchronizeVetting: true,
 	})
 	require.NoError(t, err, "failed to upload dar files")
-	darIds := uploadResp.GetDarIds()
 
 	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
 		UserId: "user-participant1",
@@ -108,7 +107,7 @@ func TestDeployTokenPool(t *testing.T) {
 	})
 	require.NoError(t, err, "deploy TAR")
 	require.NotEmpty(t, tarAddrRef.Output.Address, "TAR address")
-	tarInstanceAddr := contracts.HexToInstanceAddress(tarAddrRef.Output.Address)
+	tarRawInstanceAddress := contracts.RawInstanceAddressFromString(tarAddrRef.Output.Address)
 
 	env := &cldf.Environment{
 		Logger:           logger.Test(t),
@@ -130,36 +129,64 @@ func TestDeployTokenPool(t *testing.T) {
 		UserName:      user.GetId(),
 		Party:         party,
 		Config: DeployTokenPoolConfig{
-			CcipOwner:                         party,
-			PoolOwner:                         party,
-			InstrumentId:                      instrumentId,
-			Decimals:                          6,
-			Qualifier:                         "AMT",
-			TokenAdminRegistryInstanceAddress: &tarInstanceAddr,
+			CcipOwner:                            party,
+			PoolOwner:                            party,
+			InstrumentId:                         instrumentId,
+			Decimals:                             6,
+			Qualifier:                            "AMT",
+			TokenAdminRegistryRawInstanceAddress: tarRawInstanceAddress,
 		},
 	})
 	require.NoError(t, err, "deploy token pool and register with TAR")
 
 	// Verify TAR config: fetch TAR from ACS and unmarshal with UnmarshalActiveContract (uses UnmarshalCreatedEvent)
-	tar, err := findTARByInstanceAddress(t.Context(), deps.StateServiceClient, party, darIds[1])
+	tar, err := findTARByInstanceAddress(t.Context(), deps.StateServiceClient, party)
 	require.NoError(t, err, "find TAR contract in ACS")
 
-	// TokenConfigs is GENMAP (map); values are map[string]interface{} with string party IDs. Check correct owner.
+	// TokenConfigs is GENMAP (map); each value is a TokenConfig with optional tokenPool (PoolRegistration).
+	// poolOwner is nested: config.data["tokenPool"].data["poolOwner"] (or tokenPool may be under "value" if optional).
 	var found bool
 	for _, v := range tar.TokenConfigs {
-		m, ok := v.(map[string]interface{})
+		configMap, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		tokenPoolOwnerStr := optionalPartyStringFromMap(m, "tokenPoolOwner")
-		if tokenPoolOwnerStr == "" {
+		// Unmarshaled form may wrap fields in "data"
+		m := configMap
+		if data, ok := configMap["data"].(map[string]interface{}); ok {
+			m = data
+		}
+		tokenPoolRaw, ok := m["tokenPool"]
+		if !ok || tokenPoolRaw == nil {
 			continue
 		}
-		require.Equal(t, party, tokenPoolOwnerStr, "TAR token config tokenPoolOwner should match pool owner")
+		// Optional: {"_type": "optional", "value": <PoolRegistration map>}
+		var tokenPoolMap map[string]interface{}
+		if opt, ok := tokenPoolRaw.(map[string]interface{}); ok {
+			if val, has := opt["value"]; has && val != nil {
+				tokenPoolMap, _ = val.(map[string]interface{})
+			}
+		}
+		if tokenPoolMap == nil {
+			tokenPoolMap, _ = tokenPoolRaw.(map[string]interface{})
+		}
+		if tokenPoolMap == nil {
+			continue
+		}
+		// poolOwner may be under tokenPool.data when unmarshaled
+		tokenPoolData := tokenPoolMap
+		if data, ok := tokenPoolMap["data"].(map[string]interface{}); ok {
+			tokenPoolData = data
+		}
+		poolOwnerStr := optionalPartyStringFromMap(tokenPoolData, "poolOwner")
+		if poolOwnerStr == "" {
+			continue
+		}
+		require.Equal(t, party, poolOwnerStr, "TAR token config tokenPool.poolOwner should match pool owner")
 		found = true
 		break
 	}
-	require.True(t, found, "TAR should have a TokenConfig with tokenPoolOwner set (pool registered)")
+	require.True(t, found, "TAR should have a TokenConfig with tokenPool.poolOwner set (pool registered)")
 }
 
 // optionalPartyStringFromMap gets an optional party from a map: either direct string or {"value": "<party>"}.
@@ -182,11 +209,12 @@ func optionalPartyStringFromMap(m map[string]interface{}, key string) string {
 }
 
 // findTARByInstanceAddress streams GetActiveContracts for TokenAdminRegistry and returns the ActiveContract whose instanceId matches the given instance address.
-func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServiceClient, party string, packageId string) (*tokenadminregistry.TokenAdminRegistry, error) {
+func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServiceClient, party string) (*tokenadminregistry.TokenAdminRegistry, error) {
 	ledgerEndResp, err := stateClient.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
 		return nil, err
 	}
+
 	stream, err := stateClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: ledgerEndResp.GetOffset(),
 		EventFormat: &apiv2.EventFormat{
@@ -196,7 +224,7 @@ func findTARByInstanceAddress(ctx context.Context, stateClient apiv2.StateServic
 						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
 							TemplateFilter: &apiv2.TemplateFilter{
 								TemplateId: &apiv2.Identifier{
-									PackageId:  packageId,
+									PackageId:  "#ccip-tokenadminregistry",
 									ModuleName: "CCIP.TokenAdminRegistry",
 									EntityName: "TokenAdminRegistry",
 								},
