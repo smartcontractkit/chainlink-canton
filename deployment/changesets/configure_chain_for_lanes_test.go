@@ -184,6 +184,8 @@ func TestConfigureChainForLanes(t *testing.T) {
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
 
 	// Configure Chain for Lanes
+	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
+	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
 	out, err = ConfigureChainForLanes{}.Apply(*env, CantonCSDeps[ConfigureChainForLanesConfig]{
 		ChainSelector: chainSelector,
 		Participant:   0,
@@ -203,7 +205,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 						OnRamps:                  [][]byte{[]byte("")},
 						OffRamp:                  nil,
 						DefaultInboundCCVs:       nil,
-						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])},
+						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						DefaultOutboundCCVs:      nil,
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",

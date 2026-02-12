@@ -330,6 +330,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
 
 	// Deploy and configure lane
+	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
+	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
 		ChainSelector: env.Selector,
@@ -349,7 +351,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						OnRamps:                  [][]byte{[]byte("0000000000000000000000000000000000000001")},
 						OffRamp:                  nil,
 						DefaultInboundCCVs:       nil,
-						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])},
+						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						DefaultOutboundCCVs:      nil,
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",

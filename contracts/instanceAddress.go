@@ -2,7 +2,9 @@ package contracts
 
 import (
 	"bytes"
+	"errors"
 	"reflect"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -17,7 +19,20 @@ const InstanceAddressLength = 32
 
 type RawInstanceAddress string
 
-func RawInstanceAddressFromString(s string) RawInstanceAddress { return RawInstanceAddress(s) }
+func RawInstanceAddressFromString(s string) (RawInstanceAddress, error) {
+	// Validate that s is a valid raw instance address by checking if it contains exactly one '@'
+	split := strings.Split(s, "@")
+	if len(split) != 2 {
+		return "", errors.New("invalid raw instance address: must contain exactly one '@'")
+	}
+	for _, s := range split {
+		if len(s) == 0 {
+			return "", errors.New("invalid raw instance address: parts cannot be empty")
+		}
+	}
+
+	return RawInstanceAddress(s), nil
+}
 
 func (r RawInstanceAddress) String() string { return string(r) }
 

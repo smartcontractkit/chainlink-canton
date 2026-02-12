@@ -74,7 +74,10 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy RMNRemote: %w", err)
 		}
 		addresses = append(addresses, deployRMNRemoteReport.Output)
-		rmnRemoteRawInstanceAddress := contracts.RawInstanceAddressFromString(deployRMNRemoteReport.Output.Labels.List()[0])
+		rmnRemoteRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployRMNRemoteReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse RMNRemote raw instance address: %w", err)
+		}
 
 		// Deploy Global Config
 		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
@@ -88,7 +91,10 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalConfig: %w", err)
 		}
 		addresses = append(addresses, deployGlobalConfigReport.Output)
-		globalConfigRawInstanceAddress := contracts.RawInstanceAddressFromString(deployGlobalConfigReport.Output.Labels.List()[0])
+		globalConfigRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployGlobalConfigReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse GlobalConfig raw instance address: %w", err)
+		}
 
 		// Deploy Token Admin Registry
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
@@ -104,7 +110,10 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy TokenAdminRegistry: %w", err)
 		}
 		addresses = append(addresses, deployTokenAdminRegistryReport.Output)
-		tokenAdminRegistryRawInstanceAddress := contracts.RawInstanceAddressFromString(deployTokenAdminRegistryReport.Output.Labels.List()[0])
+		tokenAdminRegistryRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployTokenAdminRegistryReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse TokenAdminRegistry raw instance address: %w", err)
+		}
 
 		// Deploy FeeQuoter
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
