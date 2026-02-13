@@ -10,7 +10,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -75,7 +74,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			}
 
 			// Find contract by InstanceAddress
-			contractID, err := FindContractIDByInstanceAddress(b.GetContext(), b.Logger, deps.StateServiceClient, deps.Party, params.Template.GetTemplateID(), input.InstanceAddress)
+			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), deps.StateServiceClient, deps.Party, params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
@@ -128,17 +127,18 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 	)
 }
 
-// FindContractIDByInstanceAddress finds a contract ID by its instance address
-func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, stateService apiv2.StateServiceClient, party, templateId string, instanceAddress contracts.InstanceAddress) (string, error) {
+// FindActiveContractByInstanceAddress finds an active contract by its instance address. It returns an error if there are multiple or zero active contracts matching the instance address.
+// The returned ActiveContract includes the CreatedEventBlob required for explicit disclosures.
+func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2.StateServiceClient, party, templateId string, instanceAddress contracts.InstanceAddress) (*apiv2.ActiveContract, error) {
 	ledgerEndResp, err := stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
-		return "", fmt.Errorf("failed to get ledger end: %w", err)
+		return nil, fmt.Errorf("failed to get ledger end: %w", err)
 	}
 
 	// Parse template ID to get package ID, module name, and entity name
 	packageID, moduleName, entityName, err := parseTemplateIDFromString(templateId)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse template ID: %w", err)
+		return nil, fmt.Errorf("failed to parse template ID: %w", err)
 	}
 
 	activeContractsResp, err := stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
@@ -155,7 +155,7 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 										ModuleName: moduleName,
 										EntityName: entityName,
 									},
-									IncludeCreatedEventBlob: false,
+									IncludeCreatedEventBlob: true,
 								},
 							},
 						},
@@ -166,25 +166,24 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to get active contracts: %w", err)
+		return nil, fmt.Errorf("failed to get active contracts: %w", err)
 	}
 	defer activeContractsResp.CloseSend()
 
-	var contractID string
+	var activeContract *apiv2.ActiveContract
 	for {
-		activeContract, err := activeContractsResp.Recv()
+		activeContractResp, err := activeContractsResp.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}
 
-			return "", fmt.Errorf("failed to receive active contracts: %w", err)
+			return nil, fmt.Errorf("failed to receive active contracts: %w", err)
 		}
 
-		if c, ok := activeContract.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+		if c, ok := activeContractResp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
 			createArguments := c.ActiveContract.GetCreatedEvent().GetCreateArguments()
 			if createArguments == nil {
-				logger.Debugw("Skipping contract with nil create arguments", "contractID", c.ActiveContract.GetCreatedEvent().ContractId)
 				continue
 			}
 
@@ -196,7 +195,6 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 				}
 			}
 			if contractInstanceId == "" {
-				logger.Debugw("Skipping contract with missing instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId)
 				continue
 			}
 
@@ -204,28 +202,36 @@ func FindContractIDByInstanceAddress(ctx context.Context, logger logger.Logger, 
 			instanceID := contracts.InstanceID(contractInstanceId)
 			signatories := c.ActiveContract.GetCreatedEvent().GetSignatories()
 			if len(signatories) != 1 {
-				logger.Debugw("Skipping contract with unexpected number of signatories", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "numSignatories", len(signatories))
 				continue
 			}
 			gotAddress := instanceID.RawInstanceAddress(types.PARTY(signatories[0])).InstanceAddress()
 
 			if instanceAddress != gotAddress {
-				logger.Debugw("Skipping contract with different instanceId field", "contractID", c.ActiveContract.GetCreatedEvent().ContractId, "instanceId", contractInstanceId)
 				continue
 			}
 
-			if contractID != "" {
-				return "", fmt.Errorf("multiple active contracts found for InstanceAddress %s", instanceAddress.String())
+			if activeContract != nil {
+				return nil, fmt.Errorf("multiple active contracts found for InstanceAddress %s", instanceAddress.String())
 			}
-			contractID = c.ActiveContract.GetCreatedEvent().ContractId
+			activeContract = c.ActiveContract
 		}
 	}
 
-	if contractID == "" {
-		return "", fmt.Errorf("no active contract found for InstanceAddress %s", instanceAddress.String())
+	if activeContract == nil {
+		return nil, fmt.Errorf("no active contract found for InstanceAddress %s", instanceAddress.String())
 	}
 
-	return contractID, nil
+	return activeContract, nil
+}
+
+// FindActiveContractIDByInstanceAddress finds an active contract ID by its instance address. It returns an error if there are multiple or zero active contracts matching the instance address.
+func FindActiveContractIDByInstanceAddress(ctx context.Context, stateService apiv2.StateServiceClient, party, templateId string, instanceAddress contracts.InstanceAddress) (string, error) {
+	activeContract, err := FindActiveContractByInstanceAddress(ctx, stateService, party, templateId, instanceAddress)
+	if err != nil {
+		return "", err
+	}
+
+	return activeContract.GetCreatedEvent().GetContractId(), nil
 }
 
 // parseTemplateIDFromString parses a template ID string like "#package:Module:Entity" into its components
