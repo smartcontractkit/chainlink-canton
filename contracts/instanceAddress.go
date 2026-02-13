@@ -14,9 +14,6 @@ import (
 	ccip_common "github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
 )
 
-// InstanceAddressLength is the length in bytes of an InstanceAddress.
-const InstanceAddressLength = 32
-
 type RawInstanceAddress string
 
 func RawInstanceAddressFromString(s string) (RawInstanceAddress, error) {
@@ -49,6 +46,9 @@ func (r RawInstanceAddress) Binding() ccip_common.RawInstanceAddress {
 	}
 }
 
+// InstanceAddressLength is the length in bytes of an InstanceAddress.
+const InstanceAddressLength = 32
+
 // InstanceAddress represents the 32 byte Keccak256 hash of an instance ID + owner party.
 type InstanceAddress [InstanceAddressLength]byte
 
@@ -77,9 +77,7 @@ func (a InstanceAddress) Hex() string { return hexutil.Encode(a[:]) }
 // String returns the hex string representation of the InstanceAddress, prefixed with "0x".
 func (a InstanceAddress) String() string { return a.Hex() }
 
-var (
-	instanceAddressT = reflect.TypeFor[InstanceAddress]()
-)
+var instanceAddressT = reflect.TypeFor[InstanceAddress]()
 
 // UnmarshalText parses an InstanceAddress in hex syntax.
 func (a *InstanceAddress) UnmarshalText(text []byte) error {
@@ -102,4 +100,65 @@ func (a *InstanceAddress) SetBytes(b []byte) {
 	}
 
 	copy(a[InstanceAddressLength-len(b):], b)
+}
+
+const HashedPartyLength = 32
+
+// HashedParty represents the 32 byte Keccak256 hash of a party string.
+type HashedParty [HashedPartyLength]byte
+
+func BytesToHashedParty(b []byte) HashedParty {
+	var party HashedParty
+	party.SetBytes(b)
+
+	return party
+}
+
+// HashedPartyFromString computes the Keccak256 hash of the given party string and returns it as a HashedParty.
+func HashedPartyFromString(party string) HashedParty {
+	h := sha3.NewLegacyKeccak256()
+	h.Write([]byte(party))
+
+	return HashedParty(h.Sum(nil))
+}
+
+// HexToHashedParty converts a hex string to a HashedParty.
+// s may be prefixed with "0x".
+func HexToHashedParty(s string) HashedParty { return BytesToHashedParty(common.FromHex(s)) }
+
+// Cmp compares two HashedParties.
+func (p HashedParty) Cmp(other HashedParty) int { return bytes.Compare(p[:], other[:]) }
+
+// Bytes returns the byte slice representation of the HashedParty.
+func (p HashedParty) Bytes() []byte { return p[:] }
+
+// Hex returns the hex string representation of the HashedParty, prefixed with "0x".
+func (p HashedParty) Hex() string { return hexutil.Encode(p[:]) }
+
+// String returns the hex string representation of the HashedParty, prefixed with "0x".
+func (p HashedParty) String() string { return p.Hex() }
+
+var hashedPartyT = reflect.TypeFor[HashedParty]()
+
+// UnmarshalText parses a HashedParty in hex syntax.
+func (p *HashedParty) UnmarshalText(text []byte) error {
+	return hexutil.UnmarshalFixedText("HashedParty", text, p[:])
+}
+
+// UnmarshalJSON parses a HashedParty in hex syntax.
+func (p *HashedParty) UnmarshalJSON(input []byte) error {
+	return hexutil.UnmarshalFixedJSON(hashedPartyT, input, p[:])
+}
+
+// MarshalText returns the hex representation of p.
+func (p HashedParty) MarshalText() ([]byte, error) { return hexutil.Bytes(p[:]).MarshalText() }
+
+// SetBytes sets the HashedParty to the value of b.
+// If b is larger than HashedPartyLength, b is cropped from the left.
+func (p *HashedParty) SetBytes(b []byte) {
+	if len(b) > len(p) {
+		b = b[len(b)-HashedPartyLength:]
+	}
+
+	copy(p[HashedPartyLength-len(b):], b)
 }
