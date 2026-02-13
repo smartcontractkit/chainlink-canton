@@ -9,10 +9,12 @@ import (
 	mrand "math/rand"
 	"sort"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -138,71 +140,33 @@ func NewMCMSEncoder(pkgID string) mcms.MCMSEncoder {
 }
 
 // MustEncodeScheduleBatch encodes ScheduleBatchParams and returns the full EncodedChoice.
-// Panics on error. Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeScheduleBatch(encoder mcms.MCMSEncoder, params mcms.ScheduleBatchParams) *bind.EncodedChoice {
+// Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeScheduleBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.ScheduleBatchParams) *bind.EncodedChoice {
+	t.Helper()
 	choice, err := encoder.ScheduleBatch(params)
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode ScheduleBatchParams: %v", err))
-	}
+	require.NoError(t, err, "failed to encode ScheduleBatchParams")
 
 	return choice
 }
 
 // MustEncodeCancelBatch encodes CancelBatchParams and returns the full EncodedChoice.
-// Panics on error. Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeCancelBatch(encoder mcms.MCMSEncoder, params mcms.CancelBatchParams) *bind.EncodedChoice {
+// Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeCancelBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.CancelBatchParams) *bind.EncodedChoice {
+	t.Helper()
 	choice, err := encoder.CancelBatch(params)
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode CancelBatchParams: %v", err))
-	}
+	require.NoError(t, err, "failed to encode CancelBatchParams")
 
 	return choice
 }
 
-// MustEncodeBypasserExecute encodes BypasserExecuteBatchParams and returns the full EncodedChoice.
-// Panics on error. Use choice.Choice for the function name, choice.OperationData for hex data.
-func MustEncodeBypasserExecuteBatch(encoder mcms.MCMSEncoder, params mcms.BypasserExecuteBatchParams) *bind.EncodedChoice {
+// MustEncodeBypasserExecuteBatch encodes BypasserExecuteBatchParams and returns the full EncodedChoice.
+// Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeBypasserExecuteBatch(t testing.TB, encoder mcms.MCMSEncoder, params mcms.BypasserExecuteBatchParams) *bind.EncodedChoice {
+	t.Helper()
 	choice, err := encoder.BypasserExecuteBatch(params)
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode BypasserExecuteBatchParams: %v", err))
-	}
+	require.NoError(t, err, "failed to encode BypasserExecuteBatchParams")
 
 	return choice
-}
-
-// Legacy functions - kept for compatibility but prefer the encoder pattern above
-
-// MustEncodeScheduleBatchParams encodes ScheduleBatchParams using generated bindings, panics on error
-// Deprecated: Use MustEncodeScheduleBatch with an encoder instead
-func MustEncodeScheduleBatchParams(params mcms.ScheduleBatchParams) string {
-	encoded, err := params.MarshalHex()
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode ScheduleBatchParams: %v", err))
-	}
-
-	return encoded
-}
-
-// MustEncodeCancelBatchParams encodes CancelBatchParams using generated bindings, panics on error
-// Deprecated: Use MustEncodeCancelBatch with an encoder instead
-func MustEncodeCancelBatchParams(params mcms.CancelBatchParams) string {
-	encoded, err := params.MarshalHex()
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode CancelBatchParams: %v", err))
-	}
-
-	return encoded
-}
-
-// MustEncodeBypasserExecuteBatchParams encodes BypasserExecuteBatchParams using generated bindings, panics on error
-// Deprecated: Use MustEncodeBypasserExecute with an encoder instead
-func MustEncodeBypasserExecuteBatchParams(params mcms.BypasserExecuteBatchParams) string {
-	encoded, err := params.MarshalHex()
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode BypasserExecuteBatchParams: %v", err))
-	}
-
-	return encoded
 }
 
 // MCMSRootMetadata matches Canton RootMetadata

@@ -9,7 +9,6 @@ concurrency:
 
 env:
   GOLANGCI_LINT_VERSION: v2.8.0
-  GOTOOLCHAIN: auto
 
 jobs:
   gomods:
