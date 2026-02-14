@@ -51,23 +51,23 @@ type IITokenPool interface {
 	TokenPoolCalculateFee(contractID string, args TokenPoolCalculateFee) *model.ExerciseCommand
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // LockOrBurnResult is a Record type
@@ -78,27 +78,27 @@ type LockOrBurnResult struct {
 }
 
 // ToMap converts LockOrBurnResult to a map for DAML arguments
-func (t LockOrBurnResult) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t LockOrBurnResult) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["poolChangeCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.PoolChangeCids))
+	m["poolChangeCids"] = func() []any {
+		res := make([]any, 0, len(t.PoolChangeCids))
 		for _, e := range t.PoolChangeCids {
 			res = append(res, e)
 		}
 		return res
 	}()
 
-	m["senderChangeCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.SenderChangeCids))
+	m["senderChangeCids"] = func() []any {
+		res := make([]any, 0, len(t.SenderChangeCids))
 		for _, e := range t.SenderChangeCids {
 			res = append(res, e)
 		}
 		return res
 	}()
 
-	m["sendingMessageCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -125,19 +125,19 @@ type ReleaseOrMintResult struct {
 }
 
 // ToMap converts ReleaseOrMintResult to a map for DAML arguments
-func (t ReleaseOrMintResult) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ReleaseOrMintResult) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["output"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["output"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Output).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Output
 	}()
 
-	m["poolChangeCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.PoolChangeCids))
+	m["poolChangeCids"] = func() []any {
+		res := make([]any, 0, len(t.PoolChangeCids))
 		for _, e := range t.PoolChangeCids {
 			res = append(res, e)
 		}
@@ -163,11 +163,11 @@ type ReleaseOrMintResultCompleted struct {
 }
 
 // ToMap converts ReleaseOrMintResultCompleted to a map for DAML arguments
-func (t ReleaseOrMintResultCompleted) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ReleaseOrMintResultCompleted) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["receiverHoldingCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ReceiverHoldingCids))
+	m["receiverHoldingCids"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverHoldingCids))
 		for _, e := range t.ReceiverHoldingCids {
 			res = append(res, e)
 		}
@@ -199,7 +199,7 @@ func (v ReleaseOrMintResultOutput) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ReleaseOrMintResultOutput
+// UnmarshalJSON implements custom JSON unmarshalling for ReleaseOrMintResultOutput
 func (v *ReleaseOrMintResultOutput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -220,7 +220,7 @@ func (v ReleaseOrMintResultOutput) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v ReleaseOrMintResultOutput) GetVariantValue() interface{} {
+func (v ReleaseOrMintResultOutput) GetVariantValue() any {
 
 	if v.ReleaseOrMintResultPending != nil {
 		return v.ReleaseOrMintResultPending
@@ -241,11 +241,11 @@ type ReleaseOrMintResultPending struct {
 }
 
 // ToMap converts ReleaseOrMintResultPending to a map for DAML arguments
-func (t ReleaseOrMintResultPending) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ReleaseOrMintResultPending) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["transferInstructionCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["transferInstructionCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -273,27 +273,27 @@ type TokenInput struct {
 }
 
 // ToMap converts TokenInput to a map for DAML arguments
-func (t TokenInput) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenInput) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["transferFactory"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["transferFactory"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TransferFactory).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TransferFactory
 	}()
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
 		return t.ExtraArgs
 	}()
 
-	m["tokenPoolHoldings"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.TokenPoolHoldings))
+	m["tokenPoolHoldings"] = func() []any {
+		res := make([]any, 0, len(t.TokenPoolHoldings))
 		for _, e := range t.TokenPoolHoldings {
 			res = append(res, e)
 		}
@@ -321,15 +321,15 @@ type TokenPoolView struct {
 }
 
 // ToMap converts TokenPoolView to a map for DAML arguments
-func (t TokenPoolView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPoolView) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["owner"] = t.Owner.ToMap()
 
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -356,11 +356,11 @@ type TokenPoolCalculateFee struct {
 }
 
 // ToMap converts TokenPoolCalculateFee to a map for DAML arguments
-func (t TokenPoolCalculateFee) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPoolCalculateFee) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["sendingMessageCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -393,8 +393,8 @@ type TokenPoolGetRequiredCCVs struct {
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
-func (t TokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["remoteChainSelector"] = t.RemoteChainSelector
 
@@ -404,8 +404,8 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]interface{} {
 
 	m["extraData"] = string(t.ExtraData)
 
-	m["direction"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["direction"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Direction).(mapper); ok {
 			return m.toMap()
 		}
@@ -438,27 +438,27 @@ type TokenPoolLockOrBurn struct {
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
-func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPoolLockOrBurn) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["sendingMessageCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
 	}()
 
-	m["tokenInput"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenInput"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TokenInput
 	}()
 
-	m["senderInputCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.SenderInputCids))
+	m["senderInputCids"] = func() []any {
+		res := make([]any, 0, len(t.SenderInputCids))
 		for _, e := range t.SenderInputCids {
 			res = append(res, e)
 		}
@@ -467,8 +467,8 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]interface{} {
 
 	m["amount"] = t.Amount
 
-	m["rmnRemoteCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -500,35 +500,35 @@ type TokenPoolReleaseFromTicket struct {
 }
 
 // ToMap converts TokenPoolReleaseFromTicket to a map for DAML arguments
-func (t TokenPoolReleaseFromTicket) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPoolReleaseFromTicket) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["tokenReceiveTicketCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenReceiveTicketCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenReceiveTicketCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TokenReceiveTicketCid
 	}()
 
-	m["tokenAdminRegistryCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["rmnRemoteCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.RmnRemoteCid
 	}()
 
-	m["tokenInput"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenInput"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
 			return m.toMap()
 		}
@@ -558,19 +558,19 @@ type TokenPoolVerifyInboundCCVs struct {
 }
 
 // ToMap converts TokenPoolVerifyInboundCCVs to a map for DAML arguments
-func (t TokenPoolVerifyInboundCCVs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPoolVerifyInboundCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["executingMessageCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.ExecutingMessageCid
 	}()
 
-	m["tokenAdminRegistryCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
 			return m.toMap()
 		}

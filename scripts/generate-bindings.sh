@@ -24,15 +24,7 @@ MCMS_OUTPUT_DIR="$GEN_DIR/mcms"
 # DARs are exported by: go run ./bindings/compile/cmd/export-dars -out artifacts/dars
 DAR_DIR="$PROJECT_ROOT/contracts/dars"
 
-# Find godaml
-if command -v godaml >/dev/null 2>&1; then
-  GODAML_BIN="godaml"
-elif [ -f "$PROJECT_ROOT/bin/godaml" ]; then
-  GODAML_BIN="$PROJECT_ROOT/bin/godaml"
-else
-  die "godaml not found in PATH or at $PROJECT_ROOT/bin/godaml"
-fi
-log_info "Using godaml: $GODAML_BIN"
+GODAML_VERSION="c95242fe54ed" # Pin to specific version, should reflect go.mod
 
 # Ensure exported DARs exist
 [ -d "$DAR_DIR" ] || die "DAR directory not found: $DAR_DIR (run: go run ./bindings/compile/cmd/export-dars -out artifacts/dars)"
@@ -81,7 +73,7 @@ run_godaml() {
   tmp="$(mktemp)"
 
   set +e
-  "$GODAML_BIN" --dar "$dar" --output "$out" --go_package "$pkg" >"$tmp" 2>&1
+  go run github.com/smartcontractkit/go-daml/cmd@"$GODAML_VERSION" --dar "$dar" --output "$out" --go_package "$pkg" >"$tmp" 2>&1
   local rc=$?
   set -e
 

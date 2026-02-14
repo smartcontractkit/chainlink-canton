@@ -29,23 +29,23 @@ type Template interface {
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // CCIPMessageReceived is a Template type
@@ -69,14 +69,14 @@ func (t CCIPMessageReceived) GetTemplateIDWithPackageID(packageID string) string
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["router"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["router"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Router).(mapper); ok {
 			return m.toMap()
 		}
@@ -87,8 +87,8 @@ func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
 	args["messageId"] = string(t.MessageId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["message"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
 			return m.toMap()
 		}
@@ -96,12 +96,12 @@ func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
 	}()
 
 	if t.TokenReleaseResult != nil {
-		args["tokenReleaseResult"] = map[string]interface{}{
+		args["tokenReleaseResult"] = map[string]any{
 			"_type": "optional",
 			"value": *t.TokenReleaseResult,
 		}
 	} else {
-		args["tokenReleaseResult"] = map[string]interface{}{
+		args["tokenReleaseResult"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -114,14 +114,14 @@ func (t CCIPMessageReceived) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t CCIPMessageReceived) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["router"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["router"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Router).(mapper); ok {
 			return m.toMap()
 		}
@@ -132,8 +132,8 @@ func (t CCIPMessageReceived) CreateCommandWithPackageID(packageID string) *model
 	args["messageId"] = string(t.MessageId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["message"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Message).(mapper); ok {
 			return m.toMap()
 		}
@@ -141,12 +141,12 @@ func (t CCIPMessageReceived) CreateCommandWithPackageID(packageID string) *model
 	}()
 
 	if t.TokenReleaseResult != nil {
-		args["tokenReleaseResult"] = map[string]interface{}{
+		args["tokenReleaseResult"] = map[string]any{
 			"_type": "optional",
 			"value": *t.TokenReleaseResult,
 		}
 	} else {
-		args["tokenReleaseResult"] = map[string]interface{}{
+		args["tokenReleaseResult"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -176,7 +176,7 @@ func (t CCIPMessageReceived) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPReceiver", "CCIPMessageReceived"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -186,7 +186,7 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPReceiver", "CCIPMessageReceived"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -209,7 +209,7 @@ func (t CCIPReceiver) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -218,10 +218,10 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["requiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.RequiredCCVs))
+	args["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -239,7 +239,7 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -248,10 +248,10 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["requiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.RequiredCCVs))
+	args["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -286,7 +286,7 @@ func (t CCIPReceiver) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPReceiver", "CCIPReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -296,7 +296,7 @@ func (t CCIPReceiver) ArchiveWithPackageID(contractID string, packageID string) 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPReceiver", "CCIPReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -370,11 +370,11 @@ type CCVInput struct {
 }
 
 // ToMap converts CCVInput to a map for DAML arguments
-func (t CCVInput) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t CCVInput) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["ccvCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["ccvCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.CcvCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -410,43 +410,43 @@ type Execute2 struct {
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
-func (t Execute2) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Execute2) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["routerCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["routerCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.RouterCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.RouterCid
 	}()
 
-	m["offRampCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["offRampCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.OffRampCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.OffRampCid
 	}()
 
-	m["globalConfigCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["globalConfigCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.GlobalConfigCid
 	}()
 
-	m["tokenAdminRegistryCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TokenAdminRegistryCid
 	}()
 
-	m["rmnRemoteCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -456,20 +456,20 @@ func (t Execute2) ToMap() map[string]interface{} {
 	m["encodedMessage"] = string(t.EncodedMessage)
 
 	if t.TokenTransfer != nil {
-		m["tokenTransfer"] = map[string]interface{}{
+		m["tokenTransfer"] = map[string]any{
 			"_type": "optional",
 			"value": *t.TokenTransfer,
 		}
 	} else {
-		m["tokenTransfer"] = map[string]interface{}{
+		m["tokenTransfer"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
-	m["ccvInputs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CcvInputs))
+	m["ccvInputs"] = func() []any {
+		res := make([]any, 0, len(t.CcvInputs))
 		for _, e := range t.CcvInputs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -479,10 +479,10 @@ func (t Execute2) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["additionalRequiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.AdditionalRequiredCCVs))
+	m["additionalRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.AdditionalRequiredCCVs))
 		for _, e := range t.AdditionalRequiredCCVs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -511,8 +511,8 @@ type GetRequiredCCVs struct {
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
-func (t GetRequiredCCVs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetRequiredCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -537,11 +537,11 @@ type TokenTransferInput struct {
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
-func (t TokenTransferInput) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenTransferInput) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["tokenPoolCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenPoolCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenPoolCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -550,8 +550,8 @@ func (t TokenTransferInput) ToMap() map[string]interface{} {
 
 	m["tokenReceiverParty"] = t.TokenReceiverParty.ToMap()
 
-	m["tokenInput"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["tokenInput"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TokenInput).(mapper); ok {
 			return m.toMap()
 		}
@@ -577,13 +577,13 @@ type UpdateRequiredCCVs struct {
 }
 
 // ToMap converts UpdateRequiredCCVs to a map for DAML arguments
-func (t UpdateRequiredCCVs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UpdateRequiredCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["newRequiredCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.NewRequiredCCVs))
+	m["newRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.NewRequiredCCVs))
 		for _, e := range t.NewRequiredCCVs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {

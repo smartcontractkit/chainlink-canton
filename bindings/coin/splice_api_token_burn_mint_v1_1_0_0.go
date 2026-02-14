@@ -41,13 +41,13 @@ type BurnMintFactoryView struct {
 }
 
 // ToMap converts BurnMintFactoryView to a map for DAML arguments
-func (t BurnMintFactoryView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BurnMintFactoryView) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["admin"] = t.Admin.ToMap()
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -78,31 +78,31 @@ type BurnMintFactoryBurnMint struct {
 }
 
 // ToMap converts BurnMintFactoryBurnMint to a map for DAML arguments
-func (t BurnMintFactoryBurnMint) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BurnMintFactoryBurnMint) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
 		return t.InstrumentId
 	}()
 
-	m["inputHoldingCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.InputHoldingCids))
+	m["inputHoldingCids"] = func() []any {
+		res := make([]any, 0, len(t.InputHoldingCids))
 		for _, e := range t.InputHoldingCids {
 			res = append(res, e)
 		}
 		return res
 	}()
 
-	m["outputs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Outputs))
+	m["outputs"] = func() []any {
+		res := make([]any, 0, len(t.Outputs))
 		for _, e := range t.Outputs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -112,16 +112,16 @@ func (t BurnMintFactoryBurnMint) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["extraActors"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ExtraActors))
+	m["extraActors"] = func() []any {
+		res := make([]any, 0, len(t.ExtraActors))
 		for _, e := range t.ExtraActors {
 			res = append(res, e.ToMap())
 		}
 		return res
 	}()
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
@@ -147,11 +147,11 @@ type BurnMintFactoryBurnMintResult struct {
 }
 
 // ToMap converts BurnMintFactoryBurnMintResult to a map for DAML arguments
-func (t BurnMintFactoryBurnMintResult) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BurnMintFactoryBurnMintResult) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["outputCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OutputCids))
+	m["outputCids"] = func() []any {
+		res := make([]any, 0, len(t.OutputCids))
 		for _, e := range t.OutputCids {
 			res = append(res, e)
 		}
@@ -178,8 +178,8 @@ type BurnMintFactoryPublicFetch struct {
 }
 
 // ToMap converts BurnMintFactoryPublicFetch to a map for DAML arguments
-func (t BurnMintFactoryPublicFetch) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BurnMintFactoryPublicFetch) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
@@ -206,15 +206,15 @@ type BurnMintOutput struct {
 }
 
 // ToMap converts BurnMintOutput to a map for DAML arguments
-func (t BurnMintOutput) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BurnMintOutput) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["owner"] = t.Owner.ToMap()
 
 	m["amount"] = t.Amount
 
-	m["context"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
