@@ -42,23 +42,23 @@ type IMCMSReceiver interface {
 	MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // APSetConfig is a Record type
@@ -70,13 +70,13 @@ type APSetConfig struct {
 }
 
 // ToMap converts APSetConfig to a map for DAML arguments
-func (t APSetConfig) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t APSetConfig) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["apSigners"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ApSigners))
+	m["apSigners"] = func() []any {
+		res := make([]any, 0, len(t.ApSigners))
 		for _, e := range t.ApSigners {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -86,16 +86,16 @@ func (t APSetConfig) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["apGroupQuorums"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ApGroupQuorums))
+	m["apGroupQuorums"] = func() []any {
+		res := make([]any, 0, len(t.ApGroupQuorums))
 		for _, e := range t.ApGroupQuorums {
 			res = append(res, int64(e))
 		}
 		return res
 	}()
 
-	m["apGroupParents"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ApGroupParents))
+	m["apGroupParents"] = func() []any {
+		res := make([]any, 0, len(t.ApGroupParents))
 		for _, e := range t.ApGroupParents {
 			res = append(res, int64(e))
 		}
@@ -129,7 +129,7 @@ func (v AdminParams) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for AdminParams
+// UnmarshalJSON implements custom JSON unmarshalling for AdminParams
 func (v *AdminParams) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -150,7 +150,7 @@ func (v AdminParams) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v AdminParams) GetVariantValue() interface{} {
+func (v AdminParams) GetVariantValue() any {
 
 	if v.APSetConfig != nil {
 		return v.APSetConfig
@@ -170,8 +170,8 @@ type ArchiveMCMSEntrypointEvent struct {
 }
 
 // ToMap converts ArchiveMCMSEntrypointEvent to a map for DAML arguments
-func (t ArchiveMCMSEntrypointEvent) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ArchiveMCMSEntrypointEvent) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -200,7 +200,7 @@ func (v ArgValue) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for ArgValue
+// UnmarshalJSON implements custom JSON unmarshalling for ArgValue
 func (v *ArgValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -233,7 +233,7 @@ func (v ArgValue) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v ArgValue) GetVariantValue() interface{} {
+func (v ArgValue) GetVariantValue() any {
 
 	if v.AVText != nil {
 		return v.AVText
@@ -267,8 +267,8 @@ type BlockedFunction struct {
 }
 
 // ToMap converts BlockedFunction to a map for DAML arguments
-func (t BlockedFunction) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BlockedFunction) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["targetInstanceId"] = string(t.TargetInstanceId)
 
@@ -293,13 +293,13 @@ type BypasserExecuteParams struct {
 }
 
 // ToMap converts BypasserExecuteParams to a map for DAML arguments
-func (t BypasserExecuteParams) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t BypasserExecuteParams) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["calls"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Calls))
+	m["calls"] = func() []any {
+		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -330,21 +330,21 @@ type CanExecuteOp struct {
 }
 
 // ToMap converts CanExecuteOp to a map for DAML arguments
-func (t CanExecuteOp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t CanExecuteOp) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["targetRole"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["targetRole"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TargetRole
 	}()
 
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["op"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Op).(mapper); ok {
 			return m.toMap()
 		}
@@ -370,8 +370,8 @@ type CancelBatchParams struct {
 }
 
 // ToMap converts CancelBatchParams to a map for DAML arguments
-func (t CancelBatchParams) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t CancelBatchParams) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["opId"] = string(t.OpId)
 
@@ -407,7 +407,7 @@ func (t Counter) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t Counter) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -426,7 +426,7 @@ func (t Counter) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t Counter) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -462,7 +462,7 @@ func (t Counter) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -472,7 +472,7 @@ func (t Counter) ArchiveWithPackageID(contractID string, packageID string) *mode
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -574,11 +574,11 @@ type ExecuteOp struct {
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
-func (t ExecuteOp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ExecuteOp) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["targetRole"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["targetRole"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
 			return m.toMap()
 		}
@@ -587,24 +587,24 @@ func (t ExecuteOp) ToMap() map[string]interface{} {
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["op"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["op"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Op).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Op
 	}()
 
-	m["opProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.OpProof))
+	m["opProof"] = func() []any {
+		res := make([]any, 0, len(t.OpProof))
 		for _, e := range t.OpProof {
 			res = append(res, string(e))
 		}
 		return res
 	}()
 
-	m["targetCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.TargetCids))
+	m["targetCids"] = func() []any {
+		res := make([]any, 0, len(t.TargetCids))
 		for _, e := range t.TargetCids {
 			res = append(res, e)
 		}
@@ -635,17 +635,17 @@ type ExecuteScheduledBatch struct {
 }
 
 // ToMap converts ExecuteScheduledBatch to a map for DAML arguments
-func (t ExecuteScheduledBatch) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ExecuteScheduledBatch) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
 	m["opId"] = string(t.OpId)
 
-	m["calls"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Calls))
+	m["calls"] = func() []any {
+		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -659,8 +659,8 @@ func (t ExecuteScheduledBatch) ToMap() map[string]interface{} {
 
 	m["salt"] = string(t.Salt)
 
-	m["targetCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.TargetCids))
+	m["targetCids"] = func() []any {
+		res := make([]any, 0, len(t.TargetCids))
 		for _, e := range t.TargetCids {
 			res = append(res, e)
 		}
@@ -688,8 +688,8 @@ type ExpiringRoot struct {
 }
 
 // ToMap converts ExpiringRoot to a map for DAML arguments
-func (t ExpiringRoot) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ExpiringRoot) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["root"] = string(t.Root)
 
@@ -716,8 +716,8 @@ type GetBlockedFunctions struct {
 }
 
 // ToMap converts GetBlockedFunctions to a map for DAML arguments
-func (t GetBlockedFunctions) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetBlockedFunctions) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -740,8 +740,8 @@ type GetBlockedFunctionsCount struct {
 }
 
 // ToMap converts GetBlockedFunctionsCount to a map for DAML arguments
-func (t GetBlockedFunctionsCount) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetBlockedFunctionsCount) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -764,8 +764,8 @@ type GetInstanceIdChoice struct {
 }
 
 // ToMap converts GetInstanceIdChoice to a map for DAML arguments
-func (t GetInstanceIdChoice) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetInstanceIdChoice) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["viewer"] = t.Viewer.ToMap()
 
@@ -788,8 +788,8 @@ type GetMinDelay struct {
 }
 
 // ToMap converts GetMinDelay to a map for DAML arguments
-func (t GetMinDelay) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetMinDelay) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -813,13 +813,13 @@ type GetState struct {
 }
 
 // ToMap converts GetState to a map for DAML arguments
-func (t GetState) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetState) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
-	m["targetRole"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["targetRole"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
 			return m.toMap()
 		}
@@ -846,8 +846,8 @@ type GetTimestamp struct {
 }
 
 // ToMap converts GetTimestamp to a map for DAML arguments
-func (t GetTimestamp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetTimestamp) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -872,8 +872,8 @@ type GetValue struct {
 }
 
 // ToMap converts GetValue to a map for DAML arguments
-func (t GetValue) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetValue) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["viewer"] = t.Viewer.ToMap()
 
@@ -897,8 +897,8 @@ type IsOperation struct {
 }
 
 // ToMap converts IsOperation to a map for DAML arguments
-func (t IsOperation) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t IsOperation) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -924,8 +924,8 @@ type IsOperationDone struct {
 }
 
 // ToMap converts IsOperationDone to a map for DAML arguments
-func (t IsOperationDone) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t IsOperationDone) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -951,8 +951,8 @@ type IsOperationPending struct {
 }
 
 // ToMap converts IsOperationPending to a map for DAML arguments
-func (t IsOperationPending) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t IsOperationPending) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -978,8 +978,8 @@ type IsOperationReady struct {
 }
 
 // ToMap converts IsOperationReady to a map for DAML arguments
-func (t IsOperationReady) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t IsOperationReady) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["submitter"] = t.Submitter.ToMap()
 
@@ -1023,7 +1023,7 @@ func (t MCMS) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t MCMS) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -1035,8 +1035,8 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	args["chainId"] = int64(t.ChainId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["proposer"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["proposer"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Proposer).(mapper); ok {
 			return m.toMap()
 		}
@@ -1044,8 +1044,8 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["canceller"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["canceller"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Canceller).(mapper); ok {
 			return m.toMap()
 		}
@@ -1053,8 +1053,8 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["bypasser"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["bypasser"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Bypasser).(mapper); ok {
 			return m.toMap()
 		}
@@ -1062,8 +1062,8 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minDelay"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["minDelay"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.MinDelay).(mapper); ok {
 			return m.toMap()
 		}
@@ -1071,10 +1071,10 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockedFunctions"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.BlockedFunctions))
+	args["blockedFunctions"] = func() []any {
+		res := make([]any, 0, len(t.BlockedFunctions))
 		for _, e := range t.BlockedFunctions {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -1085,11 +1085,11 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["timelockTimestamps"] = func() interface{} {
+	args["timelockTimestamps"] = func() any {
 		if t.TimelockTimestamps == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.TimelockTimestamps}
+		return map[string]any{"_type": "genmap", "value": t.TimelockTimestamps}
 	}()
 
 	return &model.CreateCommand{
@@ -1100,7 +1100,7 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -1112,8 +1112,8 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	args["chainId"] = int64(t.ChainId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["proposer"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["proposer"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Proposer).(mapper); ok {
 			return m.toMap()
 		}
@@ -1121,8 +1121,8 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["canceller"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["canceller"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Canceller).(mapper); ok {
 			return m.toMap()
 		}
@@ -1130,8 +1130,8 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["bypasser"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["bypasser"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Bypasser).(mapper); ok {
 			return m.toMap()
 		}
@@ -1139,8 +1139,8 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minDelay"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["minDelay"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.MinDelay).(mapper); ok {
 			return m.toMap()
 		}
@@ -1148,10 +1148,10 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockedFunctions"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.BlockedFunctions))
+	args["blockedFunctions"] = func() []any {
+		res := make([]any, 0, len(t.BlockedFunctions))
 		for _, e := range t.BlockedFunctions {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -1162,11 +1162,11 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["timelockTimestamps"] = func() interface{} {
+	args["timelockTimestamps"] = func() any {
 		if t.TimelockTimestamps == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.TimelockTimestamps}
+		return map[string]any{"_type": "genmap", "value": t.TimelockTimestamps}
 	}()
 
 	return &model.CreateCommand{
@@ -1320,7 +1320,7 @@ func (t MCMS) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -1330,7 +1330,7 @@ func (t MCMS) ArchiveWithPackageID(contractID string, packageID string) *model.E
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -1523,7 +1523,7 @@ func (t MCMSEntrypointEvent) GetTemplateIDWithPackageID(packageID string) string
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -1538,8 +1538,8 @@ func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
 	args["operationData"] = string(t.OperationData)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["contractIdsAsText"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ContractIdsAsText))
+	args["contractIdsAsText"] = func() []any {
+		res := make([]any, 0, len(t.ContractIdsAsText))
 		for _, e := range t.ContractIdsAsText {
 			res = append(res, string(e))
 		}
@@ -1554,7 +1554,7 @@ func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t MCMSEntrypointEvent) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["owner"] = t.Owner.ToMap()
@@ -1569,8 +1569,8 @@ func (t MCMSEntrypointEvent) CreateCommandWithPackageID(packageID string) *model
 	args["operationData"] = string(t.OperationData)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["contractIdsAsText"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ContractIdsAsText))
+	args["contractIdsAsText"] = func() []any {
+		res := make([]any, 0, len(t.ContractIdsAsText))
 		for _, e := range t.ContractIdsAsText {
 			res = append(res, string(e))
 		}
@@ -1602,7 +1602,7 @@ func (t MCMSEntrypointEvent) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -1612,7 +1612,7 @@ func (t MCMSEntrypointEvent) ArchiveWithPackageID(contractID string, packageID s
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -1644,8 +1644,8 @@ type MCMSReceiverView struct {
 }
 
 // ToMap converts MCMSReceiverView to a map for DAML arguments
-func (t MCMSReceiverView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MCMSReceiverView) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["owner"] = t.Owner.ToMap()
 
@@ -1673,8 +1673,8 @@ type MCMSReceiverEntrypoint struct {
 }
 
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
-func (t MCMSReceiverEntrypoint) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MCMSReceiverEntrypoint) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1682,8 +1682,8 @@ func (t MCMSReceiverEntrypoint) ToMap() map[string]interface{} {
 
 	m["operationData"] = string(t.OperationData)
 
-	m["contractIds"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ContractIds))
+	m["contractIds"] = func() []any {
+		res := make([]any, 0, len(t.ContractIds))
 		for _, e := range t.ContractIds {
 			res = append(res, e)
 		}
@@ -1709,8 +1709,8 @@ type MCMSReceiverGetInstanceId struct {
 }
 
 // ToMap converts MCMSReceiverGetInstanceId to a map for DAML arguments
-func (t MCMSReceiverGetInstanceId) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MCMSReceiverGetInstanceId) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["c"] = t.C.ToMap()
 
@@ -1738,11 +1738,11 @@ type MCMSState struct {
 }
 
 // ToMap converts MCMSState to a map for DAML arguments
-func (t MCMSState) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MCMSState) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["role"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["role"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Role).(mapper); ok {
 			return m.toMap()
 		}
@@ -1780,13 +1780,13 @@ type MultisigConfig struct {
 }
 
 // ToMap converts MultisigConfig to a map for DAML arguments
-func (t MultisigConfig) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MultisigConfig) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["signers"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Signers))
+	m["signers"] = func() []any {
+		res := make([]any, 0, len(t.Signers))
 		for _, e := range t.Signers {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -1796,16 +1796,16 @@ func (t MultisigConfig) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["groupQuorums"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.GroupQuorums))
+	m["groupQuorums"] = func() []any {
+		res := make([]any, 0, len(t.GroupQuorums))
 		for _, e := range t.GroupQuorums {
 			res = append(res, int64(e))
 		}
 		return res
 	}()
 
-	m["groupParents"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.GroupParents))
+	m["groupParents"] = func() []any {
+		res := make([]any, 0, len(t.GroupParents))
 		for _, e := range t.GroupParents {
 			res = append(res, int64(e))
 		}
@@ -1836,8 +1836,8 @@ type Op struct {
 }
 
 // ToMap converts Op to a map for DAML arguments
-func (t Op) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Op) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["chainId"] = int64(t.ChainId)
 
@@ -1872,8 +1872,8 @@ type RawSignature struct {
 }
 
 // ToMap converts RawSignature to a map for DAML arguments
-func (t RawSignature) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t RawSignature) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["publicKey"] = string(t.PublicKey)
 
@@ -1937,34 +1937,34 @@ type RoleState struct {
 }
 
 // ToMap converts RoleState to a map for DAML arguments
-func (t RoleState) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t RoleState) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["config"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["config"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Config).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Config
 	}()
 
-	m["seenHashes"] = func() interface{} {
+	m["seenHashes"] = func() any {
 		if t.SeenHashes == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.SeenHashes}
+		return map[string]any{"_type": "genmap", "value": t.SeenHashes}
 	}()
 
-	m["expiringRoot"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["expiringRoot"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExpiringRoot).(mapper); ok {
 			return m.toMap()
 		}
 		return t.ExpiringRoot
 	}()
 
-	m["rootMetadata"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["rootMetadata"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.RootMetadata).(mapper); ok {
 			return m.toMap()
 		}
@@ -1994,8 +1994,8 @@ type RootMetadata struct {
 }
 
 // ToMap converts RootMetadata to a map for DAML arguments
-func (t RootMetadata) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t RootMetadata) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["chainId"] = int64(t.ChainId)
 
@@ -2029,13 +2029,13 @@ type ScheduleBatchParams struct {
 }
 
 // ToMap converts ScheduleBatchParams to a map for DAML arguments
-func (t ScheduleBatchParams) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ScheduleBatchParams) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["calls"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Calls))
+	m["calls"] = func() []any {
+		res := make([]any, 0, len(t.Calls))
 		for _, e := range t.Calls {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -2074,21 +2074,21 @@ type SetConfig struct {
 }
 
 // ToMap converts SetConfig to a map for DAML arguments
-func (t SetConfig) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t SetConfig) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["targetRole"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["targetRole"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TargetRole
 	}()
 
-	m["newSigners"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.NewSigners))
+	m["newSigners"] = func() []any {
+		res := make([]any, 0, len(t.NewSigners))
 		for _, e := range t.NewSigners {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -2098,16 +2098,16 @@ func (t SetConfig) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["newGroupQuorums"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.NewGroupQuorums))
+	m["newGroupQuorums"] = func() []any {
+		res := make([]any, 0, len(t.NewGroupQuorums))
 		for _, e := range t.NewGroupQuorums {
 			res = append(res, int64(e))
 		}
 		return res
 	}()
 
-	m["newGroupParents"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.NewGroupParents))
+	m["newGroupParents"] = func() []any {
+		res := make([]any, 0, len(t.NewGroupParents))
 		for _, e := range t.NewGroupParents {
 			res = append(res, int64(e))
 		}
@@ -2138,13 +2138,13 @@ type SetConfigParams struct {
 }
 
 // ToMap converts SetConfigParams to a map for DAML arguments
-func (t SetConfigParams) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t SetConfigParams) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["signers"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Signers))
+	m["signers"] = func() []any {
+		res := make([]any, 0, len(t.Signers))
 		for _, e := range t.Signers {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -2154,16 +2154,16 @@ func (t SetConfigParams) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["groupQuorums"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.GroupQuorums))
+	m["groupQuorums"] = func() []any {
+		res := make([]any, 0, len(t.GroupQuorums))
 		for _, e := range t.GroupQuorums {
 			res = append(res, int64(e))
 		}
 		return res
 	}()
 
-	m["groupParents"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.GroupParents))
+	m["groupParents"] = func() []any {
+		res := make([]any, 0, len(t.GroupParents))
 		for _, e := range t.GroupParents {
 			res = append(res, int64(e))
 		}
@@ -2197,11 +2197,11 @@ type SetRoot struct {
 }
 
 // ToMap converts SetRoot to a map for DAML arguments
-func (t SetRoot) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t SetRoot) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["targetRole"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["targetRole"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TargetRole).(mapper); ok {
 			return m.toMap()
 		}
@@ -2214,26 +2214,26 @@ func (t SetRoot) ToMap() map[string]interface{} {
 
 	m["validUntil"] = t.ValidUntil
 
-	m["metadata"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["metadata"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Metadata).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Metadata
 	}()
 
-	m["metadataProof"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.MetadataProof))
+	m["metadataProof"] = func() []any {
+		res := make([]any, 0, len(t.MetadataProof))
 		for _, e := range t.MetadataProof {
 			res = append(res, string(e))
 		}
 		return res
 	}()
 
-	m["signatures"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Signatures))
+	m["signatures"] = func() []any {
+		res := make([]any, 0, len(t.Signatures))
 		for _, e := range t.Signatures {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -2264,8 +2264,8 @@ type SignerInfo struct {
 }
 
 // ToMap converts SignerInfo to a map for DAML arguments
-func (t SignerInfo) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t SignerInfo) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["signerAddress"] = string(t.SignerAddress)
 
@@ -2294,8 +2294,8 @@ type TimelockCall struct {
 }
 
 // ToMap converts TimelockCall to a map for DAML arguments
-func (t TimelockCall) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TimelockCall) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["targetInstanceId"] = string(t.TargetInstanceId)
 

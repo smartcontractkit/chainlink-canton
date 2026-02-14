@@ -29,23 +29,23 @@ type Template interface {
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // Curse is a Record type
@@ -54,8 +54,8 @@ type Curse struct {
 }
 
 // ToMap converts Curse to a map for DAML arguments
-func (t Curse) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Curse) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["subject"] = string(t.Subject)
 
@@ -78,8 +78,8 @@ type CurseChain struct {
 }
 
 // ToMap converts CurseChain to a map for DAML arguments
-func (t CurseChain) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t CurseChain) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["chainSelector"] = t.ChainSelector
 
@@ -101,8 +101,8 @@ type CurseGlobal struct {
 }
 
 // ToMap converts CurseGlobal to a map for DAML arguments
-func (t CurseGlobal) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t CurseGlobal) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -122,11 +122,11 @@ type CurseMultiple struct {
 }
 
 // ToMap converts CurseMultiple to a map for DAML arguments
-func (t CurseMultiple) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t CurseMultiple) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["subjects"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Subjects))
+	m["subjects"] = func() []any {
+		res := make([]any, 0, len(t.Subjects))
 		for _, e := range t.Subjects {
 			res = append(res, string(e))
 		}
@@ -152,8 +152,8 @@ type GetCursedSubjects struct {
 }
 
 // ToMap converts GetCursedSubjects to a map for DAML arguments
-func (t GetCursedSubjects) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetCursedSubjects) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -176,8 +176,8 @@ type IsCursed struct {
 }
 
 // ToMap converts IsCursed to a map for DAML arguments
-func (t IsCursed) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t IsCursed) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -201,8 +201,8 @@ type IsCursedForChain struct {
 }
 
 // ToMap converts IsCursedForChain to a map for DAML arguments
-func (t IsCursedForChain) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t IsCursedForChain) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -241,7 +241,7 @@ func (t RMNRemote) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t RMNRemote) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -253,8 +253,8 @@ func (t RMNRemote) CreateCommand() *model.CreateCommand {
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["cursedSubjects"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CursedSubjects))
+	args["cursedSubjects"] = func() []any {
+		res := make([]any, 0, len(t.CursedSubjects))
 		for _, e := range t.CursedSubjects {
 			res = append(res, string(e))
 		}
@@ -269,7 +269,7 @@ func (t RMNRemote) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t RMNRemote) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -281,8 +281,8 @@ func (t RMNRemote) CreateCommandWithPackageID(packageID string) *model.CreateCom
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["cursedSubjects"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.CursedSubjects))
+	args["cursedSubjects"] = func() []any {
+		res := make([]any, 0, len(t.CursedSubjects))
 		for _, e := range t.CursedSubjects {
 			res = append(res, string(e))
 		}
@@ -545,7 +545,7 @@ func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -555,7 +555,7 @@ func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *mo
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -586,8 +586,8 @@ type Uncurse struct {
 }
 
 // ToMap converts Uncurse to a map for DAML arguments
-func (t Uncurse) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Uncurse) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["subject"] = string(t.Subject)
 
@@ -610,8 +610,8 @@ type UncurseChain struct {
 }
 
 // ToMap converts UncurseChain to a map for DAML arguments
-func (t UncurseChain) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UncurseChain) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["chainSelector"] = t.ChainSelector
 
@@ -633,8 +633,8 @@ type UncurseGlobal struct {
 }
 
 // ToMap converts UncurseGlobal to a map for DAML arguments
-func (t UncurseGlobal) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UncurseGlobal) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -654,11 +654,11 @@ type UncurseMultiple struct {
 }
 
 // ToMap converts UncurseMultiple to a map for DAML arguments
-func (t UncurseMultiple) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UncurseMultiple) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["subjects"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Subjects))
+	m["subjects"] = func() []any {
+		res := make([]any, 0, len(t.Subjects))
 		for _, e := range t.Subjects {
 			res = append(res, string(e))
 		}
@@ -684,8 +684,8 @@ type UpdateCCIPOwner struct {
 }
 
 // ToMap converts UpdateCCIPOwner to a map for DAML arguments
-func (t UpdateCCIPOwner) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UpdateCCIPOwner) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["newCCIPOwner"] = t.NewCCIPOwner.ToMap()
 

@@ -38,13 +38,13 @@ type HoldingView struct {
 }
 
 // ToMap converts HoldingView to a map for DAML arguments
-func (t HoldingView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t HoldingView) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["owner"] = t.Owner.ToMap()
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -54,18 +54,18 @@ func (t HoldingView) ToMap() map[string]interface{} {
 	m["amount"] = t.Amount
 
 	if t.Lock != nil {
-		m["lock"] = map[string]interface{}{
+		m["lock"] = map[string]any{
 			"_type": "optional",
 			"value": *t.Lock,
 		}
 	} else {
-		m["lock"] = map[string]interface{}{
+		m["lock"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -92,8 +92,8 @@ type InstrumentId struct {
 }
 
 // ToMap converts InstrumentId to a map for DAML arguments
-func (t InstrumentId) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t InstrumentId) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["admin"] = t.Admin.ToMap()
 
@@ -121,11 +121,11 @@ type Lock struct {
 }
 
 // ToMap converts Lock to a map for DAML arguments
-func (t Lock) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Lock) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["holders"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.Holders))
+	m["holders"] = func() []any {
+		res := make([]any, 0, len(t.Holders))
 		for _, e := range t.Holders {
 			res = append(res, e.ToMap())
 		}
@@ -133,18 +133,18 @@ func (t Lock) ToMap() map[string]interface{} {
 	}()
 
 	if t.ExpiresAt != nil {
-		m["expiresAt"] = map[string]interface{}{
+		m["expiresAt"] = map[string]any{
 			"_type": "optional",
 			"value": *t.ExpiresAt,
 		}
 	} else {
-		m["expiresAt"] = map[string]interface{}{
+		m["expiresAt"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
-	m["expiresAfter"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["expiresAfter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExpiresAfter).(mapper); ok {
 			return m.toMap()
 		}
@@ -152,12 +152,12 @@ func (t Lock) ToMap() map[string]interface{} {
 	}()
 
 	if t.Context != nil {
-		m["context"] = map[string]interface{}{
+		m["context"] = map[string]any{
 			"_type": "optional",
 			"value": string(*t.Context),
 		}
 	} else {
-		m["context"] = map[string]interface{}{
+		m["context"] = map[string]any{
 			"_type": "optional",
 		}
 	}

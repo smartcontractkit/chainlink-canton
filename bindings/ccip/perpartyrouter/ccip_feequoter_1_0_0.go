@@ -27,13 +27,13 @@ type ApplyDestChainConfigUpdates struct {
 }
 
 // ToMap converts ApplyDestChainConfigUpdates to a map for DAML arguments
-func (t ApplyDestChainConfigUpdates) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ApplyDestChainConfigUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["destChainConfigArgs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.DestChainConfigArgs))
+	m["destChainConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.DestChainConfigArgs))
 		for _, e := range t.DestChainConfigArgs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -64,13 +64,13 @@ type ApplyFeeTokenUpdates struct {
 }
 
 // ToMap converts ApplyFeeTokenUpdates to a map for DAML arguments
-func (t ApplyFeeTokenUpdates) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ApplyFeeTokenUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["feeTokensToRemove"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.FeeTokensToRemove))
+	m["feeTokensToRemove"] = func() []any {
+		res := make([]any, 0, len(t.FeeTokensToRemove))
 		for _, e := range t.FeeTokensToRemove {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -80,10 +80,10 @@ func (t ApplyFeeTokenUpdates) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["feeTokensToAdd"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.FeeTokensToAdd))
+	m["feeTokensToAdd"] = func() []any {
+		res := make([]any, 0, len(t.FeeTokensToAdd))
 		for _, e := range t.FeeTokensToAdd {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -123,8 +123,8 @@ type DestChainConfig2 struct {
 }
 
 // ToMap converts DestChainConfig2 to a map for DAML arguments
-func (t DestChainConfig2) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t DestChainConfig2) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
 
@@ -166,13 +166,13 @@ type DestChainConfigArgs struct {
 }
 
 // ToMap converts DestChainConfigArgs to a map for DAML arguments
-func (t DestChainConfigArgs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t DestChainConfigArgs) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["destChainConfig"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["destChainConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.DestChainConfig).(mapper); ok {
 			return m.toMap()
 		}
@@ -216,7 +216,7 @@ func (t FeeQuoter) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t FeeQuoter) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -225,48 +225,48 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["feeTokens"] = func() interface{} {
+	args["feeTokens"] = func() any {
 		if t.FeeTokens == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.FeeTokens}
+		return map[string]any{"_type": "genmap", "value": t.FeeTokens}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["destChainConfigs"] = func() interface{} {
+	args["destChainConfigs"] = func() any {
 		if t.DestChainConfigs == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
+		return map[string]any{"_type": "genmap", "value": t.DestChainConfigs}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenTransferFeeConfigs"] = func() interface{} {
+	args["tokenTransferFeeConfigs"] = func() any {
 		if t.TokenTransferFeeConfigs == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
+		return map[string]any{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["usdPerUnitGasByDestChainSelector"] = func() interface{} {
+	args["usdPerUnitGasByDestChainSelector"] = func() any {
 		if t.UsdPerUnitGasByDestChainSelector == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
+		return map[string]any{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["usdPerToken"] = func() interface{} {
+	args["usdPerToken"] = func() any {
 		if t.UsdPerToken == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.UsdPerToken}
+		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["priceUpdaters"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.PriceUpdaters))
+	args["priceUpdaters"] = func() []any {
+		res := make([]any, 0, len(t.PriceUpdaters))
 		for _, e := range t.PriceUpdaters {
 			res = append(res, e.ToMap())
 		}
@@ -281,7 +281,7 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -290,48 +290,48 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["feeTokens"] = func() interface{} {
+	args["feeTokens"] = func() any {
 		if t.FeeTokens == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.FeeTokens}
+		return map[string]any{"_type": "genmap", "value": t.FeeTokens}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["destChainConfigs"] = func() interface{} {
+	args["destChainConfigs"] = func() any {
 		if t.DestChainConfigs == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.DestChainConfigs}
+		return map[string]any{"_type": "genmap", "value": t.DestChainConfigs}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenTransferFeeConfigs"] = func() interface{} {
+	args["tokenTransferFeeConfigs"] = func() any {
 		if t.TokenTransferFeeConfigs == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
+		return map[string]any{"_type": "genmap", "value": t.TokenTransferFeeConfigs}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["usdPerUnitGasByDestChainSelector"] = func() interface{} {
+	args["usdPerUnitGasByDestChainSelector"] = func() any {
 		if t.UsdPerUnitGasByDestChainSelector == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
+		return map[string]any{"_type": "genmap", "value": t.UsdPerUnitGasByDestChainSelector}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["usdPerToken"] = func() interface{} {
+	args["usdPerToken"] = func() any {
 		if t.UsdPerToken == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.UsdPerToken}
+		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["priceUpdaters"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.PriceUpdaters))
+	args["priceUpdaters"] = func() []any {
+		res := make([]any, 0, len(t.PriceUpdaters))
 		for _, e := range t.PriceUpdaters {
 			res = append(res, e.ToMap())
 		}
@@ -552,7 +552,7 @@ func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -562,7 +562,7 @@ func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *mo
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -594,11 +594,11 @@ type FeeQuoterFinalizeFee struct {
 }
 
 // ToMap converts FeeQuoterFinalizeFee to a map for DAML arguments
-func (t FeeQuoterFinalizeFee) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t FeeQuoterFinalizeFee) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["sendingMessageCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SendingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -628,13 +628,13 @@ type FeeQuoterGetTokenTransferFee struct {
 }
 
 // ToMap converts FeeQuoterGetTokenTransferFee to a map for DAML arguments
-func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
 
-	m["token"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["token"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Token).(mapper); ok {
 			return m.toMap()
 		}
@@ -663,11 +663,11 @@ type FeeTokenArgs struct {
 }
 
 // ToMap converts FeeTokenArgs to a map for DAML arguments
-func (t FeeTokenArgs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t FeeTokenArgs) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -696,8 +696,8 @@ type GasPriceUpdate struct {
 }
 
 // ToMap converts GasPriceUpdate to a map for DAML arguments
-func (t GasPriceUpdate) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GasPriceUpdate) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -723,8 +723,8 @@ type GetDestChainConfig2 struct {
 }
 
 // ToMap converts GetDestChainConfig2 to a map for DAML arguments
-func (t GetDestChainConfig2) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetDestChainConfig2) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -750,8 +750,8 @@ type GetDestinationChainGasPrice struct {
 }
 
 // ToMap converts GetDestinationChainGasPrice to a map for DAML arguments
-func (t GetDestinationChainGasPrice) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetDestinationChainGasPrice) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -776,8 +776,8 @@ type GetFeeTokens struct {
 }
 
 // ToMap converts GetFeeTokens to a map for DAML arguments
-func (t GetFeeTokens) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetFeeTokens) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -801,11 +801,11 @@ type GetPremiumMultiplierWeiPerEth struct {
 }
 
 // ToMap converts GetPremiumMultiplierWeiPerEth to a map for DAML arguments
-func (t GetPremiumMultiplierWeiPerEth) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetPremiumMultiplierWeiPerEth) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["token"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["token"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Token).(mapper); ok {
 			return m.toMap()
 		}
@@ -834,11 +834,11 @@ type GetTokenPrice struct {
 }
 
 // ToMap converts GetTokenPrice to a map for DAML arguments
-func (t GetTokenPrice) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t GetTokenPrice) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -867,13 +867,13 @@ type PriceUpdates struct {
 }
 
 // ToMap converts PriceUpdates to a map for DAML arguments
-func (t PriceUpdates) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t PriceUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["tokenPriceUpdates"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.TokenPriceUpdates))
+	m["tokenPriceUpdates"] = func() []any {
+		res := make([]any, 0, len(t.TokenPriceUpdates))
 		for _, e := range t.TokenPriceUpdates {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -883,10 +883,10 @@ func (t PriceUpdates) ToMap() map[string]interface{} {
 		return res
 	}()
 
-	m["gasPriceUpdates"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.GasPriceUpdates))
+	m["gasPriceUpdates"] = func() []any {
+		res := make([]any, 0, len(t.GasPriceUpdates))
 		for _, e := range t.GasPriceUpdates {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -916,8 +916,8 @@ type TimestampedPrice struct {
 }
 
 // ToMap converts TimestampedPrice to a map for DAML arguments
-func (t TimestampedPrice) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TimestampedPrice) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["price"] = t.Price
 
@@ -943,11 +943,11 @@ type TokenPriceUpdate struct {
 }
 
 // ToMap converts TokenPriceUpdate to a map for DAML arguments
-func (t TokenPriceUpdate) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenPriceUpdate) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -977,8 +977,8 @@ type TokenTransferFeeConfig struct {
 }
 
 // ToMap converts TokenTransferFeeConfig to a map for DAML arguments
-func (t TokenTransferFeeConfig) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenTransferFeeConfig) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["feeUSD"] = t.FeeUSD
 
@@ -1006,11 +1006,11 @@ type UpdatePrices struct {
 }
 
 // ToMap converts UpdatePrices to a map for DAML arguments
-func (t UpdatePrices) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UpdatePrices) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["priceUpdates"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["priceUpdates"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.PriceUpdates).(mapper); ok {
 			return m.toMap()
 		}
