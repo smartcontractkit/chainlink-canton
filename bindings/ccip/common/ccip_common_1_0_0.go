@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 const PackageName = "ccip-common"

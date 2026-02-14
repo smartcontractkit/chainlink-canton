@@ -4,17 +4,13 @@ go 1.25.5
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
-replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
-
-replace github.com/smartcontractkit/go-daml => github.com/smartcontractkit/go-daml v0.0.0-20260212010319-eefec8925e3c
-
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/deepmap/oapi-codegen v1.8.2
-	github.com/digital-asset/dazl-client/v8 v8.8.0
+	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.34.0
@@ -23,7 +19,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260206205333-9187f22f0a04
 	github.com/smartcontractkit/chainlink-common v0.10.0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.80.0
-	github.com/smartcontractkit/go-daml v0.6.0
+	github.com/smartcontractkit/go-daml v0.0.0-20260214045349-fe092e3a73cd
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.79.1
 )
@@ -228,7 +224,7 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/term v0.40.0 // indirect
@@ -236,7 +232,7 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260114163908-3f89685c29c3 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
