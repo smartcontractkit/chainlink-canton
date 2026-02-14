@@ -66,8 +66,8 @@ type Transfer struct {
 }
 
 // ToMap converts Transfer to a map for DAML arguments
-func (t Transfer) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Transfer) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["sender"] = t.Sender.ToMap()
 
@@ -75,8 +75,8 @@ func (t Transfer) ToMap() map[string]interface{} {
 
 	m["amount"] = t.Amount
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -87,16 +87,16 @@ func (t Transfer) ToMap() map[string]interface{} {
 
 	m["executeBefore"] = t.ExecuteBefore
 
-	m["inputHoldingCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.InputHoldingCids))
+	m["inputHoldingCids"] = func() []any {
+		res := make([]any, 0, len(t.InputHoldingCids))
 		for _, e := range t.InputHoldingCids {
 			res = append(res, e)
 		}
 		return res
 	}()
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -123,13 +123,13 @@ type TransferFactoryView struct {
 }
 
 // ToMap converts TransferFactoryView to a map for DAML arguments
-func (t TransferFactoryView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferFactoryView) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["admin"] = t.Admin.ToMap()
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -156,8 +156,8 @@ type TransferFactoryPublicFetch struct {
 }
 
 // ToMap converts TransferFactoryPublicFetch to a map for DAML arguments
-func (t TransferFactoryPublicFetch) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferFactoryPublicFetch) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
@@ -184,21 +184,21 @@ type TransferFactoryTransfer struct {
 }
 
 // ToMap converts TransferFactoryTransfer to a map for DAML arguments
-func (t TransferFactoryTransfer) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferFactoryTransfer) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["expectedAdmin"] = t.ExpectedAdmin.ToMap()
 
-	m["transfer"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["transfer"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Transfer).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Transfer
 	}()
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
@@ -226,27 +226,27 @@ type TransferInstructionResult struct {
 }
 
 // ToMap converts TransferInstructionResult to a map for DAML arguments
-func (t TransferInstructionResult) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionResult) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["output"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["output"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Output).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Output
 	}()
 
-	m["senderChangeCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.SenderChangeCids))
+	m["senderChangeCids"] = func() []any {
+		res := make([]any, 0, len(t.SenderChangeCids))
 		for _, e := range t.SenderChangeCids {
 			res = append(res, e)
 		}
 		return res
 	}()
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -272,11 +272,11 @@ type TransferInstructionResultCompleted struct {
 }
 
 // ToMap converts TransferInstructionResultCompleted to a map for DAML arguments
-func (t TransferInstructionResultCompleted) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionResultCompleted) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["receiverHoldingCids"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ReceiverHoldingCids))
+	m["receiverHoldingCids"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverHoldingCids))
 		for _, e := range t.ReceiverHoldingCids {
 			res = append(res, e)
 		}
@@ -309,7 +309,7 @@ func (v TransferInstructionResultOutput) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionResultOutput
+// UnmarshalJSON implements custom JSON unmarshalling for TransferInstructionResultOutput
 func (v *TransferInstructionResultOutput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -334,7 +334,7 @@ func (v TransferInstructionResultOutput) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v TransferInstructionResultOutput) GetVariantValue() interface{} {
+func (v TransferInstructionResultOutput) GetVariantValue() any {
 
 	if v.TransferInstructionResultPending != nil {
 		return v.TransferInstructionResultPending
@@ -359,11 +359,11 @@ type TransferInstructionResultPending struct {
 }
 
 // ToMap converts TransferInstructionResultPending to a map for DAML arguments
-func (t TransferInstructionResultPending) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionResultPending) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["transferInstructionCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["transferInstructionCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TransferInstructionCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -395,7 +395,7 @@ func (v TransferInstructionStatus) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for TransferInstructionStatus
+// UnmarshalJSON implements custom JSON unmarshalling for TransferInstructionStatus
 func (v *TransferInstructionStatus) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -416,7 +416,7 @@ func (v TransferInstructionStatus) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v TransferInstructionStatus) GetVariantValue() interface{} {
+func (v TransferInstructionStatus) GetVariantValue() any {
 
 	if v.TransferPendingReceiverAcceptance != nil {
 		return v.TransferPendingReceiverAcceptance
@@ -440,38 +440,38 @@ type TransferInstructionView struct {
 }
 
 // ToMap converts TransferInstructionView to a map for DAML arguments
-func (t TransferInstructionView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionView) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	if t.OriginalInstructionCid != nil {
-		m["originalInstructionCid"] = map[string]interface{}{
+		m["originalInstructionCid"] = map[string]any{
 			"_type": "optional",
 			"value": *t.OriginalInstructionCid,
 		}
 	} else {
-		m["originalInstructionCid"] = map[string]interface{}{
+		m["originalInstructionCid"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
-	m["transfer"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["transfer"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Transfer).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Transfer
 	}()
 
-	m["status"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["status"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Status).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Status
 	}()
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -497,11 +497,11 @@ type TransferInstructionAccept struct {
 }
 
 // ToMap converts TransferInstructionAccept to a map for DAML arguments
-func (t TransferInstructionAccept) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionAccept) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
@@ -527,11 +527,11 @@ type TransferInstructionReject struct {
 }
 
 // ToMap converts TransferInstructionReject to a map for DAML arguments
-func (t TransferInstructionReject) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionReject) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
@@ -558,19 +558,19 @@ type TransferInstructionUpdate struct {
 }
 
 // ToMap converts TransferInstructionUpdate to a map for DAML arguments
-func (t TransferInstructionUpdate) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionUpdate) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["extraActors"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.ExtraActors))
+	m["extraActors"] = func() []any {
+		res := make([]any, 0, len(t.ExtraActors))
 		for _, e := range t.ExtraActors {
 			res = append(res, e.ToMap())
 		}
 		return res
 	}()
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
@@ -596,11 +596,11 @@ type TransferInstructionWithdraw struct {
 }
 
 // ToMap converts TransferInstructionWithdraw to a map for DAML arguments
-func (t TransferInstructionWithdraw) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferInstructionWithdraw) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["extraArgs"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExtraArgs).(mapper); ok {
 			return m.toMap()
 		}
@@ -626,14 +626,14 @@ type TransferPendingInternalWorkflow struct {
 }
 
 // ToMap converts TransferPendingInternalWorkflow to a map for DAML arguments
-func (t TransferPendingInternalWorkflow) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TransferPendingInternalWorkflow) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["pendingActions"] = func() interface{} {
+	m["pendingActions"] = func() any {
 		if t.PendingActions == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.PendingActions}
+		return map[string]any{"_type": "genmap", "value": t.PendingActions}
 	}()
 
 	return m

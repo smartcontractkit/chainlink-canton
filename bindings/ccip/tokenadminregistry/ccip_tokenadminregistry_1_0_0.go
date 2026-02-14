@@ -29,23 +29,23 @@ type Template interface {
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // PoolRegistration is a Record type
@@ -55,8 +55,8 @@ type PoolRegistration struct {
 }
 
 // ToMap converts PoolRegistration to a map for DAML arguments
-func (t PoolRegistration) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t PoolRegistration) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["poolOwner"] = t.PoolOwner.ToMap()
 
@@ -94,7 +94,7 @@ func (t TokenAdminRegistry) GetTemplateIDWithPackageID(packageID string) string 
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -103,11 +103,11 @@ func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenConfigs"] = func() interface{} {
+	args["tokenConfigs"] = func() any {
 		if t.TokenConfigs == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.TokenConfigs}
+		return map[string]any{"_type": "genmap", "value": t.TokenConfigs}
 	}()
 
 	return &model.CreateCommand{
@@ -118,7 +118,7 @@ func (t TokenAdminRegistry) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t TokenAdminRegistry) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instanceId"] = string(t.InstanceId)
@@ -127,11 +127,11 @@ func (t TokenAdminRegistry) CreateCommandWithPackageID(packageID string) *model.
 	args["owner"] = t.Owner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenConfigs"] = func() interface{} {
+	args["tokenConfigs"] = func() any {
 		if t.TokenConfigs == nil {
-			return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+			return map[string]any{"_type": "genmap", "value": GENMAP{}}
 		}
-		return map[string]interface{}{"_type": "genmap", "value": t.TokenConfigs}
+		return map[string]any{"_type": "genmap", "value": t.TokenConfigs}
 	}()
 
 	return &model.CreateCommand{
@@ -327,7 +327,7 @@ func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -337,7 +337,7 @@ func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -369,11 +369,11 @@ type TokenAdminRegistryAcceptAdminRole struct {
 }
 
 // ToMap converts TokenAdminRegistryAcceptAdminRole to a map for DAML arguments
-func (t TokenAdminRegistryAcceptAdminRole) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryAcceptAdminRole) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -403,19 +403,19 @@ type TokenAdminRegistryConsumeReceiveTicket struct {
 }
 
 // ToMap converts TokenAdminRegistryConsumeReceiveTicket to a map for DAML arguments
-func (t TokenAdminRegistryConsumeReceiveTicket) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryConsumeReceiveTicket) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["ticketCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["ticketCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.TicketCid).(mapper); ok {
 			return m.toMap()
 		}
 		return t.TicketCid
 	}()
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -444,11 +444,11 @@ type TokenAdminRegistryGetTokenConfig struct {
 }
 
 // ToMap converts TokenAdminRegistryGetTokenConfig to a map for DAML arguments
-func (t TokenAdminRegistryGetTokenConfig) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryGetTokenConfig) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -478,11 +478,11 @@ type TokenAdminRegistryIsAdministrator struct {
 }
 
 // ToMap converts TokenAdminRegistryIsAdministrator to a map for DAML arguments
-func (t TokenAdminRegistryIsAdministrator) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryIsAdministrator) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -518,11 +518,11 @@ type TokenAdminRegistryIssueReceiveTicket struct {
 }
 
 // ToMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
-func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -562,11 +562,11 @@ type TokenAdminRegistryProposeAdministrator struct {
 }
 
 // ToMap converts TokenAdminRegistryProposeAdministrator to a map for DAML arguments
-func (t TokenAdminRegistryProposeAdministrator) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryProposeAdministrator) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -599,11 +599,11 @@ type TokenAdminRegistrySetInboundPoolCCVs struct {
 }
 
 // ToMap converts TokenAdminRegistrySetInboundPoolCCVs to a map for DAML arguments
-func (t TokenAdminRegistrySetInboundPoolCCVs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistrySetInboundPoolCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["executingMessageCid"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
 			return m.toMap()
 		}
@@ -612,10 +612,10 @@ func (t TokenAdminRegistrySetInboundPoolCCVs) ToMap() map[string]interface{} {
 
 	m["poolInstanceId"] = string(t.PoolInstanceId)
 
-	m["poolCCVs"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.PoolCCVs))
+	m["poolCCVs"] = func() []any {
+		res := make([]any, 0, len(t.PoolCCVs))
 		for _, e := range t.PoolCCVs {
-			type mapper interface{ toMap() map[string]interface{} }
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())
 			} else {
@@ -648,11 +648,11 @@ type TokenAdminRegistrySetPool struct {
 }
 
 // ToMap converts TokenAdminRegistrySetPool to a map for DAML arguments
-func (t TokenAdminRegistrySetPool) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistrySetPool) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -660,12 +660,12 @@ func (t TokenAdminRegistrySetPool) ToMap() map[string]interface{} {
 	}()
 
 	if t.TokenPool != nil {
-		m["tokenPool"] = map[string]interface{}{
+		m["tokenPool"] = map[string]any{
 			"_type": "optional",
 			"value": *t.TokenPool,
 		}
 	} else {
-		m["tokenPool"] = map[string]interface{}{
+		m["tokenPool"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -693,11 +693,11 @@ type TokenAdminRegistryTransferAdminRole struct {
 }
 
 // ToMap converts TokenAdminRegistryTransferAdminRole to a map for DAML arguments
-func (t TokenAdminRegistryTransferAdminRole) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenAdminRegistryTransferAdminRole) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["instrumentId"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.InstrumentId).(mapper); ok {
 			return m.toMap()
 		}
@@ -729,38 +729,38 @@ type TokenConfig struct {
 }
 
 // ToMap converts TokenConfig to a map for DAML arguments
-func (t TokenConfig) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t TokenConfig) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	if t.Admin != nil {
-		m["admin"] = map[string]interface{}{
+		m["admin"] = map[string]any{
 			"_type": "optional",
 			"value": (*t.Admin).ToMap(),
 		}
 	} else {
-		m["admin"] = map[string]interface{}{
+		m["admin"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
 	if t.PendingAdmin != nil {
-		m["pendingAdmin"] = map[string]interface{}{
+		m["pendingAdmin"] = map[string]any{
 			"_type": "optional",
 			"value": (*t.PendingAdmin).ToMap(),
 		}
 	} else {
-		m["pendingAdmin"] = map[string]interface{}{
+		m["pendingAdmin"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
 	if t.TokenPool != nil {
-		m["tokenPool"] = map[string]interface{}{
+		m["tokenPool"] = map[string]any{
 			"_type": "optional",
 			"value": *t.TokenPool,
 		}
 	} else {
-		m["tokenPool"] = map[string]interface{}{
+		m["tokenPool"] = map[string]any{
 			"_type": "optional",
 		}
 	}

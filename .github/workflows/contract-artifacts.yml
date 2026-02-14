@@ -45,29 +45,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Add Go bin to PATH
-        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
-      - name: Install godaml
-        run: |
-          set -euo pipefail
-          GOBIN="$(go env GOPATH)/bin"
-          mkdir -p "$GOBIN"
-
-          echo "Building godaml from source..."
-          git clone https://github.com/smartcontractkit/go-daml.git /tmp/go-daml
-          cd /tmp/go-daml
-          git checkout fe092e3a73cd14973d611dbb1a8d694fb41af9be
-
-          MAIN_DIRS="$(go list -f '{{if eq .Name "main"}}{{.Dir}}{{end}}' ./... | sed '/^$/d' || true)"
-          MAIN_DIR="$(echo "$MAIN_DIRS" | grep -E '/cmd/|/cli/' | head -n 1 || true)"
-          if [ -z "${MAIN_DIR:-}" ]; then MAIN_DIR="$(echo "$MAIN_DIRS" | head -n 1 || true)"; fi
-          if [ -z "${MAIN_DIR:-}" ]; then echo "Error: No Go 'main' package found"; exit 1; fi
-
-          go build -o "$GOBIN/godaml" "$MAIN_DIR"
-          command -v godaml >/dev/null
-          godaml -h >/dev/null
-
       - name: Generate bindings
         run: |
           set -euo pipefail

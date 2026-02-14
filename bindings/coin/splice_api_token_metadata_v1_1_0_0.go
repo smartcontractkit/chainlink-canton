@@ -33,8 +33,8 @@ type AnyContractView struct {
 }
 
 // ToMap converts AnyContractView to a map for DAML arguments
-func (t AnyContractView) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t AnyContractView) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -69,7 +69,7 @@ func (v AnyValue) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for AnyValue
+// UnmarshalJSON implements custom JSON unmarshalling for AnyValue
 func (v *AnyValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -126,7 +126,7 @@ func (v AnyValue) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v AnyValue) GetVariantValue() interface{} {
+func (v AnyValue) GetVariantValue() any {
 
 	if v.AVText != nil {
 		return v.AVText
@@ -183,11 +183,11 @@ type ChoiceContext struct {
 }
 
 // ToMap converts ChoiceContext to a map for DAML arguments
-func (t ChoiceContext) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ChoiceContext) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["values"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["values"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Values).(mapper); ok {
 			return m.toMap()
 		}
@@ -213,11 +213,11 @@ type ChoiceExecutionMetadata struct {
 }
 
 // ToMap converts ChoiceExecutionMetadata to a map for DAML arguments
-func (t ChoiceExecutionMetadata) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ChoiceExecutionMetadata) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -244,19 +244,19 @@ type ExtraArgs struct {
 }
 
 // ToMap converts ExtraArgs to a map for DAML arguments
-func (t ExtraArgs) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t ExtraArgs) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["context"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Context
 	}()
 
-	m["meta"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["meta"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Meta).(mapper); ok {
 			return m.toMap()
 		}
@@ -282,11 +282,11 @@ type Metadata struct {
 }
 
 // ToMap converts Metadata to a map for DAML arguments
-func (t Metadata) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Metadata) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["values"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["values"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Values).(mapper); ok {
 			return m.toMap()
 		}
