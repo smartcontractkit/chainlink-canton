@@ -2,7 +2,7 @@ module github.com/smartcontractkit/chainlink-canton/eds
 
 go 1.25.5
 
-replace github.com/digital-asset/dazl-client/v8 => github.com/noders-team/dazl-client/v8 v8.7.1-2
+replace github.com/smartcontractkit/chainlink-canton => ../
 
 require (
 	github.com/digital-asset/dazl-client/v8 v8.7.1
@@ -22,5 +22,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260114163908-3f89685c29c3 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-replace github.com/smartcontractkit/chainlink-canton => ..
