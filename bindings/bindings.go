@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/chainlink-canton/bindings/ledger"
 )
 
 // UnmarshalActiveContract unmarshals a Canton ActiveContract response into a typed DAML binding struct.

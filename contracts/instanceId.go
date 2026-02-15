@@ -5,7 +5,7 @@ import (
 	"math/rand/v2"
 	"strings"
 
-	"github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/chainlink-canton/bindings/types"
 )
 
 const (

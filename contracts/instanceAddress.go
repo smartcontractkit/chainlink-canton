@@ -8,10 +8,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/chainlink-canton/bindings/types"
 	"golang.org/x/crypto/sha3"
 
-	ccip_common "github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	ccip_common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 )
 
 type RawInstanceAddress string

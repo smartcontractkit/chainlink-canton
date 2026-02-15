@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/chainlink-canton/bindings/codegen"
+	"github.com/smartcontractkit/chainlink-canton/bindings/codegen/model"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/go-daml/codegen"
-	"github.com/smartcontractkit/go-daml/codegen/model"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 	}
 
 	artifactsDir := flag.String("artifacts", "bindings", "Path to the bindings artifacts output directory")
-	basePath := flag.String("basePath", buildInfo.Main.Path+"/bindings", "Base Go import path for generated bindings")
+	basePath := flag.String("basePath", buildInfo.Main.Path+"/bindings/generated", "Base Go import path for generated bindings")
 	flag.Parse()
 
 	log.Info().Str("artifacts", *artifactsDir).Msg("Generating bindings...")
@@ -49,6 +49,7 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Msg("Failed to get main package ID from DAR")
 		}
+
 		externalPackage := model.ExternalPackage{
 			Import: fmt.Sprintf("%s/%s", *basePath, strings.Join(s, "/")),
 			Alias:  s[len(s)-1],
