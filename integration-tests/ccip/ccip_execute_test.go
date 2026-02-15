@@ -283,7 +283,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							StorageLocation:          "ipfs://test-receive",
 							Threshold:                2,
 							Signers:                  ccvSignerPubKeys,
-							RmnRemoteInstanceAddress: ccvs.RawInstanceAddress{}, // Set by sequence
+							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
 							RemoteChainFeeConfigs:    nil,
 						},
 					},
