@@ -80,6 +80,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			}
 
 			// Get template ID and choice name from the method
+			// TODO: we shouldn't need this
 			exerciseCommand := params.Method(contractID, input.Args)
 
 			// Parse template ID to get package ID, module name, and entity name
