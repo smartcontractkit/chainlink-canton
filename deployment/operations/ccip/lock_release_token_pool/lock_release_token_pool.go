@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -20,7 +21,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys the CCIP LockReleaseTokenPool contract on Canton",
 	Validate: func(template lockreleasetokenpool.LockReleaseTokenPool) error {
-		if template.InstrumentId == (lockreleasetokenpool.InstrumentId{}) {
+		if template.InstrumentId == (splice_api_token_holding_v1.InstrumentId{}) {
 			return errors.New("instrument ID cannot be empty")
 		}
 		if template.Decimals < 0 {

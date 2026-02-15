@@ -6,3 +6,6 @@ navigator.log
 .idea
 .vscode
 .DS_Store
+
+go.work
+go.work.sum

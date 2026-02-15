@@ -141,9 +141,9 @@ var DeployChainContracts = operations.NewSequence(
 			ActAs:         []string{deps.Party},
 			Template: offrampBinding.OffRamp{
 				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
-				GlobalConfigInstanceAddress:       offrampBinding.RawInstanceAddress(globalConfigRawInstanceAddress.Binding()),
-				RmnRemoteInstanceAddress:          offrampBinding.RawInstanceAddress(rmnRemoteRawInstanceAddress.Binding()),
-				TokenAdminRegistryInstanceAddress: offrampBinding.RawInstanceAddress(tokenAdminRegistryRawInstanceAddress.Binding()),
+				GlobalConfigInstanceAddress:       globalConfigRawInstanceAddress.Binding(),
+				RmnRemoteInstanceAddress:          rmnRemoteRawInstanceAddress.Binding(),
+				TokenAdminRegistryInstanceAddress: tokenAdminRegistryRawInstanceAddress.Binding(),
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -158,9 +158,9 @@ var DeployChainContracts = operations.NewSequence(
 			ActAs:         []string{deps.Party},
 			Template: onrampBinding.OnRamp{
 				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
-				GlobalConfigInstanceAddress:       onrampBinding.RawInstanceAddress(globalConfigRawInstanceAddress.Binding()),
-				RmnRemoteInstanceAddress:          onrampBinding.RawInstanceAddress(rmnRemoteRawInstanceAddress.Binding()),
-				TokenAdminRegistryInstanceAddress: onrampBinding.RawInstanceAddress(tokenAdminRegistryRawInstanceAddress.Binding()),
+				GlobalConfigInstanceAddress:       globalConfigRawInstanceAddress.Binding(),
+				RmnRemoteInstanceAddress:          rmnRemoteRawInstanceAddress.Binding(),
+				TokenAdminRegistryInstanceAddress: tokenAdminRegistryRawInstanceAddress.Binding(),
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -198,7 +198,7 @@ var DeployChainContracts = operations.NewSequence(
 					StorageLocation:          committeeVerifier.Template.StorageLocation,
 					Threshold:                committeeVerifier.Template.Threshold,
 					Signers:                  committeeVerifier.Template.Signers,
-					RmnRemoteInstanceAddress: ccvs.RawInstanceAddress(rmnRemoteRawInstanceAddress.Binding()),
+					RmnRemoteInstanceAddress: rmnRemoteRawInstanceAddress.Binding(),
 					RemoteChainFeeConfigs:    committeeVerifier.Template.RemoteChainFeeConfigs,
 				},
 				OwnerParty: committeeVerifier.Template.Owner,

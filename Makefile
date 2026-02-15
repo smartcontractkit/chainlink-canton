@@ -6,8 +6,7 @@ compile-contracts:
 
 .PHONY: generate-bindings
 generate-bindings:
-	@echo "Generating contract bindings..."
-	sh ./scripts/generate-bindings.sh
+	go run ./contracts/cmd/bindings
 
 .PHONY: contracts
 contracts: compile-contracts generate-bindings

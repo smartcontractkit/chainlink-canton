@@ -9,6 +9,9 @@ import (
 //go:embed dars
 var Dars embed.FS
 
+//go:embed dependencies
+var Dependencies embed.FS
+
 type Package string
 
 const (
@@ -30,6 +33,11 @@ const (
 	CCIPPerPartyRouter       = Package("ccip-perpartyrouter")
 	CCIPRMN                  = Package("ccip-rmn")
 	CCIPTest                 = Package("ccip-test")
+
+	SpliceApiTokenBurnMintV1            = Package("splice-api-token-burn-mint-v1")
+	SpliceApiTokenHoldingV1             = Package("splice-api-token-holding-v1")
+	SpliceApiTokenMetadataV1            = Package("splice-api-token-metadata-v1")
+	SpliceApiTokenTransferInstructionV1 = Package("splice-api-token-transfer-instruction-v1")
 )
 
 const CurrentVersion = "current"
@@ -53,6 +61,11 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPPerPartyRouter:       []string{"1.0.0", CurrentVersion},
 	CCIPRMN:                  []string{"1.0.0", CurrentVersion},
 	CCIPTest:                 []string{"1.0.0", CurrentVersion},
+
+	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
+	SpliceApiTokenHoldingV1:             []string{"1.0.0"},
+	SpliceApiTokenMetadataV1:            []string{"1.0.0"},
+	SpliceApiTokenTransferInstructionV1: []string{"1.0.0"},
 }
 
 func GetDar(packageName Package, version string) ([]byte, error) {
@@ -68,8 +81,36 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 	path := fmt.Sprintf("dars/%s-%s.dar", packageName, version)
 	data, err := Dars.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded DAR file %s: %w", path, err)
+		// Try to read from dependencies if not found in dars
+		data, err = Dependencies.ReadFile(fmt.Sprintf("dependencies/%s-%s.dar", packageName, version))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read embedded DAR file %s: %w", path, err)
+		}
 	}
 
 	return data, nil
+}
+
+var OutputDirs = map[Package][]string{
+	Coin: []string{"coin"},
+
+	MCMS: []string{"mcms"},
+
+	CCIPReceiver:             []string{"ccip", "ccipreceiver"},
+	CCIPSender:               []string{"ccip", "ccipsender"},
+	CCIPCommitteeVerifier:    []string{"ccip", "ccvs"},
+	CCIPCommon:               []string{"ccip", "common"},
+	CCIPFeeQuoter:            []string{"ccip", "feequoter"},
+	CCIPPoolInterfaces:       []string{"ccip", "interfaces"},
+	CCIPLockReleaseTokenPool: []string{"ccip", "lockreleasetokenpool"},
+	CCIPOffRamp:              []string{"ccip", "offramp"},
+	CCIPOnRamp:               []string{"ccip", "onramp"},
+	CCIPPerPartyRouter:       []string{"ccip", "perpartyrouter"},
+	CCIPRMN:                  []string{"ccip", "rmn"},
+	CCIPTokenAdminRegistry:   []string{"ccip", "tokenadminregistry"},
+
+	SpliceApiTokenBurnMintV1:            []string{"splice", "splice_api_token_burn_mint_v1"},
+	SpliceApiTokenHoldingV1:             []string{"splice", "splice_api_token_holding_v1"},
+	SpliceApiTokenMetadataV1:            []string{"splice", "splice_api_token_metadata_v1"},
+	SpliceApiTokenTransferInstructionV1: []string{"splice", "splice_api_token_transfer_instruction_v1"},
 }

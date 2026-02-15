@@ -39,18 +39,12 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-
       - name: Install Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Generate bindings
-        run: |
-          set -euo pipefail
-          chmod +x scripts/generate-bindings.sh
-          ./scripts/generate-bindings.sh
-
+        run: make generate-bindings
       - name: Verify generated files exist
         run: |
           set -euo pipefail
@@ -58,7 +52,6 @@ jobs:
           test -n "$(find bindings/ccip -name '*.go' -type f 2>/dev/null | head -1)"
           test -n "$(find bindings/mcms -name '*.go' -type f 2>/dev/null | head -1)"
           echo "Generated files found"
-
       - name: Verify bindings are up-to-date
         run: |
           set -euo pipefail
@@ -66,12 +59,12 @@ jobs:
           # Check for changes in the workspace
           if ! git diff --quiet HEAD; then
             echo "### Bindings are out of date!" >> $GITHUB_STEP_SUMMARY
-            echo "The bindings in the repository do not match the output of \`./scripts/generate-bindings.sh\` using godaml (Go 1.25.5)." >> $GITHUB_STEP_SUMMARY
+            echo "The bindings in the repository do not match the output of \`make generate-bindings\` using godaml (Go 1.25.5)." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "#### To fix this, run these commands locally and commit the result:" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
             echo 'gvm use go1.25.5' >> $GITHUB_STEP_SUMMARY
-            echo './scripts/generate-bindings.sh' >> $GITHUB_STEP_SUMMARY
+            echo 'make generate-bindings' >> $GITHUB_STEP_SUMMARY
             echo 'git add . && git commit -m "chore: update generated bindings"' >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             
@@ -87,10 +80,3 @@ jobs:
           else
             echo "### Bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
           fi
-
-      - name: Cleanup exported DARs
-        if: always()
-        run: |
-          set -euo pipefail
-          rm -rf artifacts/dars || true
-          echo "Cleaned artifacts/dars"
