@@ -8,7 +8,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
@@ -20,7 +22,7 @@ type RegisterTokenPoolInput struct {
 	// TokenAdminRegistryInstanceAddress is the instance address of the TokenAdminRegistry contract.
 	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
 	// InstrumentId identifies the token (admin party + token id).
-	InstrumentId tokenadminregistry.InstrumentId
+	InstrumentId splice_api_token_holding_v1.InstrumentId
 	// PoolInstanceID is the instance ID of the token pool.
 	PoolInstanceID string
 	// CcipParty is the CCIP owner party (acts on ProposeAdministrator).
