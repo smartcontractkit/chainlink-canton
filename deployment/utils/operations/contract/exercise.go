@@ -16,7 +16,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonOps "github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 )

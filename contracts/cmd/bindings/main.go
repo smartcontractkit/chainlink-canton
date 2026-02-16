@@ -23,8 +23,8 @@ func main() {
 		return
 	}
 
-	artifactsDir := flag.String("artifacts", "bindings", "Path to the bindings artifacts output directory")
-	basePath := flag.String("basePath", buildInfo.Main.Path+"/bindings", "Base Go import path for generated bindings")
+	artifactsDir := flag.String("artifacts", filepath.Join("bindings", "generated"), "Path to the bindings artifacts output directory")
+	basePath := flag.String("basePath", buildInfo.Main.Path+"/bindings/generated", "Base Go import path for generated bindings")
 	flag.Parse()
 
 	log.Info().Str("artifacts", *artifactsDir).Msg("Generating bindings...")
