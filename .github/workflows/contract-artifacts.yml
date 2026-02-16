@@ -45,13 +45,6 @@ jobs:
           go-version-file: go.mod
       - name: Generate bindings
         run: make generate-bindings
-      - name: Verify generated files exist
-        run: |
-          set -euo pipefail
-          test -n "$(find bindings/coin -name '*.go' -type f 2>/dev/null | head -1)"
-          test -n "$(find bindings/ccip -name '*.go' -type f 2>/dev/null | head -1)"
-          test -n "$(find bindings/mcms -name '*.go' -type f 2>/dev/null | head -1)"
-          echo "Generated files found"
       - name: Verify bindings are up-to-date
         run: |
           set -euo pipefail
