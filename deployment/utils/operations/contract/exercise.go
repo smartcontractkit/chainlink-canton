@@ -74,8 +74,10 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 				}
 			}
 
+			participant := deps.Chain.Participants[deps.Participant]
+
 			// Find contract by InstanceAddress
-			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), deps.StateServiceClient, deps.Party, params.Template.GetTemplateID(), input.InstanceAddress)
+			contractID, err := FindActiveContractIDByInstanceAddress(b.GetContext(), participant.LedgerServices.State, participant.PartyID, params.Template.GetTemplateID(), input.InstanceAddress)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to find contract by InstanceAddress %s: %w", input.InstanceAddress.Hex(), err)
 			}
@@ -92,7 +94,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			// Convert args struct to ledger.MapToValue for ChoiceArgument
 			choiceArgument := ledger.MapToValue(input.Args)
 
-			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+			submitResp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,

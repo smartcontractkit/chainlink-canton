@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -155,7 +156,7 @@ func GetTransferFactory(ctx context.Context, transferInstructionClient transferI
 
 func MintAMT(
 	ctx context.Context,
-	participant Participant,
+	participant canton.Participant,
 	metadataClient tokenMetadataV1.ClientWithResponsesInterface,
 	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface,
 	scanProxyClient scanProxy.ClientWithResponsesInterface,
@@ -187,7 +188,7 @@ func MintAMT(
 	}
 
 	// Mint AMT
-	response, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	response, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{

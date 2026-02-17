@@ -1,9 +1,11 @@
 package tests
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"net/http"
 	"slices"
@@ -13,6 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -41,9 +46,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(3))
 
 	// Setup participants
-	ccipParticipant := env.Participant(1)
-	receiverParticipant := env.Participant(2)
-	tokenPoolOwnerParticipant := env.Participant(3)
+	ccipParticipant := env.Chain.Participants[0]
+	receiverParticipant := env.Chain.Participants[1]
+	tokenPoolOwnerParticipant := env.Chain.Participants[2]
 
 	// DAR Uploading
 	// Read DARs
@@ -69,18 +74,37 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
-	partyCCIP := ccipParticipant.Party
-	partyReceiver := receiverParticipant.Party
-	partyTokenPoolOwner := tokenPoolOwnerParticipant.Party
+	partyCCIP := ccipParticipant.PartyID
+	partyReceiver := receiverParticipant.PartyID
+	partyTokenPoolOwner := tokenPoolOwnerParticipant.PartyID
 	t.Logf("Parties: CCIP=%s, Receiver=%s, PoolOwner=%s", partyCCIP, partyReceiver, partyTokenPoolOwner)
 
+	// Create Scan and Registry API clients
+	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
+	tokenSource := ccipParticipant.TokenSource
+	interceptor := func(ctx context.Context, req *http.Request) error {
+		token, err := tokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+	scanProxyClient, err := scanProxy.NewClientWithResponses(ccipParticipant.Endpoints.ValidatorAPIURL, scanProxy.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create scan proxy client")
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create token metadata client")
+	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), transferInstructionV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create transfer instruction client")
+
 	// Get DSO Admin Party (registry admin)
-	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), env.Splice.TokenMetadataClient)
+	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
 	require.NoError(t, err)
 
 	// Token Setup
 	// Mint tokens to Token Pool Owner (these will be "locked" in the pool)
-	poolHoldingCid, err := testhelpers.MintAMT(t.Context(), tokenPoolOwnerParticipant, env.Splice.TokenMetadataClient, env.Splice.TransferInstructionClient, tokenPoolOwnerParticipant.ScanProxyClient, partyTokenPoolOwner, "100.00")
+	poolHoldingCid, err := testhelpers.MintAMT(t.Context(), tokenPoolOwnerParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyTokenPoolOwner, "100.00")
 	require.NoError(t, err)
 	t.Logf("Minted 100 AMT to Pool Owner, Holding CID: %s", poolHoldingCid)
 
@@ -104,7 +128,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
 	// Deploy RMNRemote (required by CommitteeVerifier and PrepareExecute/Execute)
-	res, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -128,7 +152,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	// Deploy CommitteeVerifier
 	versionTag := "49ff34ed"
 	ccvId := "test-ccv-receive@" + partyCCIP
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -164,7 +188,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	destChainSelector := "456"
 
 	// Deploy GlobalConfig with source chain config including the CCV
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -200,7 +224,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Deployed GlobalConfig: %s", globalConfigCid)
 
 	// Deploy TokenAdminRegistry
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -221,7 +245,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Deployed TokenAdminRegistry: %s", tokenAdminRegistryCid)
 
 	// Deploy OffRamp with instance addresses for GlobalConfig, RMNRemote, TokenAdminRegistry
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -244,7 +268,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Deployed OffRamp: %s", offRampCid)
 
 	// Deploy PerPartyRouterFactory
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -270,7 +294,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -303,7 +327,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Token Pool Setup
 	// Deploy LockReleaseTokenPool
-	res, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -338,7 +362,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Register pool in TokenAdminRegistry (ProposeAdministrator -> AcceptAdminRole -> SetPool)
 	// Step 1: ProposeAdministrator
-	res, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -367,7 +391,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -395,7 +419,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = tokenPoolOwnerParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -460,7 +484,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	verifierResultsHex := hex.EncodeToString(verifierResults)
 
 	// Deploy CCIPReceiver for receiver
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -481,7 +505,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
 	// Get TransferFactory and pool holdings (needed by CCIPReceiver.Execute for token release)
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), env.Splice.TransferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
+	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partyTokenPoolOwner, partyReceiver)
 	require.NoError(t, err)
 
 	poolHoldings, err := testhelpers.ListActiveContractsByInterfaceId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
@@ -567,7 +591,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release in one transaction
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -630,7 +654,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	if !releaseCompleted && pendingTransferInstructionCid != "" {
 		time.Sleep(500 * time.Millisecond)
 
-		acceptContextResp, err := env.Splice.TransferInstructionClient.GetTransferInstructionAcceptContextWithResponse(t.Context(), pendingTransferInstructionCid, transferInstructionV1.GetChoiceContextRequest{})
+		acceptContextResp, err := transferInstructionClient.GetTransferInstructionAcceptContextWithResponse(t.Context(), pendingTransferInstructionCid, transferInstructionV1.GetChoiceContextRequest{})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, acceptContextResp.StatusCode(), "Failed to get accept context: %s", string(acceptContextResp.Body))
 
@@ -649,7 +673,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		acceptContext, err := testhelpers.ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
 		require.NoError(t, err)
 
-		_, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		_, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 			Commands: &apiv2.Commands{
 				CommandId: uuid.Must(uuid.NewUUID()).String(),
 				Commands: []*apiv2.Command{{

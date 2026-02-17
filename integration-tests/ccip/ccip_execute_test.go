@@ -202,8 +202,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
-	ccipParticipant := env.Participant(1)
-	receiverParticipant := env.Participant(2)
+	ccipParticipant := env.Chain.Participants[0]
+	receiverParticipant := env.Chain.Participants[1]
 
 	// Upload DARs
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
@@ -231,8 +231,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
-	partyCCIP := ccipParticipant.Party
-	partyReceiver := receiverParticipant.Party
+	partyCCIP := ccipParticipant.PartyID
+	partyReceiver := receiverParticipant.PartyID
 	t.Logf("Parties: CCIP=%s, Receiver=%s", partyCCIP, partyReceiver)
 
 	// CCV Setup
@@ -266,9 +266,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Deploy Chain contracts
 	out, err := changesets.DeployChainContracts{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployChainContractsConfig]{
-		ChainSelector: env.Selector,
+		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   0,
-		Party:         partyCCIP,
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
@@ -318,15 +317,15 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	}
 
 	// Resolve contracts
-	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(global_config.ContractType), global_config.Version, ""))
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
 	require.NoError(t, err, "failed to get FeeQuoter address")
-	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(onramp.ContractType), onramp.Version, ""))
+	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(onramp.ContractType), onramp.Version, ""))
 	require.NoError(t, err, "failed to get OnRamp address")
-	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(offramp.ContractType), offramp.Version, ""))
+	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(offramp.ContractType), offramp.Version, ""))
 	require.NoError(t, err, "failed to get OffRamp address")
-	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
+	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
 
 	// Deploy and configure lane
@@ -334,12 +333,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
-		ChainSelector: env.Selector,
+		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   0,
-		Party:         partyCCIP,
 		Config: changesets.ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      env.Selector,
+				ChainSelector:      env.Chain.ChainSelector(),
 				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
 				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
 				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
@@ -376,7 +374,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err := receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -410,7 +408,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := &MessageV1{
 		SourceChainSelector: remoteSelector,
-		DestChainSelector:   env.Selector,
+		DestChainSelector:   env.Chain.ChainSelector(),
 		SequenceNumber:      1,
 		ExecutionGasLimit:   200000,
 		CCIPReceiveGasLimit: 100000,
@@ -438,7 +436,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	verifierResultsHex := hex.EncodeToString(verifierResults)
 
 	// Deploy CCIPReceiver for receiver
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -489,7 +487,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one transaction
-	res, err = receiverParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{

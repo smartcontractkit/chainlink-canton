@@ -33,6 +33,7 @@ registry_api_url="http://scan.localhost:8080" # The Token Registry API URL to us
 name="Participant 1" # A human-readable name for the participant
 jwt="ey...jbJ0" # JWT token to authenticate with this participant
 username="ledger-api-user" # The username for this participant, the JWT must have a subject claim matching this username
+party="party:123" # The party to use for this participant, if not set the primary party for the given user will be queried and used
 json_ledger_api_url="http://participant1.json-ledger-api.localhost:8080" # The JSON Ledger API URL to use
 grpc_ledger_api_url="participant1.grpc-ledger-api.localhost:8080" # The gRPC Ledger API URL to use
 admin_api_url="participant1.admin-api.localhost:8080" # The gRPC Admin API URL to use
