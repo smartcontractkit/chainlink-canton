@@ -9,7 +9,6 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/deepmap/oapi-codegen v1.8.2
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
