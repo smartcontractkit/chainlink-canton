@@ -172,6 +172,18 @@ func (t *CCIPMessageReceived) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCIPMessageReceived to hex string (Canton MCMS format)
+func (t CCIPMessageReceived) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPMessageReceived from hex string (Canton MCMS format)
+func (t *CCIPMessageReceived) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for CCIPMessageReceived
 
 // Archive exercises the Archive choice on this CCIPMessageReceived contract
@@ -280,6 +292,18 @@ func (t CCIPReceiver) MarshalJSON() ([]byte, error) {
 func (t *CCIPReceiver) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CCIPReceiver to hex string (Canton MCMS format)
+func (t CCIPReceiver) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPReceiver from hex string (Canton MCMS format)
+func (t *CCIPReceiver) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for CCIPReceiver
@@ -401,6 +425,18 @@ func (t *CCVInput) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCVInput to hex string (Canton MCMS format)
+func (t CCVInput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCVInput from hex string (Canton MCMS format)
+func (t *CCVInput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Execute2 is a Record type
 type Execute2 struct {
 	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
@@ -510,6 +546,18 @@ func (t *Execute2) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes Execute2 to hex string (Canton MCMS format)
+func (t Execute2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Execute2 from hex string (Canton MCMS format)
+func (t *Execute2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
 	Caller types.PARTY `json:"caller"`
@@ -532,6 +580,18 @@ func (t GetRequiredCCVs) MarshalJSON() ([]byte, error) {
 func (t *GetRequiredCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetRequiredCCVs to hex string (Canton MCMS format)
+func (t GetRequiredCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVs from hex string (Canton MCMS format)
+func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenTransferInput is a Record type
@@ -576,6 +636,18 @@ func (t *TokenTransferInput) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TokenTransferInput to hex string (Canton MCMS format)
+func (t TokenTransferInput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenTransferInput from hex string (Canton MCMS format)
+func (t *TokenTransferInput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UpdateRequiredCCVs is a Record type
 type UpdateRequiredCCVs struct {
 	NewRequiredCCVs []common.RawInstanceAddress `json:"newRequiredCCVs"`
@@ -610,3 +682,68 @@ func (t *UpdateRequiredCCVs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
+
+// MarshalHex encodes UpdateRequiredCCVs to hex string (Canton MCMS format)
+func (t UpdateRequiredCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdateRequiredCCVs from hex string (Canton MCMS format)
+func (t *UpdateRequiredCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	Execute2(args Execute2) (*bind.EncodedChoice, error)
+	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
+	UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// Execute2 encodes parameters for the Execute2 choice.
+func (e *encoder) Execute2(args Execute2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Execute2", args)
+}
+
+// GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
+func (e *encoder) GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
+}
+
+// UpdateRequiredCCVs encodes parameters for the UpdateRequiredCCVs choice.
+func (e *encoder) UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdateRequiredCCVs", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

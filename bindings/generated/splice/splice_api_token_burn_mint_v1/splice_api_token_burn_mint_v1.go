@@ -99,6 +99,18 @@ func (t *BurnMintFactoryView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes BurnMintFactoryView to hex string (Canton MCMS format)
+func (t BurnMintFactoryView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryView from hex string (Canton MCMS format)
+func (t *BurnMintFactoryView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // BurnMintFactoryBurnMint is a Record type
 type BurnMintFactoryBurnMint struct {
 	ExpectedAdmin    types.PARTY                              `json:"expectedAdmin"`
@@ -173,6 +185,18 @@ func (t *BurnMintFactoryBurnMint) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes BurnMintFactoryBurnMint to hex string (Canton MCMS format)
+func (t BurnMintFactoryBurnMint) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryBurnMint from hex string (Canton MCMS format)
+func (t *BurnMintFactoryBurnMint) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // BurnMintFactoryBurnMintResult is a Record type
 type BurnMintFactoryBurnMintResult struct {
 	OutputCids []types.CONTRACT_ID `json:"outputCids"`
@@ -203,6 +227,18 @@ func (t *BurnMintFactoryBurnMintResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes BurnMintFactoryBurnMintResult to hex string (Canton MCMS format)
+func (t BurnMintFactoryBurnMintResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryBurnMintResult from hex string (Canton MCMS format)
+func (t *BurnMintFactoryBurnMintResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // BurnMintFactoryPublicFetch is a Record type
 type BurnMintFactoryPublicFetch struct {
 	ExpectedAdmin types.PARTY `json:"expectedAdmin"`
@@ -228,6 +264,18 @@ func (t BurnMintFactoryPublicFetch) MarshalJSON() ([]byte, error) {
 func (t *BurnMintFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes BurnMintFactoryPublicFetch to hex string (Canton MCMS format)
+func (t BurnMintFactoryPublicFetch) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintFactoryPublicFetch from hex string (Canton MCMS format)
+func (t *BurnMintFactoryPublicFetch) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // BurnMintOutput is a Record type
@@ -266,6 +314,18 @@ func (t *BurnMintOutput) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes BurnMintOutput to hex string (Canton MCMS format)
+func (t BurnMintOutput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes BurnMintOutput from hex string (Canton MCMS format)
+func (t *BurnMintOutput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IBurnMintFactoryInterfaceID returns the interface ID for the IBurnMintFactory interface using the package name
 func IBurnMintFactoryInterfaceID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
@@ -275,3 +335,38 @@ func IBurnMintFactoryInterfaceID() string {
 func IBurnMintFactoryInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "Splice.Api.Token.BurnMintV1", "BurnMintFactory")
 }
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)
