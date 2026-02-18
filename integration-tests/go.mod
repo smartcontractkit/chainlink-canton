@@ -17,7 +17,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260206205333-9187f22f0a04
 	github.com/smartcontractkit/chainlink-common v0.10.0
-	github.com/smartcontractkit/chainlink-deployments-framework v0.80.3-0.20260217150524-e83907322b13
+	github.com/smartcontractkit/chainlink-deployments-framework v0.81.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260217070730-8baea5c5955e
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.79.1
