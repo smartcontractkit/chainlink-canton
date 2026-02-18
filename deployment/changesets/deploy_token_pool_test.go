@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -18,11 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -45,17 +41,9 @@ func TestDeployTokenPool(t *testing.T) {
 	}).Initialize(t.Context())
 	require.NoError(t, err)
 
-	token, err := bc.(*canton.Chain).Participants[0].JWTProvider.Token(t.Context())
-	require.NoError(t, err)
-
-	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	adminApiClient, err := grpc.NewClient(bc.(*canton.Chain).Participants[0].Endpoints.AdminAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	require.NoError(t, err, "Failed to dial gRPC admin API")
-	ledgerApiClient, err := grpc.NewClient(bc.(*canton.Chain).Participants[0].Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	require.NoError(t, err, "Failed to dial gRPC ledger API")
-
-	packageServiceClient := participantv30.NewPackageServiceClient(adminApiClient)
-	userManagementServiceClient := admin.NewUserManagementServiceClient(ledgerApiClient)
+	cantonChain := bc.(*canton.Chain)
+	participant := cantonChain.Participants[0]
+	party := participant.PartyID
 
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
 	require.NoError(t, err)
@@ -63,7 +51,7 @@ func TestDeployTokenPool(t *testing.T) {
 	require.NoError(t, err)
 	poolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
 	require.NoError(t, err)
-	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+	_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars: []*participantv30.UploadDarRequest_UploadDarData{
 			{Bytes: commonDar},
 			{Bytes: tarDar},
@@ -74,25 +62,14 @@ func TestDeployTokenPool(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to upload dar files")
 
-	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
-		UserId: "user-participant1",
-	})
-	require.NoError(t, err, "failed to get user")
-	user := userResp.GetUser()
-	party := user.GetPrimaryParty()
-
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
 		t.Context,
 		logger.Test(t),
 		reporter,
 	)
-	cantonChain := bc.(*canton.Chain)
 	deps := dependencies.CantonDeps{
-		Chain:                *cantonChain,
-		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
-		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
-		Party:                party,
+		Chain: *cantonChain,
 	}
 
 	// Deploy TAR so we have an instance address for register-with-TAR
@@ -126,8 +103,6 @@ func TestDeployTokenPool(t *testing.T) {
 	_, err = (DeployTokenPool{}).Apply(*env, CantonCSDeps[DeployTokenPoolConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,
-		UserName:      user.GetId(),
-		Party:         party,
 		Config: DeployTokenPoolConfig{
 			CcipOwner:                         party,
 			PoolOwner:                         party,
@@ -140,7 +115,7 @@ func TestDeployTokenPool(t *testing.T) {
 	require.NoError(t, err, "deploy token pool and register with TAR")
 
 	// Verify TAR config: fetch TAR from ACS and unmarshal with UnmarshalActiveContract (uses UnmarshalCreatedEvent)
-	tar, err := findTARByInstanceAddress(t.Context(), deps.StateServiceClient, party)
+	tar, err := findTARByInstanceAddress(t.Context(), participant.LedgerServices.State, party)
 	require.NoError(t, err, "find TAR contract in ACS")
 
 	// TokenConfigs is GENMAP (map); each value is a TokenConfig with optional tokenPool (PoolRegistration).

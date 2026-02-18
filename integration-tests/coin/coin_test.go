@@ -21,22 +21,22 @@ func TestCoin(t *testing.T) {
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(5))
 
-	version, err := env.Participant(1).VersionServiceClient.GetLedgerApiVersion(t.Context(), &apiv2.GetLedgerApiVersionRequest{})
+	version, err := env.Chain.Participants[0].LedgerServices.Version.GetLedgerApiVersion(t.Context(), &apiv2.GetLedgerApiVersionRequest{})
 	require.NoError(t, err)
 	fmt.Println(version.Version)
 
 	// Upload the DARs to all participants
 	coinDar, err := contracts.GetDar(contracts.Coin, contracts.CurrentVersion)
 	require.NoError(t, err)
-	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{coinDar}, env.Participants...)
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{coinDar}, env.Chain.Participants...)
 	require.NoError(t, err)
 	fmt.Printf("Uploaded coin DARs to all participants: %v\n", packageIDs)
 
-	partyAlice := env.Participants[0].Party
-	partyBob := env.Participants[1].Party
-	partyCharlie := env.Participants[2].Party
-	partyDave := env.Participants[3].Party
-	partyErin := env.Participants[4].Party
+	partyAlice := env.Chain.Participants[0].PartyID
+	partyBob := env.Chain.Participants[1].PartyID
+	partyCharlie := env.Chain.Participants[2].PartyID
+	partyDave := env.Chain.Participants[3].PartyID
+	partyErin := env.Chain.Participants[4].PartyID
 
 	fmt.Println("Parties:")
 	fmt.Printf(" - Alice: %s\n", partyAlice)
@@ -55,7 +55,7 @@ func TestCoin(t *testing.T) {
 			Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "LINK"}},
 		},
 	}}}}
-	res, err := env.Participant(1).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := env.Chain.Participants[0].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -100,12 +100,12 @@ func TestCoin(t *testing.T) {
 	fmt.Printf("Deployed registry, CID: %v\n", registryCid)
 
 	// Query the contract for explicit disclosure
-	disclosedRegistry, err := testhelpers.GetDisclosedContractById(t.Context(), env.Participant(1), registryCid)
+	disclosedRegistry, err := testhelpers.GetDisclosedContractById(t.Context(), env.Chain.Participants[0], registryCid)
 	require.NoError(t, err)
 	fmt.Printf("Queried registry for disclosure: %v\n", disclosedRegistry.GetContractId())
 
 	// Bob creates MintPreapproval
-	res, err = env.Participant(2).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[1].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -145,7 +145,7 @@ func TestCoin(t *testing.T) {
 	time.Sleep(time.Second * 5)
 
 	// Alice mints to Bob
-	res, err = env.Participant(1).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[0].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -235,7 +235,7 @@ func TestCoin(t *testing.T) {
 	time.Sleep(time.Second * 5)
 
 	// Bob transfers part of their holdings to charlie
-	res, err = env.Participant(2).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[1].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -326,7 +326,7 @@ func TestCoin(t *testing.T) {
 	time.Sleep(time.Second * 5)
 
 	// Charlie accepts transfer from Bob
-	res, err = env.Participant(3).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[2].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -376,7 +376,7 @@ func TestCoin(t *testing.T) {
 	time.Sleep(time.Second * 5)
 
 	// Alice grants mint rights to Dave
-	res, err = env.Participant(1).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[0].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -418,7 +418,7 @@ func TestCoin(t *testing.T) {
 	time.Sleep(time.Second * 5)
 
 	// Erin grants MintPreapproval
-	res, err = env.Participant(5).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[4].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{
@@ -455,7 +455,7 @@ func TestCoin(t *testing.T) {
 		}
 	}
 	fmt.Printf("Erin created MintPreapproval, CID: %v\n", erinPreApprovalCid)
-	disclosedErinPreApproval, err := testhelpers.GetDisclosedContractById(t.Context(), env.Participant(5), erinPreApprovalCid)
+	disclosedErinPreApproval, err := testhelpers.GetDisclosedContractById(t.Context(), env.Chain.Participants[4], erinPreApprovalCid)
 	require.NoError(t, err)
 	fmt.Printf("Queried MintPreapproval for disclosure: %v\n", disclosedErinPreApproval.GetContractId())
 	time.Sleep(time.Second * 5)
@@ -463,9 +463,9 @@ func TestCoin(t *testing.T) {
 	// Dave uses the MintRole to mint to Erin
 
 	// Asynchronously, listen to all updates that have Erin on Participant 5 as a stakeholder
-	currentOffset, err := testhelpers.GetCurrentOffset(t.Context(), env.Participant(5))
+	currentOffset, err := testhelpers.GetCurrentOffset(t.Context(), env.Chain.Participants[4].LedgerServices.State)
 	require.NoError(t, err)
-	updateStream, err := env.Participant(5).UpdateServiceClient.GetUpdates(t.Context(), &apiv2.GetUpdatesRequest{
+	updateStream, err := env.Chain.Participants[4].LedgerServices.Update.GetUpdates(t.Context(), &apiv2.GetUpdatesRequest{
 		BeginExclusive: currentOffset,
 		UpdateFormat: &apiv2.UpdateFormat{
 			IncludeTransactions: &apiv2.TransactionFormat{
@@ -509,7 +509,7 @@ func TestCoin(t *testing.T) {
 		}
 	}()
 
-	res, err = env.Participant(4).CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = env.Chain.Participants[3].LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{

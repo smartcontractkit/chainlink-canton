@@ -8,41 +8,11 @@ import (
 	"slices"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
-	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
-
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 )
 
-type Participant struct {
-	Name string
-	// GetToken returns a JWT token to authenticate API calls against this participant
-	GetToken func(ctx context.Context) (string, error)
-	// GetConfig returns the participant's configuration
-	GetConfig func() ParticipantConfig
-	UserName  string
-	Party     string
-
-	// API Clients
-
-	// Admin API
-	PackageServiceClient participantv30.PackageServiceClient
-
-	// Ledger API
-	PartyManagementServiceClient admin.PartyManagementServiceClient
-	UserManagementServiceClient  admin.UserManagementServiceClient
-
-	StateServiceClient   apiv2.StateServiceClient
-	CommandServiceClient apiv2.CommandServiceClient
-	UpdateServiceClient  apiv2.UpdateServiceClient
-	VersionServiceClient apiv2.VersionServiceClient
-
-	// Validator API
-	ScanProxyClient scanProxy.ClientWithResponsesInterface
-}
-
-func GetCurrentOffset(ctx context.Context, participant Participant) (int64, error) {
-	ledgerEndResp, err := participant.StateServiceClient.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+func GetCurrentOffset(ctx context.Context, stateService apiv2.StateServiceClient) (int64, error) {
+	ledgerEndResp, err := stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ledger end: %w", err)
 	}
@@ -50,16 +20,16 @@ func GetCurrentOffset(ctx context.Context, participant Participant) (int64, erro
 	return ledgerEndResp.GetOffset(), nil
 }
 
-func GetDisclosedContractById(ctx context.Context, participant Participant, contractId string) (*apiv2.DisclosedContract, error) {
-	offset, err := GetCurrentOffset(ctx, participant)
+func GetDisclosedContractById(ctx context.Context, participant canton.Participant, contractId string) (*apiv2.DisclosedContract, error) {
+	offset, err := GetCurrentOffset(ctx, participant.LedgerServices.State)
 	if err != nil {
 		return nil, err
 	}
-	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+	activeContractsResponse, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: offset,
 		EventFormat: &apiv2.EventFormat{
 			FiltersByParty: map[string]*apiv2.Filters{
-				participant.Party: {
+				participant.PartyID: {
 					Cumulative: []*apiv2.CumulativeFilter{
 						{
 							IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
@@ -101,13 +71,13 @@ func GetDisclosedContractById(ctx context.Context, participant Participant, cont
 	return nil, fmt.Errorf("failed to find active contract with id %s", contractId)
 }
 
-func GetDisclosedContractByTemplateId(ctx context.Context, participant Participant, templateId *apiv2.Identifier) (*apiv2.DisclosedContract, error) {
+func GetDisclosedContractByTemplateId(ctx context.Context, participant canton.Participant, templateId *apiv2.Identifier) (*apiv2.DisclosedContract, error) {
 	activeContracts, err := ListActiveContractsByTemplateId(ctx, participant, templateId)
 	if err != nil {
 		return nil, fmt.Errorf("could not get active contracts: %w", err)
 	}
 	if len(activeContracts) == 0 {
-		return nil, fmt.Errorf("no active contracts with templateId %v found on participant %vfor party %s", templateId, participant.Name, participant.Party)
+		return nil, fmt.Errorf("no active contracts with templateId %v found on participant %vfor party %s", templateId, participant.Name, participant.PartyID)
 	}
 
 	contract := activeContracts[len(activeContracts)-1]
@@ -120,17 +90,17 @@ func GetDisclosedContractByTemplateId(ctx context.Context, participant Participa
 	}, nil
 }
 
-func ListActiveContractsByTemplateId(ctx context.Context, participant Participant, templateId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
+func ListActiveContractsByTemplateId(ctx context.Context, participant canton.Participant, templateId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
 	var activeContracts []*apiv2.ActiveContract
-	offset, err := GetCurrentOffset(ctx, participant)
+	offset, err := GetCurrentOffset(ctx, participant.LedgerServices.State)
 	if err != nil {
 		return nil, err
 	}
-	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+	activeContractsResponse, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: offset,
 		EventFormat: &apiv2.EventFormat{
 			FiltersByParty: map[string]*apiv2.Filters{
-				participant.Party: {
+				participant.PartyID: {
 					Cumulative: []*apiv2.CumulativeFilter{
 						{
 							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{TemplateFilter: &apiv2.TemplateFilter{
@@ -145,7 +115,7 @@ func ListActiveContractsByTemplateId(ctx context.Context, participant Participan
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get active contracts for party %v: %w", participant.Party, err)
+		return nil, fmt.Errorf("failed to get active contracts for party %v: %w", participant.PartyID, err)
 	}
 	defer activeContractsResponse.CloseSend()
 	for {
@@ -167,17 +137,17 @@ func ListActiveContractsByTemplateId(ctx context.Context, participant Participan
 	return activeContracts, nil
 }
 
-func ListActiveContractsByInterfaceId(ctx context.Context, participant Participant, interfaceId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
+func ListActiveContractsByInterfaceId(ctx context.Context, participant canton.Participant, interfaceId *apiv2.Identifier) ([]*apiv2.ActiveContract, error) {
 	var activeContracts []*apiv2.ActiveContract
-	offset, err := GetCurrentOffset(ctx, participant)
+	offset, err := GetCurrentOffset(ctx, participant.LedgerServices.State)
 	if err != nil {
 		return nil, err
 	}
-	activeContractsResponse, err := participant.StateServiceClient.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+	activeContractsResponse, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: offset,
 		EventFormat: &apiv2.EventFormat{
 			FiltersByParty: map[string]*apiv2.Filters{
-				participant.Party: {
+				participant.PartyID: {
 					Cumulative: []*apiv2.CumulativeFilter{
 						{
 							IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
