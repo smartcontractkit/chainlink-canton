@@ -104,6 +104,18 @@ func (t *AddCCVFee) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes AddCCVFee to hex string (Canton MCMS format)
+func (t AddCCVFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCCVFee from hex string (Canton MCMS format)
+func (t *AddCCVFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AddCCVVerification is a Record type
 type AddCCVVerification struct {
 	CcvInstanceId types.TEXT  `json:"ccvInstanceId"`
@@ -132,6 +144,18 @@ func (t AddCCVVerification) MarshalJSON() ([]byte, error) {
 func (t *AddCCVVerification) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCCVVerification to hex string (Canton MCMS format)
+func (t AddCCVVerification) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCCVVerification from hex string (Canton MCMS format)
+func (t *AddCCVVerification) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // AddTokenSend is a Record type
@@ -196,6 +220,18 @@ func (t *AddTokenSend) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes AddTokenSend to hex string (Canton MCMS format)
+func (t AddTokenSend) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddTokenSend from hex string (Canton MCMS format)
+func (t *AddTokenSend) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AddTokenSendFee is a Record type
 type AddTokenSendFee struct {
 	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
@@ -233,6 +269,18 @@ func (t AddTokenSendFee) MarshalJSON() ([]byte, error) {
 func (t *AddTokenSendFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddTokenSendFee to hex string (Canton MCMS format)
+func (t AddTokenSendFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddTokenSendFee from hex string (Canton MCMS format)
+func (t *AddTokenSendFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // AddVerifierData is a Record type
@@ -277,6 +325,18 @@ func (t *AddVerifierData) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes AddVerifierData to hex string (Canton MCMS format)
+func (t AddVerifierData) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddVerifierData from hex string (Canton MCMS format)
+func (t *AddVerifierData) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CCVFee is a Record type
 type CCVFee struct {
 	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
@@ -313,6 +373,18 @@ func (t *CCVFee) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCVFee to hex string (Canton MCMS format)
+func (t CCVFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCVFee from hex string (Canton MCMS format)
+func (t *CCVFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CCVVerification is a Record type
 type CCVVerification struct {
 	CcvInstanceId types.TEXT  `json:"ccvInstanceId"`
@@ -343,6 +415,18 @@ func (t *CCVVerification) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCVVerification to hex string (Canton MCMS format)
+func (t CCVVerification) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCVVerification from hex string (Canton MCMS format)
+func (t *CCVVerification) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CrossChainVerifierView is a Record type
 type CrossChainVerifierView struct {
 	CcipOwner       types.PARTY `json:"ccipOwner"`
@@ -368,6 +452,18 @@ func (t CrossChainVerifierView) MarshalJSON() ([]byte, error) {
 func (t *CrossChainVerifierView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CrossChainVerifierView to hex string (Canton MCMS format)
+func (t CrossChainVerifierView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CrossChainVerifierView from hex string (Canton MCMS format)
+func (t *CrossChainVerifierView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // CrossChainVerifierCalculateFee is a Record type
@@ -401,6 +497,18 @@ func (t CrossChainVerifierCalculateFee) MarshalJSON() ([]byte, error) {
 func (t *CrossChainVerifierCalculateFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CrossChainVerifierCalculateFee to hex string (Canton MCMS format)
+func (t CrossChainVerifierCalculateFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CrossChainVerifierCalculateFee from hex string (Canton MCMS format)
+func (t *CrossChainVerifierCalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // CrossChainVerifierForwardToVerifier is a Record type
@@ -448,6 +556,18 @@ func (t *CrossChainVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CrossChainVerifierForwardToVerifier to hex string (Canton MCMS format)
+func (t CrossChainVerifierForwardToVerifier) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CrossChainVerifierForwardToVerifier from hex string (Canton MCMS format)
+func (t *CrossChainVerifierForwardToVerifier) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CrossChainVerifierVerifyMessage is a Record type
 type CrossChainVerifierVerifyMessage struct {
 	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
@@ -491,6 +611,18 @@ func (t CrossChainVerifierVerifyMessage) MarshalJSON() ([]byte, error) {
 func (t *CrossChainVerifierVerifyMessage) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CrossChainVerifierVerifyMessage to hex string (Canton MCMS format)
+func (t CrossChainVerifierVerifyMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CrossChainVerifierVerifyMessage from hex string (Canton MCMS format)
+func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // DestChainConfig is a Record type
@@ -561,6 +693,18 @@ func (t DestChainConfig) MarshalJSON() ([]byte, error) {
 func (t *DestChainConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DestChainConfig to hex string (Canton MCMS format)
+func (t DestChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DestChainConfig from hex string (Canton MCMS format)
+func (t *DestChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ExecutingMessageV1 is a Template type
@@ -786,6 +930,18 @@ func (t *ExecutingMessageV1) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes ExecutingMessageV1 to hex string (Canton MCMS format)
+func (t ExecutingMessageV1) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutingMessageV1 from hex string (Canton MCMS format)
+func (t *ExecutingMessageV1) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for ExecutingMessageV1
 
 // ExecutingMessageV1Archive exercises the ExecutingMessageV1_Archive choice on this ExecutingMessageV1 contract
@@ -896,6 +1052,18 @@ func (t *ExecutingMessageV1Archive) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes ExecutingMessageV1Archive to hex string (Canton MCMS format)
+func (t ExecutingMessageV1Archive) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutingMessageV1Archive from hex string (Canton MCMS format)
+func (t *ExecutingMessageV1Archive) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FeeTokenAmount is a Record type
 type FeeTokenAmount struct {
 	Caller types.PARTY `json:"caller"`
@@ -918,6 +1086,18 @@ func (t FeeTokenAmount) MarshalJSON() ([]byte, error) {
 func (t *FeeTokenAmount) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeTokenAmount to hex string (Canton MCMS format)
+func (t FeeTokenAmount) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeTokenAmount from hex string (Canton MCMS format)
+func (t *FeeTokenAmount) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // FinalizeFee is a Record type
@@ -947,6 +1127,18 @@ func (t *FinalizeFee) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes FinalizeFee to hex string (Canton MCMS format)
+func (t FinalizeFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FinalizeFee from hex string (Canton MCMS format)
+func (t *FinalizeFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetDestChainConfig is a Record type
 type GetDestChainConfig struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
@@ -974,6 +1166,18 @@ func (t *GetDestChainConfig) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes GetDestChainConfig to hex string (Canton MCMS format)
+func (t GetDestChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetDestChainConfig from hex string (Canton MCMS format)
+func (t *GetDestChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetSourceChainConfig is a Record type
 type GetSourceChainConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
@@ -999,6 +1203,18 @@ func (t GetSourceChainConfig) MarshalJSON() ([]byte, error) {
 func (t *GetSourceChainConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetSourceChainConfig to hex string (Canton MCMS format)
+func (t GetSourceChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetSourceChainConfig from hex string (Canton MCMS format)
+func (t *GetSourceChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // GlobalConfig is a Template type
@@ -1107,6 +1323,18 @@ func (t GlobalConfig) MarshalJSON() ([]byte, error) {
 func (t *GlobalConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GlobalConfig to hex string (Canton MCMS format)
+func (t GlobalConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GlobalConfig from hex string (Canton MCMS format)
+func (t *GlobalConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for GlobalConfig
@@ -1248,6 +1476,18 @@ func (e *IssuerType) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, e)
 }
 
+// MarshalHex encodes IssuerType to hex string (Canton MCMS format)
+func (e IssuerType) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes IssuerType from hex string (Canton MCMS format)
+func (e *IssuerType) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
+}
+
 var _ types.ENUM = IssuerType("")
 
 // MessageExecutionState is an enum type
@@ -1282,6 +1522,18 @@ func (e MessageExecutionState) MarshalJSON() ([]byte, error) {
 func (e *MessageExecutionState) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, e)
+}
+
+// MarshalHex encodes MessageExecutionState to hex string (Canton MCMS format)
+func (e MessageExecutionState) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes MessageExecutionState from hex string (Canton MCMS format)
+func (e *MessageExecutionState) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
 }
 
 var _ types.ENUM = MessageExecutionState("")
@@ -1358,6 +1610,18 @@ func (t *MessageV1) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes MessageV1 to hex string (Canton MCMS format)
+func (t MessageV1) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MessageV1 from hex string (Canton MCMS format)
+func (t *MessageV1) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RawInstanceAddress is a Record type
 type RawInstanceAddress struct {
 	Unpack types.TEXT `json:"unpack"`
@@ -1380,6 +1644,18 @@ func (t RawInstanceAddress) MarshalJSON() ([]byte, error) {
 func (t *RawInstanceAddress) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RawInstanceAddress to hex string (Canton MCMS format)
+func (t RawInstanceAddress) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RawInstanceAddress from hex string (Canton MCMS format)
+func (t *RawInstanceAddress) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Receipt is a Record type
@@ -1437,6 +1713,18 @@ func (t Receipt) MarshalJSON() ([]byte, error) {
 func (t *Receipt) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Receipt to hex string (Canton MCMS format)
+func (t Receipt) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Receipt from hex string (Canton MCMS format)
+func (t *Receipt) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // SendingMessageV1 is a Template type
@@ -1931,6 +2219,18 @@ func (t *SendingMessageV1) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes SendingMessageV1 to hex string (Canton MCMS format)
+func (t SendingMessageV1) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SendingMessageV1 from hex string (Canton MCMS format)
+func (t *SendingMessageV1) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for SendingMessageV1
 
 // AddCCVFee exercises the AddCCVFee choice on this SendingMessageV1 contract
@@ -2115,6 +2415,18 @@ func (t *SetInboundPoolCCVs) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes SetInboundPoolCCVs to hex string (Canton MCMS format)
+func (t SetInboundPoolCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetInboundPoolCCVs from hex string (Canton MCMS format)
+func (t *SetInboundPoolCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        types.BOOL           `json:"isEnabled"`
@@ -2168,6 +2480,18 @@ func (t SourceChainConfig) MarshalJSON() ([]byte, error) {
 func (t *SourceChainConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SourceChainConfig to hex string (Canton MCMS format)
+func (t SourceChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SourceChainConfig from hex string (Canton MCMS format)
+func (t *SourceChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenReceiveTicket is a Template type
@@ -2293,6 +2617,18 @@ func (t *TokenReceiveTicket) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TokenReceiveTicket to hex string (Canton MCMS format)
+func (t TokenReceiveTicket) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenReceiveTicket from hex string (Canton MCMS format)
+func (t *TokenReceiveTicket) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for TokenReceiveTicket
 
 // Archive exercises the Archive choice on this TokenReceiveTicket contract
@@ -2361,6 +2697,18 @@ func (t *TokenSendData) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TokenSendData to hex string (Canton MCMS format)
+func (t TokenSendData) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenSendData from hex string (Canton MCMS format)
+func (t *TokenSendData) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenSendFee is a Record type
 type TokenSendFee struct {
 	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
@@ -2395,6 +2743,18 @@ func (t TokenSendFee) MarshalJSON() ([]byte, error) {
 func (t *TokenSendFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenSendFee to hex string (Canton MCMS format)
+func (t TokenSendFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenSendFee from hex string (Canton MCMS format)
+func (t *TokenSendFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TokenTransferV1 is a Record type
@@ -2436,6 +2796,18 @@ func (t *TokenTransferV1) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TokenTransferV1 to hex string (Canton MCMS format)
+func (t TokenTransferV1) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenTransferV1 from hex string (Canton MCMS format)
+func (t *TokenTransferV1) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UpdateDestChainConfig is a Record type
 type UpdateDestChainConfig struct {
 	DestChainSelector types.NUMERIC   `json:"destChainSelector"`
@@ -2469,6 +2841,18 @@ func (t *UpdateDestChainConfig) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes UpdateDestChainConfig to hex string (Canton MCMS format)
+func (t UpdateDestChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdateDestChainConfig from hex string (Canton MCMS format)
+func (t *UpdateDestChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // UpdateSourceChainConfig is a Record type
 type UpdateSourceChainConfig struct {
 	SourceChainSelector types.NUMERIC     `json:"sourceChainSelector"`
@@ -2500,6 +2884,18 @@ func (t UpdateSourceChainConfig) MarshalJSON() ([]byte, error) {
 func (t *UpdateSourceChainConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UpdateSourceChainConfig to hex string (Canton MCMS format)
+func (t UpdateSourceChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdateSourceChainConfig from hex string (Canton MCMS format)
+func (t *UpdateSourceChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // VerifierData is a Record type
@@ -2544,6 +2940,18 @@ func (t *VerifierData) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes VerifierData to hex string (Canton MCMS format)
+func (t VerifierData) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes VerifierData from hex string (Canton MCMS format)
+func (t *VerifierData) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IICrossChainVerifierInterfaceID returns the interface ID for the IICrossChainVerifier interface using the package name
 func IICrossChainVerifierInterfaceID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.CrossChainVerifier", "ICrossChainVerifier")
@@ -2553,3 +2961,116 @@ func IICrossChainVerifierInterfaceID() string {
 func IICrossChainVerifierInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.CrossChainVerifier", "ICrossChainVerifier")
 }
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	AddCCVFee(args AddCCVFee) (*bind.EncodedChoice, error)
+	AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error)
+	AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error)
+	AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error)
+	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
+	ExecutingMessageV1Archive(args ExecutingMessageV1Archive) (*bind.EncodedChoice, error)
+	FeeTokenAmount(args FeeTokenAmount) (*bind.EncodedChoice, error)
+	FinalizeFee(args FinalizeFee) (*bind.EncodedChoice, error)
+	GetDestChainConfig(args GetDestChainConfig) (*bind.EncodedChoice, error)
+	GetSourceChainConfig(args GetSourceChainConfig) (*bind.EncodedChoice, error)
+	SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoice, error)
+	UpdateDestChainConfig(args UpdateDestChainConfig) (*bind.EncodedChoice, error)
+	UpdateSourceChainConfig(args UpdateSourceChainConfig) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// AddCCVFee encodes parameters for the AddCCVFee choice.
+func (e *encoder) AddCCVFee(args AddCCVFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCCVFee", args)
+}
+
+// AddCCVVerification encodes parameters for the AddCCVVerification choice.
+func (e *encoder) AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCCVVerification", args)
+}
+
+// AddTokenSend encodes parameters for the AddTokenSend choice.
+func (e *encoder) AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSend", args)
+}
+
+// AddTokenSendFee encodes parameters for the AddTokenSendFee choice.
+func (e *encoder) AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSendFee", args)
+}
+
+// AddVerifierData encodes parameters for the AddVerifierData choice.
+func (e *encoder) AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddVerifierData", args)
+}
+
+// ExecutingMessageV1Archive encodes parameters for the ExecutingMessageV1Archive choice.
+func (e *encoder) ExecutingMessageV1Archive(args ExecutingMessageV1Archive) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ExecutingMessageV1Archive", args)
+}
+
+// FeeTokenAmount encodes parameters for the FeeTokenAmount choice.
+func (e *encoder) FeeTokenAmount(args FeeTokenAmount) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FeeTokenAmount", args)
+}
+
+// FinalizeFee encodes parameters for the FinalizeFee choice.
+func (e *encoder) FinalizeFee(args FinalizeFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeFee", args)
+}
+
+// GetDestChainConfig encodes parameters for the GetDestChainConfig choice.
+func (e *encoder) GetDestChainConfig(args GetDestChainConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChainConfig", args)
+}
+
+// GetSourceChainConfig encodes parameters for the GetSourceChainConfig choice.
+func (e *encoder) GetSourceChainConfig(args GetSourceChainConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetSourceChainConfig", args)
+}
+
+// SetInboundPoolCCVs encodes parameters for the SetInboundPoolCCVs choice.
+func (e *encoder) SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetInboundPoolCCVs", args)
+}
+
+// UpdateDestChainConfig encodes parameters for the UpdateDestChainConfig choice.
+func (e *encoder) UpdateDestChainConfig(args UpdateDestChainConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdateDestChainConfig", args)
+}
+
+// UpdateSourceChainConfig encodes parameters for the UpdateSourceChainConfig choice.
+func (e *encoder) UpdateSourceChainConfig(args UpdateSourceChainConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdateSourceChainConfig", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

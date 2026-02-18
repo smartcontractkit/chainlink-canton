@@ -55,7 +55,7 @@ realTestOp = Op
   , multisigId = realTestProposerMultisigId
   , nonce = 0
   , targetInstanceId = "counter@ccip_owner-9cefe94d"
-  , functionName = "increment"
+  , functionName = "Increment"
   , operationData = ""
   }
 
@@ -69,11 +69,11 @@ realTestMetadata = RootMetadata
   }
 
 realTestRoot : Text
-realTestRoot = "f79d104652a3359be3e060cba203f1a18c1f39d0b84e9e5a6e325c4861cdfd14"
+realTestRoot = "d404af7c8d405c25514074b1c9ac786d6af1fc8af57600ec91d92938c1edb392"
 
 realTestMetadataProof : [Text]
 realTestMetadataProof =
-  [ "d144a6dbb4e03601445592e7d5a907bb6bc9e71fcca975ee0148bb092efab544"
+  [ "308639a4becac84bcaec1a6aebedc63dde1ce458b5a30b967bbacfaac3944a35"
   ]
 
 realTestOpProof : [Text]
@@ -87,13 +87,13 @@ realTestSignatures : [RawSignature]
 realTestSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "c82d140d22ca95ccbe2a41e803c69e336bb6bac3afbe92f7968317b50d51f829"
-      , s = "65020ad3b8ba9b8fd39c4b5907411e7c6448f5068d0562236f385f23fd4e1be3"
+      , r = "080849a948777927a3409b86cccb969e5ae28dea9f3403a16fdb6dec9f31856d"
+      , s = "329bd78d9d96e71d047c1532db0e611a44cb2bb60684989a61a401d6d534a1f1"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "390099c2faf379475a8ebd27c737a7d4e449a7f8a94c74830a151429a085e654"
-      , s = "3411081f42c536a01d82dc02560a10b6f073a34cb5af23421d9d594b60bb329b"
+      , r = "f8d7b0450db3d0eef4f4a1e2c391bfea2c370387da75233339ae14c1bd611d2a"
+      , s = "76dd89f5cfc8378d6650241727d540cbd7f99b5785fbfc59905939f835d23409"
       }
   ]
 
@@ -149,7 +149,7 @@ testFullFlow = script do
 
   -- Step 4: Prepare operation and metadata
   let 
-    op = Op chainId (makeMcmsId mcmsInstanceId Proposer) 0 counterId "increment" ""
+    op = Op chainId (makeMcmsId mcmsInstanceId Proposer) 0 counterId "Increment" ""
     metadata = RootMetadata chainId (makeMcmsId mcmsInstanceId Proposer) 0 1 False
 
   debug "Flow test setup complete"
@@ -357,10 +357,10 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
         , nonce = 0
         , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
-        , functionName = "bypasser_execute_batch"
-        , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409696e6372656d656e7400"
+        , functionName = "BypasserExecuteBatch"
+        , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e7400"
         }
-  let externalBypasserRoot = "a66935f215ed953673030362902d2709fa4276452652953d476116781b5c1e49"
+  let externalBypasserRoot = "f26a0e63c779312478e7b1dc81649c7165f90ec55b0f95c4716572b5d826d1c2"
   let externalBypasserMetadata = RootMetadata
         { chainId = 1
         , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
@@ -368,18 +368,18 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         , postOpCount = 1
         , overridePreviousRoot = False
         }
-  let externalBypasserMetadataProof = ["ae7faccbf87f2002a3f93c2170db7a73976e10a5dc4f177f2c906cd975a0a154"]
+  let externalBypasserMetadataProof = ["a4d4ba0d1233922c561ca70a4c98d62a6f7a108af84003c7ecdb1ead4ed0dd81"]
   let externalBypasserOpProof = ["6fb0ca7c1189483951018ab7f466e827ed5e91a17d4227fba82fde2ae6d9d206"]
   let externalBypasserSignatures =
         [ RawSignature
             { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-            , r = "77595c7c914b6bac8d4b1c845861603d024d8dd26989ee5425792325d1cf1cc3"
-            , s = "329acc44efb5700cbe78ce65c9270b2a5786112e247ce172bc12b85e0b93f2f8"
+            , r = "9ab498dc1703b5daa8144f97086702399fdb2e35840aba222df665808abb9238"
+            , s = "1684c26717675285f2bc9d49767b5b0817851afb6cfe54e0effb156285e5dda6"
             }
         , RawSignature
             { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-            , r = "4201e9762ad1d3a862d30032938f908f0ab150e72b1e9db4cf836fdc1aa80d91"
-            , s = "1cbf89b7a23863b79d0a6192bccee247fc614f4b5d5e749c5db581234b549fe3"
+            , r = "7c0161d9bc3671b3fb7e0ef75fcf0abb705bf266da1c7661078d5b7e11f4cad4"
+            , s = "6f3869545411d557ed8509ecdf83a5170e9a83d584a9dca65252e065a44a34bd"
             }
         ]
 
@@ -667,8 +667,8 @@ testSelfDispatchSetConfigCodec = script do
 testBlockedFunctionOnMCMS : Script ()
 testBlockedFunctionOnMCMS = script do
   ccipOwner <- allocateParty "ccip_owner"
-  let bf1 = BlockedFunction "counter@ccip_owner" "reset"
-  let bf2 = BlockedFunction "counter@ccip_owner" "set_value"
+  let bf1 = BlockedFunction "counter@ccip_owner" "Reset"
+  let bf2 = BlockedFunction "counter@ccip_owner" "SetValue"
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner

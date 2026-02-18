@@ -74,20 +74,20 @@ template Counter
 
         -- Dispatch to the appropriate function
         case functionName of
-          "increment" -> do
+          "Increment" -> do
             -- Increment counter (operationData ignored)
             debug $ "Counter: incrementing value from " <> show value <> " to " <> show (value + 1)
             newCid <- create this with value = value + 1
             pure (toInterfaceContractId @MCMSReceiver newCid)
 
-          "set_value" -> do
+          "SetValue" -> do
             -- Set value from operationData
             -- Format: just the integer as decimal string
             let newValue = parseDecimalToInt operationData
             newCid <- create this with value = newValue
             pure (toInterfaceContractId @MCMSReceiver newCid)
 
-          "reset" -> do
+          "Reset" -> do
             -- Reset to zero
             newCid <- create this with value = 0
             pure (toInterfaceContractId @MCMSReceiver newCid)

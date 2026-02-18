@@ -125,6 +125,18 @@ func (t *CoinHolding) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CoinHolding to hex string (Canton MCMS format)
+func (t CoinHolding) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CoinHolding from hex string (Canton MCMS format)
+func (t *CoinHolding) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for CoinHolding
 
 // Transfer exercises the Transfer choice on this CoinHolding contract
@@ -267,6 +279,18 @@ func (t CoinRegistry) MarshalJSON() ([]byte, error) {
 func (t *CoinRegistry) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CoinRegistry to hex string (Canton MCMS format)
+func (t CoinRegistry) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CoinRegistry from hex string (Canton MCMS format)
+func (t *CoinRegistry) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for CoinRegistry
@@ -466,6 +490,18 @@ func (t *CoinTransferInstruction) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CoinTransferInstruction to hex string (Canton MCMS format)
+func (t CoinTransferInstruction) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CoinTransferInstruction from hex string (Canton MCMS format)
+func (t *CoinTransferInstruction) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for CoinTransferInstruction
 
 // Archive exercises the Archive choice on this CoinTransferInstruction contract
@@ -635,6 +671,18 @@ func (t *MintPreapproval) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes MintPreapproval to hex string (Canton MCMS format)
+func (t MintPreapproval) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MintPreapproval from hex string (Canton MCMS format)
+func (t *MintPreapproval) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Choice methods for MintPreapproval
 
 // MintPreapprovalMint exercises the MintPreapproval_Mint choice on this MintPreapproval contract
@@ -712,6 +760,18 @@ func (t *MintPreapprovalMint) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes MintPreapprovalMint to hex string (Canton MCMS format)
+func (t MintPreapprovalMint) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MintPreapprovalMint from hex string (Canton MCMS format)
+func (t *MintPreapprovalMint) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MintRole is a Template type
 type MintRole struct {
 	Issuer   types.PARTY       `json:"issuer"`
@@ -787,6 +847,18 @@ func (t MintRole) MarshalJSON() ([]byte, error) {
 func (t *MintRole) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes MintRole to hex string (Canton MCMS format)
+func (t MintRole) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MintRole from hex string (Canton MCMS format)
+func (t *MintRole) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for MintRole
@@ -877,6 +949,18 @@ func (t *MintRoleMint) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes MintRoleMint to hex string (Canton MCMS format)
+func (t MintRoleMint) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MintRoleMint from hex string (Canton MCMS format)
+func (t *MintRoleMint) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Transfer is a Record type
 type Transfer struct {
 	To types.PARTY `json:"to"`
@@ -900,3 +984,68 @@ func (t *Transfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
+
+// MarshalHex encodes Transfer to hex string (Canton MCMS format)
+func (t Transfer) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Transfer from hex string (Canton MCMS format)
+func (t *Transfer) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	MintPreapprovalMint(args MintPreapprovalMint) (*bind.EncodedChoice, error)
+	MintRoleMint(args MintRoleMint) (*bind.EncodedChoice, error)
+	Transfer(args Transfer) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// MintPreapprovalMint encodes parameters for the MintPreapprovalMint choice.
+func (e *encoder) MintPreapprovalMint(args MintPreapprovalMint) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("MintPreapprovalMint", args)
+}
+
+// MintRoleMint encodes parameters for the MintRoleMint choice.
+func (e *encoder) MintRoleMint(args MintRoleMint) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("MintRoleMint", args)
+}
+
+// Transfer encodes parameters for the Transfer choice.
+func (e *encoder) Transfer(args Transfer) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Transfer", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

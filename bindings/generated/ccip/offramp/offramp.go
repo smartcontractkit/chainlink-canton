@@ -126,6 +126,18 @@ func (t *ExecuteFromRouter) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes ExecuteFromRouter to hex string (Canton MCMS format)
+func (t ExecuteFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecuteFromRouter from hex string (Canton MCMS format)
+func (t *ExecuteFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
 	MessageId           types.TEXT         `json:"messageId"`
@@ -177,6 +189,18 @@ func (t *ExecuteFromRouterResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes ExecuteFromRouterResult to hex string (Canton MCMS format)
+func (t ExecuteFromRouterResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecuteFromRouterResult from hex string (Canton MCMS format)
+func (t *ExecuteFromRouterResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
 	GlobalConfigCid      types.CONTRACT_ID           `json:"globalConfigCid"`
@@ -222,6 +246,18 @@ func (t GetRequiredCCVsForExecute) MarshalJSON() ([]byte, error) {
 func (t *GetRequiredCCVsForExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetRequiredCCVsForExecute to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForExecute) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsForExecute from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // OffRamp is a Template type
@@ -337,6 +373,18 @@ func (t OffRamp) MarshalJSON() ([]byte, error) {
 func (t *OffRamp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes OffRamp to hex string (Canton MCMS format)
+func (t OffRamp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes OffRamp from hex string (Canton MCMS format)
+func (t *OffRamp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for OffRamp
@@ -475,3 +523,68 @@ func (t *PrepareExecute) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
+
+// MarshalHex encodes PrepareExecute to hex string (Canton MCMS format)
+func (t PrepareExecute) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareExecute from hex string (Canton MCMS format)
+func (t *PrepareExecute) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	ExecuteFromRouter(args ExecuteFromRouter) (*bind.EncodedChoice, error)
+	GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error)
+	PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// ExecuteFromRouter encodes parameters for the ExecuteFromRouter choice.
+func (e *encoder) ExecuteFromRouter(args ExecuteFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ExecuteFromRouter", args)
+}
+
+// GetRequiredCCVsForExecute encodes parameters for the GetRequiredCCVsForExecute choice.
+func (e *encoder) GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVsForExecute", args)
+}
+
+// PrepareExecute encodes parameters for the PrepareExecute choice.
+func (e *encoder) PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareExecute", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

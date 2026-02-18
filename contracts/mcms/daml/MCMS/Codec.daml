@@ -21,9 +21,9 @@ module MCMS.Codec
   , ScheduleBatchParams(..)
   , encodeScheduleBatchParams
   , decodeScheduleBatchParams
-  , BypasserExecuteParams(..)
-  , encodeBypasserExecuteParams
-  , decodeBypasserExecuteParams
+  , BypasserExecuteBatchParams(..)
+  , encodeBypasserExecuteBatchParams
+  , decodeBypasserExecuteBatchParams
   , CancelBatchParams(..)
   , encodeCancelBatchParams
   , decodeCancelBatchParams
@@ -184,6 +184,17 @@ decodeUint32WithOffset encoded offset = do
   value <- decodeUint32 hex
   return (value, offset + 4)
 
+-- | Encode int64 (8 bytes)
+encodeInt64 : Int -> Optional BytesHex
+encodeInt64 n =
+  Some (padLeft 16 "0" (intToHex (abs n)))
+
+-- | Decode int64 (8 bytes)
+decodeInt64 : BytesHex -> Optional Int
+decodeInt64 hex =
+  if byteCount hex /= 8 then None
+  else fromHex hex
+
 -- | Encode text as length-prefixed bytes
 encodeText : Text -> BytesHex
 encodeText t =
@@ -341,7 +352,7 @@ encodeScheduleBatchParams params =
     callsEncoded = encodeList params.calls encodeTimelockCall
     predecessorEncoded = encodeText params.predecessor
     saltEncoded = encodeText params.salt
-    delayEncoded = fromSome (encodeUint32 params.delaySecs)
+    delayEncoded = fromSome (encodeInt64 params.delaySecs)
   in
     callsEncoded <> predecessorEncoded <> saltEncoded <> delayEncoded
 
@@ -350,8 +361,8 @@ decodeScheduleBatchParams encoded = do
   (calls, offset1) <- decodeList encoded 0 decodeTimelockCall
   (predecessor, offset2) <- decodeText encoded offset1
   (salt, offset3) <- decodeText encoded offset2
-  delayHex <- extractBytes encoded offset3 4
-  delaySecs <- decodeUint32 delayHex
+  delayHex <- extractBytes encoded offset3 8
+  delaySecs <- decodeInt64 delayHex
   Some ScheduleBatchParams
     { calls = calls
     , predecessor = predecessor
@@ -365,18 +376,18 @@ decodeScheduleBatchParams encoded = do
 -- Note: targetCids are provided externally, not in operationData
 -- ===========================================================================
 
-data BypasserExecuteParams = BypasserExecuteParams
+data BypasserExecuteBatchParams = BypasserExecuteBatchParams
   with
     calls : [TimelockCall]
   deriving (Show, Eq)
 
-encodeBypasserExecuteParams : BypasserExecuteParams -> BytesHex
-encodeBypasserExecuteParams params = encodeList params.calls encodeTimelockCall
+encodeBypasserExecuteBatchParams : BypasserExecuteBatchParams -> BytesHex
+encodeBypasserExecuteBatchParams params = encodeList params.calls encodeTimelockCall
 
-decodeBypasserExecuteParams : BytesHex -> Optional BypasserExecuteParams
-decodeBypasserExecuteParams encoded = do
+decodeBypasserExecuteBatchParams : BytesHex -> Optional BypasserExecuteBatchParams
+decodeBypasserExecuteBatchParams encoded = do
   (calls, _) <- decodeList encoded 0 decodeTimelockCall
-  Some BypasserExecuteParams { calls = calls }
+  Some BypasserExecuteBatchParams { calls = calls }
 
 -- ===========================================================================
 -- CANCEL BATCH PARAMS (for cancel_batch self-dispatch)
