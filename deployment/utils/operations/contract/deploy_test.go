@@ -7,8 +7,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/ccip/common"
-	"github.com/smartcontractkit/chainlink-canton/bindings/coin"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/coin"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
