@@ -10,6 +10,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/assert"
@@ -79,7 +80,7 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 // createMCMSContract creates an MCMS contract using bindings and returns the contract ID.
 func createMCMSContract(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	config MCMSConfig,
 	owner, baseMcmsID string,
@@ -89,7 +90,7 @@ func createMCMSContract(
 	instanceID := fmt.Sprintf("%s@%s", baseMcmsID, owner)
 	mcmsContract := buildMCMSBindingFromConfig(config, owner, instanceID, chainID)
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -115,7 +116,7 @@ func createMCMSContract(
 // createCounterContract creates a Counter contract using bindings and returns the contract ID.
 func createCounterContract(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner, instanceID string,
 ) string {
@@ -126,7 +127,7 @@ func createCounterContract(
 		Value:      types.INT64(0),
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -154,8 +155,8 @@ func TestMCMS_Execute(t *testing.T) {
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
-	participant := env.Participant(1)
-	randomUserParticipant := env.Participant(2)
+	participant := env.Chain.Participants[0]
+	randomUserParticipant := env.Chain.Participants[1]
 
 	// ========================
 	// |   Setup: Upload DAR  |
@@ -174,8 +175,8 @@ func TestMCMS_Execute(t *testing.T) {
 	// |   Setup: Parties     |
 	// ========================
 
-	ccipOwner := participant.Party
-	randomUser := randomUserParticipant.Party
+	ccipOwner := participant.PartyID
+	randomUser := randomUserParticipant.PartyID
 	t.Logf("Using CCIP party: %s", ccipOwner)
 	t.Logf("Using user party: %s", randomUser)
 
@@ -244,7 +245,7 @@ func testExecuteOpFlow(
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	ccipOwnerParty string,
 ) {
 	// Create MCMS encoder for this package
@@ -319,7 +320,7 @@ func testExecuteOpFlow(
 		TimelockTimestamps: types.GENMAP{},
 	}
 
-	mcmsCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	mcmsCreateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -353,7 +354,7 @@ func testExecuteOpFlow(
 		Value:      types.INT64(0),
 	}
 
-	counterCreateRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	counterCreateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -465,7 +466,7 @@ func testExecuteOpFlow(
 		Signatures:    bindingSignatures,
 	}
 
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -524,7 +525,7 @@ func testExecuteOpFlow(
 		TargetCids: []types.CONTRACT_ID{types.CONTRACT_ID(counterCid)},
 	}
 
-	executeOpRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	executeOpRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -648,7 +649,7 @@ func testSignatureVerificationFails(
 	mcmsPkgID string,
 	config MCMSConfig,
 	chainId int64,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	ccipOwnerParty string,
 ) {
 	// Use helper to create MCMS contract with bindings
@@ -709,7 +710,7 @@ func testSignatureVerificationFails(
 
 	// Attempt SetRoot with invalid signatures - should fail
 	t.Log("Attempting SetRoot with invalid signatures...")
-	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -748,7 +749,7 @@ func testReplayProtection(
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	ccipOwnerParty string,
 ) {
 	// Use helper to create MCMS contract with bindings
@@ -807,7 +808,7 @@ func testReplayProtection(
 
 	// First SetRoot - should succeed
 	t.Log("First SetRoot call (should succeed)...")
-	setRootRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -840,7 +841,7 @@ func testReplayProtection(
 
 	// Second SetRoot with SAME signatures - should fail with E_ALREADY_SEEN_HASH
 	t.Log("Second SetRoot call with same signatures (should fail)...")
-	_, err = participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -876,7 +877,7 @@ func testExecuteMCMSOp(
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
-	ccipParticipant, userParticipant testhelpers.Participant,
+	ccipParticipant, userParticipant canton.Participant,
 	ccipOwnerParty, userParty string,
 ) {
 	// ========================
@@ -976,7 +977,7 @@ func testExecuteMCMSOp(
 
 	t.Log("Calling SetRoot with MCMS proposal...")
 
-	setRootRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -1067,7 +1068,7 @@ func testExecuteMCMSOp(
 
 	// No separate params - params are encoded in op.operationData (like Aptos BCS)
 	// randomUser (bob) submits via userParticipant with disclosed contract
-	_, err = userParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = userParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -1118,8 +1119,8 @@ func testExecuteMCMSOp(
 	var newNumSigners int64 = -1
 	var newQuorum int64 = -1
 	var newMcmsCid string
-	offset, _ := testhelpers.GetCurrentOffset(t.Context(), ccipParticipant)
-	acsRes, err := ccipParticipant.StateServiceClient.GetActiveContracts(t.Context(), &apiv2.GetActiveContractsRequest{
+	offset, _ := testhelpers.GetCurrentOffset(t.Context(), ccipParticipant.LedgerServices.State)
+	acsRes, err := ccipParticipant.LedgerServices.State.GetActiveContracts(t.Context(), &apiv2.GetActiveContractsRequest{
 		ActiveAtOffset: offset,
 		EventFormat: &apiv2.EventFormat{
 			FiltersByParty: map[string]*apiv2.Filters{
@@ -1242,7 +1243,7 @@ func testSignatoryCheck(
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
-	ccipParticipant, _ testhelpers.Participant,
+	ccipParticipant, _ canton.Participant,
 	ccipOwnerParty, _ string,
 ) {
 	// Create MCMS encoder for this package
@@ -1356,7 +1357,7 @@ func testSignatoryCheck(
 
 	t.Log("Calling SetRoot (should succeed - root doesn't check ownership)...")
 
-	setRootRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	setRootRes, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -1428,7 +1429,7 @@ func testSignatoryCheck(
 	}
 
 	// ExecuteOp - should SUCCEED because both MCMS and Counter have the same owner
-	executeOpRes, err := ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	executeOpRes, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{

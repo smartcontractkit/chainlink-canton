@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -22,7 +23,7 @@ func TestMCMS_Timelock(t *testing.T) {
 	t.Parallel()
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
-	participant := env.Participant(1)
+	participant := env.Chain.Participants[0]
 
 	// Upload DAR
 	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
@@ -35,7 +36,7 @@ func TestMCMS_Timelock(t *testing.T) {
 	// Create MCMS encoder for this package
 	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
 
-	ccipOwner := participant.Party
+	ccipOwner := participant.PartyID
 
 	// Shared signer set for all roles (tests can diverge later)
 	signers := createSigners(t, 3)
@@ -223,7 +224,7 @@ func createSigners(t *testing.T, count int) []*MCMSSigner {
 	return signers
 }
 
-func createCounter(t *testing.T, participant testhelpers.Participant, mcmsPkgID, owner, instanceID string) string {
+func createCounter(t *testing.T, participant canton.Participant, mcmsPkgID, owner, instanceID string) string {
 	t.Helper()
 
 	// Use bindings to create Counter - provides type safety and tests bindings work correctly
@@ -233,7 +234,7 @@ func createCounter(t *testing.T, participant testhelpers.Participant, mcmsPkgID,
 		Value:      types.INT64(0),
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -258,7 +259,7 @@ func createCounter(t *testing.T, participant testhelpers.Participant, mcmsPkgID,
 
 func createMCMSMultiRole(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	chainID int64,
@@ -337,7 +338,7 @@ func createMCMSMultiRole(
 		TimelockTimestamps: types.GENMAP{},
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -362,7 +363,7 @@ func createMCMSMultiRole(
 
 func setRootWithRole(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -410,7 +411,7 @@ func setRootWithRole(
 		Signatures:    bindingSignatures,
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -443,7 +444,7 @@ func setRootWithRole(
 
 func scheduleBatch(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -468,7 +469,7 @@ func scheduleBatch(
 		TargetCids: []types.CONTRACT_ID{},
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -511,7 +512,7 @@ func toTextSlice(s []string) []types.TEXT {
 
 func scheduleBatchExpectError(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -536,7 +537,7 @@ func scheduleBatchExpectError(
 		TargetCids: []types.CONTRACT_ID{},
 	}
 
-	_, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -563,7 +564,7 @@ func scheduleBatchExpectError(
 //nolint:unparam // predecessor is always ZeroHash in tests but kept for API consistency
 func executeScheduledBatch(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -585,7 +586,7 @@ func executeScheduledBatch(
 		TargetCids:  toContractIDSlice(targetCids),
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -628,7 +629,7 @@ func toContractIDSlice(s []string) []types.CONTRACT_ID {
 
 func executeScheduledBatchExpectError(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -649,7 +650,7 @@ func executeScheduledBatchExpectError(
 		TargetCids:  toContractIDSlice(targetCids),
 	}
 
-	_, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -675,7 +676,7 @@ func executeScheduledBatchExpectError(
 
 func cancelBatch(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -699,7 +700,7 @@ func cancelBatch(
 		TargetCids: []types.CONTRACT_ID{},
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -730,7 +731,7 @@ func cancelBatch(
 	return ""
 }
 
-func queryCounterValue(t *testing.T, participant testhelpers.Participant, mcmsPkgID, instanceID string) int64 {
+func queryCounterValue(t *testing.T, participant canton.Participant, mcmsPkgID, instanceID string) int64 {
 	t.Helper()
 	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
 		PackageId:  mcmsPkgID,
@@ -760,7 +761,7 @@ func queryCounterValue(t *testing.T, participant testhelpers.Participant, mcmsPk
 
 func bypasserExecuteBatch(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -786,7 +787,7 @@ func bypasserExecuteBatch(
 		TargetCids: toContractIDSlice(targetCids),
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -819,7 +820,7 @@ func bypasserExecuteBatch(
 
 func queryMinDelay(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -830,7 +831,7 @@ func queryMinDelay(
 		Submitter: types.PARTY(owner),
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -868,7 +869,7 @@ func queryMinDelay(
 
 func queryBlockedFunctionsCount(
 	t *testing.T,
-	participant testhelpers.Participant,
+	participant canton.Participant,
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
@@ -879,7 +880,7 @@ func queryBlockedFunctionsCount(
 		Submitter: types.PARTY(owner),
 	}
 
-	res, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -918,7 +919,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 	t.Parallel()
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
-	participant := env.Participant(1)
+	participant := env.Chain.Participants[0]
 
 	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
@@ -930,7 +931,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 	// Create MCMS encoder for this package
 	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
 
-	ccipOwner := participant.Party
+	ccipOwner := participant.PartyID
 
 	signers := createSigners(t, 3)
 	cfg := New2of3Config(signers)
