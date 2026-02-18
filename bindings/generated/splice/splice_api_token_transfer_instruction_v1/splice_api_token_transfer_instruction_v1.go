@@ -148,6 +148,18 @@ func (t *Transfer) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes Transfer to hex string (Canton MCMS format)
+func (t Transfer) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Transfer from hex string (Canton MCMS format)
+func (t *Transfer) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferFactoryView is a Record type
 type TransferFactoryView struct {
 	Admin types.PARTY                           `json:"admin"`
@@ -181,6 +193,18 @@ func (t *TransferFactoryView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferFactoryView to hex string (Canton MCMS format)
+func (t TransferFactoryView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferFactoryView from hex string (Canton MCMS format)
+func (t *TransferFactoryView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferFactoryPublicFetch is a Record type
 type TransferFactoryPublicFetch struct {
 	ExpectedAdmin types.PARTY `json:"expectedAdmin"`
@@ -206,6 +230,18 @@ func (t TransferFactoryPublicFetch) MarshalJSON() ([]byte, error) {
 func (t *TransferFactoryPublicFetch) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferFactoryPublicFetch to hex string (Canton MCMS format)
+func (t TransferFactoryPublicFetch) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferFactoryPublicFetch from hex string (Canton MCMS format)
+func (t *TransferFactoryPublicFetch) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TransferFactoryTransfer is a Record type
@@ -248,6 +284,18 @@ func (t TransferFactoryTransfer) MarshalJSON() ([]byte, error) {
 func (t *TransferFactoryTransfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferFactoryTransfer to hex string (Canton MCMS format)
+func (t TransferFactoryTransfer) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferFactoryTransfer from hex string (Canton MCMS format)
+func (t *TransferFactoryTransfer) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TransferInstructionResult is a Record type
@@ -298,6 +346,18 @@ func (t *TransferInstructionResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferInstructionResult to hex string (Canton MCMS format)
+func (t TransferInstructionResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionResult from hex string (Canton MCMS format)
+func (t *TransferInstructionResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferInstructionResultCompleted is a Record type
 type TransferInstructionResultCompleted struct {
 	ReceiverHoldingCids []types.CONTRACT_ID `json:"receiverHoldingCids"`
@@ -328,6 +388,18 @@ func (t *TransferInstructionResultCompleted) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferInstructionResultCompleted to hex string (Canton MCMS format)
+func (t TransferInstructionResultCompleted) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionResultCompleted from hex string (Canton MCMS format)
+func (t *TransferInstructionResultCompleted) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferInstructionResultOutput is a variant/union type
 type TransferInstructionResultOutput struct {
 	TransferInstructionResultPending   *TransferInstructionResultPending   `json:"TransferInstructionResult_Pending,omitempty"`
@@ -345,6 +417,18 @@ func (v TransferInstructionResultOutput) MarshalJSON() ([]byte, error) {
 func (v *TransferInstructionResultOutput) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes TransferInstructionResultOutput to hex string (Canton MCMS format)
+func (v TransferInstructionResultOutput) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes TransferInstructionResultOutput from hex string (Canton MCMS format)
+func (v *TransferInstructionResultOutput) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -415,6 +499,18 @@ func (t *TransferInstructionResultPending) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferInstructionResultPending to hex string (Canton MCMS format)
+func (t TransferInstructionResultPending) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionResultPending from hex string (Canton MCMS format)
+func (t *TransferInstructionResultPending) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferInstructionStatus is a variant/union type
 type TransferInstructionStatus struct {
 	TransferPendingReceiverAcceptance *types.UNIT                      `json:"TransferPendingReceiverAcceptance,omitempty"`
@@ -431,6 +527,18 @@ func (v TransferInstructionStatus) MarshalJSON() ([]byte, error) {
 func (v *TransferInstructionStatus) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes TransferInstructionStatus to hex string (Canton MCMS format)
+func (v TransferInstructionStatus) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes TransferInstructionStatus from hex string (Canton MCMS format)
+func (v *TransferInstructionStatus) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -523,6 +631,18 @@ func (t *TransferInstructionView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferInstructionView to hex string (Canton MCMS format)
+func (t TransferInstructionView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionView from hex string (Canton MCMS format)
+func (t *TransferInstructionView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferInstructionAccept is a Record type
 type TransferInstructionAccept struct {
 	ExtraArgs splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
@@ -553,6 +673,18 @@ func (t *TransferInstructionAccept) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferInstructionAccept to hex string (Canton MCMS format)
+func (t TransferInstructionAccept) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionAccept from hex string (Canton MCMS format)
+func (t *TransferInstructionAccept) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferInstructionReject is a Record type
 type TransferInstructionReject struct {
 	ExtraArgs splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
@@ -581,6 +713,18 @@ func (t TransferInstructionReject) MarshalJSON() ([]byte, error) {
 func (t *TransferInstructionReject) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferInstructionReject to hex string (Canton MCMS format)
+func (t TransferInstructionReject) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionReject from hex string (Canton MCMS format)
+func (t *TransferInstructionReject) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TransferInstructionUpdate is a Record type
@@ -622,6 +766,18 @@ func (t *TransferInstructionUpdate) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferInstructionUpdate to hex string (Canton MCMS format)
+func (t TransferInstructionUpdate) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionUpdate from hex string (Canton MCMS format)
+func (t *TransferInstructionUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TransferInstructionWithdraw is a Record type
 type TransferInstructionWithdraw struct {
 	ExtraArgs splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
@@ -650,6 +806,18 @@ func (t TransferInstructionWithdraw) MarshalJSON() ([]byte, error) {
 func (t *TransferInstructionWithdraw) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferInstructionWithdraw to hex string (Canton MCMS format)
+func (t TransferInstructionWithdraw) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferInstructionWithdraw from hex string (Canton MCMS format)
+func (t *TransferInstructionWithdraw) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // TransferPendingInternalWorkflow is a Record type
@@ -681,6 +849,18 @@ func (t *TransferPendingInternalWorkflow) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes TransferPendingInternalWorkflow to hex string (Canton MCMS format)
+func (t TransferPendingInternalWorkflow) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferPendingInternalWorkflow from hex string (Canton MCMS format)
+func (t *TransferPendingInternalWorkflow) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ITransferFactoryInterfaceID returns the interface ID for the ITransferFactory interface using the package name
 func ITransferFactoryInterfaceID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.TransferInstructionV1", "TransferFactory")
@@ -700,3 +880,38 @@ func ITransferInstructionInterfaceID() string {
 func ITransferInstructionInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "Splice.Api.Token.TransferInstructionV1", "TransferInstruction")
 }
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

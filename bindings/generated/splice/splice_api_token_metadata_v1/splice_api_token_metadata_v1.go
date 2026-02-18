@@ -78,6 +78,18 @@ func (t *AnyContractView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes AnyContractView to hex string (Canton MCMS format)
+func (t AnyContractView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AnyContractView from hex string (Canton MCMS format)
+func (t *AnyContractView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AnyValue is a variant/union type
 type AnyValue struct {
 	AVText       *types.TEXT        `json:"AV_Text,omitempty"`
@@ -103,6 +115,18 @@ func (v AnyValue) MarshalJSON() ([]byte, error) {
 func (v *AnyValue) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes AnyValue to hex string (Canton MCMS format)
+func (v AnyValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes AnyValue from hex string (Canton MCMS format)
+func (v *AnyValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -237,6 +261,18 @@ func (t *ChoiceContext) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes ChoiceContext to hex string (Canton MCMS format)
+func (t ChoiceContext) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ChoiceContext from hex string (Canton MCMS format)
+func (t *ChoiceContext) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ChoiceExecutionMetadata is a Record type
 type ChoiceExecutionMetadata struct {
 	Meta Metadata `json:"meta"`
@@ -265,6 +301,18 @@ func (t ChoiceExecutionMetadata) MarshalJSON() ([]byte, error) {
 func (t *ChoiceExecutionMetadata) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ChoiceExecutionMetadata to hex string (Canton MCMS format)
+func (t ChoiceExecutionMetadata) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ChoiceExecutionMetadata from hex string (Canton MCMS format)
+func (t *ChoiceExecutionMetadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ExtraArgs is a Record type
@@ -306,6 +354,18 @@ func (t *ExtraArgs) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes ExtraArgs to hex string (Canton MCMS format)
+func (t ExtraArgs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExtraArgs from hex string (Canton MCMS format)
+func (t *ExtraArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // Metadata is a Record type
 type Metadata struct {
 	Values types.TEXTMAP `json:"values"`
@@ -336,6 +396,18 @@ func (t *Metadata) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes Metadata to hex string (Canton MCMS format)
+func (t Metadata) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Metadata from hex string (Canton MCMS format)
+func (t *Metadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IAnyContractInterfaceID returns the interface ID for the IAnyContract interface using the package name
 func IAnyContractInterfaceID() string {
 	return fmt.Sprintf("#%s:%s:%s", PackageName, "Splice.Api.Token.MetadataV1", "AnyContract")
@@ -345,3 +417,38 @@ func IAnyContractInterfaceID() string {
 func IAnyContractInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "Splice.Api.Token.MetadataV1", "AnyContract")
 }
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

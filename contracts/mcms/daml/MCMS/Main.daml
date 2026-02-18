@@ -45,7 +45,7 @@ import MCMS.Codec
   , decodeBlockedFunction
   , decodeSelfDispatchSetConfig
   , decodeScheduleBatchParams
-  , decodeBypasserExecuteParams
+  , decodeBypasserExecuteBatchParams
   , decodeCancelBatchParams
   )
 
@@ -225,39 +225,39 @@ template MCMS
         -- 6. Dispatch based on functionName (like Aptos dispatch_to_timelock)
         --    Parameters are decoded from op.operationData (like Aptos BCS deserialization)
         case op.functionName of
-          "schedule_batch" -> do
+          "ScheduleBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_SCHEDULE: must use Proposer" $ targetRole == Proposer
             assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
               op.targetInstanceId == instanceId
             case decodeScheduleBatchParams op.operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode schedule_batch params"
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode ScheduleBatch params"
               Some params ->
                 scheduleBatchInternal now this rs params.calls params.predecessor params.salt (seconds params.delaySecs)
 
-          "bypasser_execute_batch" -> do
+          "BypasserExecuteBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_BYPASS: must use Bypasser" $ targetRole == Bypasser
             assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
               op.targetInstanceId == instanceId
-            case decodeBypasserExecuteParams op.operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode bypasser_execute_batch params"
+            case decodeBypasserExecuteBatchParams op.operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode BypasserExecuteBatch params"
               Some params ->
                 bypasserExecuteBatchInternal owner this rs params.calls targetCids
 
-          "cancel_batch" -> do
+          "CancelBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_CANCEL: must use Canceller" $ targetRole == Canceller
             assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
               op.targetInstanceId == instanceId
             case decodeCancelBatchParams op.operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode cancel_batch params"
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode CancelBatch params"
               Some params ->
                 cancelBatchInternal this rs params.opId
 
           -- Self-dispatch: MCMS configuration changes (admin operations)
-          "set_config" -> do
+          "SetConfig" -> do
             assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
               op.targetInstanceId == instanceId
             case decodeSetConfigParams op.operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode set_config params"
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode SetConfig params"
               Some params -> do
                 let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
                 assertMsg "E_TOO_MANY_SIGNERS" $ length newConfig.signers <= maxNumSigners
@@ -271,7 +271,7 @@ template MCMS
                 let newRs = rs with config = newConfig, expiringRoot = newExpiringRoot
                 create (setRoleState targetRole newRs this)
 
-          "clear_root" -> do
+          "ClearRoot" -> do
             assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
               op.targetInstanceId == instanceId
             let newRs = rs with
@@ -495,17 +495,17 @@ setRoleState Bypasser rs m = m with bypasser = rs
 --      → processCallsLoop → executeSelfDispatch
 --      Security: Bypasser's merkle proof validated the calls.
 --
--- Supported functions: update_min_delay, block_function, unblock_function,
---                      set_config, schedule_batch, cancel_batch
+-- Supported functions: UpdateMinDelay, BlockFunction, UnblockFunction,
+--                      SetConfig, ScheduleBatch, CancelBatch
 executeSelfDispatch : MCMS -> TimelockCall -> Update MCMS
 executeSelfDispatch mcms call =
   case call.functionName of
-    "update_min_delay" ->
+    "UpdateMinDelay" ->
       case parseInt call.operationData of
         None -> abort "E_INVALID_DELAY: operationData must be integer seconds"
         Some secs -> pure $ mcms with minDelay = seconds secs
 
-    "block_function" ->
+    "BlockFunction" ->
       case decodeBlockedFunction call.operationData of
         None -> abort "E_INVALID_OPERATION_DATA: failed to decode blocked function"
         Some bf ->
@@ -513,14 +513,14 @@ executeSelfDispatch mcms call =
           then pure $ mcms with blockedFunctions = bf :: mcms.blockedFunctions
           else pure mcms
 
-    "unblock_function" ->
+    "UnblockFunction" ->
       case decodeBlockedFunction call.operationData of
         None -> abort "E_INVALID_OPERATION_DATA: failed to decode blocked function"
         Some bf -> pure $ mcms with blockedFunctions = filter (/= bf) mcms.blockedFunctions
 
-    "set_config" ->
+    "SetConfig" ->
       case decodeSelfDispatchSetConfig call.operationData of
-        None -> abort "E_INVALID_OPERATION_DATA: failed to decode set_config params"
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode SetConfig params"
         Some (targetRole, params) -> do
           let rs = getRoleState targetRole mcms
           let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
@@ -534,9 +534,9 @@ executeSelfDispatch mcms call =
           let newRs = rs with config = newConfig, expiringRoot = clearedRoot
           pure $ setRoleState targetRole newRs mcms
 
-    "schedule_batch" ->
+    "ScheduleBatch" ->
       case decodeScheduleBatchParams call.operationData of
-        None -> abort "E_INVALID_OPERATION_DATA: failed to decode schedule_batch params"
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode ScheduleBatch params"
         Some params -> do
           now <- getTime
           let delay = seconds params.delaySecs
@@ -550,9 +550,9 @@ executeSelfDispatch mcms call =
           let readyTime = addRelTime now delay
           pure $ mcms with timelockTimestamps = Map.insert opId readyTime mcms.timelockTimestamps
 
-    "cancel_batch" ->
+    "CancelBatch" ->
       case decodeCancelBatchParams call.operationData of
-        None -> abort "E_INVALID_OPERATION_DATA: failed to decode cancel_batch params"
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode CancelBatch params"
         Some params -> do
           case Map.lookup params.opId mcms.timelockTimestamps of
             None -> abort "E_OPERATION_NOT_FOUND"

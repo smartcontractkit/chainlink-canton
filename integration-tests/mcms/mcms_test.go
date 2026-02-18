@@ -107,7 +107,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	fmt.Println("\n=== Step 4: Build Proposal ===")
 
 	proposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
-		AddOperation("counter@owner", "increment", "").
+		AddOperation("counter@owner", "Increment", "").
 		Build()
 
 	fmt.Printf("Merkle Root: %s\n", proposal.GetRoot())
@@ -380,7 +380,7 @@ func TestMCMSCrypto_ProposalBuilder(t *testing.T) {
 	preOpCount := 0
 
 	proposal := NewMCMSProposal(chainId, multisigId, preOpCount, false).
-		AddOperation("counter@owner", "increment", "").
+		AddOperation("counter@owner", "Increment", "").
 		Build()
 
 	fmt.Println("\n-- Metadata --")
@@ -522,7 +522,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 	multisigId := "mcms-test-001-proposer"
 
 	proposal := NewMCMSProposal(chainId, multisigId, 0, false).
-		AddOperation("counter@owner", "increment", "").
+		AddOperation("counter@owner", "Increment", "").
 		Build()
 
 	fmt.Println("\n-- Metadata --")
