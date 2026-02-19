@@ -74,7 +74,7 @@ jobs:
           remote_name: "origin"
           remote_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}
       - name: Update comment
-        id: post-comment
+        id: update-comment
         uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc #v2.8.2
         if: always()
         with:
