@@ -7,6 +7,9 @@ on:
   repository_dispatch:
     types: [ auto-fix-command ] # ChatOps dispatch
 
+env:
+  GOLANGCI_LINT_VERSION: v2.8.0
+
 permissions: {}
 jobs:
   fix-pr:
@@ -26,9 +29,12 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          install-only: true
       - name: Install DPM
         uses: ./.github/actions/install-dpm
-        # Run Fixes
       - name: Run fixes
         run: make fix-all
       - name: Create commit
