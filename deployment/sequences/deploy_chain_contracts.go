@@ -46,11 +46,16 @@ type GlobalConfigParams struct {
 	Template common.GlobalConfig
 }
 
+type FeeQuoterParams struct {
+	Template feequoter.FeeQuoter
+}
+
 type DeployChainContractsParams struct {
 	CCIPOwnerParty     string
 	CommitteeVerifiers []CommitteeVerifierParams
 	GlobalConfig       GlobalConfigParams
 	RMNRemote          RMNRemoteParams
+	FeeQuoterConfig    FeeQuoterParams
 }
 
 var DeployChainContracts = operations.NewSequence(
@@ -127,7 +132,7 @@ var DeployChainContracts = operations.NewSequence(
 				TokenTransferFeeConfigs:          nil,
 				UsdPerUnitGasByDestChainSelector: nil,
 				UsdPerToken:                      nil,
-				PriceUpdaters:                    nil,
+				PriceUpdaters:                    input.FeeQuoterConfig.Template.PriceUpdaters,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})

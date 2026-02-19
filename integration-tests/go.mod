@@ -7,6 +7,8 @@ replace github.com/smartcontractkit/chainlink-canton => ../
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
+replace github.com/smartcontractkit/go-daml => ../../go-daml
+
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/deepmap/oapi-codegen v1.8.2
