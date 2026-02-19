@@ -5,6 +5,9 @@ on:
 jobs:
   slashCommandDispatch:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Setup GitHub Token
         id: setup-github-token
