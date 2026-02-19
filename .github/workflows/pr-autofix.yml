@@ -14,7 +14,7 @@ permissions: {}
 jobs:
   fix-pr:
     name: Fix PR
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'auto-fix') || github.event.client_payload.slash_command.command == 'repository_dispatch' }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'auto-fix') || github.event.client_payload.slash_command.command == 'auto-fix' }}
     permissions:
       contents: read
       id-token: write
