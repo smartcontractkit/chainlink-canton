@@ -38,3 +38,8 @@ golangci-lint-fix-integration-tests: ## Run golangci-lint --fix on the integrati
 
 .PHONY: golangci-lint-fix-all
 golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-eds golangci-lint-fix-integration-tests ## Run golangci-lint --fix on all modules.
+
+## Run all fix targets.
+## Compiles contracts, generates bindings, runs go mod tidy, and runs golangci-lint --fix on all modules.
+.PHONY: fix-all
+fix-all: contracts gomodtidy golangci-lint-fix-all
