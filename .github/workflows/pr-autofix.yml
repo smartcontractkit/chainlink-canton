@@ -26,7 +26,6 @@ jobs:
           aws-region: ${{ secrets.GATI_AWS_REGION }}
       - name: Post comment
         id: post-comment
-        if: github.event.client_payload.slash_command.command == 'auto-fix'
         uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc #v2.8.2
         with:
           repo-token: ${{ steps.setup-github-token.outputs.access-token }}
@@ -35,15 +34,6 @@ jobs:
           message: |
             ⏳ **Autofix is running...**
             Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
-          message-success: |
-            ✅ **Autofix successful**
-            Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
-          message-failure: |
-            ❌ **Autofix failed**
-            Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
-          message-cancelled: |
-            ✖️ **Autofix cancelled**
-            Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}️
       - name: Check out code
         uses: actions/checkout@v4
         with:
@@ -83,3 +73,20 @@ jobs:
           local_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}
           remote_name: "origin"
           remote_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}
+      - name: Update comment
+        id: post-comment
+        uses: mshick/add-pr-comment@b8f338c590a895d50bcbfa6c5859251edc8952fc #v2.8.2
+        if: always()
+        with:
+          repo-token: ${{ steps.setup-github-token.outputs.access-token }}
+          refresh-message-position: true
+          issue: ${{ github.event.client_payload.github.payload.issue.number }}
+          message-success: |
+            ✅ **Autofix successful**
+            Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
+          message-failure: |
+            ❌ **Autofix failed**
+            Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
+          message-cancelled: |
+            ✖️ **Autofix cancelled**
+            Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}️
