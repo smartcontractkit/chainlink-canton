@@ -1,9 +1,5 @@
 name: Autofix PR
 on:
-  pull_request:
-    types:
-      - labeled
-      - synchronize
   repository_dispatch:
     types: [ auto-fix-command ] # ChatOps dispatch
 
@@ -14,9 +10,7 @@ permissions: {}
 jobs:
   fix-pr:
     name: Fix PR
-    # Run if the PR is labeled with 'auto-fix' and NOT created by the bot - since we don't want to re-run after a fix has been commited,
-    # or if the workflow is triggered by the ChatOps command 'auto-fix'
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'auto-fix') && github.event.commits[0].author.name != 'app-token-issuer-integrations[bot]' || github.event.client_payload.slash_command.command == 'auto-fix' }}
+    if: github.event.client_payload.slash_command.command == 'auto-fix'
     permissions:
       contents: read
       id-token: write
@@ -37,7 +31,7 @@ jobs:
         with:
           repo-token: ${{ steps.setup-github-token.outputs.access-token }}
           refresh-message-position: true
-          issue: ${{ github.event.client_payload.github.payload.issue.number || github.event.pull_request.number }}
+          issue: ${{ github.event.client_payload.github.payload.issue.number }}
           message: |
             ⏳ **Autofix is running...**
             Workflow run: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
@@ -53,7 +47,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.client_payload.pull_request.head.ref || github.head_ref }}
+          ref: ${{ github.event.client_payload.pull_request.head.ref }}
           fetch-depth: 0
       - name: Install Go
         uses: actions/setup-go@v6
@@ -86,6 +80,6 @@ jobs:
         uses: asana/push-signed-commits@d615ca88d8e1a946734c24970d1e7a6c56f34897 # v1
         with:
           github-token: ${{ steps.setup-github-token.outputs.access-token }}
-          local_branch_name: ${{ github.event.client_payload.pull_request.head.ref || github.head_ref }}
+          local_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}
           remote_name: "origin"
-          remote_branch_name: ${{ github.event.client_payload.pull_request.head.ref || github.head_ref }}
+          remote_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}
