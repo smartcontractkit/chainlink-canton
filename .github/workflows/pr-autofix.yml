@@ -1,15 +1,17 @@
-name: Update Dependabot PRs
+name: Autofix PR
 on:
   pull_request:
     types:
       - labeled
       - synchronize
+  repository_dispatch:
+    types: [ auto-fix-command ] # ChatOps dispatch
 
 permissions: {}
 jobs:
-  gomodstidy:
-    name: Tidy all Go modules
-    if: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'dependencies-go') }}
+  fix-pr:
+    name: Fix PR
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'autofix') || github.event.client_payload.slash_command.comman == 'repository_dispatch' }}
     permissions:
       contents: read
       id-token: write
@@ -24,8 +26,11 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - name: Run gomods tidy
-        run: make gomodtidy
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+        # Run Fixes
+      - name: Run fixes
+        run: make fix-all
       - name: Create commit
         id: commit
         run: |
@@ -35,7 +40,7 @@ jobs:
           else
             git config --global user.name "Login will be determined by the Github API based on the creator of the token"
             git config --global user.email ""
-            git commit -am "[dependabot skip] Tidy all Go modules"
+            git commit -am "[autofix] apply fix-all to PR"
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
       - name: Setup GitHub Token
