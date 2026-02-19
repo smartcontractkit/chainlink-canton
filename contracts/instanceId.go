@@ -2,10 +2,9 @@ package contracts
 
 import (
 	"fmt"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"math/rand/v2"
 	"strings"
-
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 const (
