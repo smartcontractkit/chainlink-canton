@@ -15,7 +15,7 @@ jobs:
           aws-lambda-url: ${{ secrets.GATI_AWS_LABDA_URL_INTEGRATIONS }}
           aws-region: ${{ secrets.GATI_AWS_REGION }}
       - name: Slash Command Dispatch
-        uses: peter-evans/slash-command-dispatch@v5
+        uses: peter-evans/slash-command-dispatch@9bdcd7914ec1b75590b790b844aa3b8eee7c683a # v5.0.2
         with:
           token: ${{ steps.setup-github-token.outputs.access-token }}
           reaction-token: ${{ steps.setup-github-token.outputs.access-token }}
