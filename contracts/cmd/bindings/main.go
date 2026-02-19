@@ -126,7 +126,7 @@ func generatePackage(dar []byte, pkgFile string, externalPackages model.External
 		dalfs = append(dalfs, dalf)
 	}
 
-	result, err := codegen.CodegenDalfs(dalfs, reader, pkgFile, manifest, false, externalPackages)
+	result, err := codegen.CodegenDalfs(dalfs, reader, pkgFile, manifest, true, externalPackages)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate code: %w", err)
 	}

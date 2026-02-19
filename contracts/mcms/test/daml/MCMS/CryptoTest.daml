@@ -114,18 +114,18 @@ testCryptoHashOpLeaf = script do
   -- op[0].multisigId = "test-mcms-proposer"
   -- op[0].nonce = 0
   -- op[0].targetInstanceId = "counter"
-  -- op[0].functionName = "increment"
+  -- op[0].functionName = "Increment"
   -- op[0].operationData = ""
-  -- op[0].leaf = "4b4fa101e8d3f8a353897651f725e63bfe1abe50dc5edc3b6f3ef466c5901a61"
+  -- op[0].leaf = "f91f525af385e7112e20ef75cf34dbbb74ed2d2f46cf9b5d6e9457b85e050c22"
   let op = Op
         { chainId = 1
         , multisigId = "test-mcms-proposer"
         , nonce = 0
         , targetInstanceId = "counter"
-        , functionName = "increment"
+        , functionName = "Increment"
         , operationData = ""
         }
-  let expectedLeaf = "4b4fa101e8d3f8a353897651f725e63bfe1abe50dc5edc3b6f3ef466c5901a61"
+  let expectedLeaf = "f91f525af385e7112e20ef75cf34dbbb74ed2d2f46cf9b5d6e9457b85e050c22"
   let actualLeaf = hashOpLeafNative op
 
   assertMsg ("hashOpLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $

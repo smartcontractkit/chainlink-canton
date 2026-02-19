@@ -4,14 +4,10 @@ import (
 	"fmt"
 
 	"github.com/aws/smithy-go/ptr"
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	coinBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/coin"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
@@ -45,38 +41,24 @@ func (d DeployCoin) Apply(e cldf.Environment, config CantonCSDeps[DeployCoinConf
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
-	participant := chain.Participants[config.Participant]
-
-	token, err := participant.JWTProvider.Token(e.GetContext())
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get JWT: %w", err)
-	}
-
-	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	ledgerApiClient, err := grpc.NewClient(participant.Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create gRPC ledger API client: %w", err)
-	}
 
 	deps := dependencies.CantonDeps{
-		Chain:                chain,
-		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
-		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
-		Party:                config.Party,
+		Chain: chain,
 	}
 
+	party := chain.Participants[config.Participant].PartyID
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, coin.Deploy, deps, contract.DeployInput[coinBinding.CoinRegistry]{
 		ChainSelector: config.ChainSelector,
 		Qualifier:     ptr.String(config.Config.Symbol),
-		ActAs:         []string{config.Party},
+		ActAs:         []string{party},
 		Template: coinBinding.CoinRegistry{
-			Issuer: types.PARTY(config.Party),
+			Issuer: types.PARTY(party),
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{
-				Admin: types.PARTY(config.Party),
+				Admin: types.PARTY(party),
 				Id:    types.TEXT(config.Config.Symbol),
 			},
 		},
-		OwnerParty: types.PARTY(config.Party),
+		OwnerParty: types.PARTY(party),
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to apply DeployCoin operation: %w", err)

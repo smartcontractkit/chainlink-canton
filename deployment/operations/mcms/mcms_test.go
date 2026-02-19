@@ -4,19 +4,14 @@ import (
 	"sync"
 	"testing"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 
@@ -35,24 +30,13 @@ func TestMCMSOps(t *testing.T) {
 	}).Initialize(t.Context())
 	require.NoError(t, err)
 	cantonChain := bc.(*canton.Chain)
-
-	token, err := cantonChain.Participants[0].JWTProvider.Token(t.Context())
-	require.NoError(t, err)
-
-	// Create gRPC clients
-	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	adminApiClient, err := grpc.NewClient(cantonChain.Participants[0].Endpoints.AdminAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	require.NoError(t, err, "Failed to dial gRPC admin API")
-	ledgerApiClient, err := grpc.NewClient(cantonChain.Participants[0].Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	require.NoError(t, err, "Failed to dial gRPC ledger API")
-
-	packageServiceClient := participantv30.NewPackageServiceClient(adminApiClient)
-	userManagementServiceClient := admin.NewUserManagementServiceClient(ledgerApiClient)
+	participant := cantonChain.Participants[0]
+	primaryParty := participant.PartyID
 
 	// Upload Dar
 	mcmdDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err, "failed to get MCMS dar file")
-	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+	_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars: []*participantv30.UploadDarRequest_UploadDarData{
 			{Bytes: mcmdDar},
 		},
@@ -61,13 +45,6 @@ func TestMCMSOps(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to upload MCMS dar file")
 
-	// Get primary party
-	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
-		UserId: "user-participant1",
-	})
-	require.NoError(t, err, "failed to get user")
-	primaryParty := userResp.GetUser().GetPrimaryParty()
-
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
 		t.Context,
@@ -75,10 +52,7 @@ func TestMCMSOps(t *testing.T) {
 		reporter,
 	)
 	deps := dependencies.CantonDeps{
-		Chain:                *cantonChain,
-		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
-		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
-		Party:                primaryParty,
+		Chain: *cantonChain,
 	}
 
 	chainID := int64(1)

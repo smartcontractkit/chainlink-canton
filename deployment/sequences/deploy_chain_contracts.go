@@ -65,10 +65,12 @@ var DeployChainContracts = operations.NewSequence(
 	func(b operations.Bundle, deps dependencies.CantonDeps, input DeployChainContractsParams) (sequences.OnChainOutput, error) {
 		var addresses []datastore.AddressRef
 
+		party := deps.Chain.Participants[deps.Participant].PartyID
+
 		// Deploy RMNRemote
 		deployRMNRemoteReport, err := operations.ExecuteOperation(b, rmn_remote.Deploy, deps, contract.DeployInput[rmn.RMNRemote]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template: rmn.RMNRemote{
 				RmnOwner:       input.RMNRemote.Template.RmnOwner,
 				CcipOwner:      types.PARTY(input.CCIPOwnerParty),
@@ -89,7 +91,7 @@ var DeployChainContracts = operations.NewSequence(
 		input.GlobalConfig.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
 		deployGlobalConfigReport, err := operations.ExecuteOperation(b, global_config.Deploy, deps, contract.DeployInput[common.GlobalConfig]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template:      input.GlobalConfig.Template,
 			OwnerParty:    types.PARTY(input.CCIPOwnerParty),
 		})
@@ -105,7 +107,7 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy Token Admin Registry
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[tokenadminregistry.TokenAdminRegistry]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template: tokenadminregistry.TokenAdminRegistry{
 				Owner:        types.PARTY(input.CCIPOwnerParty),
 				TokenConfigs: nil,
@@ -124,7 +126,7 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy FeeQuoter
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template: feequoter.FeeQuoter{
 				Owner:                            types.PARTY(input.CCIPOwnerParty),
 				FeeTokens:                        nil,
@@ -144,7 +146,7 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy OffRamp
 		deployOffRampReport, err := operations.ExecuteOperation(b, offramp.Deploy, deps, contract.DeployInput[offrampBinding.OffRamp]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template: offrampBinding.OffRamp{
 				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
 				GlobalConfigInstanceAddress:       globalConfigRawInstanceAddress.Binding(),
@@ -161,7 +163,7 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy OnRamp
 		deployOnRampReport, err := operations.ExecuteOperation(b, onramp.Deploy, deps, contract.DeployInput[onrampBinding.OnRamp]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template: onrampBinding.OnRamp{
 				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
 				GlobalConfigInstanceAddress:       globalConfigRawInstanceAddress.Binding(),
@@ -178,7 +180,7 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy PerPartyRouterFactory
 		deployPerPartyRouterFactoryReport, err := operations.ExecuteOperation(b, per_party_router_factory.Deploy, deps, contract.DeployInput[perpartyrouter.PerPartyRouterFactory]{
 			ChainSelector: deps.Chain.Selector,
-			ActAs:         []string{deps.Party},
+			ActAs:         []string{party},
 			Template: perpartyrouter.PerPartyRouterFactory{
 				CcipOwner:         types.PARTY(input.CCIPOwnerParty),
 				RegisteredRouters: nil,
@@ -195,7 +197,7 @@ var DeployChainContracts = operations.NewSequence(
 			committeeVerifier.Template.CcipOwner = types.PARTY(input.CCIPOwnerParty)
 			deployCommitteeVerifierReport, err := operations.ExecuteOperation(b, committee_verifier.Deploy, deps, contract.DeployInput[ccvs.CommitteeVerifier]{
 				ChainSelector: deps.Chain.Selector,
-				ActAs:         []string{deps.Party},
+				ActAs:         []string{party},
 				Template: ccvs.CommitteeVerifier{
 					Owner:                    committeeVerifier.Template.Owner,
 					CcipOwner:                types.PARTY(input.CCIPOwnerParty),

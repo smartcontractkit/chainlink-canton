@@ -86,7 +86,7 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 				return datastore.AddressRef{}, fmt.Errorf("failed to parse template ID %s: %w", templateID, err)
 			}
 
-			submitResp, err := deps.CommandServiceClient.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
+			submitResp, err := deps.Chain.Participants[deps.Participant].LedgerServices.Command.SubmitAndWaitForTransaction(b.GetContext(), &apiv2.SubmitAndWaitForTransactionRequest{
 				Commands: &apiv2.Commands{
 					CommandId: uuid.Must(uuid.NewUUID()).String(),
 					ActAs:     input.ActAs,

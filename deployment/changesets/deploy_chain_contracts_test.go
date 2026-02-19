@@ -7,7 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
 	"github.com/ethereum/go-ethereum/crypto"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -18,11 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -41,18 +37,9 @@ func TestDeployChainContracts(t *testing.T) {
 	}).Initialize(t.Context())
 	require.NoError(t, err)
 
-	token, err := bc.(*canton.Chain).Participants[0].JWTProvider.Token(t.Context())
-	require.NoError(t, err)
-
-	// Create gRPC clients
-	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	adminApiClient, err := grpc.NewClient(bc.(*canton.Chain).Participants[0].Endpoints.AdminAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	require.NoError(t, err, "Failed to dial gRPC admin API")
-	ledgerApiClient, err := grpc.NewClient(bc.(*canton.Chain).Participants[0].Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	require.NoError(t, err, "Failed to dial gRPC ledger API")
-
-	packageServiceClient := participantv30.NewPackageServiceClient(adminApiClient)
-	userManagementServiceClient := admin.NewUserManagementServiceClient(ledgerApiClient)
+	cantonChain := bc.(*canton.Chain)
+	participant := cantonChain.Participants[0]
+	ccipOwnerParty := participant.PartyID
 
 	// Upload Dars
 	dars := []struct {
@@ -75,19 +62,12 @@ func TestDeployChainContracts(t *testing.T) {
 		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{Bytes: darBytes})
 	}
 
-	_, err = packageServiceClient.UploadDar(t.Context(), &participantv30.UploadDarRequest{
+	_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars:               darData,
 		VetAllPackages:     true,
 		SynchronizeVetting: true,
 	})
 	require.NoError(t, err, "failed to upload DAR files")
-
-	// Get primary party
-	userResp, err := userManagementServiceClient.GetUser(t.Context(), &admin.GetUserRequest{
-		UserId: "user-participant1",
-	})
-	require.NoError(t, err, "failed to get user")
-	user := userResp.GetUser()
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -119,17 +99,16 @@ func TestDeployChainContracts(t *testing.T) {
 	config := CantonCSDeps[DeployChainContractsConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,
-		Party:         user.GetPrimaryParty(),
 		Config: DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
-				CCIPOwnerParty: user.GetPrimaryParty(),
+				CCIPOwnerParty: ccipOwnerParty,
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Template: ccvs.CommitteeVerifier{
-							Owner:               types.PARTY(user.GetPrimaryParty()),
-							CcipOwner:           types.PARTY(user.GetPrimaryParty()),
+							Owner:               types.PARTY(ccipOwnerParty),
+							CcipOwner:           types.PARTY(ccipOwnerParty),
 							VersionTag:          types.TEXT(versionTag),
-							MessageSentObserver: types.PARTY(user.GetPrimaryParty()),
+							MessageSentObserver: types.PARTY(ccipOwnerParty),
 							StorageLocation:     "ipfs://test-receive",
 							Threshold:           2,
 							Signers:             ccvSignerPubKeys,
@@ -146,7 +125,7 @@ func TestDeployChainContracts(t *testing.T) {
 				RMNRemote: sequences.RMNRemoteParams{
 					Template: rmn.RMNRemote{
 						CcipOwner:      "", // Populated by the sequence
-						RmnOwner:       types.PARTY(user.GetPrimaryParty()),
+						RmnOwner:       types.PARTY(ccipOwnerParty),
 						CursedSubjects: nil,
 					},
 				},

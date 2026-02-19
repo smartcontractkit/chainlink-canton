@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -37,7 +38,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 
-	participant := env.Participant(1)
+	participant := env.Chain.Participants[0]
 
 	// ========================
 	// |   Setup: Upload DAR  |
@@ -56,7 +57,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	// |   Setup: Parties     |
 	// ========================
 
-	mcmsOwner := participant.Party
+	mcmsOwner := participant.PartyID
 	t.Logf("Using party: %s", mcmsOwner)
 
 	// ===========================================================================
@@ -107,7 +108,7 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 	fmt.Println("\n=== Step 4: Build Proposal ===")
 
 	proposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
-		AddOperation("counter@owner", "increment", "").
+		AddOperation("counter@owner", "Increment", "").
 		Build()
 
 	fmt.Printf("Merkle Root: %s\n", proposal.GetRoot())
@@ -380,7 +381,7 @@ func TestMCMSCrypto_ProposalBuilder(t *testing.T) {
 	preOpCount := 0
 
 	proposal := NewMCMSProposal(chainId, multisigId, preOpCount, false).
-		AddOperation("counter@owner", "increment", "").
+		AddOperation("counter@owner", "Increment", "").
 		Build()
 
 	fmt.Println("\n-- Metadata --")
@@ -522,7 +523,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 	multisigId := "mcms-test-001-proposer"
 
 	proposal := NewMCMSProposal(chainId, multisigId, 0, false).
-		AddOperation("counter@owner", "increment", "").
+		AddOperation("counter@owner", "Increment", "").
 		Build()
 
 	fmt.Println("\n-- Metadata --")
@@ -597,7 +598,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 // HELPER FUNCTIONS
 // ===========================================================================
 
-func createMCMS(ctx context.Context, participant testhelpers.Participant, owner string, chainId int, baseMcmsId string) (string, error) {
+func createMCMS(ctx context.Context, participant canton.Participant, owner string, chainId int, baseMcmsId string) (string, error) {
 	emptyMap := &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}
 	epochTime := &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: 0}}
 	emptyExpiringRoot := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -636,7 +637,7 @@ func createMCMS(ctx context.Context, participant testhelpers.Participant, owner 
 	}}}
 	emptyBlockedFunctions := &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}
 
-	createRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	createRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -673,7 +674,7 @@ func createMCMS(ctx context.Context, participant testhelpers.Participant, owner 
 	return createRes.GetTransaction().GetEvents()[0].GetCreated().GetContractId(), nil
 }
 
-func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, owner string, mcmsCid string, config MCMSConfig) (string, error) {
+func setMCMSConfig(ctx context.Context, participant canton.Participant, owner string, mcmsCid string, config MCMSConfig) (string, error) {
 	signerInfoValues := make([]*apiv2.Value, len(config.Signers))
 	for i, si := range config.Signers {
 		signerInfoValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
@@ -692,7 +693,7 @@ func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, own
 		groupParentValues[i] = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(config.GroupParents[i])}}
 	}
 
-	exerciseRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	exerciseRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{
@@ -736,7 +737,7 @@ func setMCMSConfig(ctx context.Context, participant testhelpers.Participant, own
 	return "", fmt.Errorf("MCMS contract not found in SetConfig response")
 }
 
-func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner string, mcmsCid string,
+func setMCMSRoot(ctx context.Context, participant canton.Participant, owner string, mcmsCid string,
 	root string, validUntil time.Time, metadata *MCMSRootMetadata, metadataProof []string, signatures []RawSignature) (string, error) {
 	validUntilMicros := validUntil.UnixMicro()
 
@@ -766,7 +767,7 @@ func setMCMSRoot(ctx context.Context, participant testhelpers.Participant, owner
 		},
 	}}}
 
-	exerciseRes, err := participant.CommandServiceClient.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+	exerciseRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{

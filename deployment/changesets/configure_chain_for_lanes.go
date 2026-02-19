@@ -3,13 +3,9 @@ package changesets
 import (
 	"fmt"
 
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/auth"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
@@ -39,24 +35,9 @@ func (c ConfigureChainForLanes) Apply(e cldf.Environment, config CantonCSDeps[Co
 	ds := datastore.NewMemoryDataStore()
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
-	participant := chain.Participants[config.Participant]
-
-	token, err := participant.JWTProvider.Token(e.GetContext())
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get JWT: %w", err)
-	}
-
-	insecureCreds := grpc.WithTransportCredentials(insecure.NewCredentials())
-	ledgerApiClient, err := grpc.NewClient(participant.Endpoints.GRPCLedgerAPIURL, insecureCreds, grpc.WithPerRPCCredentials(auth.NewBearerToken(token)))
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to create gRPC ledger API client: %w", err)
-	}
 
 	deps := dependencies.CantonDeps{
-		Chain:                chain,
-		CommandServiceClient: apiv2.NewCommandServiceClient(ledgerApiClient),
-		StateServiceClient:   apiv2.NewStateServiceClient(ledgerApiClient),
-		Party:                config.Party,
+		Chain: chain,
 	}
 
 	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.ConfigureChainForLanes, deps, config.Config.Input)

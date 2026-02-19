@@ -119,6 +119,18 @@ func (t *CCIPSendFromRouter) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCIPSendFromRouter to hex string (Canton MCMS format)
+func (t CCIPSendFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPSendFromRouter from hex string (Canton MCMS format)
+func (t *CCIPSendFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CCIPSendFromRouterResult is a Record type
 type CCIPSendFromRouterResult struct {
 	VerifierBlobs        []types.TEXT     `json:"verifierBlobs"`
@@ -172,6 +184,18 @@ func (t *CCIPSendFromRouterResult) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCIPSendFromRouterResult to hex string (Canton MCMS format)
+func (t CCIPSendFromRouterResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPSendFromRouterResult from hex string (Canton MCMS format)
+func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CancelSendFromRouter is a Record type
 type CancelSendFromRouter struct {
 	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
@@ -217,6 +241,18 @@ func (t *CancelSendFromRouter) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CancelSendFromRouter to hex string (Canton MCMS format)
+func (t CancelSendFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CancelSendFromRouter from hex string (Canton MCMS format)
+func (t *CancelSendFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
 	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
@@ -248,6 +284,18 @@ func (t GetRequiredCCVsForSend) MarshalJSON() ([]byte, error) {
 func (t *GetRequiredCCVsForSend) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetRequiredCCVsForSend to hex string (Canton MCMS format)
+func (t GetRequiredCCVsForSend) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsForSend from hex string (Canton MCMS format)
+func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // OnRamp is a Template type
@@ -382,6 +430,18 @@ func (t OnRamp) MarshalJSON() ([]byte, error) {
 func (t *OnRamp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes OnRamp to hex string (Canton MCMS format)
+func (t OnRamp) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes OnRamp from hex string (Canton MCMS format)
+func (t *OnRamp) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for OnRamp
@@ -606,3 +666,74 @@ func (t *PrepareSendFromRouter) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
+
+// MarshalHex encodes PrepareSendFromRouter to hex string (Canton MCMS format)
+func (t PrepareSendFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareSendFromRouter from hex string (Canton MCMS format)
+func (t *PrepareSendFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
+	CancelSendFromRouter(args CancelSendFromRouter) (*bind.EncodedChoice, error)
+	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
+	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// CCIPSendFromRouter encodes parameters for the CCIPSendFromRouter choice.
+func (e *encoder) CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CCIPSendFromRouter", args)
+}
+
+// CancelSendFromRouter encodes parameters for the CancelSendFromRouter choice.
+func (e *encoder) CancelSendFromRouter(args CancelSendFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CancelSendFromRouter", args)
+}
+
+// GetRequiredCCVsForSend encodes parameters for the GetRequiredCCVsForSend choice.
+func (e *encoder) GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVsForSend", args)
+}
+
+// PrepareSendFromRouter encodes parameters for the PrepareSendFromRouter choice.
+func (e *encoder) PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareSendFromRouter", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)

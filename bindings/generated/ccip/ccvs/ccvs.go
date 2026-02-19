@@ -82,6 +82,18 @@ func (t *CCVFeeConfig) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CCVFeeConfig to hex string (Canton MCMS format)
+func (t CCVFeeConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCVFeeConfig from hex string (Canton MCMS format)
+func (t *CCVFeeConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
 	InstanceId               types.TEXT                `json:"instanceId"`
@@ -228,6 +240,18 @@ func (t CommitteeVerifier) MarshalJSON() ([]byte, error) {
 func (t *CommitteeVerifier) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifier to hex string (Canton MCMS format)
+func (t CommitteeVerifier) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifier from hex string (Canton MCMS format)
+func (t *CommitteeVerifier) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Choice methods for CommitteeVerifier
@@ -416,6 +440,18 @@ func (t *CommitteeVerifierCalculateFee) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshal(data, t)
 }
 
+// MarshalHex encodes CommitteeVerifierCalculateFee to hex string (Canton MCMS format)
+func (t CommitteeVerifierCalculateFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierCalculateFee from hex string (Canton MCMS format)
+func (t *CommitteeVerifierCalculateFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
 	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
@@ -459,6 +495,18 @@ func (t CommitteeVerifierForwardToVerifier) MarshalJSON() ([]byte, error) {
 func (t *CommitteeVerifierForwardToVerifier) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierForwardToVerifier to hex string (Canton MCMS format)
+func (t CommitteeVerifierForwardToVerifier) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierForwardToVerifier from hex string (Canton MCMS format)
+func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // CommitteeVerifierVerifyMessage is a Record type
@@ -505,3 +553,68 @@ func (t *CommitteeVerifierVerifyMessage) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
+
+// MarshalHex encodes CommitteeVerifierVerifyMessage to hex string (Canton MCMS format)
+func (t CommitteeVerifierVerifyMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierVerifyMessage from hex string (Canton MCMS format)
+func (t *CommitteeVerifierVerifyMessage) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
+	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
+	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+// CommitteeVerifierCalculateFee encodes parameters for the CommitteeVerifierCalculateFee choice.
+func (e *encoder) CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierCalculateFee", args)
+}
+
+// CommitteeVerifierForwardToVerifier encodes parameters for the CommitteeVerifierForwardToVerifier choice.
+func (e *encoder) CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
+}
+
+// CommitteeVerifierVerifyMessage encodes parameters for the CommitteeVerifierVerifyMessage choice.
+func (e *encoder) CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
+}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)
