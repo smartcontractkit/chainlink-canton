@@ -121,7 +121,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 			_, err := operations.ExecuteOperation(b, global_config.UpdateDestChainConfig, deps, contract.ChoiceInput[common.UpdateDestChainConfig]{
 				ChainSelector:   deps.Chain.Selector,
 				InstanceAddress: input.GlobalConfig,
-				ActAs:           []string{deps.Party},
+				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
 				Args:            arg,
 			})
 			if err != nil {

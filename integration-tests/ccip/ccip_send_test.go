@@ -1,9 +1,12 @@
 package tests
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -35,6 +38,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
@@ -47,8 +53,8 @@ func TestCCIPSendE2E(t *testing.T) {
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
 
-	ccipParticipant := env.Participant(1)
-	senderParticipant := env.Participant(2)
+	ccipParticipant := env.Chain.Participants[0]
+	senderParticipant := env.Chain.Participants[1]
 
 	// Upload DARs
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
@@ -76,8 +82,8 @@ func TestCCIPSendE2E(t *testing.T) {
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
 
 	// Allocate parties
-	partyCCIP := ccipParticipant.Party
-	partySender := senderParticipant.Party
+	partyCCIP := ccipParticipant.PartyID
+	partySender := senderParticipant.PartyID
 	t.Logf("Parties: CCIP=%s, Sender=%s", partyCCIP, partySender)
 
 	// CCV Setup
@@ -112,9 +118,8 @@ func TestCCIPSendE2E(t *testing.T) {
 
 	// Deploy Chain contracts
 	out, err := changesets.DeployChainContracts{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployChainContractsConfig]{
-		ChainSelector: env.Selector,
+		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   0,
-		Party:         partyCCIP,
 		Config: changesets.DeployChainContractsConfig{
 			Params: sequences.DeployChainContractsParams{
 				CCIPOwnerParty: partyCCIP,
@@ -176,27 +181,26 @@ func TestCCIPSendE2E(t *testing.T) {
 	}
 
 	// Resolve contracts
-	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	globalConfig, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(global_config.ContractType), global_config.Version, ""))
 	require.NoError(t, err, "failed to get GlobalConfig address")
-	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+	feeQuoter, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
 	require.NoError(t, err, "failed to get FeeQuoter address")
-	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(onramp.ContractType), onramp.Version, ""))
+	onRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(onramp.ContractType), onramp.Version, ""))
 	require.NoError(t, err, "failed to get OnRamp address")
-	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(offramp.ContractType), offramp.Version, ""))
+	offRamp, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(offramp.ContractType), offramp.Version, ""))
 	require.NoError(t, err, "failed to get OffRamp address")
-	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Selector, datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
+	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
 
 	// Deploy and configure lane for outbound sends
 	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
 	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
 	out, err = changesets.ConfigureChainForLanes{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.ConfigureChainForLanesConfig]{
-		ChainSelector: env.Selector,
+		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   0,
-		Party:         partyCCIP,
 		Config: changesets.ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      env.Selector,
+				ChainSelector:      env.Chain.ChainSelector(),
 				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
 				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
 				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
@@ -230,9 +234,28 @@ func TestCCIPSendE2E(t *testing.T) {
 	cldfEnv.DataStore = out.DataStore.Seal()
 	t.Log("Configured chain for lanes")
 
+	// Create Scan and Registry API clients
+	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
+	tokenSource := ccipParticipant.TokenSource
+	interceptor := func(ctx context.Context, req *http.Request) error {
+		token, err := tokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+	scanProxyClient, err := scanProxy.NewClientWithResponses(ccipParticipant.Endpoints.ValidatorAPIURL, scanProxy.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create scan proxy client")
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create token metadata client")
+	transferInstructionClient, err := transferInstructionV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), transferInstructionV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create transfer instruction client")
+
 	// Setup Amulet token as fee token
 	// Get registry admin for Amulet tokens
-	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), env.Splice.TokenMetadataClient)
+	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
 	require.NoError(t, err, "failed to get registry admin")
 
 	// Fee token is Amulet
@@ -251,7 +274,7 @@ func TestCCIPSendE2E(t *testing.T) {
 
 	// ApplyFeeTokenUpdates: Add the fee token with premium multiplier of 1.0 (no premium)
 	premiumMultiplier := "1.0" // 1.0 means no premium/discount
-	_, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -287,7 +310,7 @@ func TestCCIPSendE2E(t *testing.T) {
 
 	// UpdatePrices: Set price for FeeToken (e.g., $1.00 per token)
 	usdPerToken := "1.00"
-	_, err = ccipParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -322,7 +345,7 @@ func TestCCIPSendE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	res, err := senderParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -358,7 +381,7 @@ func TestCCIPSendE2E(t *testing.T) {
 	t.Logf("Test payload: %s", string(testPayload))
 
 	// Deploy CCIPSender for sender
-	res, err = senderParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
@@ -433,7 +456,7 @@ func TestCCIPSendE2E(t *testing.T) {
 	t.Logf("partySender=%q", partySender)
 
 	// Mint Amulet tokens to sender so they can pay the fee
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, env.Splice.TokenMetadataClient, env.Splice.TransferInstructionClient, senderParticipant.ScanProxyClient, partySender, "100.00")
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.00")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted 100 Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
@@ -448,7 +471,7 @@ func TestCCIPSendE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get disclosed CommitteeVerifier")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
-	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), env.Splice.TransferInstructionClient, registryAdmin, partySender, partyCCIP)
+	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 	require.NoError(t, err, "failed to get transfer factory")
 	require.NotNil(t, choiceContext, "choiceContext should not be nil")
 
@@ -547,7 +570,7 @@ func TestCCIPSendE2E(t *testing.T) {
 	t.Logf("Send arg:\n%s", string(b))
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
-	res, err = senderParticipant.CommandServiceClient.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
