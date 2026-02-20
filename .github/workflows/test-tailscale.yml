@@ -25,7 +25,7 @@ jobs:
       # "requested tags [...] are invalid or not permitted". Create the tag
       # in Tailscale Admin → ACL (Visual) → Tags and set owner to autogroup:admin.
       - name: Connect to Tailscale
-        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9
+        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON_DEVNET }}
           audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
