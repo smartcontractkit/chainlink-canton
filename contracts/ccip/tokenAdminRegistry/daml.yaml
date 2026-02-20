@@ -7,8 +7,8 @@ build-options:
 data-dependencies:
   - ../../dependencies/splice-api-token-metadata-v1-1.0.0.dar
   - ../../dependencies/splice-api-token-holding-v1-1.0.0.dar
-  - ../common/.daml/dist/ccip-common-1.0.0.dar
-  - ../../mcms/.daml/dist/mcms-1.0.0.dar
+  - ../rmn/.daml/dist/ccip-rmn-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
+  - ../common/.daml/dist/ccip-common-1.0.0.dar

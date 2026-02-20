@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "734a12924b71bc59594246101aa6d63454317960829bc8e8697c48717142277a"
+	PackageID   = "a2e42ef3580c2219b792864e426bb93332d0170c4fae3bbcd9ccffa871b5f403"
 	SDKVersion  = "3.4.10"
 )
 
@@ -454,22 +455,22 @@ func (t *CommitteeVerifierCalculateFee) UnmarshalHex(data string) error {
 
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
-	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT        `json:"verifierArgs"`
-	Caller            types.PARTY       `json:"caller"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
 func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
+	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteCid
+		return t.Context
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -511,22 +512,22 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	VerifierResults     types.TEXT        `json:"verifierResults"`
-	Caller              types.PARTY       `json:"caller"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	Caller              types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
 func (t CommitteeVerifierVerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
+	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteCid
+		return t.Context
 	}()
 
 	m["executingMessageCid"] = func() any {

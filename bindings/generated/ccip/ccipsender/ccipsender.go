@@ -9,6 +9,7 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "882492e3fa258d5699a8b0a5921f7953fe820e15ecfd0ae0fbc7a9ca27140d39"
+	PackageID   = "8f3a245d2ff599219c90f8929319c5ef9e8a6ad1de025e90f2c16de646c4fe35"
 	SDKVersion  = "3.4.10"
 )
 
@@ -224,27 +225,31 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // Send is a Record type
 type Send struct {
-	RouterCid             types.CONTRACT_ID                        `json:"routerCid"`
-	OnRampCid             types.CONTRACT_ID                        `json:"onRampCid"`
-	GlobalConfigCid       types.CONTRACT_ID                        `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID                        `json:"rmnRemoteCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	DestChainSelector     types.NUMERIC                            `json:"destChainSelector"`
-	Receiver              types.TEXT                               `json:"receiver"`
-	Payload               types.TEXT                               `json:"payload"`
-	CcipReceiveGasLimit   types.INT64                              `json:"ccipReceiveGasLimit"`
-	SenderRequiredCCVs    []common.RawInstanceAddress              `json:"senderRequiredCCVs"`
-	FeeToken              splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	FeeTokenInput         interfaces.TokenInput                    `json:"feeTokenInput"`
-	FeeTokenHoldingCids   []types.CONTRACT_ID                      `json:"feeTokenHoldingCids"`
-	TokenTransfer         *TokenTransferInput                      `json:"tokenTransfer"`
-	CcvSendInputs         []CCVSendInput                           `json:"ccvSendInputs"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	RouterCid           types.CONTRACT_ID                          `json:"routerCid"`
+	DestChainSelector   types.NUMERIC                              `json:"destChainSelector"`
+	Receiver            types.TEXT                                 `json:"receiver"`
+	Payload             types.TEXT                                 `json:"payload"`
+	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
+	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
+	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
+	FeeTokenInput       interfaces.TokenInput                      `json:"feeTokenInput"`
+	FeeTokenHoldingCids []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
+	TokenTransfer       *TokenTransferInput                        `json:"tokenTransfer"`
+	CcvSendInputs       []CCVSendInput                             `json:"ccvSendInputs"`
 }
 
 // ToMap converts Send to a map for DAML arguments
 func (t Send) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
 
 	m["routerCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -252,46 +257,6 @@ func (t Send) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.RouterCid
-	}()
-
-	m["onRampCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.OnRampCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.OnRampCid
-	}()
-
-	m["globalConfigCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.GlobalConfigCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
-
-	m["feeQuoterCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeQuoterCid
 	}()
 
 	m["destChainSelector"] = t.DestChainSelector

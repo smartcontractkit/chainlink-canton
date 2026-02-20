@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "897f6bab414efa1d2e4659f36131af9565882876040b8356ee47599c2ad92760"
+	PackageID   = "106ce55e1a8dd77e4aaf50106ff87eec65b86ce56ff65aec6f4b9a2a2cee2761"
 	SDKVersion  = "3.4.10"
 )
 
@@ -439,20 +440,25 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
-	OffRampCid             types.CONTRACT_ID           `json:"offRampCid"`
-	GlobalConfigCid        types.CONTRACT_ID           `json:"globalConfigCid"`
-	TokenAdminRegistryCid  types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid           types.CONTRACT_ID           `json:"rmnRemoteCid"`
-	EncodedMessage         types.TEXT                  `json:"encodedMessage"`
-	TokenTransfer          *TokenTransferInput         `json:"tokenTransfer"`
-	CcvInputs              []CCVInput                  `json:"ccvInputs"`
-	AdditionalRequiredCCVs []common.RawInstanceAddress `json:"additionalRequiredCCVs"`
+	Context                splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	RouterCid              types.CONTRACT_ID                          `json:"routerCid"`
+	EncodedMessage         types.TEXT                                 `json:"encodedMessage"`
+	TokenTransfer          *TokenTransferInput                        `json:"tokenTransfer"`
+	CcvInputs              []CCVInput                                 `json:"ccvInputs"`
+	AdditionalRequiredCCVs []common.RawInstanceAddress                `json:"additionalRequiredCCVs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
 func (t Execute2) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
 
 	m["routerCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -460,38 +466,6 @@ func (t Execute2) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.RouterCid
-	}()
-
-	m["offRampCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.OffRampCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.OffRampCid
-	}()
-
-	m["globalConfigCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.GlobalConfigCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
 	}()
 
 	m["encodedMessage"] = string(t.EncodedMessage)
