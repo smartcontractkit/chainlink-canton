@@ -40,6 +40,9 @@ jobs:
 
       - name: Troubleshoot DNS (Tailscale resolution + 20s sleep)
         run: |
+          echo "===  tailscale set --accept-routes=true ==="
+          tailscale set --accept-routes=true
+          echo ""
           echo "=== Tailscale DNS status ==="
           tailscale dns status || true
           echo ""
@@ -57,8 +60,10 @@ jobs:
 
       - name: Test Canton Devnet connectivity
         run: |
-          echo "=== tailscale down && tailscale up workaround ==="
-          sudo tailscale down && sudo tailscale up
+          # echo "=== tailscale down && tailscale up workaround ==="
+          # sudo tailscale down && sudo tailscale up
+          echo "===  tailscale set --accept-routes=true ==="
+          tailscale set --accept-routes=true
           echo ""
           echo "=== IP that will be used for canton-devnet.bcy-v.metalhosts.com (expect 100.x.x.x for Tailscale) ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
