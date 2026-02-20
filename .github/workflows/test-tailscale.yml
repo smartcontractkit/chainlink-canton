@@ -50,6 +50,9 @@ jobs:
 
       - name: Test Canton Devnet connectivity
         run: |
+          echo "=== tailscale down && tailscale up workaround ==="
+          tailscale down && tailscale up
+          echo ""
           echo "=== IP that will be used for canton-devnet.bcy-v.metalhosts.com (expect 100.x.x.x for Tailscale) ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
           echo ""
