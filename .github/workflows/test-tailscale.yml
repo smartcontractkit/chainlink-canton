@@ -1,0 +1,34 @@
+name: Test Tailscale Connectivity
+run-name: Test Tailscale connectivity to Canton Devnet
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  test-tailscale:
+    name: Test Tailscale Connectivity
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    # Optional: set environment if using GitHub Environment secrets (e.g. canton-devnet)
+    # environment: canton-devnet
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON_DEVNET }}
+          audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
+          tags: tag:bcy-validators-gha
+
+      - name: Test Canton Devnet connectivity
+        run: |
+          curl -f -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant
+          echo "✅ Canton Devnet is accessible via Tailscale"
