@@ -10,8 +10,6 @@ replace (
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
 )
 
-replace github.com/smartcontractkit/go-daml => ../go-daml
-
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aws/smithy-go v1.24.0
@@ -24,7 +22,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260206205333-9187f22f0a04
 	github.com/smartcontractkit/chainlink-common v0.10.0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.81.0
-	github.com/smartcontractkit/go-daml v0.0.0-20260217070730-8baea5c5955e
+	github.com/smartcontractkit/go-daml v0.0.0-20260219003852-a14a57e6863b
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
 	gopkg.in/yaml.v3 v3.0.1
