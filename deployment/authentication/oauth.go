@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/icza/gox/osx"
 
@@ -98,16 +99,18 @@ func NewAuthorizationCodeProvider(ctx context.Context, authURL, clientID string)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(html))
-		return
 	})
 
 	// Start callback server
 	server := http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: serveMux,
+		Addr:              fmt.Sprintf(":%d", port),
+		Handler:           serveMux,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	fmt.Println("Waiting for authentication...")
-	go server.ListenAndServe()
+	go func() {
+		_ = server.ListenAndServe()
+	}()
 	fmt.Println("Attempting to open your default browser.\nIf the browser does not open, open the following URL:")
 	fmt.Println(authCodeURL)
 	_ = osx.OpenDefault(authCodeURL)
@@ -129,6 +132,7 @@ func generateState() string {
 	if _, err := rand.Read(b); err != nil {
 		panic(err)
 	}
+
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
@@ -137,7 +141,9 @@ func (p OIDCProvider) TokenSource() oauth2.TokenSource {
 }
 
 func (p OIDCProvider) TransportCredentials() credentials.TransportCredentials {
-	return credentials.NewTLS(&tls.Config{})
+	return credentials.NewTLS(&tls.Config{
+		MinVersion: tls.VersionTLS12,
+	})
 }
 
 func (p OIDCProvider) PerRPCCredentials() credentials.PerRPCCredentials {
