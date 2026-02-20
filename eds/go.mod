@@ -5,7 +5,7 @@ go 1.25.5
 replace github.com/smartcontractkit/chainlink-canton => ../
 
 require (
-	github.com/digital-asset/dazl-client/v8 v8.7.1
+	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/gorilla/mux v1.8.1
 	github.com/stretchr/testify v1.11.1
