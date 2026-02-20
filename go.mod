@@ -16,6 +16,7 @@ require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.16.8
 	github.com/google/uuid v1.6.0
+	github.com/icza/gox v0.2.5
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.96

@@ -7,8 +7,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"os"
-	"os/exec"
+
+	"github.com/icza/gox/osx"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"golang.org/x/oauth2"
@@ -108,7 +108,9 @@ func NewAuthorizationCodeProvider(ctx context.Context, authURL, clientID string)
 	}
 	fmt.Println("Waiting for authentication...")
 	go server.ListenAndServe()
-	openBrowser(authCodeURL)
+	fmt.Println("Attempting to open your default browser.\nIf the browser does not open, open the following URL:")
+	fmt.Println(authCodeURL)
+	_ = osx.OpenDefault(authCodeURL)
 	select {
 	case token := <-callbackChan:
 		fmt.Println("Authentication complete")
@@ -128,14 +130,6 @@ func generateState() string {
 		panic(err)
 	}
 	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-func openBrowser(urlStr string) {
-	fmt.Fprintf(os.Stderr, "Opening browser to: %s\n", urlStr)
-	cmd := exec.Command("open", urlStr)
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
 }
 
 func (p OIDCProvider) TokenSource() oauth2.TokenSource {
