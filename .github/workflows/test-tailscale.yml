@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     # Required: your Tailscale OIDC subject is repo:...:environment:* so the job must use an environment
-    environment: canton-devnet
+    # environment: canton-devnet
     permissions:
       id-token: write  # Required for OIDC
       contents: read
@@ -34,7 +34,7 @@ jobs:
       - name: Troubleshoot DNS (Tailscale resolution + 20s sleep)
         run: |
           echo "=== Tailscale DNS status ==="
-          tailscale dns status || true
+          sudo tailscale dns status || true
           echo ""
           echo "=== Resolving canton-devnet.bcy-v.metalhosts.com ==="
           tailscale dns resolve canton-devnet.bcy-v.metalhosts.com 2>/dev/null || true
