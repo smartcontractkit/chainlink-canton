@@ -4,11 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -25,12 +23,15 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -505,69 +506,63 @@ func TestCCIPSendE2E(t *testing.T) {
 		}())
 	}
 
-	// Log choiceContext structure for debugging
-	choiceContextJSON, _ := json.MarshalIndent(choiceContext, "", "  ")
-	t.Logf("choiceContext structure:\n%s", string(choiceContextJSON))
-
-	// Strip "0x" prefix from transferFactoryCid if present (Canton contract IDs shouldn't have it, but be safe)
-	transferFactoryCid = strings.TrimPrefix(transferFactoryCid, "0x")
-	transferFactoryCid = strings.TrimPrefix(transferFactoryCid, "0X")
-
-	// Build command arguments manually using apiv2.Value structures (like ccip_execute_token_test.go)
-	// Use choiceContext directly as apiv2.Value to preserve the structure
-	var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{
-			Label: "values",
-			Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
-		},
-	}}}}
-
-	// Build feeTokenHoldingCids list
-	feeTokenHoldingCids := []*apiv2.Value{
-		{Sum: &apiv2.Value_ContractId{ContractId: feeTokenHoldingCid}},
+	choiceContextRecord := choiceContext.GetRecord()
+	var choiceContextValues types.TEXTMAP
+	if choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
+		valuesField := choiceContextRecord.Fields[0]
+		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
+			textMap := valuesField.GetValue().GetTextMap()
+			choiceContextValues = make(types.TEXTMAP)
+			for _, entry := range textMap.GetEntries() {
+				// Convert apiv2.Value to types.TEXT (simplified - may need more complex conversion)
+				if entry.GetValue().GetText() != "" {
+					choiceContextValues[entry.GetKey()] = types.TEXT(entry.GetValue().GetText())
+				}
+			}
+		}
 	}
 
-	// Build FeeToken InstrumentId
-	feeTokenInstrumentIdValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(feeTokenInstrumentId.Admin)}}},
-		{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: string(feeTokenInstrumentId.Id)}}},
-	}}}}
+	ccvSendInput := ccipsender.CCVSendInput{
+		CcvCid:        types.CONTRACT_ID(disclosedCCV.ContractId),
+		CcvRawAddress: committeeVerifierRawAddr.Binding(),
+		VerifierArgs:  types.TEXT(""),
+	}
 
-	ccipSendArgs := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-		{Label: "onRampCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedOnRamp.ContractId}}},
-		{Label: "globalConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedGlobalConfig.ContractId}}},
-		{Label: "tokenAdminRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTar.ContractId}}},
-		{Label: "rmnRemoteCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedRmnRemote.ContractId}}},
-		{Label: "feeQuoterCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedFeeQuoter.ContractId}}},
-		{Label: "destChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(remoteSelector, 10)}}},
-		{Label: "receiver", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: receiverHex}}},
-		{Label: "payload", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: testPayloadHex}}},
-		{Label: "ccipReceiveGasLimit", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 100000}}},
-		{Label: "senderRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-		{Label: "feeToken", Value: feeTokenInstrumentIdValue},
-		{Label: "feeTokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-			{Label: "transferFactory", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: transferFactoryCid}}},
-			{Label: "extraArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "context", Value: choiceContext},
-				{Label: "meta", Value: emptyMetadata},
-			}}}}},
-			{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-		}}}}},
-		{Label: "feeTokenHoldingCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: feeTokenHoldingCids}}}},
-		{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
-		{Label: "ccvSendInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-			{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}}},
-				{Label: "ccvRawAddress", Value: rawInstanceAddress(committeeVerifierRawAddr.String())},
-				{Label: "verifierArgs", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: ""}}},
-			}}}},
-		}}}}},
-	}}}}
+	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
+		Context: splice_api_token_metadata_v1.ChoiceContext{
+			Values: choiceContextValues,
+		},
+		Meta: splice_api_token_metadata_v1.Metadata{
+			Values: types.TEXTMAP{},
+		},
+	}
 
-	b, _ := json.MarshalIndent(ccipSendArgs, "", "  ")
-	require.NoError(t, err)
-	t.Logf("Send arg:\n%s", string(b))
+	feeTokenInput := interfaces.TokenInput{
+		TransferFactory:   types.CONTRACT_ID(transferFactoryCid),
+		ExtraArgs:         extraArgs,
+		TokenPoolHoldings: []types.CONTRACT_ID{},
+	}
+
+	sendArgs := ccipsender.Send{
+		RouterCid:             types.CONTRACT_ID(routerCid),
+		OnRampCid:             types.CONTRACT_ID(disclosedOnRamp.ContractId),
+		GlobalConfigCid:       types.CONTRACT_ID(disclosedGlobalConfig.ContractId),
+		TokenAdminRegistryCid: types.CONTRACT_ID(disclosedTar.ContractId),
+		RmnRemoteCid:          types.CONTRACT_ID(disclosedRmnRemote.ContractId),
+		FeeQuoterCid:          types.CONTRACT_ID(disclosedFeeQuoter.ContractId),
+		DestChainSelector:     types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Receiver:              types.TEXT(receiverHex),
+		Payload:               types.TEXT(testPayloadHex),
+		CcipReceiveGasLimit:   types.INT64(100000),
+		SenderRequiredCCVs:    []common.RawInstanceAddress{},
+		FeeToken:              feeTokenInstrumentId,
+		FeeTokenInput:         feeTokenInput,
+		FeeTokenHoldingCids:   []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+		TokenTransfer:         nil,
+		CcvSendInputs:         []ccipsender.CCVSendInput{ccvSendInput},
+	}
+
+	ccipSendArgs := ledger.MapToValue(sendArgs)
 
 	// CCIPSender.Send: PrepareSend + CCV tickets + Send in one transaction
 	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -608,17 +603,6 @@ func TestCCIPSendE2E(t *testing.T) {
 	for _, event := range res.GetTransaction().GetEvents() {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-				// CCIPMessageSent structure:
-				// - ccipOwner (Party)
-				// - sender (Party)
-				// - observers ([Party])
-				// - event (CCIPMessageSentEvent)
-				//   - destChainSelector
-				//   - sequenceNumber
-				//   - messageId
-				//   - encodedMessage
-				//   - verifierBlobs
-				//   - receipts
 				fields := e.Created.GetCreateArguments().GetFields()
 				if len(fields) >= 4 {
 					// fields[3] is the "event" field (CCIPMessageSentEvent)
