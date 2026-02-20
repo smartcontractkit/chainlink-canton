@@ -67,7 +67,7 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 			if err != nil {
 				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
 			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} // days since epoch
+			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} //nolint:gosec // days since epoch
 		case "AV_Time":
 			valueString, ok := rawValue.(string)
 			if !ok {
