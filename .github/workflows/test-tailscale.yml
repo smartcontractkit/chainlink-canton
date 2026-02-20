@@ -50,6 +50,12 @@ jobs:
 
       - name: Test Canton Devnet connectivity
         run: |
+          echo "=== IP that will be used for canton-devnet.bcy-v.metalhosts.com (expect 100.x.x.x for Tailscale) ==="
+          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+          echo ""
+          echo "=== IP route show table all |grep tailscale ==="
+          ip route show table all |grep tailscale || true
+          echo ""
           curl -v -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant || true
           echo ""
-          echo "✅ Check logs above for resolution IP and HTTP response (403 may be server-side auth)"
+          echo "✅ If you see 403: request reached AWS (awselb) but was rejected server-side (ELB/WAF/app allowlist or auth)."
