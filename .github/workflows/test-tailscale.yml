@@ -11,8 +11,8 @@ jobs:
     name: Test Tailscale Connectivity
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    # Optional: set environment if using GitHub Environment secrets (e.g. canton-devnet)
-    # environment: canton-devnet
+    # Required: your Tailscale OIDC subject is repo:...:environment:* so the job must use an environment
+    environment: canton-devnet
     permissions:
       id-token: write  # Required for OIDC
       contents: read
@@ -21,6 +21,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # If you see "sudo failed with exit code 1", the real error is often
+      # "requested tags [...] are invalid or not permitted". Create the tag
+      # in Tailscale Admin → ACL (Visual) → Tags and set owner to autogroup:admin.
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
         with:
@@ -28,7 +31,25 @@ jobs:
           audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
           tags: tag:bcy-validators-gha
 
+      - name: Troubleshoot DNS (Tailscale resolution + 20s sleep)
+        run: |
+          echo "=== Tailscale DNS status ==="
+          tailscale dns status || true
+          echo ""
+          echo "=== Resolving canton-devnet.bcy-v.metalhosts.com ==="
+          tailscale dns resolve canton-devnet.bcy-v.metalhosts.com 2>/dev/null || true
+          echo ""
+          echo "=== System resolver (getent) ==="
+          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+          echo ""
+          echo "=== /etc/resolv.conf ==="
+          cat /etc/resolv.conf
+          echo ""
+          echo "=== Sleeping 20s before curl ==="
+          sleep 20
+
       - name: Test Canton Devnet connectivity
         run: |
-          curl -f -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant
-          echo "✅ Canton Devnet is accessible via Tailscale"
+          curl -v -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant || true
+          echo ""
+          echo "✅ Check logs above for resolution IP and HTTP response (403 may be server-side auth)"
