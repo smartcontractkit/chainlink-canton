@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -577,11 +578,9 @@ func TestCCIPSendE2E(t *testing.T) {
 				}},
 			}},
 			ActAs: []string{partySender},
-			DisclosedContracts: append(
-				append(
-					[]*apiv2.DisclosedContract{disclosedCCIPSender, disclosedRouter, disclosedOnRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedFeeQuoter, disclosedFeeTokenHolding, disclosedCCV},
-					transferFactoryDisclosures...,
-				),
+			DisclosedContracts: slices.Concat(
+				[]*apiv2.DisclosedContract{disclosedCCIPSender, disclosedRouter, disclosedOnRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedFeeQuoter, disclosedFeeTokenHolding, disclosedCCV},
+				transferFactoryDisclosures,
 			),
 		},
 	})
