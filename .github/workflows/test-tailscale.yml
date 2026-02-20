@@ -31,10 +31,17 @@ jobs:
           audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
           tags: tag:bcy-validators-gha
 
+      # Required for app connectors: Linux nodes don't accept advertised routes by default.
+      # This allows the runner to receive routes from the app connector (e.g. canton-devnet IPs via tailscale0).
+      - name: Accept app connector routes
+        run: |
+          sudo tailscale set --accept-routes=true
+          sudo tailscale set --operator=$USER
+
       - name: Troubleshoot DNS (Tailscale resolution + 20s sleep)
         run: |
           echo "=== Tailscale DNS status ==="
-          sudo tailscale dns status || true
+          tailscale dns status || true
           echo ""
           echo "=== Resolving canton-devnet.bcy-v.metalhosts.com ==="
           tailscale dns resolve canton-devnet.bcy-v.metalhosts.com 2>/dev/null || true
