@@ -51,13 +51,13 @@ jobs:
       - name: Test Canton Devnet connectivity
         run: |
           echo "=== tailscale down && tailscale up workaround ==="
-          tailscale down && tailscale up
+          sudo tailscale down && sudo tailscale up
           echo ""
           echo "=== IP that will be used for canton-devnet.bcy-v.metalhosts.com (expect 100.x.x.x for Tailscale) ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
           echo ""
-          echo "=== IP route show table all |grep tailscale ==="
-          ip route show table all |grep tailscale || true
+          echo "=== IP route show table all ==="
+          ip route show table all || true
           echo ""
           curl -v -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant || true
           echo ""
