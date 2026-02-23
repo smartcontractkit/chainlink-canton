@@ -20,7 +20,6 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -593,6 +592,4 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Execute completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
-
-	time.Sleep(time.Minute * 60)
 }
