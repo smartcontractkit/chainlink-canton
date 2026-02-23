@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "4416f36f11477734f2db804e4a68b4e23df21a4a06074facf99fe2aa8e17adb8"
+	PackageID   = "09c2bea2bbe54c79d6607e44c17800b05871eae4c6c520ab477aed199a65f0dd"
 	SDKVersion  = "3.4.10"
 )
 
@@ -388,9 +388,8 @@ func (t *CCIPSendResult) UnmarshalHex(data string) error {
 
 // CancelSend is a Record type
 type CancelSend struct {
-	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 }
 
 // ToMap converts CancelSend to a map for DAML arguments
@@ -411,14 +410,6 @@ func (t CancelSend) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
 	}()
 
 	return m

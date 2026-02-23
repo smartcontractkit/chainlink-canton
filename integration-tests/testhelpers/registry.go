@@ -71,7 +71,7 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 		case "AV_Time":
 			valueString, ok := rawValue.(string)
 			if !ok {
-				return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
+				return nil, fmt.Errorf("AV_Time value is not a string: %T", rawValue)
 			}
 			t, err := time.Parse(time.RFC3339, valueString)
 			if err != nil {
@@ -81,7 +81,7 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 		case "AV_RelTime":
 			valueFloat, ok := rawValue.(float64)
 			if !ok {
-				return nil, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
+				return nil, fmt.Errorf("AV_RelTime value is not a number: %T", rawValue)
 			}
 			value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}},
