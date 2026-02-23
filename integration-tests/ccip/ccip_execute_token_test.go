@@ -52,6 +52,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// DAR Uploading
 	// Read DARs
+	rmnDar, err := contracts.GetDar(contracts.CCIPRMN, contracts.CurrentVersion)
+	require.NoError(t, err)
 	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
 	require.NoError(t, err)
 	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
@@ -68,7 +70,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Upload DARs to all participants
-	dars := [][]byte{commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, tokenPoolDar, perPartyRouterDar, ccipReceiverDar}
+	dars := [][]byte{rmnDar, commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, tokenPoolDar, perPartyRouterDar, ccipReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -590,6 +592,30 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		poolHoldingDisclosures,
 	)
 
+	// Create context - replace with EDS
+	executeContext := map[string]any{
+		"values": map[string]any{
+			"off-ramp": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedOffRamp.ContractId,
+			},
+			"global-config": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedGlobalConfig.ContractId,
+			},
+			"token-admin-registry": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedTar.ContractId,
+			},
+			"rmn-remote": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedRmnRemote.ContractId,
+			},
+		},
+	}
+	executeContextValue, err := testhelpers.ChoiceContextFromData(executeContext)
+	require.NoError(t, err)
+
 	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release in one transaction
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -600,11 +626,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					ContractId: ccipReceiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "context", Value: executeContextValue},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-						{Label: "offRampCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: offRampCid}}},
-						{Label: "globalConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: globalConfigCid}}},
-						{Label: "tokenAdminRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTar.ContractId}}},
-						{Label: "rmnRemoteCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: rmnRemoteCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedPool.ContractId}}},

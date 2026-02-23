@@ -7,7 +7,9 @@ import DA.Assert
 import DA.Crypto.Text (keccak256)
 import DA.Map qualified as Map
 import DA.Optional
+import DA.TextMap qualified as TextMap
 
+import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.GlobalConfig qualified as GlobalConfig
@@ -18,6 +20,8 @@ import CCIP.PerPartyRouter qualified as PerPartyRouter
 import qualified CCIP.RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
+
+import qualified Splice.Api.Token.MetadataV1
 
 
 -- | Test execute with CCV verification via collecting contract pattern.
@@ -133,8 +137,9 @@ testExecuteWithCCVVerification = script do
     -- PrepareExecute to create ExecutingMessageV1
     executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
-            offRampCid = offRamp
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.Context.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -153,10 +158,11 @@ testExecuteWithCCVVerification = script do
     -- Execute via PerPartyRouter
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
-            rmnRemoteCid = rmnRemote
-            offRampCid = offRamp
-            globalConfigCid = globalConfig
-            tokenAdminRegistryCid = tokenAdminRegistry
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.Context.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.Context.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.Context.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
 
@@ -270,8 +276,9 @@ testExecuteFailsMissingCCV = script do
     -- PrepareExecute
     executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
-            offRampCid = offRamp
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.Context.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -280,10 +287,11 @@ testExecuteFailsMissingCCV = script do
     -- Execute WITHOUT adding any CCV verification - should fail
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
-            rmnRemoteCid = rmnRemote
-            offRampCid = offRamp
-            globalConfigCid = globalConfig
-            tokenAdminRegistryCid = tokenAdminRegistry
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.Context.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.Context.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.Context.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
 
@@ -388,8 +396,9 @@ testExecuteWrongReceiver = script do
     -- PrepareExecute should fail because receiver address doesn't match
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
-            offRampCid = offRamp
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.Context.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver  -- Providing receiver, but message.receiver is otherParty
             tokenReceiverParty = None

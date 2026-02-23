@@ -4,6 +4,7 @@ import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1Wi
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
@@ -12,6 +13,8 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Crypto.DerEncoding
+
+import qualified Splice.Api.Token.MetadataV1
 
 versionTagV1_7_0 : BytesHex = "49ff34ed"
 
@@ -53,7 +56,7 @@ template CommitteeVerifier
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
                     with
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        context = arg.context
                         executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
                         caller = arg.caller
@@ -67,7 +70,7 @@ template CommitteeVerifier
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
                     with
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        context = arg.context
                         sendingMessageCid = arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
@@ -77,12 +80,15 @@ template CommitteeVerifier
         -- for signature verification (encoding is deterministic).
         nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
                 caller : Party
             controller caller
             do
+                -- Get Cids from context
+                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+
                 execMsg <- fetch executingMessageCid
                 let message = execMsg.message
 
@@ -152,12 +158,15 @@ template CommitteeVerifier
         nonconsuming choice CommitteeVerifier_ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 verifierArgs : BytesHex
                 caller : Party
             controller caller
             do
+                -- Get Cids from context
+                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse
