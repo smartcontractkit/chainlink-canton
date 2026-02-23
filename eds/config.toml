@@ -1,0 +1,37 @@
+chain_selector = 8706591216959472610
+
+[server]
+host = "0.0.0.0"
+port = 8088
+
+[contracts]
+[contracts.per_party_router_factory]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0x6adcd1eec11ab4dde5255c2413b1852f88b9906f6b1c6df03cdf8a9e0b8cc079"
+[contracts.on_ramp]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0xc96bf91ad7cfb8b34d3f1a3e51d29c2a9a9ff593c7016c5f1280f5176a17d8fc"
+[contracts.off_ramp]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0x184dd2ba044fe7131c457d7e02fef230f2e2dc650bf1f01a44a80f4871114bd4"
+[contracts.global_config]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0xde3fc748df63e4af95135fe608f3def0dcb09ed6046523f9f2bca94f908abe07"
+[contracts.token_admin_registry]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0x043087e4f6160f4f517ed460bccce49e524c53b59570b43ef4aeeae529fdf147"
+[contracts.rmn_remote]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0x64b2c33063a3f7934d17417cc1556f2f920329122a940977729824516343f4ba"
+[contracts.default_ccv]
+party_id = "participant1-localparty-1::122088643defc2ec1f2bb7a1f2f96fbbcf16bdd34b1e858336bbf5b4e1498ef9291b"
+instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
+
+[node]
+url = "participant1.grpc-ledger-api.localhost:8080"
+max_retries = 10
+
+[node.auth]
+type = "static"
+user_id = "ledger-api-user"
+jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"

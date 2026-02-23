@@ -1,7 +1,7 @@
 # Use this configuration file to run integration tests against a locally running Docker Compose environment.
 # See /compose/localnet to set up the environment.
 
-selector=8706591216959472610
+chain_selector=8706591216959472610
 
 scan_api_url="http://scan.localhost:8080"
 registry_api_url="http://scan.localhost:8080"
