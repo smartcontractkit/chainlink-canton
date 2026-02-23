@@ -238,11 +238,11 @@ template PerPartyRouter
             with
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             controller partyOwner
             do
                 -- Get Cids from context
                 onRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OnRamp.OnRamp) context CCIP.Context.onRampKey
+                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
 
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
