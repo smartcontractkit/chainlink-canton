@@ -15,6 +15,10 @@ contracts: compile-contracts generate-bindings
 gomodtidy: ## Run go mod tidy on all modules.
 	go run github.com/jmank88/gomods@v0.1.7 tidy
 
+.PHONY: test-daml-contracts
+test-daml-contracts:
+	find ./contracts -name 'daml.yaml' -execdir dpm test \;
+
 # GolangCI-Lint targets
 
 .PHONY: golangci-lint-main golangci-lint-eds golangci-lint-integration-tests
