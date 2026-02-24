@@ -88,7 +88,7 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 			AdminAPIURL:      config.AdminAPIURL,
 			ValidatorAPIURL:  config.ValidatorAPIURL,
 			UserID:           config.UserName,
-			PartyID:          config.Party,
+			PartyID:          party,
 			AuthProvider:     authProvider,
 		}
 	}
