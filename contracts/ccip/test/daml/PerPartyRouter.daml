@@ -144,7 +144,7 @@ testCCIPSend = script do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = Splice.Api.Token.MetadataV1.ChoiceContext with
                 values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 --(CCIP.Context.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.Context.tokenAdminRegistryKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
                  (CCIP.Context.feeQuoterKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.Context.globalConfigKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.Context.onRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId onRamp)]
