@@ -34,7 +34,7 @@ jobs:
           fi
 
   generate-bindings:
-    name: Generate Bindings from Dar artifacts
+    name: Generate Bindings
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -91,6 +91,7 @@ jobs:
           cd contracts
           dpm build --all
       - name: Test Daml Contracts
-        run: |
-          go run ./contracts/cmd/test --root . --color --plain --output ./summary.md
-          cat summary.md >$GITHUB_STEP_SUMMARY
+        run: go run ./contracts/cmd/test --root . --color --plain --output ./summary.md
+      - name: Output test summary
+        if: always()
+        run: cat summary.md >$GITHUB_STEP_SUMMARY
