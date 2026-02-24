@@ -1,4 +1,4 @@
-name: Contract artifacts
+name: Daml Contracts
 
 on:
   push:
@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   compile-contracts:
-    name: Compile contracts
+    name: Compile
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -34,7 +34,7 @@ jobs:
           fi
 
   generate-bindings:
-    name: Generate Bindings from Dar artifacts
+    name: Generate Bindings
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -73,3 +73,22 @@ jobs:
           else
             echo "### Bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
           fi
+
+  test-contracts:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Test Daml Contracts
+        run: |
+          cd contracts
+          dpm build --all
+          go run ./cmd/test --root . --color --plain --output ./summary.md
+          car summary.md >$GITHUB_STEP_SUMMARY
