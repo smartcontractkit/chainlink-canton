@@ -176,6 +176,7 @@ testBypasserExternalCall = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create Counter (external MCMSReceiver target)
   counterCid <- submit ccipOwner do
@@ -247,6 +248,7 @@ testScheduledExternalCall = script do
       minDelay = seconds 0  -- No delay for testing
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create Counter
   counterCid <- submit ccipOwner do
@@ -281,7 +283,7 @@ testScheduledExternalCall = script do
       targetCids = []
 
   -- Compute the opId for the scheduled batch
-  let calls = [TimelockCall counterInstanceId "Increment" ""]
+  let calls = [TimelockCall with targetInstanceId = counterInstanceId, functionName = "Increment", operationData = "", contractIds = []]
   let opId = hashTimelockOpId calls zeroHash externalScheduleSalt
 
   -- Verify operation was scheduled
@@ -340,6 +342,7 @@ testExternalCallWrongInstanceId = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create Counter with wrong instanceId
   counterCid <- submit ccipOwner do
@@ -398,6 +401,7 @@ testExternalCallForgedSignatory = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create Counter owned by malicious party (ccipOwner is NOT a signatory)
   -- but claiming the forged instanceId
@@ -459,6 +463,7 @@ testMultipleExternalTargets = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create two Counter targets
   counter1Cid <- submit ccipOwner do
@@ -501,6 +506,7 @@ testMixedSelfDispatchAndExternal = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create Counter target
   counterCid <- submit ccipOwner do

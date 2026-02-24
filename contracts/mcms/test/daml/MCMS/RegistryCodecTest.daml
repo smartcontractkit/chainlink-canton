@@ -1,0 +1,250 @@
+-- | Registry Codec Tests
+-- Roundtrip encode/decode tests for RegistryCodec operations
+module MCMS.RegistryCodecTest where
+
+import Daml.Script
+import MCMS.RegistryCodec
+
+-- ===========================================================================
+-- REGISTER CONTRACT PARAMS TESTS
+-- ===========================================================================
+
+-- | Test: Encode/decode RegisterContractParams roundtrip
+testRegisterContractParamsCodec : Script ()
+testRegisterContractParamsCodec = script do
+  let params = RegisterContractParams
+        { instanceId = "counter@ccip_owner"
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+
+  let encoded = encodeRegisterContractParams params
+  let decoded = decodeRegisterContractParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode RegisterContractParams"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "version should match" $ p.version == params.version
+      assertMsg "contractType should match" $ p.contractType == params.contractType
+      assertMsg "metadataKeys should match" $ p.metadataKeys == params.metadataKeys
+      assertMsg "metadataValues should match" $ p.metadataValues == params.metadataValues
+
+  debug "testRegisterContractParamsCodec PASSED!"
+  pure ()
+
+-- | Test: Encode/decode RegisterContractParams with metadata
+testRegisterContractParamsCodecWithMetadata : Script ()
+testRegisterContractParamsCodecWithMetadata = script do
+  let params = RegisterContractParams
+        { instanceId = "onramp@ccip_owner"
+        , version = "2.0.0"
+        , contractType = "OnRamp"
+        , metadataKeys = ["chain", "env"]
+        , metadataValues = ["canton", "prod"]
+        }
+
+  let encoded = encodeRegisterContractParams params
+  let decoded = decodeRegisterContractParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode RegisterContractParams with metadata"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "version should match" $ p.version == params.version
+      assertMsg "contractType should match" $ p.contractType == params.contractType
+      assertMsg "metadataKeys should match" $ p.metadataKeys == params.metadataKeys
+      assertMsg "metadataValues should match" $ p.metadataValues == params.metadataValues
+
+  debug "testRegisterContractParamsCodecWithMetadata PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- INITIATE UPGRADE PARAMS TESTS
+-- ===========================================================================
+
+-- | Test: Encode/decode InitiateUpgradeParams roundtrip
+testInitiateUpgradeParamsCodec : Script ()
+testInitiateUpgradeParamsCodec = script do
+  let params = InitiateUpgradeParams
+        { instanceId = "counter@ccip_owner"
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+
+  let encoded = encodeInitiateUpgradeParams params
+  let decoded = decodeInitiateUpgradeParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode InitiateUpgradeParams"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "fromVersion should match" $ p.fromVersion == params.fromVersion
+      assertMsg "toVersion should match" $ p.toVersion == params.toVersion
+      assertMsg "migrationParams should match" $ p.migrationParams == params.migrationParams
+
+  debug "testInitiateUpgradeParamsCodec PASSED!"
+  pure ()
+
+-- | Test: Encode/decode InitiateUpgradeParams with migration params
+testInitiateUpgradeParamsCodecWithMigration : Script ()
+testInitiateUpgradeParamsCodecWithMigration = script do
+  let params = InitiateUpgradeParams
+        { instanceId = "feequoter@ccip_owner"
+        , fromVersion = "1.5.0"
+        , toVersion = "2.0.0"
+        , migrationParams = "deadbeef"
+        }
+
+  let encoded = encodeInitiateUpgradeParams params
+  let decoded = decodeInitiateUpgradeParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode InitiateUpgradeParams with migration"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "fromVersion should match" $ p.fromVersion == params.fromVersion
+      assertMsg "toVersion should match" $ p.toVersion == params.toVersion
+      assertMsg "migrationParams should match" $ p.migrationParams == params.migrationParams
+
+  debug "testInitiateUpgradeParamsCodecWithMigration PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- COMPLETE UPGRADE PARAMS TESTS
+-- ===========================================================================
+
+-- | Test: Encode/decode CompleteUpgradeParams roundtrip
+testCompleteUpgradeParamsCodec : Script ()
+testCompleteUpgradeParamsCodec = script do
+  let params = CompleteUpgradeParams
+        { instanceId = "counter@ccip_owner"
+        , newVersion = "2.0.0"
+        }
+
+  let encoded = encodeCompleteUpgradeParams params
+  let decoded = decodeCompleteUpgradeParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode CompleteUpgradeParams"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "newVersion should match" $ p.newVersion == params.newVersion
+
+  debug "testCompleteUpgradeParamsCodec PASSED!"
+  pure ()
+
+-- | Test: Encode/decode CompleteUpgradeParams with longer version string
+testCompleteUpgradeParamsCodecLongVersion : Script ()
+testCompleteUpgradeParamsCodecLongVersion = script do
+  let params = CompleteUpgradeParams
+        { instanceId = "tokenpool@ccip_owner"
+        , newVersion = "10.20.30"
+        }
+
+  let encoded = encodeCompleteUpgradeParams params
+  let decoded = decodeCompleteUpgradeParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode CompleteUpgradeParams with long version"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "newVersion should match" $ p.newVersion == params.newVersion
+
+  debug "testCompleteUpgradeParamsCodecLongVersion PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- CANCEL UPGRADE PARAMS TESTS
+-- ===========================================================================
+
+-- | Test: Encode/decode CancelUpgradeParams roundtrip
+testCancelUpgradeParamsCodec : Script ()
+testCancelUpgradeParamsCodec = script do
+  let params = CancelUpgradeParams
+        { instanceId = "counter@ccip_owner"
+        }
+
+  let encoded = encodeCancelUpgradeParams params
+  let decoded = decodeCancelUpgradeParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode CancelUpgradeParams"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+
+  debug "testCancelUpgradeParamsCodec PASSED!"
+  pure ()
+
+-- | Test: Encode/decode CancelUpgradeParams with long instanceId
+testCancelUpgradeParamsCodecLongId : Script ()
+testCancelUpgradeParamsCodecLongId = script do
+  let params = CancelUpgradeParams
+        { instanceId = "very-long-contract-name-for-testing@ccip_owner-12345678"
+        }
+
+  let encoded = encodeCancelUpgradeParams params
+  let decoded = decodeCancelUpgradeParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode CancelUpgradeParams with long id"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+
+  debug "testCancelUpgradeParamsCodecLongId PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- EDGE CASE TESTS
+-- ===========================================================================
+
+-- | Test: Empty strings in RegisterContractParams
+testRegisterContractParamsCodecEmpty : Script ()
+testRegisterContractParamsCodecEmpty = script do
+  let params = RegisterContractParams
+        { instanceId = ""
+        , version = ""
+        , contractType = ""
+        , metadataKeys = []
+        , metadataValues = []
+        }
+
+  let encoded = encodeRegisterContractParams params
+  let decoded = decodeRegisterContractParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode empty RegisterContractParams"
+    Some p -> do
+      assertMsg "instanceId should be empty" $ p.instanceId == ""
+      assertMsg "version should be empty" $ p.version == ""
+      assertMsg "contractType should be empty" $ p.contractType == ""
+
+  debug "testRegisterContractParamsCodecEmpty PASSED!"
+  pure ()
+
+-- | Test: Special characters in instanceId
+testRegisterContractParamsCodecSpecialChars : Script ()
+testRegisterContractParamsCodecSpecialChars = script do
+  let params = RegisterContractParams
+        { instanceId = "counter-v1@party::namespace-12345"
+        , version = "1.0.0-beta.1"
+        , contractType = "Counter_V1"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+
+  let encoded = encodeRegisterContractParams params
+  let decoded = decodeRegisterContractParams encoded
+
+  case decoded of
+    None -> abort "Failed to decode RegisterContractParams with special chars"
+    Some p -> do
+      assertMsg "instanceId should match" $ p.instanceId == params.instanceId
+      assertMsg "version should match" $ p.version == params.version
+      assertMsg "contractType should match" $ p.contractType == params.contractType
+
+  debug "testRegisterContractParamsCodecSpecialChars PASSED!"
+  pure ()

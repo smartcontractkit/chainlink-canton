@@ -129,6 +129,7 @@ testFullFlow = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Step 2: Create Counter with instanceId (stable identifier)
   let counterId = "counter-v1@" <> partyToText ccipOwner
@@ -173,6 +174,7 @@ testFullFlowWithRealSignatures = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Step 2: Create Counter (view returns "counter@ccip_owner")
   let counterId = realTestOp.targetInstanceId
@@ -214,6 +216,7 @@ testReplayProtection = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- First SetRoot should succeed
   mcmsCid <- submit ccipOwner do
@@ -257,6 +260,7 @@ testNonceOrdering = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- SetRoot
   mcmsCid <- submit ccipOwner do
@@ -302,6 +306,7 @@ testRootExpiry = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- CanExecuteOp should return false because no root is set
   canExec <- submit ccipOwner do
@@ -343,6 +348,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Create Counter owned by ccipOwner
   counterCid <- submit ccipOwner do
@@ -484,6 +490,7 @@ testExecuteMcmsOp = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Encode new config params (change from 2-of-3 to 1-of-3)
   let newParams = SetConfigParams
@@ -565,6 +572,7 @@ testTimelockSchedule = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- SetRoot first
   mcmsCid <- submit ccipOwner do
@@ -605,6 +613,7 @@ testTimelockViewFunctions = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
+      registryCid = None
 
   -- Test GetMinDelay (starts at 0 for testing)
   minDelayVal <- submit ccipOwner do
@@ -680,6 +689,7 @@ testBlockedFunctionOnMCMS = script do
       minDelay = seconds 0
       blockedFunctions = [bf1, bf2]
       timelockTimestamps = Map.empty
+      registryCid = None
   blocked <- submit ccipOwner do
     exerciseCmd mcmsCid GetBlockedFunctions with submitter = ccipOwner
   assertMsg "Should have 2 blocked functions" $ length blocked == 2

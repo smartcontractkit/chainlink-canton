@@ -39,7 +39,7 @@ import MCMS.Types
   )
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), parsePartyIdText)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSEntrypointResult(..), parsePartyIdText)
 import MCMS.Codec
   ( decodeSetConfigParams
   , decodeBlockedFunction
@@ -48,6 +48,8 @@ import MCMS.Codec
   , decodeBypasserExecuteBatchParams
   , decodeCancelBatchParams
   )
+import MCMS.MCMSRegistry (MCMSRegistry)
+import MCMS.RegistryCodec ()
 
 template MCMS
   with
@@ -61,6 +63,8 @@ template MCMS
     minDelay : RelTime                         -- Minimum delay for scheduled operations
     blockedFunctions : [BlockedFunction]         -- Functions that cannot be scheduled (per-target)
     timelockTimestamps : Map.Map Text Time     -- opId -> readyTime (or doneTimestamp if done)
+    -- Registry reference for contract upgrade support
+    registryCid : Optional (ContractId MCMSRegistry)  -- Optional reference to contract registry
   where
     signatory owner
 
@@ -327,7 +331,8 @@ template MCMS
               length targetCids == length externalCalls
 
             -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
-            (_, finalMcms) <- processCallsLoop owner targetCids this calls 0
+            -- Start with empty accumulated outputs - they get threaded between calls
+            (_, finalMcms) <- processCallsLoop owner targetCids this calls 0 []
 
             -- 8. Mark as done (set to doneTimestamp)
             create (finalMcms with
@@ -443,6 +448,26 @@ template MCMS
       controller submitter
       do pure $ length blockedFunctions
 
+    -- | Get registry contract ID (if configured)
+    nonconsuming choice GetRegistryCid : Optional (ContractId MCMSRegistry)
+      with
+        submitter : Party
+      controller submitter
+      do pure registryCid
+
+    -- | Set registry contract ID (admin operation)
+    -- This links the MCMS instance to a contract registry for upgrade support
+    choice SetRegistryCid : ContractId MCMS
+      with
+        newRegistryCid : ContractId MCMSRegistry
+      controller owner
+      do create this with registryCid = Some newRegistryCid
+
+    -- | Clear registry contract ID (admin operation)
+    choice ClearRegistryCid : ContractId MCMS
+      controller owner
+      do create this with registryCid = None
+
 -- ===========================================================================
 -- VIEW TYPES
 -- ===========================================================================
@@ -480,6 +505,28 @@ setRoleState : Role -> RoleState -> MCMS -> MCMS
 setRoleState Proposer rs m = m with proposer = rs
 setRoleState Canceller rs m = m with canceller = rs
 setRoleState Bypasser rs m = m with bypasser = rs
+
+-- | Execute a self-dispatch call with accumulated outputs from previous batch calls
+-- accumulatedOutputs: Output CIDs from previous calls (e.g., UpgradeReceipt from ExecuteUpgrade)
+-- These are passed to registry operations like CompleteUpgrade
+executeSelfDispatchWithOutputs : MCMS -> TimelockCall -> [ContractId ()] -> Update MCMS
+executeSelfDispatchWithOutputs mcms call accumulatedOutputs =
+  case call.functionName of
+    -- Registry operations that need accumulated outputs
+    "CompleteUpgrade" ->
+      -- Finalize an upgrade in the registry - requires receipt from ExecuteUpgrade
+      case mcms.registryCid of
+        None -> abort "E_NO_REGISTRY: registryCid not configured"
+        Some regCid -> do
+          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
+            caller = mcms.owner
+            functionName = "CompleteUpgrade"
+            operationData = call.operationData
+            contractIds = accumulatedOutputs  -- Pass accumulated outputs (includes receipt)
+          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+
+    -- All other functions delegate to executeSelfDispatch (no outputs needed)
+    _ -> executeSelfDispatch mcms call
 
 -- | Execute a self-dispatch call (admin operations routed through timelock)
 -- This function does NOT perform role checks. This is intentional and safe because:
@@ -560,6 +607,60 @@ executeSelfDispatch mcms call =
               assertMsg "E_ALREADY_EXECUTED" $ readyTime /= doneTimestamp
               pure $ mcms with timelockTimestamps = Map.delete params.opId mcms.timelockTimestamps
 
+    -- =========================================================================
+    -- REGISTRY OPERATIONS (Contract Upgrade Support)
+    -- These operations dispatch to the MCMSRegistry for contract lifecycle management
+    -- =========================================================================
+
+    "RegisterContract" ->
+      -- Register a new contract in the registry
+      -- Requires registryCid to be set
+      case mcms.registryCid of
+        None -> abort "E_NO_REGISTRY: registryCid not configured"
+        Some regCid -> do
+          -- Dispatch to registry via MCMSReceiver interface
+          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
+            caller = mcms.owner
+            functionName = "RegisterContract"
+            operationData = call.operationData
+            contractIds = []
+          -- Update registry CID with the new one from result
+          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+
+    "InitiateUpgrade" ->
+      -- Mark a contract as pending upgrade in the registry
+      case mcms.registryCid of
+        None -> abort "E_NO_REGISTRY: registryCid not configured"
+        Some regCid -> do
+          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
+            caller = mcms.owner
+            functionName = "InitiateUpgrade"
+            operationData = call.operationData
+            contractIds = []
+          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+
+    -- NOTE: CompleteUpgrade is handled by executeSelfDispatchWithOutputs
+    -- because it needs accumulated outputs (UpgradeReceipt) from previous calls
+
+    "CancelUpgradeRegistry" ->
+      -- Cancel a pending upgrade in the registry
+      case mcms.registryCid of
+        None -> abort "E_NO_REGISTRY: registryCid not configured"
+        Some regCid -> do
+          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
+            caller = mcms.owner
+            functionName = "CancelUpgrade"
+            operationData = call.operationData
+            contractIds = []
+          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+
+    "SetRegistry" ->
+      -- Set or update the registry contract ID
+      -- operationData contains the registry instanceId for verification
+      -- The actual ContractId must be provided externally
+      -- This is a self-contained operation that doesn't require existing registry
+      pure mcms  -- Placeholder - actual registry CID would be updated via contract recreation
+
     _ -> abort $ "E_UNKNOWN_SELF_DISPATCH: " <> call.functionName
 
 -- ===========================================================================
@@ -604,7 +705,8 @@ bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids = do
     length targetCids == length externalCalls
 
   -- 2. Process all calls (self-dispatch inline, external via MCMSReceiver)
-  (_, finalMcms) <- processCallsLoop ownerParty targetCids mcms calls 0
+  -- Start with empty accumulated outputs - they get threaded between calls
+  (_, finalMcms) <- processCallsLoop ownerParty targetCids mcms calls 0 []
 
   -- 3. Increment bypasser opCount
   let finalRs = getRoleState Bypasser finalMcms
@@ -629,12 +731,15 @@ cancelBatchInternal mcms rs opIdToCancel = do
   create (updated with timelockTimestamps = Map.delete opIdToCancel mcms.timelockTimestamps)
 
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
-processCallsLoop : Party -> [ContractId MCMSReceiver] -> MCMS -> [TimelockCall] -> Int -> Update (Int, MCMS)
-processCallsLoop _ _ mcms [] extIdx = pure (extIdx, mcms)
-processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx
+-- accumulatedOutputs: Output CIDs from previous calls in the batch, threaded to subsequent calls
+-- This enables ExecuteUpgrade to produce a receipt that CompleteUpgrade can consume
+processCallsLoop : Party -> [ContractId MCMSReceiver] -> MCMS -> [TimelockCall] -> Int -> [ContractId ()] -> Update (Int, MCMS)
+processCallsLoop _ _ mcms [] extIdx _accumulatedOutputs = pure (extIdx, mcms)
+processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx accumulatedOutputs
   | call.targetInstanceId == mcms.instanceId = do
-      newMcms <- executeSelfDispatch mcms call
-      processCallsLoop ownerParty targetCids newMcms rest extIdx
+      -- Self-dispatch: pass accumulatedOutputs as contractIds for registry operations
+      newMcms <- executeSelfDispatchWithOutputs mcms call accumulatedOutputs
+      processCallsLoop ownerParty targetCids newMcms rest extIdx accumulatedOutputs
   | otherwise = do
       let targetCid = targetCids !! extIdx
       target <- fetch targetCid
@@ -646,9 +751,13 @@ processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx
         Some partyIdText ->
           assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
             any (\s -> partyToText s == partyIdText) (signatory target)
-      _ <- exercise targetCid MCMSReceiver_Entrypoint with
+      -- Exercise and receive MCMSEntrypointResult
+      -- Merge accumulated outputs with call's contractIds
+      result <- exercise targetCid MCMSReceiver_Entrypoint with
         caller = ownerParty
         functionName = call.functionName
         operationData = call.operationData
-        contractIds = []
-      processCallsLoop ownerParty targetCids mcms rest (extIdx + 1)
+        contractIds = call.contractIds <> accumulatedOutputs
+      -- Accumulate this call's outputCids for subsequent calls
+      let newAccumulatedOutputs = accumulatedOutputs <> result.outputCids
+      processCallsLoop ownerParty targetCids mcms rest (extIdx + 1) newAccumulatedOutputs

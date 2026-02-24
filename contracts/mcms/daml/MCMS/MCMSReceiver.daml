@@ -23,10 +23,31 @@ data ArgValue
 -- ===========================================================================
 
 -- | View for MCMSReceiver interface
+-- Enhanced view includes version and contractType for registry introspection
 data MCMSReceiverView = MCMSReceiverView
   with
     owner : Party
-    instanceId : Text  -- Stable identifier that doesn't change when contract updates
+    instanceId : Text    -- Stable identifier that doesn't change when contract updates
+    version : Text       -- Current version (e.g., "1.0.0")
+    contractType : Text  -- Template name (e.g., "Counter", "OffRamp", "GlobalConfig")
+  deriving (Show, Eq)
+
+-- ===========================================================================
+-- RICH RETURN TYPE (replaces simple ContractId)
+-- ===========================================================================
+
+-- | Result of MCMSReceiver_Entrypoint
+-- - selfCid: The updated contract (archive/recreate pattern)
+-- - outputCids: Auxiliary outputs (tickets, receipts, etc.)
+--
+-- This rich return type allows:
+-- - PrepareUpgrade to return the ticket CID directly (no event inspection needed)
+-- - Future operations to return multiple outputs
+-- - Normal operations to return empty outputCids (backward compatible)
+data MCMSEntrypointResult = MCMSEntrypointResult
+  with
+    selfCid : ContractId MCMSReceiver    -- Updated self after operation
+    outputCids : [ContractId ()]          -- Auxiliary outputs (e.g., tickets)
   deriving (Show, Eq)
 
 -- | MCMSReceiver interface
@@ -43,13 +64,16 @@ interface MCMSReceiver where
   -- MCMS has already verified the Merkle proof and signatures
   --
   -- Parameters:
+  --   selfCid: The contract's own ContractId (passed from choice for exercising sub-choices)
   --   functionName: The function to call (e.g., "increment", "setConfig")
   --   operationData: Serialized parameters (hex) - contract decodes this
   --   contractIds: Array of untyped contract IDs that the target may need to invoke
   --                Receiving contract uses coerceContractId to cast to specific types
   --
-  -- Returns: New contract ID after operation
-  mcmsEntrypoint : Text -> Text -> [ContractId ()] -> Update (ContractId MCMSReceiver)
+  -- Returns: MCMSEntrypointResult with:
+  --   - selfCid: The updated contract after the operation
+  --   - outputCids: Auxiliary outputs (e.g., StateMigrationTicket for PrepareUpgrade)
+  mcmsEntrypoint : ContractId MCMSReceiver -> Text -> Text -> [ContractId ()] -> Update MCMSEntrypointResult
 
   -- | Non-consuming choice to get instance ID (for validation)
   nonconsuming choice MCMSReceiver_GetInstanceId : Text
@@ -60,10 +84,21 @@ interface MCMSReceiver where
       let v = view this
       pure v.instanceId
 
+  -- | Get full view (version, type, etc.)
+  -- Allows external callers to read contract metadata
+  nonconsuming choice MCMSReceiver_GetView : MCMSReceiverView
+    with
+      viewer : Party
+    controller viewer
+    do
+      pure (view this)
+
   -- | Choice for MCMS to call with verified operation
   -- Only ccip_owner can call this (MCMS has ccip_owner as signatory)
   -- The implementation dispatches based on functionName
-  choice MCMSReceiver_Entrypoint : ContractId MCMSReceiver
+  -- NOTE: This is non-consuming so that mcmsEntrypoint can exercise consuming
+  --       sub-choices on self (Daml doesn't allow double-consumption)
+  nonconsuming choice MCMSReceiver_Entrypoint : MCMSEntrypointResult
     with
       caller : Party             -- Must be ccip_owner (MCMS passes this through)
       functionName : Text        -- Function to execute
@@ -71,9 +106,14 @@ interface MCMSReceiver where
       contractIds : [ContractId ()]  -- Untyped contract IDs for target to use
     controller caller
     do
+      -- Explicit authorization check (defense-in-depth)
+      let v = view this
+      assertMsg "E_UNAUTHORIZED: caller must be owner" $ caller == v.owner
+
       -- Call the interface method implementation
       -- `mcmsEntrypoint` is the abstract method that implementations provide
-      ((this `mcmsEntrypoint` functionName) operationData) contractIds
+      -- Pass `self` so the implementation can exercise consuming sub-choices
+      (((this `mcmsEntrypoint` self) functionName) operationData) contractIds
 
 -- ===========================================================================
 -- HELPER FUNCTIONS
@@ -118,3 +158,32 @@ getIntValue m key =
       Some i -> pure i
       None -> abort $ "Invalid int for key: " <> key
     None -> abort $ "Missing key: " <> key
+
+-- ===========================================================================
+-- UPGRADE RECEIPT
+-- ===========================================================================
+
+-- | Proof that an upgrade was executed
+-- Created by ExecuteUpgrade, consumed by CompleteUpgrade
+-- Security properties:
+--   - Forgery prevention: signatory owner (only upgrade service can create)
+--   - Reuse prevention: consumed (archived) during CompleteUpgrade
+--   - Cross-upgrade prevention: contains instanceId/versions that must match PendingUpgrade
+--   - Owner consistency: receipt owner must match registry owner
+template UpgradeReceipt
+  with
+    owner : Party                  -- ccip_owner party (must match registry owner)
+    instanceId : Text              -- Contract that was upgraded
+    fromVersion : Text             -- Version upgraded from
+    toVersion : Text               -- Version upgraded to
+    newContractCid : ContractId () -- The V2 contract created (untyped for flexibility)
+    executedAt : Time              -- When the upgrade was executed
+    serviceInstanceId : Text       -- Which upgrade service performed this
+  where
+    signatory owner
+
+    -- | Consume the receipt (prevents reuse)
+    -- Called by CompleteUpgrade after validation
+    choice ConsumeUpgradeReceipt : ()
+      controller owner
+      do pure ()

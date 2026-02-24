@@ -1,0 +1,403 @@
+-- | MCMS Registry for Contract Upgrade Support
+-- Tracks MCMS-governed contracts and manages upgrade lifecycle
+module MCMS.MCMSRegistry where
+
+import DA.Map qualified as Map
+import DA.Optional (fromOptional)
+import DA.Text qualified as T
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSEntrypointResult(..), UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
+import MCMS.RegistryCodec
+  ( decodeRegisterContractParams
+  , decodeInitiateUpgradeParams
+  , decodeCompleteUpgradeParams
+  , decodeCancelUpgradeParams
+  )
+
+-- ===========================================================================
+-- DATA TYPES
+-- ===========================================================================
+
+-- | Status of a registered contract
+data ContractStatus
+  = Active           -- Contract is operational
+  | UpgradePending   -- Upgrade has been initiated
+  | Deprecated       -- Contract has been replaced by newer version
+  deriving (Show, Eq, Ord)
+
+-- | Registration information for a governed contract
+data ContractRegistration = ContractRegistration
+  with
+    instanceId : Text              -- Stable identifier
+    version : Text                 -- Semantic version (e.g., "1.0.0")
+    status : ContractStatus        -- Current status
+    deployedAt : Time              -- When contract was registered
+    contractType : Text            -- Template name
+    metadata : Map.Map Text Text   -- Additional metadata
+  deriving (Show, Eq)
+
+-- | Information about a pending upgrade
+data PendingUpgrade = PendingUpgrade
+  with
+    instanceId : Text              -- Contract being upgraded
+    fromVersion : Text             -- Current version
+    toVersion : Text               -- Target version
+    initiatedAt : Time             -- When upgrade was initiated
+    migrationParams : Text         -- Hex-encoded migration parameters
+  deriving (Show, Eq)
+
+-- | Historical record of an upgrade
+data UpgradeHistoryEntry = UpgradeHistoryEntry
+  with
+    fromVersion : Text             -- Previous version
+    toVersion : Text               -- New version
+    upgradedAt : Time              -- When upgrade completed
+    migrationParams : Text         -- Parameters used
+  deriving (Show, Eq)
+
+-- ===========================================================================
+-- MCMS REGISTRY TEMPLATE
+-- ===========================================================================
+
+-- | Central registry for MCMS-governed contracts
+-- Implements MCMSReceiver to be controllable via MCMS governance
+template MCMSRegistry
+  with
+    owner : Party                                           -- ccip_owner party
+    instanceId : Text                                       -- Registry's stable identifier
+    registrations : Map.Map Text ContractRegistration       -- instanceId -> registration
+    pendingUpgrades : Map.Map Text PendingUpgrade           -- instanceId -> pending upgrade
+    upgradeHistory : Map.Map Text [UpgradeHistoryEntry]     -- instanceId -> history
+  where
+    signatory owner
+
+    -- =========================================================================
+    -- MCMS RECEIVER INTERFACE
+    -- =========================================================================
+
+    interface instance MCMSReceiver for MCMSRegistry where
+      view = MCMSReceiverView with
+        owner
+        instanceId
+        version = "1.0.0"            -- Version for registry
+        contractType = "MCMSRegistry"  -- Type for identification
+
+      mcmsEntrypoint selfCid functionName operationData contractIds = do
+        now <- getTime
+        -- Archive old contract (MCMSReceiver_Entrypoint is non-consuming)
+        let selfRegistryCid : ContractId MCMSRegistry = coerceContractId selfCid
+        exercise selfRegistryCid ArchiveRegistry
+        case functionName of
+          "RegisterContract" ->
+            case decodeRegisterContractParams operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode RegisterContract params"
+              Some params -> do
+                assertMsg "E_ALREADY_REGISTERED" $
+                  not $ Map.member params.instanceId registrations
+                let metadata = buildMetadataMap params.metadataKeys params.metadataValues
+                let registration = ContractRegistration with
+                      instanceId = params.instanceId
+                      version = params.version
+                      status = Active
+                      deployedAt = now
+                      contractType = params.contractType
+                      metadata
+                let newRegistrations = Map.insert params.instanceId registration registrations
+                newCid <- create this with registrations = newRegistrations
+                pure MCMSEntrypointResult with
+                  selfCid = toInterfaceContractId @MCMSReceiver newCid
+                  outputCids = []
+
+          "InitiateUpgrade" ->
+            case decodeInitiateUpgradeParams operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode InitiateUpgrade params"
+              Some params -> do
+                -- Verify contract exists and is active
+                case Map.lookup params.instanceId registrations of
+                  None -> abort $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
+                  Some reg -> do
+                    assertMsg "E_NOT_ACTIVE" $ reg.status == Active
+                    assertMsg "E_VERSION_MISMATCH" $ reg.version == params.fromVersion
+                    -- Check no pending upgrade
+                    assertMsg "E_UPGRADE_ALREADY_PENDING" $
+                      not $ Map.member params.instanceId pendingUpgrades
+                    -- Create pending upgrade
+                    let upgrade = PendingUpgrade with
+                          instanceId = params.instanceId
+                          fromVersion = params.fromVersion
+                          toVersion = params.toVersion
+                          initiatedAt = now
+                          migrationParams = params.migrationParams
+                    let newPending = Map.insert params.instanceId upgrade pendingUpgrades
+                    -- Mark registration as upgrade pending
+                    let updatedReg = reg with status = UpgradePending
+                    let newRegistrations = Map.insert params.instanceId updatedReg registrations
+                    newCid <- create this with
+                      registrations = newRegistrations
+                      pendingUpgrades = newPending
+                    pure MCMSEntrypointResult with
+                      selfCid = toInterfaceContractId @MCMSReceiver newCid
+                      outputCids = []
+
+          "CompleteUpgrade" ->
+            case decodeCompleteUpgradeParams operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode CompleteUpgrade params"
+              Some params -> do
+                -- Verify pending upgrade exists
+                case Map.lookup params.instanceId pendingUpgrades of
+                  None -> abort $ "E_NO_PENDING_UPGRADE: " <> params.instanceId
+                  Some pending -> do
+                    assertMsg "E_VERSION_MISMATCH" $ pending.toVersion == params.newVersion
+
+                    -- NEW: Require UpgradeReceipt from ExecuteUpgrade
+                    case contractIds of
+                      [] -> abort "E_MISSING_UPGRADE_RECEIPT"
+                      (receiptCidUntyped :: _) -> do
+                        -- Cast to UpgradeReceipt and fetch
+                        let receiptCid : ContractId UpgradeReceipt = coerceContractId receiptCidUntyped
+                        receipt <- fetch receiptCid
+
+                        -- Validate receipt matches pending upgrade
+                        assertMsg "E_RECEIPT_INSTANCE_MISMATCH" $
+                          receipt.instanceId == params.instanceId
+                        assertMsg "E_RECEIPT_FROM_VERSION_MISMATCH" $
+                          receipt.fromVersion == pending.fromVersion
+                        assertMsg "E_RECEIPT_TO_VERSION_MISMATCH" $
+                          receipt.toVersion == pending.toVersion
+                        assertMsg "E_RECEIPT_OWNER_MISMATCH" $
+                          receipt.owner == owner
+
+                        -- Consume receipt (prevents reuse)
+                        exercise receiptCid ConsumeUpgradeReceipt
+
+                        -- Get current registration
+                        case Map.lookup params.instanceId registrations of
+                          None -> abort $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
+                          Some reg -> do
+                            -- Update registration to new version
+                            let updatedReg = reg with
+                                  version = params.newVersion
+                                  status = Active
+                            let newRegistrations = Map.insert params.instanceId updatedReg registrations
+                            -- Remove pending upgrade
+                            let newPending = Map.delete params.instanceId pendingUpgrades
+                            -- Add to history
+                            let historyEntry = UpgradeHistoryEntry with
+                                  fromVersion = pending.fromVersion
+                                  toVersion = pending.toVersion
+                                  upgradedAt = now
+                                  migrationParams = pending.migrationParams
+                            let existingHistory = fromOptional [] (Map.lookup params.instanceId upgradeHistory)
+                            let newHistory = Map.insert params.instanceId (historyEntry :: existingHistory) upgradeHistory
+                            newCid <- create this with
+                              registrations = newRegistrations
+                              pendingUpgrades = newPending
+                              upgradeHistory = newHistory
+                            pure MCMSEntrypointResult with
+                              selfCid = toInterfaceContractId @MCMSReceiver newCid
+                              outputCids = []
+
+          "CancelUpgrade" ->
+            case decodeCancelUpgradeParams operationData of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode CancelUpgrade params"
+              Some params -> do
+                -- Verify pending upgrade exists
+                assertMsg ("E_NO_PENDING_UPGRADE: " <> params.instanceId) $
+                  Map.member params.instanceId pendingUpgrades
+                -- Get current registration
+                case Map.lookup params.instanceId registrations of
+                  None -> abort $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
+                  Some reg -> do
+                    -- Restore to active status
+                    let updatedReg = reg with status = Active
+                    let newRegistrations = Map.insert params.instanceId updatedReg registrations
+                    -- Remove pending upgrade
+                    let newPending = Map.delete params.instanceId pendingUpgrades
+                    newCid <- create this with
+                      registrations = newRegistrations
+                      pendingUpgrades = newPending
+                    pure MCMSEntrypointResult with
+                      selfCid = toInterfaceContractId @MCMSReceiver newCid
+                      outputCids = []
+
+          "DeprecateContract" -> do
+            -- Deprecate a contract (usually after successful upgrade)
+            (targetInstanceId, _) <- case decodeTextSimple operationData 0 of
+              None -> abort "E_INVALID_OPERATION_DATA: failed to decode instanceId"
+              Some r -> pure r
+            case Map.lookup targetInstanceId registrations of
+              None -> abort $ "E_CONTRACT_NOT_FOUND: " <> targetInstanceId
+              Some reg -> do
+                let updatedReg = reg with status = Deprecated
+                let newRegistrations = Map.insert targetInstanceId updatedReg registrations
+                newCid <- create this with registrations = newRegistrations
+                pure MCMSEntrypointResult with
+                  selfCid = toInterfaceContractId @MCMSReceiver newCid
+                  outputCids = []
+
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+    -- =========================================================================
+    -- INTERNAL CHOICES
+    -- =========================================================================
+
+    -- | Archive choice for state transitions (called by mcmsEntrypoint)
+    choice ArchiveRegistry : ()
+      controller owner
+      do pure ()
+
+    -- =========================================================================
+    -- VIEW CHOICES
+    -- =========================================================================
+
+    -- | Get information about a registered contract
+    nonconsuming choice GetContractInfo : Optional ContractRegistration
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ Map.lookup targetInstanceId registrations
+
+    -- | Get pending upgrade information for a contract
+    nonconsuming choice GetPendingUpgrade : Optional PendingUpgrade
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ Map.lookup targetInstanceId pendingUpgrades
+
+    -- | List all registered contracts
+    nonconsuming choice ListRegistrations : [ContractRegistration]
+      with
+        viewer : Party
+      controller viewer
+      do pure $ map snd (Map.toList registrations)
+
+    -- | Get upgrade history for a contract
+    nonconsuming choice GetUpgradeHistory : [UpgradeHistoryEntry]
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ fromOptional [] (Map.lookup targetInstanceId upgradeHistory)
+
+    -- | Check if a contract is registered
+    nonconsuming choice IsRegistered : Bool
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ Map.member targetInstanceId registrations
+
+    -- | Check if a contract has a pending upgrade
+    nonconsuming choice HasPendingUpgrade : Bool
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ Map.member targetInstanceId pendingUpgrades
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Build metadata map from parallel key/value lists
+buildMetadataMap : [Text] -> [Text] -> Map.Map Text Text
+buildMetadataMap [] _ = Map.empty
+buildMetadataMap _ [] = Map.empty
+buildMetadataMap (k :: ks) (v :: vs) =
+  Map.insert k v (buildMetadataMap ks vs)
+
+-- | Simple text decoder for single text parameter
+-- Format: len (1 byte) + text bytes
+decodeTextSimple : Text -> Int -> Optional (Text, Int)
+decodeTextSimple encoded offset = do
+  let hexLen = T.length encoded
+  let byteLen = hexLen / 2
+  if offset >= byteLen then None
+  else do
+    let lenHex = T.take 2 (T.drop (offset * 2) encoded)
+    len <- hexToInt lenHex
+    if len == 0
+      then Some ("", offset + 1)
+      else do
+        let textHex = T.take (len * 2) (T.drop ((offset + 1) * 2) encoded)
+        text <- hexToText textHex
+        Some (text, offset + 1 + len)
+
+-- | Convert hex string to int (single byte)
+hexToInt : Text -> Optional Int
+hexToInt hex =
+  let chars = T.explode hex
+  in case chars of
+    [c1, c2] -> do
+      v1 <- hexCharValue c1
+      v2 <- hexCharValue c2
+      Some (v1 * 16 + v2)
+    _ -> None
+
+-- | Get numeric value of a hex character
+hexCharValue : Text -> Optional Int
+hexCharValue "0" = Some 0
+hexCharValue "1" = Some 1
+hexCharValue "2" = Some 2
+hexCharValue "3" = Some 3
+hexCharValue "4" = Some 4
+hexCharValue "5" = Some 5
+hexCharValue "6" = Some 6
+hexCharValue "7" = Some 7
+hexCharValue "8" = Some 8
+hexCharValue "9" = Some 9
+hexCharValue "a" = Some 10
+hexCharValue "A" = Some 10
+hexCharValue "b" = Some 11
+hexCharValue "B" = Some 11
+hexCharValue "c" = Some 12
+hexCharValue "C" = Some 12
+hexCharValue "d" = Some 13
+hexCharValue "D" = Some 13
+hexCharValue "e" = Some 14
+hexCharValue "E" = Some 14
+hexCharValue "f" = Some 15
+hexCharValue "F" = Some 15
+hexCharValue _ = None
+
+-- | Convert hex to text
+hexToText : Text -> Optional Text
+hexToText "" = Some ""
+hexToText hex =
+  let chars = T.explode hex
+  in hexToTextHelper chars ""
+
+hexToTextHelper : [Text] -> Text -> Optional Text
+hexToTextHelper [] acc = Some acc
+hexToTextHelper [_] _ = None  -- Odd number of chars
+hexToTextHelper (c1 :: c2 :: rest) acc = do
+  v <- hexToInt (c1 <> c2)
+  let char = charFromInt v
+  hexToTextHelper rest (acc <> char)
+
+-- | Convert int to character (ASCII)
+charFromInt : Int -> Text
+charFromInt n =
+  -- Basic ASCII printable range
+  if n >= 32 && n <= 126
+  then intToChar n
+  else "?"
+
+-- | Placeholder for int to char conversion
+intToChar : Int -> Text
+intToChar n =
+  case n of
+    32 -> " "; 33 -> "!"; 34 -> "\""; 35 -> "#"; 36 -> "$"; 37 -> "%"; 38 -> "&"; 39 -> "'"
+    40 -> "("; 41 -> ")"; 42 -> "*"; 43 -> "+"; 44 -> ","; 45 -> "-"; 46 -> "."; 47 -> "/"
+    48 -> "0"; 49 -> "1"; 50 -> "2"; 51 -> "3"; 52 -> "4"; 53 -> "5"; 54 -> "6"; 55 -> "7"
+    56 -> "8"; 57 -> "9"; 58 -> ":"; 59 -> ";"; 60 -> "<"; 61 -> "="; 62 -> ">"; 63 -> "?"
+    64 -> "@"; 65 -> "A"; 66 -> "B"; 67 -> "C"; 68 -> "D"; 69 -> "E"; 70 -> "F"; 71 -> "G"
+    72 -> "H"; 73 -> "I"; 74 -> "J"; 75 -> "K"; 76 -> "L"; 77 -> "M"; 78 -> "N"; 79 -> "O"
+    80 -> "P"; 81 -> "Q"; 82 -> "R"; 83 -> "S"; 84 -> "T"; 85 -> "U"; 86 -> "V"; 87 -> "W"
+    88 -> "X"; 89 -> "Y"; 90 -> "Z"; 91 -> "["; 92 -> "\\"; 93 -> "]"; 94 -> "^"; 95 -> "_"
+    96 -> "`"; 97 -> "a"; 98 -> "b"; 99 -> "c"; 100 -> "d"; 101 -> "e"; 102 -> "f"; 103 -> "g"
+    104 -> "h"; 105 -> "i"; 106 -> "j"; 107 -> "k"; 108 -> "l"; 109 -> "m"; 110 -> "n"; 111 -> "o"
+    112 -> "p"; 113 -> "q"; 114 -> "r"; 115 -> "s"; 116 -> "t"; 117 -> "u"; 118 -> "v"; 119 -> "w"
+    120 -> "x"; 121 -> "y"; 122 -> "z"; 123 -> "{"; 124 -> "|"; 125 -> "}"; 126 -> "~"
+    _ -> "?"

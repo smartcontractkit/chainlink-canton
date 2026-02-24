@@ -1,0 +1,297 @@
+-- | CounterV2 - Example Upgradeable Contract
+-- Demonstrates upgrade pattern from Counter -> CounterV2
+module MCMS.CounterV2 where
+
+import DA.Text qualified as T
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSEntrypointResult(..), UpgradeReceipt(..))
+import MCMS.Counter (Counter(..), ArchiveCounter(..))
+
+-- ===========================================================================
+-- COUNTERV2 CONTRACT (Upgraded from Counter)
+-- ===========================================================================
+
+-- | Enhanced counter with label field (demonstrates state migration)
+-- Upgrades from Counter by adding:
+--   - label: Text field for naming the counter
+--   - lastModified: Timestamp of last modification
+--
+-- Simplified upgrade flow (via MCMS batch):
+--   1. InitiateUpgrade on Registry
+--   2. ExecuteUpgrade on CounterUpgradeService with contractIds=[oldCounterCid]
+--   3. CompleteUpgrade on Registry
+--
+-- Single atomic operation: fetch → validate → archive → create
+template CounterV2
+  with
+    owner : Party                              -- Same ccip_owner party as MCMS
+    instanceId : Text                          -- Stable identifier (preserved across upgrade)
+    value : Int                                -- Current counter value (migrated from v1)
+    label : Text                               -- NEW: Name/label for this counter
+    lastModified : Time                        -- NEW: Last modification timestamp
+    migratedFrom : Optional Text               -- Version this was migrated from (None if fresh)
+  where
+    signatory owner
+
+    -- Implement MCMSReceiver interface
+    interface instance MCMSReceiver for CounterV2 where
+      view = MCMSReceiverView with
+        owner
+        instanceId
+        version = "2.0.0"           -- Version for registry
+        contractType = "CounterV2"  -- Type for identification
+
+      mcmsEntrypoint selfCid functionName operationData _contractIds = do
+        -- Coerce interface ContractId to template ContractId for exercising choices
+        let selfCounterV2Cid : ContractId CounterV2 = coerceContractId selfCid
+
+        -- Dispatch to public choices (decode operationData as needed)
+        case functionName of
+          "Increment" -> do
+            newCid <- exercise selfCounterV2Cid Increment
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
+
+          "Decrement" -> do
+            newCid <- exercise selfCounterV2Cid Decrement
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
+
+          "SetValue" -> do
+            let newValue = parseDecimalToInt operationData
+            newCid <- exercise selfCounterV2Cid SetValue with newValue
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
+
+          "SetLabel" -> do
+            newCid <- exercise selfCounterV2Cid SetLabel with newLabel = operationData
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
+
+          "Reset" -> do
+            newCid <- exercise selfCounterV2Cid Reset
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
+
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+    -- =========================================================================
+    -- OWNER OPERATIONS (direct access, gated by controller owner)
+    -- =========================================================================
+
+    -- | Increment counter by 1
+    choice Increment : ContractId CounterV2
+      controller owner
+      do
+        now <- getTime
+        debug $ "CounterV2: incrementing value from " <> show value <> " to " <> show (value + 1)
+        create this with value = value + 1, lastModified = now
+
+    -- | Decrement counter by 1
+    choice Decrement : ContractId CounterV2
+      controller owner
+      do
+        now <- getTime
+        debug $ "CounterV2: decrementing value from " <> show value <> " to " <> show (value - 1)
+        create this with value = value - 1, lastModified = now
+
+    -- | Set counter to specific value
+    choice SetValue : ContractId CounterV2
+      with
+        newValue : Int
+      controller owner
+      do
+        now <- getTime
+        debug $ "CounterV2: setting value to " <> show newValue
+        create this with value = newValue, lastModified = now
+
+    -- | Set counter label
+    choice SetLabel : ContractId CounterV2
+      with
+        newLabel : Text
+      controller owner
+      do
+        now <- getTime
+        debug $ "CounterV2: setting label to " <> newLabel
+        create this with label = newLabel, lastModified = now
+
+    -- | Reset counter to zero
+    choice Reset : ContractId CounterV2
+      controller owner
+      do
+        now <- getTime
+        debug $ "CounterV2: resetting value to 0"
+        create this with value = 0, lastModified = now
+
+    -- =========================================================================
+    -- VIEW CHOICES
+    -- =========================================================================
+
+    nonconsuming choice GetValueV2 : Int
+      with viewer : Party
+      controller viewer
+      do pure value
+
+    nonconsuming choice GetLabelV2 : Text
+      with viewer : Party
+      controller viewer
+      do pure label
+
+    nonconsuming choice GetLastModifiedV2 : Time
+      with viewer : Party
+      controller viewer
+      do pure lastModified
+
+    nonconsuming choice GetFullStateV2 : CounterV2State
+      with viewer : Party
+      controller viewer
+      do pure CounterV2State with value, label, lastModified, migratedFrom
+
+-- | State snapshot for views
+data CounterV2State = CounterV2State
+  with
+    value : Int
+    label : Text
+    lastModified : Time
+    migratedFrom : Optional Text
+  deriving (Show, Eq)
+
+-- ===========================================================================
+-- UPGRADE SERVICE (MCMSReceiver-based Executor)
+-- ===========================================================================
+
+-- | Upgrade service - single atomic operation
+-- Receives old contract CID via contractIds, fetches state at execution time
+--
+-- Simplified upgrade flow:
+--   1. InitiateUpgrade on Registry
+--   2. ExecuteUpgrade on this service with contractIds=[oldCounterCid]
+--   3. CompleteUpgrade on Registry
+--
+-- Batch call format:
+--   functionName = "ExecuteUpgrade"
+--   operationData = "instanceId|fromVersion|toVersion"
+--   contractIds = [oldCounterCid]
+template CounterUpgradeService
+  with
+    owner : Party
+    serviceInstanceId : Text  -- e.g., "counter-upgrade-service@owner"
+  where
+    signatory owner
+
+    interface instance MCMSReceiver for CounterUpgradeService where
+      view = MCMSReceiverView with
+        owner
+        instanceId = serviceInstanceId
+        version = "1.0.0"
+        contractType = "CounterUpgradeService"
+
+      mcmsEntrypoint selfCid functionName operationData contractIds = do
+        let selfServiceCid : ContractId CounterUpgradeService = coerceContractId selfCid
+        case functionName of
+          "ExecuteUpgrade" ->
+            case contractIds of
+              (oldCounterCidUntyped :: _) -> do
+                (newServiceCid, newCounterV2Cid, receiptCid) <- exercise selfServiceCid ExecuteUpgrade with
+                  upgradeData = operationData
+                  oldCounterCidUntyped
+                -- Return receipt first so it's available for CompleteUpgrade
+                pure MCMSEntrypointResult with
+                  selfCid = toInterfaceContractId @MCMSReceiver newServiceCid
+                  outputCids = [coerceContractId receiptCid, coerceContractId newCounterV2Cid]
+              _ -> abort "E_MISSING_CONTRACT_ID: need [oldCounterCid]"
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+    -- | Execute upgrade from Counter V1 to CounterV2
+    -- Single atomic operation: fetch -> validate -> archive -> create -> receipt
+    -- Returns: (new service CID, new CounterV2 CID, UpgradeReceipt CID)
+    choice ExecuteUpgrade : (ContractId CounterUpgradeService, ContractId CounterV2, ContractId UpgradeReceipt)
+      with
+        upgradeData : Text           -- "instanceId|fromVersion|toVersion"
+        oldCounterCidUntyped : ContractId ()
+      controller owner
+      do
+        now <- getTime
+        let (instanceId, fromVersion, toVersion) = parseUpgradeParams upgradeData
+
+        -- 1. Fetch old contract
+        let oldCounterCid : ContractId Counter = coerceContractId oldCounterCidUntyped
+        oldCounter <- fetch oldCounterCid
+
+        -- 2. Validate
+        assertMsg "E_INSTANCE_ID_MISMATCH" $ oldCounter.instanceId == instanceId
+        assertMsg ("E_SOURCE_VERSION_MISMATCH: expected " <> fromVersion) $ fromVersion == "1.0.0"
+        assertMsg ("E_TARGET_VERSION_MISMATCH: expected " <> toVersion) $ toVersion == "2.0.0"
+
+        -- 3. Archive old contract
+        exercise oldCounterCid ArchiveCounter
+
+        -- 4. Create new CounterV2
+        newCounterV2Cid <- create CounterV2 with
+          owner = oldCounter.owner
+          instanceId = oldCounter.instanceId
+          value = oldCounter.value  -- Direct state read
+          label = "Upgraded from " <> fromVersion
+          lastModified = now
+          migratedFrom = Some fromVersion
+
+        -- 5. Create UpgradeReceipt as proof for CompleteUpgrade
+        receiptCid <- create UpgradeReceipt with
+          owner = oldCounter.owner
+          instanceId
+          fromVersion
+          toVersion
+          newContractCid = coerceContractId newCounterV2Cid
+          executedAt = now
+          serviceInstanceId
+
+        debug $ "Upgrade complete: " <> instanceId <> " " <> fromVersion <> " -> " <> toVersion
+
+        newServiceCid <- create this
+        pure (newServiceCid, newCounterV2Cid, receiptCid)
+
+-- | Parse upgrade parameters from "instanceId|fromVersion|toVersion" format
+parseUpgradeParams : Text -> (Text, Text, Text)
+parseUpgradeParams t =
+  case T.splitOn "|" t of
+    [instanceId, fromVersion, toVersion] -> (instanceId, fromVersion, toVersion)
+    _ -> error "E_INVALID_UPGRADE_PARAMS: expected 'instanceId|fromVersion|toVersion'"
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+serializeCounterV2State : Int -> Text -> Text
+serializeCounterV2State v l = show v <> "|" <> l
+
+parseDecimalToInt : Text -> Int
+parseDecimalToInt t =
+  case parseDecimalToIntHelper (T.explode t) 0 False of
+    Some n -> n
+    None -> 0
+
+parseDecimalToIntHelper : [Text] -> Int -> Bool -> Optional Int
+parseDecimalToIntHelper [] acc neg = Some (if neg then negate acc else acc)
+parseDecimalToIntHelper ("-" :: rest) 0 False =
+  parseDecimalToIntHelper rest 0 True
+parseDecimalToIntHelper (c :: rest) acc neg =
+  case digitValue c of
+    Some d -> parseDecimalToIntHelper rest (acc * 10 + d) neg
+    None -> Some (if neg then negate acc else acc)
+
+digitValue : Text -> Optional Int
+digitValue "0" = Some 0
+digitValue "1" = Some 1
+digitValue "2" = Some 2
+digitValue "3" = Some 3
+digitValue "4" = Some 4
+digitValue "5" = Some 5
+digitValue "6" = Some 6
+digitValue "7" = Some 7
+digitValue "8" = Some 8
+digitValue "9" = Some 9
+digitValue _ = None

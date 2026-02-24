@@ -1,7 +1,7 @@
 -- | Mock / adversarial contracts used by MCMS unit tests.
 module MCMS.Mock.ForgedReceiver where
 
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..))
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSEntrypointResult(..))
 
 -- | A malicious receiver that can "lie" in its view.instanceId by embedding
 -- an arbitrary party id text. This is used to test that MCMS rejects targets
@@ -18,6 +18,8 @@ template ForgedReceiver
       view = MCMSReceiverView with
         owner
         instanceId = baseId <> "@" <> forgedPartyIdText
+        version = "1.0.0"
+        contractType = "ForgedReceiver"
 
-      mcmsEntrypoint _functionName _operationData _contractIds =
+      mcmsEntrypoint _selfCid _functionName _operationData _contractIds =
         abort "ForgedReceiver: entrypoint should not be called in this test"

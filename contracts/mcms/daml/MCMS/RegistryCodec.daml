@@ -1,0 +1,183 @@
+-- | Registry Codec for MCMS Contract Registry
+-- Encoding/decoding functions for registry operation parameters
+module MCMS.RegistryCodec
+  ( RegisterContractParams(..)
+  , encodeRegisterContractParams
+  , decodeRegisterContractParams
+  , InitiateUpgradeParams(..)
+  , encodeInitiateUpgradeParams
+  , decodeInitiateUpgradeParams
+  , CompleteUpgradeParams(..)
+  , encodeCompleteUpgradeParams
+  , decodeCompleteUpgradeParams
+  , CancelUpgradeParams(..)
+  , encodeCancelUpgradeParams
+  , decodeCancelUpgradeParams
+  ) where
+
+import DA.Crypto.Text (BytesHex)
+import DA.Optional (fromSome)
+import MCMS.Codec
+  ( encodeText
+  , decodeText
+  , encodeUint32
+  , decodeUint32
+  , extractBytes
+  )
+
+-- ===========================================================================
+-- REGISTER CONTRACT PARAMS
+-- ===========================================================================
+
+-- | Parameters for RegisterContract operation
+-- Format:
+--   instanceId (text)
+--   version (text)
+--   contractType (text)
+--   numMetadata (1 byte) + for each: key (text) + value (text)
+data RegisterContractParams = RegisterContractParams
+  with
+    instanceId : Text        -- Stable identifier
+    version : Text           -- Semantic version (e.g., "1.0.0")
+    contractType : Text      -- Template name
+    metadataKeys : [Text]    -- Metadata keys
+    metadataValues : [Text]  -- Metadata values (parallel array)
+  deriving (Show, Eq)
+
+-- | Encode RegisterContractParams to bytes
+encodeRegisterContractParams : RegisterContractParams -> BytesHex
+encodeRegisterContractParams params =
+  let
+    instanceIdEncoded = encodeText params.instanceId
+    versionEncoded = encodeText params.version
+    contractTypeEncoded = encodeText params.contractType
+    numMetadata = length params.metadataKeys
+    numMetadataEncoded = fromSome (encodeUint32 numMetadata)
+    metadataEncoded = encodeMetadataPairs params.metadataKeys params.metadataValues
+  in
+    instanceIdEncoded <> versionEncoded <> contractTypeEncoded <> numMetadataEncoded <> metadataEncoded
+
+-- | Helper to encode metadata key-value pairs
+encodeMetadataPairs : [Text] -> [Text] -> BytesHex
+encodeMetadataPairs [] _ = ""
+encodeMetadataPairs _ [] = ""
+encodeMetadataPairs (k :: ks) (v :: vs) =
+  encodeText k <> encodeText v <> encodeMetadataPairs ks vs
+
+-- | Decode RegisterContractParams from bytes
+decodeRegisterContractParams : BytesHex -> Optional RegisterContractParams
+decodeRegisterContractParams encoded = do
+  (instanceId, offset1) <- decodeText encoded 0
+  (version, offset2) <- decodeText encoded offset1
+  (contractType, offset3) <- decodeText encoded offset2
+  numMetadataHex <- extractBytes encoded offset3 4
+  numMetadata <- decodeUint32 numMetadataHex
+  (keys, values, _) <- decodeMetadataPairs encoded (offset3 + 4) numMetadata
+  Some RegisterContractParams
+    { instanceId
+    , version
+    , contractType
+    , metadataKeys = keys
+    , metadataValues = values
+    }
+
+-- | Helper to decode metadata key-value pairs
+decodeMetadataPairs : BytesHex -> Int -> Int -> Optional ([Text], [Text], Int)
+decodeMetadataPairs _ offset 0 = Some ([], [], offset)
+decodeMetadataPairs encoded offset remaining = do
+  (key, offset1) <- decodeText encoded offset
+  (value, offset2) <- decodeText encoded offset1
+  (restKeys, restValues, finalOffset) <- decodeMetadataPairs encoded offset2 (remaining - 1)
+  Some (key :: restKeys, value :: restValues, finalOffset)
+
+-- ===========================================================================
+-- INITIATE UPGRADE PARAMS
+-- ===========================================================================
+
+-- | Parameters for InitiateUpgrade operation
+-- Format:
+--   instanceId (text)
+--   fromVersion (text)
+--   toVersion (text)
+--   migrationParams (text - hex encoded)
+data InitiateUpgradeParams = InitiateUpgradeParams
+  with
+    instanceId : Text        -- Contract to upgrade
+    fromVersion : Text       -- Current version
+    toVersion : Text         -- Target version
+    migrationParams : Text   -- Hex-encoded migration parameters
+  deriving (Show, Eq)
+
+-- | Encode InitiateUpgradeParams to bytes
+encodeInitiateUpgradeParams : InitiateUpgradeParams -> BytesHex
+encodeInitiateUpgradeParams params =
+  encodeText params.instanceId
+  <> encodeText params.fromVersion
+  <> encodeText params.toVersion
+  <> encodeText params.migrationParams
+
+-- | Decode InitiateUpgradeParams from bytes
+decodeInitiateUpgradeParams : BytesHex -> Optional InitiateUpgradeParams
+decodeInitiateUpgradeParams encoded = do
+  (instanceId, offset1) <- decodeText encoded 0
+  (fromVersion, offset2) <- decodeText encoded offset1
+  (toVersion, offset3) <- decodeText encoded offset2
+  (migrationParams, _) <- decodeText encoded offset3
+  Some InitiateUpgradeParams
+    { instanceId
+    , fromVersion
+    , toVersion
+    , migrationParams
+    }
+
+-- ===========================================================================
+-- COMPLETE UPGRADE PARAMS
+-- ===========================================================================
+
+-- | Parameters for CompleteUpgrade operation
+-- Format:
+--   instanceId (text)
+--   newVersion (text)
+data CompleteUpgradeParams = CompleteUpgradeParams
+  with
+    instanceId : Text        -- Contract that was upgraded
+    newVersion : Text        -- Version after upgrade
+  deriving (Show, Eq)
+
+-- | Encode CompleteUpgradeParams to bytes
+encodeCompleteUpgradeParams : CompleteUpgradeParams -> BytesHex
+encodeCompleteUpgradeParams params =
+  encodeText params.instanceId
+  <> encodeText params.newVersion
+
+-- | Decode CompleteUpgradeParams from bytes
+decodeCompleteUpgradeParams : BytesHex -> Optional CompleteUpgradeParams
+decodeCompleteUpgradeParams encoded = do
+  (instanceId, offset1) <- decodeText encoded 0
+  (newVersion, _) <- decodeText encoded offset1
+  Some CompleteUpgradeParams
+    { instanceId
+    , newVersion
+    }
+
+-- ===========================================================================
+-- CANCEL UPGRADE PARAMS
+-- ===========================================================================
+
+-- | Parameters for CancelUpgrade operation
+-- Format:
+--   instanceId (text)
+data CancelUpgradeParams = CancelUpgradeParams
+  with
+    instanceId : Text        -- Contract whose upgrade to cancel
+  deriving (Show, Eq)
+
+-- | Encode CancelUpgradeParams to bytes
+encodeCancelUpgradeParams : CancelUpgradeParams -> BytesHex
+encodeCancelUpgradeParams params = encodeText params.instanceId
+
+-- | Decode CancelUpgradeParams from bytes
+decodeCancelUpgradeParams : BytesHex -> Optional CancelUpgradeParams
+decodeCancelUpgradeParams encoded = do
+  (instanceId, _) <- decodeText encoded 0
+  Some CancelUpgradeParams { instanceId }

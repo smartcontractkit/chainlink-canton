@@ -1,6 +1,6 @@
 module MCMS.Counter where
 
-import MCMS.MCMSReceiver
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSEntrypointResult(..))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT EVENT (Emitted when mcmsEntrypoint is called)
@@ -48,8 +48,10 @@ template Counter
       view = MCMSReceiverView with
         owner
         instanceId = instanceId
+        version = "1.0.0"        -- Version for registry
+        contractType = "Counter" -- Type for identification
 
-      mcmsEntrypoint functionName operationData contractIds = do
+      mcmsEntrypoint selfCid functionName operationData contractIds = do
         -- Emit event with contractIds as text (can be verified in transaction events)
         let contractIdsAsText = map show contractIds
         _ <- create MCMSEntrypointEvent with
@@ -58,41 +60,59 @@ template Counter
           functionName
           operationData
           contractIdsAsText
-        -- Note: Event contract is left active so it appears in flat transaction events
-        -- In production, could be archived later or use a different event pattern
 
-        -- Log contractIds to demonstrate they were received and can be coerced
-        -- Note: We can't fetch `self` during a consuming choice (it's already being consumed)
-        -- In real usage, contractIds would contain OTHER contracts to interact with
-        case contractIds of
-          [] -> debug "Counter: no contractIds passed"
-          cids -> do
-            -- Demonstrate coerceContractId works by casting each to ContractId Counter
-            -- In production, you'd cast to the appropriate type for each contract
-            let counterCids : [ContractId Counter] = map coerceContractId cids
-            debug $ "Counter: received " <> show (length counterCids) <> " contractIds (coerced to Counter type)"
+        -- Coerce interface ContractId to template ContractId for exercising choices
+        let selfCounterCid : ContractId Counter = coerceContractId selfCid
 
-        -- Dispatch to the appropriate function
+        -- Dispatch to public choices (decode operationData as needed)
         case functionName of
           "Increment" -> do
-            -- Increment counter (operationData ignored)
-            debug $ "Counter: incrementing value from " <> show value <> " to " <> show (value + 1)
-            newCid <- create this with value = value + 1
-            pure (toInterfaceContractId @MCMSReceiver newCid)
+            newCid <- exercise selfCounterCid Increment
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
+
+          "Decrement" -> do
+            newCid <- exercise selfCounterCid Decrement
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
 
           "SetValue" -> do
-            -- Set value from operationData
-            -- Format: just the integer as decimal string
             let newValue = parseDecimalToInt operationData
-            newCid <- create this with value = newValue
-            pure (toInterfaceContractId @MCMSReceiver newCid)
-
-          "Reset" -> do
-            -- Reset to zero
-            newCid <- create this with value = 0
-            pure (toInterfaceContractId @MCMSReceiver newCid)
+            newCid <- exercise selfCounterCid SetValue with newValue
+            pure MCMSEntrypointResult with
+              selfCid = toInterfaceContractId @MCMSReceiver newCid
+              outputCids = []
 
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+    -- =========================================================================
+    -- OWNER OPERATIONS (direct access, gated by controller owner)
+    -- =========================================================================
+
+    -- | Increment counter by 1
+    choice Increment : ContractId Counter
+      controller owner
+      do
+        debug $ "Counter: incrementing value from " <> show value <> " to " <> show (value + 1)
+        create this with value = value + 1
+
+    -- | Decrement counter by 1
+    choice Decrement : ContractId Counter
+      controller owner
+      do
+        debug $ "Counter: decrementing value from " <> show value <> " to " <> show (value - 1)
+        create this with value = value - 1
+
+    -- | Set counter to specific value
+    choice SetValue : ContractId Counter
+      with
+        newValue : Int
+      controller owner
+      do
+        debug $ "Counter: setting value to " <> show newValue
+        create this with value = newValue
 
     -- =========================================================================
     -- QUERIES (Anyone can call with contract disclosure)
@@ -113,6 +133,11 @@ template Counter
         viewer : Party
       controller viewer
       do pure instanceId
+
+    -- | Archive choice for cleanup after upgrade
+    choice ArchiveCounter : ()
+      controller owner
+      do pure ()
 
 -- ===========================================================================
 -- HELPER FUNCTIONS

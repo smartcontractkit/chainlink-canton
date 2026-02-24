@@ -197,9 +197,10 @@ data AdminParams
 -- Represents one operation in a scheduled batch
 data TimelockCall = TimelockCall
   with
-    targetInstanceId : Text    -- Target contract's stable identifier (MCMS instanceId for self-dispatch)
-    functionName : Text        -- Function to call on target
-    operationData : Text       -- Hex-encoded parameters
+    targetInstanceId : Text       -- Target contract's stable identifier (MCMS instanceId for self-dispatch)
+    functionName : Text           -- Function to call on target
+    operationData : Text          -- Hex-encoded parameters
+    contractIds : [ContractId ()]  -- Contract IDs to pass to target (e.g., old contract CID for upgrades)
   deriving (Show, Eq, Ord)
 
 data BlockedFunction = BlockedFunction

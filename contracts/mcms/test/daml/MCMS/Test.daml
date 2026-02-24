@@ -2,10 +2,12 @@
 -- Re-exports all test modules for easy execution
 --
 -- Test organization:
---   - CryptoTest.daml     : Cryptographic function verification (keccak256, merkle proofs, etc.)
---   - GroupVotingTest.daml: Group voting algorithm tests (2-of-3, hierarchical groups)
---   - FlowTest.daml       : Full MCMS flow tests (SetRoot, replay protection)
---   - TestHelpers.daml    : Shared test utilities
+--   - CryptoTest.daml        : Cryptographic function verification (keccak256, merkle proofs, etc.)
+--   - GroupVotingTest.daml   : Group voting algorithm tests (2-of-3, hierarchical groups)
+--   - FlowTest.daml          : Full MCMS flow tests (SetRoot, replay protection)
+--   - UpgradeTest.daml       : Contract upgrade flow tests (MCMSRegistry, StateMigrationTicket)
+--   - RegistryCodecTest.daml : Codec roundtrip tests for registry operations
+--   - TestHelpers.daml       : Shared test utilities
 module MCMS.Test where
 
 import Daml.Script
@@ -14,6 +16,8 @@ import Daml.Script
 import MCMS.CryptoTest
 import MCMS.GroupVotingTest
 import MCMS.FlowTest
+import MCMS.UpgradeTest
+import MCMS.RegistryCodecTest
 
 -- ===========================================================================
 -- MASTER TEST RUNNER
@@ -54,7 +58,48 @@ testAll () = script do
 
   -- Note: Signatory check tests are in ExternalTargetTest.daml
 
+  -- Upgrade tests
+  debug ""
+  debug "--- Upgrade Tests ---"
+  -- Registry tests
+  testRegistryRegisterContract
+  testRegistryRegisterDuplicate
+  testRegistryInitiateUpgrade
+  testRegistryInitiateUpgradeNotActive
+  testRegistryInitiateUpgradeVersionMismatch
+  testRegistryCompleteUpgrade
+  testRegistryCompleteUpgradeNoPending
+  testRegistryCancelUpgrade
+  testRegistryDeprecateContract
+  testRegistryViewFunctions
+  -- Upgrade service tests (simplified 1-step pattern)
+  testUpgradeServiceExecute
+  testUpgradeServiceExecuteViaMCMS
+  testUpgradeServiceMissingContractIds
+  testUpgradeFailsOnStaleContractId
+  testUpgradeVersionMismatchRejected
+  testUpgradeTargetVersionMismatchRejected
+  testUpgradeInstanceIdMismatchRejected
+  -- Full upgrade flow tests
+  testFullUpgradeFlow
+  testUpgradeWithNonZeroValue
+  testUpgradeCancelMidway
+
+  -- Registry codec tests
+  debug ""
+  debug "--- Registry Codec Tests ---"
+  testRegisterContractParamsCodec
+  testRegisterContractParamsCodecWithMetadata
+  testInitiateUpgradeParamsCodec
+  testInitiateUpgradeParamsCodecWithMigration
+  testCompleteUpgradeParamsCodec
+  testCompleteUpgradeParamsCodecLongVersion
+  testCancelUpgradeParamsCodec
+  testCancelUpgradeParamsCodecLongId
+  testRegisterContractParamsCodecEmpty
+  testRegisterContractParamsCodecSpecialChars
+
   debug ""
   debug "=========================================="
-  debug "All MCMS POC tests completed! ✓"
+  debug "All MCMS POC tests completed!"
   debug "=========================================="

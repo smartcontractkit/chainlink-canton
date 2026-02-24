@@ -29,6 +29,7 @@ module MCMS.Codec
   , decodeCancelBatchParams
   , encodeTimelockCall
   , decodeTimelockCall
+  , encodeInt64
   ) where
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
@@ -322,16 +323,21 @@ decodeSelfDispatchSetConfig encoded = do
 -- TIMELOCK CALL ENCODING (for schedule_batch self-dispatch)
 -- ===========================================================================
 
+-- | Encode TimelockCall
+-- Note: contractIds are NOT encoded because ContractIds cannot be serialized.
+-- They must be provided at execution time via the MCMSReceiver interface.
 encodeTimelockCall : TimelockCall -> BytesHex
 encodeTimelockCall tc =
   encodeText tc.targetInstanceId <> encodeText tc.functionName <> encodeText tc.operationData
 
+-- | Decode TimelockCall
+-- Note: contractIds are set to [] here. They must be provided at execution time.
 decodeTimelockCall : BytesHex -> Int -> Optional (TimelockCall, Int)
 decodeTimelockCall encoded offset = do
   (targetInstanceId, offset1) <- decodeText encoded offset
   (functionName, offset2) <- decodeText encoded offset1
   (operationData, offset3) <- decodeText encoded offset2
-  Some (TimelockCall targetInstanceId functionName operationData, offset3)
+  Some (TimelockCall with { targetInstanceId, functionName, operationData, contractIds = [] }, offset3)
 
 -- ===========================================================================
 -- SCHEDULE BATCH PARAMS (for schedule_batch self-dispatch)

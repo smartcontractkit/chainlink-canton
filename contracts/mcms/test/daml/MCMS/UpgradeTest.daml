@@ -1,0 +1,1423 @@
+-- | Upgrade Tests for MCMS Contract Upgrade Flow
+--
+-- These tests demonstrate the MCMS contract upgrade pattern:
+--
+-- INITIAL DEPLOYMENT (Day 1):
+--   - Deploy V1 contracts (Counter, MCMSRegistry)
+--   - Register V1 with registry
+--   - No upgrade service exists yet
+--
+-- UPGRADE TIME (Day 30):
+--   - Deploy V2 additions (CounterV2, CounterUpgradeService)
+--   - Create upgrade service instance
+--   - Execute 3-step upgrade:
+--     1. InitiateUpgrade on Registry
+--     2. ExecuteUpgrade on Service (fetches state, archives V1, creates V2)
+--     3. CompleteUpgrade on Registry
+--
+-- Key design: The upgrade service is created at upgrade time, not during initial deployment.
+-- This avoids circular dependencies - V1 doesn't know V2.
+--
+module MCMS.UpgradeTest where
+
+import DA.Map qualified as Map
+import DA.List (head)
+import DA.Optional (isSome)
+import Daml.Script
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
+import MCMS.MCMSRegistry
+import MCMS.Counter (Counter(..))
+import MCMS.Counter qualified as Counter
+import MCMS.CounterV2
+import MCMS.RegistryCodec
+
+-- ===========================================================================
+-- HELPER FUNCTIONS
+-- ===========================================================================
+
+-- | Create instanceId in standard format "baseId@partyId"
+mkInstanceId : Text -> Party -> Text
+mkInstanceId base party = base <> "@" <> partyToText party
+
+-- ===========================================================================
+-- REGISTRY TESTS
+-- ===========================================================================
+
+-- | Test: Register a contract, verify it appears in ListRegistrations with status=Active
+testRegistryRegisterContract : Script ()
+testRegistryRegisterContract = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  -- Register contract via MCMSReceiver interface
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Coerce back to MCMSRegistry to verify
+  let newRegCid : ContractId MCMSRegistry = coerceContractId result.selfCid
+  registrations <- submit owner do
+    exerciseCmd newRegCid ListRegistrations with viewer = owner
+  assertMsg "Should have 1 registration" $ length registrations == 1
+
+  -- Verify registration details
+  let reg = head registrations
+  assertMsg "InstanceId should match" $ reg.instanceId == counterInstanceId
+  assertMsg "Version should be 1.0.0" $ reg.version == "1.0.0"
+  assertMsg "Status should be Active" $ reg.status == Active
+  assertMsg "ContractType should be Counter" $ reg.contractType == "Counter"
+
+  debug "testRegistryRegisterContract PASSED!"
+  pure ()
+
+-- | Test: Attempt to register same instanceId twice, expect failure
+testRegistryRegisterDuplicate : Script ()
+testRegistryRegisterDuplicate = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  -- Register contract first time
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Try to register same instanceId again - should fail
+  let newRegIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result.selfCid : ContractId MCMSRegistry)
+  submitMustFail owner do
+    exerciseCmd newRegIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.1.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  debug "testRegistryRegisterDuplicate PASSED!"
+  pure ()
+
+-- | Test: Initiate upgrade, verify status=UpgradePending, PendingUpgrade created
+testRegistryInitiateUpgrade : Script ()
+testRegistryInitiateUpgrade = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Initiate upgrade
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Verify status is UpgradePending
+  let afterUpgradeCid : ContractId MCMSRegistry = coerceContractId result2.selfCid
+  regInfo <- submit owner do
+    exerciseCmd afterUpgradeCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case regInfo of
+    None -> abort "Registration should exist"
+    Some reg -> do
+      assertMsg "Status should be UpgradePending" $ reg.status == UpgradePending
+
+  -- Verify pending upgrade exists
+  pendingUpgrade <- submit owner do
+    exerciseCmd afterUpgradeCid GetPendingUpgrade with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case pendingUpgrade of
+    None -> abort "PendingUpgrade should exist"
+    Some pending -> do
+      assertMsg "fromVersion should be 1.0.0" $ pending.fromVersion == "1.0.0"
+      assertMsg "toVersion should be 2.0.0" $ pending.toVersion == "2.0.0"
+
+  debug "testRegistryInitiateUpgrade PASSED!"
+  pure ()
+
+-- | Test: InitiateUpgrade on non-Active contract, expect failure
+testRegistryInitiateUpgradeNotActive : Script ()
+testRegistryInitiateUpgradeNotActive = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Initiate upgrade first time (this works)
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Try to initiate upgrade again when already UpgradePending - should fail
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  submitMustFail owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "2.0.0"
+        , toVersion = "3.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  debug "testRegistryInitiateUpgradeNotActive PASSED!"
+  pure ()
+
+-- | Test: InitiateUpgrade with wrong fromVersion, expect failure
+testRegistryInitiateUpgradeVersionMismatch : Script ()
+testRegistryInitiateUpgradeVersionMismatch = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Try to initiate upgrade with wrong fromVersion
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  submitMustFail owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "0.9.0"  -- Wrong version
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  debug "testRegistryInitiateUpgradeVersionMismatch PASSED!"
+  pure ()
+
+-- | Test: Complete upgrade, verify version updated, status=Active, history added
+-- This test creates a mock receipt to simulate what ExecuteUpgrade would produce
+testRegistryCompleteUpgrade : Script ()
+testRegistryCompleteUpgrade = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create registry, register contract, initiate upgrade
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Create mock UpgradeReceipt (simulating what ExecuteUpgrade would produce)
+  now <- getTime
+  receiptCid <- submit owner do
+    createCmd UpgradeReceipt with
+      owner
+      instanceId = counterInstanceId
+      fromVersion = "1.0.0"
+      toVersion = "2.0.0"
+      newContractCid = coerceContractId registryCid  -- Placeholder CID
+      executedAt = now
+      serviceInstanceId
+
+  -- Complete upgrade with receipt
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  let receiptCidUntyped : ContractId () = coerceContractId receiptCid
+  result3 <- submit owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "2.0.0"
+        }
+      contractIds = [receiptCidUntyped]
+
+  -- Verify status is Active and version is 2.0.0
+  let afterCompleteCid : ContractId MCMSRegistry = coerceContractId result3.selfCid
+  regInfo <- submit owner do
+    exerciseCmd afterCompleteCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case regInfo of
+    None -> abort "Registration should exist"
+    Some reg -> do
+      assertMsg "Status should be Active" $ reg.status == Active
+      assertMsg "Version should be 2.0.0" $ reg.version == "2.0.0"
+
+  -- Verify no pending upgrade
+  hasPending <- submit owner do
+    exerciseCmd afterCompleteCid HasPendingUpgrade with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+  assertMsg "Should not have pending upgrade" $ not hasPending
+
+  -- Verify history entry
+  history <- submit owner do
+    exerciseCmd afterCompleteCid GetUpgradeHistory with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+  assertMsg "History should have 1 entry" $ length history == 1
+  let entry = head history
+  assertMsg "fromVersion should be 1.0.0" $ entry.fromVersion == "1.0.0"
+  assertMsg "toVersion should be 2.0.0" $ entry.toVersion == "2.0.0"
+
+  -- Verify receipt was consumed (archived)
+  receiptAfter <- queryContractId owner receiptCid
+  assertMsg "Receipt should be consumed (archived)" $ receiptAfter == None
+
+  debug "testRegistryCompleteUpgrade PASSED!"
+  pure ()
+
+-- | Test: CompleteUpgrade without pending upgrade, expect failure
+testRegistryCompleteUpgradeNoPending : Script ()
+testRegistryCompleteUpgradeNoPending = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract (no upgrade initiated)
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Try to complete upgrade without initiating - should fail
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  submitMustFail owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "2.0.0"
+        }
+      contractIds = []
+
+  debug "testRegistryCompleteUpgradeNoPending PASSED!"
+  pure ()
+
+-- | Test: Cancel pending upgrade, verify status restored to Active
+testRegistryCancelUpgrade : Script ()
+testRegistryCancelUpgrade = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry, register contract, initiate upgrade
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Cancel upgrade
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  result3 <- submit owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CancelUpgrade"
+      operationData = encodeCancelUpgradeParams $ CancelUpgradeParams
+        { instanceId = counterInstanceId
+        }
+      contractIds = []
+
+  -- Verify status is Active
+  let afterCancelCid : ContractId MCMSRegistry = coerceContractId result3.selfCid
+  regInfo <- submit owner do
+    exerciseCmd afterCancelCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case regInfo of
+    None -> abort "Registration should exist"
+    Some reg -> do
+      assertMsg "Status should be Active" $ reg.status == Active
+      assertMsg "Version should still be 1.0.0" $ reg.version == "1.0.0"
+
+  -- Verify no pending upgrade
+  hasPending <- submit owner do
+    exerciseCmd afterCancelCid HasPendingUpgrade with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+  assertMsg "Should not have pending upgrade" $ not hasPending
+
+  debug "testRegistryCancelUpgrade PASSED!"
+  pure ()
+
+-- | Test: Deprecate contract, verify status=Deprecated
+testRegistryDeprecateContract : Script ()
+testRegistryDeprecateContract = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Deprecate contract (using simple text encoding for instanceId)
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "DeprecateContract"
+      operationData = encodeCancelUpgradeParams $ CancelUpgradeParams { instanceId = counterInstanceId }
+      contractIds = []
+
+  -- Verify status is Deprecated
+  let afterDeprecateCid : ContractId MCMSRegistry = coerceContractId result2.selfCid
+  regInfo <- submit owner do
+    exerciseCmd afterDeprecateCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case regInfo of
+    None -> abort "Registration should exist"
+    Some reg -> do
+      assertMsg "Status should be Deprecated" $ reg.status == Deprecated
+
+  debug "testRegistryDeprecateContract PASSED!"
+  pure ()
+
+-- | Test: View functions (GetContractInfo, GetPendingUpgrade, GetUpgradeHistory, IsRegistered, HasPendingUpgrade)
+testRegistryViewFunctions : Script ()
+testRegistryViewFunctions = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+  let nonExistentId = mkInstanceId "nonexistent" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  let regCid : ContractId MCMSRegistry = coerceContractId result1.selfCid
+
+  -- Test IsRegistered
+  isReg <- submit owner do exerciseCmd regCid IsRegistered with viewer = owner, targetInstanceId = counterInstanceId
+  assertMsg "counter should be registered" isReg
+
+  isRegNonExistent <- submit owner do exerciseCmd regCid IsRegistered with viewer = owner, targetInstanceId = nonExistentId
+  assertMsg "nonexistent should not be registered" $ not isRegNonExistent
+
+  -- Test HasPendingUpgrade (should be false initially)
+  hasPending <- submit owner do exerciseCmd regCid HasPendingUpgrade with viewer = owner, targetInstanceId = counterInstanceId
+  assertMsg "Should not have pending upgrade initially" $ not hasPending
+
+  -- Test GetContractInfo
+  info <- submit owner do exerciseCmd regCid GetContractInfo with viewer = owner, targetInstanceId = counterInstanceId
+  assertMsg "GetContractInfo should return Some" $ isSome info
+
+  infoNonExistent <- submit owner do exerciseCmd regCid GetContractInfo with viewer = owner, targetInstanceId = nonExistentId
+  assertMsg "GetContractInfo should return None for nonexistent" $ not (isSome infoNonExistent)
+
+  -- Test GetUpgradeHistory (should be empty initially)
+  history <- submit owner do exerciseCmd regCid GetUpgradeHistory with viewer = owner, targetInstanceId = counterInstanceId
+  assertMsg "History should be empty initially" $ null history
+
+  debug "testRegistryViewFunctions PASSED!"
+  pure ()
+
+
+-- ===========================================================================
+-- COUNTER UPGRADE SERVICE TESTS (Simplified 1-step pattern)
+-- ===========================================================================
+
+-- | Test: ExecuteUpgrade via direct choice
+-- Single atomic operation: fetch -> validate -> archive -> create -> receipt
+testUpgradeServiceExecute : Script ()
+testUpgradeServiceExecute = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter with value=100
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 100
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Execute upgrade via direct choice
+  (newServiceCid, newCounterV2Cid, receiptCid) <- submit owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  -- Verify new CounterV2 has correct state
+  newCounter <- queryContractId owner newCounterV2Cid
+  case newCounter of
+    None -> abort "New CounterV2 should exist"
+    Some c -> do
+      assertMsg "Value should be 100" $ c.value == 100
+      assertMsg "migratedFrom should be Some 1.0.0" $ c.migratedFrom == Some "1.0.0"
+      assertMsg "instanceId should match" $ c.instanceId == counterInstanceId
+
+  -- Verify UpgradeReceipt was created
+  receipt <- queryContractId owner receiptCid
+  case receipt of
+    None -> abort "UpgradeReceipt should exist"
+    Some r -> do
+      assertMsg "Receipt instanceId should match" $ r.instanceId == counterInstanceId
+      assertMsg "Receipt fromVersion should be 1.0.0" $ r.fromVersion == "1.0.0"
+      assertMsg "Receipt toVersion should be 2.0.0" $ r.toVersion == "2.0.0"
+
+  debug "testUpgradeServiceExecute PASSED!"
+  pure ()
+
+-- | Test: ExecuteUpgrade via MCMSReceiver interface
+testUpgradeServiceExecuteViaMCMS : Script ()
+testUpgradeServiceExecuteViaMCMS = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Execute upgrade via MCMSReceiver interface
+  let serviceIfaceCid = toInterfaceContractId @MCMSReceiver serviceCid
+  let counterCidUntyped : ContractId () = coerceContractId counterCid
+
+  result <- submit owner do
+    exerciseCmd serviceIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "ExecuteUpgrade"
+      operationData = counterInstanceId <> "|1.0.0|2.0.0"
+      contractIds = [counterCidUntyped]
+
+  -- Verify outputCids contains UpgradeReceipt and CounterV2
+  assertMsg "Should have 2 outputCids (receipt, CounterV2)" $ length result.outputCids == 2
+
+  debug "testUpgradeServiceExecuteViaMCMS PASSED!"
+  pure ()
+
+-- | Test: Call ExecuteUpgrade with empty contractIds, expect E_MISSING_CONTRACT_ID
+testUpgradeServiceMissingContractIds : Script ()
+testUpgradeServiceMissingContractIds = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to execute upgrade with empty contractIds
+  let serviceIfaceCid = toInterfaceContractId @MCMSReceiver serviceCid
+  submitMustFail owner do
+    exerciseCmd serviceIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "ExecuteUpgrade"
+      operationData = counterInstanceId <> "|1.0.0|2.0.0"
+      contractIds = []
+
+  debug "testUpgradeServiceMissingContractIds PASSED!"
+  pure ()
+
+-- | Test: Upgrade fails on stale ContractId
+-- If counter is modified after getting its CID, upgrade should fail
+testUpgradeFailsOnStaleContractId : Script ()
+testUpgradeFailsOnStaleContractId = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Modify the counter (this archives the old CID and creates a new one)
+  newCounterCid <- submit owner do
+    exerciseCmd counterCid Counter.Increment
+
+  -- Try to upgrade with the OLD (stale) CID - should fail
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"
+      oldCounterCidUntyped = coerceContractId counterCid  -- This CID is now stale!
+
+  debug "testUpgradeFailsOnStaleContractId PASSED!"
+  pure ()
+
+-- | Test: Source version mismatch rejected
+testUpgradeVersionMismatchRejected : Script ()
+testUpgradeVersionMismatchRejected = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to upgrade with wrong source version
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|0.9.0|2.0.0"  -- Wrong fromVersion!
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  debug "testUpgradeVersionMismatchRejected PASSED!"
+  pure ()
+
+-- | Test: Target version mismatch rejected
+testUpgradeTargetVersionMismatchRejected : Script ()
+testUpgradeTargetVersionMismatchRejected = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to upgrade with wrong target version
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|3.0.0"  -- Wrong toVersion!
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  debug "testUpgradeTargetVersionMismatchRejected PASSED!"
+  pure ()
+
+-- | Test: Instance ID mismatch rejected
+testUpgradeInstanceIdMismatchRejected : Script ()
+testUpgradeInstanceIdMismatchRejected = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let wrongInstanceId = mkInstanceId "wrong-counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter with WRONG instanceId
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = wrongInstanceId  -- Wrong instanceId!
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to upgrade with mismatched instanceId in params
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"  -- Expects counterInstanceId
+      oldCounterCidUntyped = coerceContractId counterCid  -- But contract has wrongInstanceId
+
+  debug "testUpgradeInstanceIdMismatchRejected PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- FULL UPGRADE FLOW TESTS (Realistic Timeline)
+-- ===========================================================================
+
+-- | Test: Complete upgrade flow with realistic timeline
+--
+-- This test demonstrates the actual workflow for upgrading contracts:
+--
+-- === INITIAL DEPLOYMENT (Day 1) ===
+-- At this point, only V1 exists. No upgrade service, no V2.
+--   1. Deploy mcms.dar (contains MCMS, MCMSRegistry, Counter V1)
+--   2. Create MCMSRegistry contract
+--   3. Create Counter contract with initial value
+--   4. Register Counter with registry (version=1.0.0, status=Active)
+--
+-- === UPGRADE TIME (Day 30) ===
+-- When ready to upgrade, deploy V2 additions and execute upgrade.
+--   5. Deploy updated mcms.dar (now includes CounterV2, CounterUpgradeService)
+--   6. Create CounterUpgradeService contract (the upgrade executor)
+--   7. Execute 3-step upgrade via MCMS:
+--      a. InitiateUpgrade on Registry -> status=UpgradePending
+--      b. ExecuteUpgrade on Service with [oldCounterCid] -> archives V1, creates V2
+--      c. CompleteUpgrade on Registry -> status=Active, version=2.0.0
+--
+-- Key insight: The upgrade service is created at upgrade time, not during
+-- initial deployment. Counter V1 doesn't know about V2 or the upgrade service.
+--
+testFullUpgradeFlow : Script ()
+testFullUpgradeFlow = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- =========================================================================
+  -- INITIAL DEPLOYMENT (Day 1)
+  -- Only V1 contracts exist. No upgrade service yet.
+  -- =========================================================================
+  debug "=== INITIAL DEPLOYMENT (Day 1) ==="
+
+  -- 1. Create MCMSRegistry
+  debug "Creating MCMSRegistry..."
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  -- 2. Create Counter V1 with initial value
+  debug "Creating Counter V1 with value=100..."
+  counterV1Cid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 100
+
+  -- 3. Register Counter with registry
+  debug "Registering Counter with registry (version=1.0.0)..."
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- At this point, Counter V1 is operational. The registry tracks it.
+  -- No CounterUpgradeService exists. No CounterV2 exists.
+  debug "Initial deployment complete. Counter V1 is operational."
+
+  -- =========================================================================
+  -- UPGRADE TIME (Day 30)
+  -- Now we want to upgrade. Deploy V2 and create upgrade service.
+  -- =========================================================================
+  debug "=== UPGRADE TIME (Day 30) ==="
+
+  -- 4. Create CounterUpgradeService (deployed with V2 additions)
+  -- In reality, this comes from an updated DAR that includes CounterV2.
+  debug "Creating CounterUpgradeService (upgrade executor)..."
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- 5. Execute 3-step upgrade
+  debug "Executing 3-step upgrade..."
+
+  -- Step 5a: InitiateUpgrade on Registry
+  debug "  Step 1/3: InitiateUpgrade on Registry"
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Step 5b: ExecuteUpgrade on UpgradeService
+  -- This is the atomic operation: fetch state -> validate -> archive V1 -> create V2 -> receipt
+  debug "  Step 2/3: ExecuteUpgrade on UpgradeService"
+  let serviceIfaceCid = toInterfaceContractId @MCMSReceiver serviceCid
+  let counterV1CidUntyped : ContractId () = coerceContractId counterV1Cid
+
+  executeResult <- submit owner do
+    exerciseCmd serviceIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "ExecuteUpgrade"
+      operationData = counterInstanceId <> "|1.0.0|2.0.0"
+      contractIds = [counterV1CidUntyped]
+
+  -- ExecuteUpgrade returns [receiptCid, newCounterV2Cid] in outputCids
+  assertMsg "ExecuteUpgrade should return 2 outputCids" $ length executeResult.outputCids == 2
+
+  -- Step 5c: CompleteUpgrade on Registry
+  -- Pass the receipt (first outputCid) from ExecuteUpgrade
+  debug "  Step 3/3: CompleteUpgrade on Registry"
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  result3 <- submit owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "2.0.0"
+        }
+      contractIds = executeResult.outputCids  -- Pass receipt from ExecuteUpgrade
+
+  -- =========================================================================
+  -- VERIFICATION
+  -- =========================================================================
+  debug "=== VERIFICATION ==="
+
+  let finalRegCid : ContractId MCMSRegistry = coerceContractId result3.selfCid
+
+  -- Verify registry shows version=2.0.0, status=Active
+  regInfo <- submit owner do
+    exerciseCmd finalRegCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case regInfo of
+    None -> abort "Registration should exist"
+    Some reg -> do
+      assertMsg "Status should be Active" $ reg.status == Active
+      assertMsg "Version should be 2.0.0" $ reg.version == "2.0.0"
+      debug $ "  Registry: version=" <> reg.version <> ", status=Active"
+
+  -- Verify upgrade history has 1 entry
+  history <- submit owner do
+    exerciseCmd finalRegCid GetUpgradeHistory with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+  assertMsg "History should have 1 entry" $ length history == 1
+  debug "  Upgrade history: 1 entry (1.0.0 -> 2.0.0)"
+
+  debug "testFullUpgradeFlow PASSED!"
+  pure ()
+
+-- | Test: State migration preserves counter value
+--
+-- This test verifies that the upgrade service correctly reads state from
+-- the old contract and transfers it to the new contract.
+--
+-- The key insight: State is read directly from the old contract at execution
+-- time (zero staleness). The upgrade service calls `fetch oldCounterCid` and
+-- reads `oldCounter.value` directly.
+--
+testUpgradeWithNonZeroValue : Script ()
+testUpgradeWithNonZeroValue = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Initial deployment: Counter V1 with value=42
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Upgrade time: Create service and execute upgrade
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  (_, newCounterV2Cid, _receiptCid) <- submit owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  -- Verify: CounterV2 has the migrated value
+  newCounter <- queryContractId owner newCounterV2Cid
+  case newCounter of
+    None -> abort "New CounterV2 should exist"
+    Some c -> do
+      assertMsg "Value should be 42" $ c.value == 42
+      assertMsg "migratedFrom should be Some 1.0.0" $ c.migratedFrom == Some "1.0.0"
+      assertMsg "instanceId preserved" $ c.instanceId == counterInstanceId
+
+  debug "testUpgradeWithNonZeroValue PASSED!"
+  pure ()
+
+-- | Test: Start upgrade, cancel before completion, verify contract still Active
+testUpgradeCancelMidway : Script ()
+testUpgradeCancelMidway = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Initiate upgrade
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Cancel upgrade (before ExecuteUpgrade or CompleteUpgrade)
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  result3 <- submit owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CancelUpgrade"
+      operationData = encodeCancelUpgradeParams $ CancelUpgradeParams
+        { instanceId = counterInstanceId
+        }
+      contractIds = []
+
+  -- Verify contract is still Active with original version
+  let finalRegCid : ContractId MCMSRegistry = coerceContractId result3.selfCid
+  regInfo <- submit owner do
+    exerciseCmd finalRegCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+
+  case regInfo of
+    None -> abort "Registration should exist"
+    Some reg -> do
+      assertMsg "Status should be Active" $ reg.status == Active
+      assertMsg "Version should still be 1.0.0" $ reg.version == "1.0.0"
+
+  debug "testUpgradeCancelMidway PASSED!"
+  pure ()
+
+-- ===========================================================================
+-- RECEIPT VERIFICATION TESTS
+-- ===========================================================================
+
+-- | Test: CompleteUpgrade without receipt fails with E_MISSING_UPGRADE_RECEIPT
+testCompleteUpgradeWithoutReceipt : Script ()
+testCompleteUpgradeWithoutReceipt = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- Initiate upgrade
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Try to complete upgrade WITHOUT receipt - should fail
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  submitMustFail owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "2.0.0"
+        }
+      contractIds = []  -- No receipt!
+
+  debug "testCompleteUpgradeWithoutReceipt PASSED!"
+  pure ()
+
+-- | Test: CompleteUpgrade with wrong receipt fails validation
+testCompleteUpgradeWithWrongReceipt : Script ()
+testCompleteUpgradeWithWrongReceipt = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+  let wrongInstanceId = mkInstanceId "wrong-counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create registry, register, and initiate upgrade
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Create receipt with WRONG instanceId
+  now <- getTime
+  wrongReceiptCid <- submit owner do
+    createCmd UpgradeReceipt with
+      owner
+      instanceId = wrongInstanceId  -- Wrong!
+      fromVersion = "1.0.0"
+      toVersion = "2.0.0"
+      newContractCid = coerceContractId registryCid
+      executedAt = now
+      serviceInstanceId
+
+  -- Try to complete upgrade with wrong receipt - should fail
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  let wrongReceiptCidUntyped : ContractId () = coerceContractId wrongReceiptCid
+  submitMustFail owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "2.0.0"
+        }
+      contractIds = [wrongReceiptCidUntyped]
+
+  debug "testCompleteUpgradeWithWrongReceipt PASSED!"
+  pure ()
+
+-- | Test: Receipt cannot be reused for another upgrade
+testReceiptCannotBeReused : Script ()
+testReceiptCannotBeReused = script do
+  owner <- allocateParty "ccip_owner"
+  let registryInstanceId = mkInstanceId "registry" owner
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create registry and register contract
+  registryCid <- submit owner do
+    createCmd MCMSRegistry with
+      owner
+      instanceId = registryInstanceId
+      registrations = Map.empty
+      pendingUpgrades = Map.empty
+      upgradeHistory = Map.empty
+
+  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
+  result1 <- submit owner do
+    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "RegisterContract"
+      operationData = encodeRegisterContractParams $ RegisterContractParams
+        { instanceId = counterInstanceId
+        , version = "1.0.0"
+        , contractType = "Counter"
+        , metadataKeys = []
+        , metadataValues = []
+        }
+      contractIds = []
+
+  -- First upgrade: 1.0.0 -> 2.0.0
+  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
+  result2 <- submit owner do
+    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "1.0.0"
+        , toVersion = "2.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Create receipt for first upgrade
+  now <- getTime
+  receiptCid <- submit owner do
+    createCmd UpgradeReceipt with
+      owner
+      instanceId = counterInstanceId
+      fromVersion = "1.0.0"
+      toVersion = "2.0.0"
+      newContractCid = coerceContractId registryCid
+      executedAt = now
+      serviceInstanceId
+
+  -- Complete first upgrade (consumes receipt)
+  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
+  let receiptCidUntyped : ContractId () = coerceContractId receiptCid
+  result3 <- submit owner do
+    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "2.0.0"
+        }
+      contractIds = [receiptCidUntyped]
+
+  -- Verify receipt is consumed
+  receiptAfter <- queryContractId owner receiptCid
+  assertMsg "Receipt should be consumed" $ receiptAfter == None
+
+  -- Second upgrade: 2.0.0 -> 3.0.0
+  let regIfaceCid4 = toInterfaceContractId @MCMSReceiver (coerceContractId result3.selfCid : ContractId MCMSRegistry)
+  result4 <- submit owner do
+    exerciseCmd regIfaceCid4 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "InitiateUpgrade"
+      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+        { instanceId = counterInstanceId
+        , fromVersion = "2.0.0"
+        , toVersion = "3.0.0"
+        , migrationParams = ""
+        }
+      contractIds = []
+
+  -- Try to reuse the consumed receipt - should fail (contract doesn't exist)
+  let regIfaceCid5 = toInterfaceContractId @MCMSReceiver (coerceContractId result4.selfCid : ContractId MCMSRegistry)
+  submitMustFail owner do
+    exerciseCmd regIfaceCid5 MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "CompleteUpgrade"
+      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
+        { instanceId = counterInstanceId
+        , newVersion = "3.0.0"
+        }
+      contractIds = [receiptCidUntyped]  -- Trying to reuse consumed receipt
+
+  debug "testReceiptCannotBeReused PASSED!"
+  pure ()
