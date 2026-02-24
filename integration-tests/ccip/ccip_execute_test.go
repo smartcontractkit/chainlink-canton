@@ -237,13 +237,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// CCV Setup
 	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
-	ccvSignerPubKeys := make([]types.TEXT, 0, 3)
+	ccvSignerPubKeys := make([]string, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
-		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
+		ccvSignerPubKeys = append(ccvSignerPubKeys, pubKeyHex)
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
@@ -280,8 +280,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							VersionTag:               types.TEXT(versionTag),
 							MessageSentObserver:      types.PARTY(partyCCIP),
 							StorageLocation:          "ipfs://test-receive",
-							Threshold:                2,
-							Signers:                  ccvSignerPubKeys,
+							SignerConfigs:            nil,                         // Will be configured later during lane setup
 							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
 							RemoteChainFeeConfigs:    nil,
 						},
@@ -337,12 +336,24 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Participant:   0,
 		Config: changesets.ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      env.Chain.ChainSelector(),
-				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
-				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
-				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
-				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: nil,
+				ChainSelector: env.Chain.ChainSelector(),
+				GlobalConfig:  contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
+				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+					{
+						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
+							},
+						},
+					},
+				},
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					remoteSelector: {
 						AllowTrafficFrom:         true,

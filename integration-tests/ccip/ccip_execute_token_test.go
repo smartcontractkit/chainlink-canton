@@ -116,6 +116,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "Amulet"}}},
 	}}}}
 
+	// CCIP Deployment
+	sourceChainSelector := "123"
+	destChainSelector := "456"
+
 	// CCV Setup
 	// Generate signer keys for CommitteeVerifier
 	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
@@ -167,12 +171,18 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "messageSentObserver", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "storageLocation", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "ipfs://test-receive"}}},
-						{Label: "threshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2}}},
-						{Label: "signers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-							{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[0]}},
-							{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[1]}},
-							{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[2]}},
-						}}}}},
+						{Label: "signerConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
+							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
+							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "sourceChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
+								{Label: "threshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2}}},
+								{Label: "signerKeys", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+									{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[0]}},
+									{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[1]}},
+									{Sum: &apiv2.Value_Text{Text: ccvSignerPubKeys[2]}},
+								}}}}},
+							}}}},
+						}}}}}},
 						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
 						{Label: "remoteChainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
@@ -184,10 +194,6 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	ccvCid := extractCreatedContractId(res)
 	t.Logf("Deployed CommitteeVerifier: %s (ccvId: %s)", ccvCid, ccvId)
-
-	// CCIP Deployment
-	sourceChainSelector := "123"
-	destChainSelector := "456"
 
 	// Deploy GlobalConfig with source chain config including the CCV
 	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
