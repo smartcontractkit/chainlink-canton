@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   compile-contracts:
-    name: Compile
+    name: Compile Contracts
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -34,7 +34,7 @@ jobs:
           fi
 
   generate-bindings:
-    name: Generate Bindings
+    name: Generate Bindings from Dar artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -75,7 +75,7 @@ jobs:
           fi
 
   test-contracts:
-    name: Test
+    name: Test Contracts
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -92,5 +92,5 @@ jobs:
           dpm build --all
       - name: Test Daml Contracts
         run: |
-          go run ./cmd/test --root . --color --plain --output ./summary.md
+          go run ./contracts/cmd/test --root . --color --plain --output ./summary.md
           cat summary.md >$GITHUB_STEP_SUMMARY
