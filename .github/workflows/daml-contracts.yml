@@ -86,9 +86,11 @@ jobs:
           go-version-file: go.mod
       - name: Install DPM
         uses: ./.github/actions/install-dpm
-      - name: Test Daml Contracts
+      - name: Compile multi-package
         run: |
           cd contracts
           dpm build --all
+      - name: Test Daml Contracts
+        run: |
           go run ./cmd/test --root . --color --plain --output ./summary.md
-          car summary.md >$GITHUB_STEP_SUMMARY
+          cat summary.md >$GITHUB_STEP_SUMMARY
