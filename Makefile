@@ -19,6 +19,11 @@ go-generate:
 gomodtidy: ## Run go mod tidy on all modules.
 	go run github.com/jmank88/gomods@v0.1.7 tidy
 
+.PHONY: test-daml-contracts
+test-daml-contracts:
+	cd contracts && dpm build --all
+	go run ./contracts/cmd/test --root ./contracts --color
+
 # GolangCI-Lint targets
 
 .PHONY: golangci-lint-main golangci-lint-integration-tests
