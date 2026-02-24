@@ -100,9 +100,6 @@ realTestSignatures =
 realTestValidUntil : Time
 realTestValidUntil = datetime 2030 Jan 1 0 0 0
 
-mkInstanceId : Text -> Party -> Text
-mkInstanceId base party = base <> "@" <> partyToText party
-
 -- ===========================================================================
 -- TESTS
 -- ===========================================================================

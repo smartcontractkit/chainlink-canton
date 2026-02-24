@@ -48,7 +48,7 @@ import MCMS.Codec
   , decodeBypasserExecuteBatchParams
   , decodeCancelBatchParams
   )
-import MCMS.MCMSRegistry (MCMSRegistry)
+import MCMS.MCMSRegistry (MCMSRegistry, GetContractInfo(..), ContractStatus(..), ContractRegistration)
 import MCMS.RegistryCodec ()
 
 template MCMS
@@ -741,6 +741,19 @@ processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx accumulatedOut
       newMcms <- executeSelfDispatchWithOutputs mcms call accumulatedOutputs
       processCallsLoop ownerParty targetCids newMcms rest extIdx accumulatedOutputs
   | otherwise = do
+      -- Validate target is registered and active in registry (if configured)
+      case mcms.registryCid of
+        Some regCid -> do
+          regInfo <- exercise regCid GetContractInfo with
+            viewer = mcms.owner
+            targetInstanceId = call.targetInstanceId
+          case regInfo of
+            None -> abort $ "E_TARGET_NOT_REGISTERED: " <> call.targetInstanceId
+            Some info ->
+              assertMsg ("E_TARGET_NOT_ACTIVE: " <> call.targetInstanceId <> " status=" <> show info.status) $
+                info.status == Active
+        None -> pure ()  -- No registry configured, skip validation
+
       let targetCid = targetCids !! extIdx
       target <- fetch targetCid
       let targetView = view target

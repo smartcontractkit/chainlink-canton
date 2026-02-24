@@ -1,0 +1,251 @@
+-- | Upgrade Service Tests for MCMS Contract Upgrade Flow
+--
+-- Tests for CounterUpgradeService contract execution:
+--   - Direct ExecuteUpgrade choice
+--   - ExecuteUpgrade via MCMSReceiver interface
+--   - Error cases (missing contract IDs, stale CIDs, version mismatches)
+--
+module MCMS.UpgradeServiceTest where
+
+import Daml.Script
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.Counter (Counter(..))
+import MCMS.Counter qualified as Counter
+import MCMS.CounterV2
+import MCMS.TestHelpers (mkInstanceId)
+
+-- ===========================================================================
+-- COUNTER UPGRADE SERVICE TESTS (Simplified 1-step pattern)
+-- ===========================================================================
+
+-- | Test: ExecuteUpgrade via direct choice
+-- Single atomic operation: fetch -> validate -> archive -> create -> receipt
+testUpgradeServiceExecute : Script ()
+testUpgradeServiceExecute = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter with value=100
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 100
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Execute upgrade via direct choice
+  (newServiceCid, newCounterV2Cid, receiptCid) <- submit owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  -- Verify new CounterV2 has correct state
+  newCounter <- queryContractId owner newCounterV2Cid
+  case newCounter of
+    None -> abort "New CounterV2 should exist"
+    Some c -> do
+      assertMsg "Value should be 100" $ c.value == 100
+      assertMsg "migratedFrom should be Some 1.0.0" $ c.migratedFrom == Some "1.0.0"
+      assertMsg "instanceId should match" $ c.instanceId == counterInstanceId
+
+  -- Verify UpgradeReceipt was created
+  receipt <- queryContractId owner receiptCid
+  case receipt of
+    None -> abort "UpgradeReceipt should exist"
+    Some r -> do
+      assertMsg "Receipt instanceId should match" $ r.instanceId == counterInstanceId
+      assertMsg "Receipt fromVersion should be 1.0.0" $ r.fromVersion == "1.0.0"
+      assertMsg "Receipt toVersion should be 2.0.0" $ r.toVersion == "2.0.0"
+
+  debug "testUpgradeServiceExecute PASSED!"
+  pure ()
+
+-- | Test: ExecuteUpgrade via MCMSReceiver interface
+testUpgradeServiceExecuteViaMCMS : Script ()
+testUpgradeServiceExecuteViaMCMS = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Execute upgrade via MCMSReceiver interface
+  let serviceIfaceCid = toInterfaceContractId @MCMSReceiver serviceCid
+  let counterCidUntyped : ContractId () = coerceContractId counterCid
+
+  result <- submit owner do
+    exerciseCmd serviceIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "ExecuteUpgrade"
+      operationData = counterInstanceId <> "|1.0.0|2.0.0"
+      contractIds = [counterCidUntyped]
+
+  -- Verify outputCids contains UpgradeReceipt and CounterV2
+  assertMsg "Should have 2 outputCids (receipt, CounterV2)" $ length result.outputCids == 2
+
+  debug "testUpgradeServiceExecuteViaMCMS PASSED!"
+  pure ()
+
+-- | Test: Call ExecuteUpgrade with empty contractIds, expect E_MISSING_CONTRACT_ID
+testUpgradeServiceMissingContractIds : Script ()
+testUpgradeServiceMissingContractIds = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to execute upgrade with empty contractIds
+  let serviceIfaceCid = toInterfaceContractId @MCMSReceiver serviceCid
+  submitMustFail owner do
+    exerciseCmd serviceIfaceCid MCMSReceiver_Entrypoint with
+      caller = owner
+      functionName = "ExecuteUpgrade"
+      operationData = counterInstanceId <> "|1.0.0|2.0.0"
+      contractIds = []
+
+  debug "testUpgradeServiceMissingContractIds PASSED!"
+  pure ()
+
+-- | Test: Upgrade fails on stale ContractId
+-- If counter is modified after getting its CID, upgrade should fail
+testUpgradeFailsOnStaleContractId : Script ()
+testUpgradeFailsOnStaleContractId = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Modify the counter (this archives the old CID and creates a new one)
+  newCounterCid <- submit owner do
+    exerciseCmd counterCid Counter.Increment
+
+  -- Try to upgrade with the OLD (stale) CID - should fail
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"
+      oldCounterCidUntyped = coerceContractId counterCid  -- This CID is now stale!
+
+  debug "testUpgradeFailsOnStaleContractId PASSED!"
+  pure ()
+
+-- | Test: Source version mismatch rejected
+testUpgradeVersionMismatchRejected : Script ()
+testUpgradeVersionMismatchRejected = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to upgrade with wrong source version
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|0.9.0|2.0.0"  -- Wrong fromVersion!
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  debug "testUpgradeVersionMismatchRejected PASSED!"
+  pure ()
+
+-- | Test: Target version mismatch rejected
+testUpgradeTargetVersionMismatchRejected : Script ()
+testUpgradeTargetVersionMismatchRejected = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to upgrade with wrong target version
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|3.0.0"  -- Wrong toVersion!
+      oldCounterCidUntyped = coerceContractId counterCid
+
+  debug "testUpgradeTargetVersionMismatchRejected PASSED!"
+  pure ()
+
+-- | Test: Instance ID mismatch rejected
+testUpgradeInstanceIdMismatchRejected : Script ()
+testUpgradeInstanceIdMismatchRejected = script do
+  owner <- allocateParty "ccip_owner"
+  let counterInstanceId = mkInstanceId "counter" owner
+  let wrongInstanceId = mkInstanceId "wrong-counter" owner
+  let serviceInstanceId = mkInstanceId "upgrade-service" owner
+
+  -- Create Counter with WRONG instanceId
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = wrongInstanceId  -- Wrong instanceId!
+      value = 42
+
+  -- Create upgrade service
+  serviceCid <- submit owner do
+    createCmd CounterUpgradeService with
+      owner
+      serviceInstanceId
+
+  -- Try to upgrade with mismatched instanceId in params
+  submitMustFail owner do
+    exerciseCmd serviceCid ExecuteUpgrade with
+      upgradeData = counterInstanceId <> "|1.0.0|2.0.0"  -- Expects counterInstanceId
+      oldCounterCidUntyped = coerceContractId counterCid  -- But contract has wrongInstanceId
+
+  debug "testUpgradeInstanceIdMismatchRejected PASSED!"
+  pure ()

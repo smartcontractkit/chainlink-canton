@@ -2,12 +2,16 @@
 -- Re-exports all test modules for easy execution
 --
 -- Test organization:
---   - CryptoTest.daml        : Cryptographic function verification (keccak256, merkle proofs, etc.)
---   - GroupVotingTest.daml   : Group voting algorithm tests (2-of-3, hierarchical groups)
---   - FlowTest.daml          : Full MCMS flow tests (SetRoot, replay protection)
---   - UpgradeTest.daml       : Contract upgrade flow tests (MCMSRegistry, StateMigrationTicket)
---   - RegistryCodecTest.daml : Codec roundtrip tests for registry operations
---   - TestHelpers.daml       : Shared test utilities
+--   - CryptoTest.daml             : Cryptographic function verification (keccak256, merkle proofs, etc.)
+--   - GroupVotingTest.daml        : Group voting algorithm tests (2-of-3, hierarchical groups)
+--   - FlowTest.daml               : Full MCMS flow tests (SetRoot, replay protection)
+--   - RegistryTest.daml           : Registry CRUD operations and view functions
+--   - UpgradeServiceTest.daml     : UpgradeService contract execution tests
+--   - UpgradeFlowTest.daml        : Full upgrade flow scenarios
+--   - UpgradeReceiptTest.daml     : Receipt verification tests
+--   - RegistryValidationTest.daml : MCMS registry validation during external calls
+--   - RegistryCodecTest.daml      : Codec roundtrip tests for registry operations
+--   - TestHelpers.daml            : Shared test utilities
 module MCMS.Test where
 
 import Daml.Script
@@ -16,7 +20,11 @@ import Daml.Script
 import MCMS.CryptoTest
 import MCMS.GroupVotingTest
 import MCMS.FlowTest
-import MCMS.UpgradeTest
+import MCMS.RegistryTest qualified as RegistryTest
+import MCMS.UpgradeServiceTest qualified as UpgradeServiceTest
+import MCMS.UpgradeFlowTest qualified as UpgradeFlowTest
+import MCMS.UpgradeReceiptTest qualified as UpgradeReceiptTest
+import MCMS.RegistryValidationTest qualified as RegistryValidationTest
 import MCMS.RegistryCodecTest
 
 -- ===========================================================================
@@ -58,32 +66,52 @@ testAll () = script do
 
   -- Note: Signatory check tests are in ExternalTargetTest.daml
 
-  -- Upgrade tests
-  debug ""
-  debug "--- Upgrade Tests ---"
   -- Registry tests
-  testRegistryRegisterContract
-  testRegistryRegisterDuplicate
-  testRegistryInitiateUpgrade
-  testRegistryInitiateUpgradeNotActive
-  testRegistryInitiateUpgradeVersionMismatch
-  testRegistryCompleteUpgrade
-  testRegistryCompleteUpgradeNoPending
-  testRegistryCancelUpgrade
-  testRegistryDeprecateContract
-  testRegistryViewFunctions
-  -- Upgrade service tests (simplified 1-step pattern)
-  testUpgradeServiceExecute
-  testUpgradeServiceExecuteViaMCMS
-  testUpgradeServiceMissingContractIds
-  testUpgradeFailsOnStaleContractId
-  testUpgradeVersionMismatchRejected
-  testUpgradeTargetVersionMismatchRejected
-  testUpgradeInstanceIdMismatchRejected
+  debug ""
+  debug "--- Registry Tests ---"
+  RegistryTest.testRegistryRegisterContract
+  RegistryTest.testRegistryRegisterDuplicate
+  RegistryTest.testRegistryInitiateUpgrade
+  RegistryTest.testRegistryInitiateUpgradeNotActive
+  RegistryTest.testRegistryInitiateUpgradeVersionMismatch
+  RegistryTest.testRegistryCompleteUpgrade
+  RegistryTest.testRegistryCompleteUpgradeNoPending
+  RegistryTest.testRegistryCancelUpgrade
+  RegistryTest.testRegistryDeprecateContract
+  RegistryTest.testRegistryViewFunctions
+
+  -- Upgrade service tests
+  debug ""
+  debug "--- Upgrade Service Tests ---"
+  UpgradeServiceTest.testUpgradeServiceExecute
+  UpgradeServiceTest.testUpgradeServiceExecuteViaMCMS
+  UpgradeServiceTest.testUpgradeServiceMissingContractIds
+  UpgradeServiceTest.testUpgradeFailsOnStaleContractId
+  UpgradeServiceTest.testUpgradeVersionMismatchRejected
+  UpgradeServiceTest.testUpgradeTargetVersionMismatchRejected
+  UpgradeServiceTest.testUpgradeInstanceIdMismatchRejected
+
   -- Full upgrade flow tests
-  testFullUpgradeFlow
-  testUpgradeWithNonZeroValue
-  testUpgradeCancelMidway
+  debug ""
+  debug "--- Upgrade Flow Tests ---"
+  UpgradeFlowTest.testFullUpgradeFlow
+  UpgradeFlowTest.testUpgradeWithNonZeroValue
+  UpgradeFlowTest.testUpgradeCancelMidway
+
+  -- Receipt verification tests
+  debug ""
+  debug "--- Receipt Verification Tests ---"
+  UpgradeReceiptTest.testCompleteUpgradeWithoutReceipt
+  UpgradeReceiptTest.testCompleteUpgradeWithWrongReceipt
+  UpgradeReceiptTest.testReceiptCannotBeReused
+
+  -- Registry validation tests (MCMS external call validation)
+  debug ""
+  debug "--- Registry Validation Tests ---"
+  RegistryValidationTest.testCallUnregisteredContractFails
+  RegistryValidationTest.testCallDeprecatedContractFails
+  RegistryValidationTest.testCallUpgradePendingContractFails
+  RegistryValidationTest.testCallActiveRegisteredContractSucceeds
 
   -- Registry codec tests
   debug ""

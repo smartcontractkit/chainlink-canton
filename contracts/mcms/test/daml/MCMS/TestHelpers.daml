@@ -56,3 +56,7 @@ makeMockSignature _addr = RawSignature
 emptyMerkleProof : [BytesHex]
 emptyMerkleProof = []
 
+-- | Create instanceId in standard format "baseId@partyId"
+mkInstanceId : Text -> Party -> Text
+mkInstanceId base party = base <> "@" <> partyToText party
+
