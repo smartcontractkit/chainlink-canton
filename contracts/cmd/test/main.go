@@ -39,6 +39,7 @@ func main() {
 			fmt.Println(path)
 			packages = append(packages, path)
 		}
+
 		return nil
 	})
 	if err != nil {
@@ -91,7 +92,7 @@ func main() {
 	}
 	wg.Wait()
 
-	var summaries []string
+	var summaries []string //nolint:prealloc
 	fmt.Println("Raw Outputs:")
 	for _, r := range results {
 		fmt.Println("==============================")
@@ -132,7 +133,7 @@ func main() {
 				markdownSummary.WriteString(fmt.Sprintf("|🔴 %s|%s|  |  |\n", status, test))
 			}
 		}
-		_ = os.WriteFile(*summaryOutput, []byte(markdownSummary.String()), 0644)
+		_ = os.WriteFile(*summaryOutput, []byte(markdownSummary.String()), 0600)
 	}
 
 	// If any test failed, exit with the code of the first failed test, otherwise exit with 0
@@ -169,6 +170,7 @@ func collectSummaries(output string) []string {
 			summaries = append(summaries, strings.TrimSpace(line))
 		}
 	}
+
 	return summaries
 }
 
