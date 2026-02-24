@@ -12,7 +12,7 @@ replace (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
-	github.com/aws/smithy-go v1.24.0
+	github.com/aws/smithy-go v1.24.1
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/google/uuid v1.6.0
