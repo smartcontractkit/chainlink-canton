@@ -409,6 +409,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
       op = externalBypasserOp
       opProof = externalBypasserOpProof
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   -- Verify counter was incremented
   counterContracts <- query @Counter ccipOwner

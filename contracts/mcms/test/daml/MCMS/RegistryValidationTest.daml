@@ -51,8 +51,7 @@ testCallUnregisteredContractFails = script do
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
         functionName = "Increment"
-        operationData = ""
-        contractIds = []]
+        operationData = ""]
   let opId = hashTimelockOpId calls zeroHash "test-salt"
 
   mcmsCid <- submit owner do
@@ -86,6 +85,7 @@ testCallUnregisteredContractFails = script do
       predecessor = zeroHash
       salt = "test-salt"
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   debug "testCallUnregisteredContractFails PASSED!"
   pure ()
@@ -149,8 +149,7 @@ testCallDeprecatedContractFails = script do
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
         functionName = "Increment"
-        operationData = ""
-        contractIds = []]
+        operationData = ""]
   let opId = hashTimelockOpId calls zeroHash "test-salt-2"
 
   mcmsCid <- submit owner do
@@ -184,6 +183,7 @@ testCallDeprecatedContractFails = script do
       predecessor = zeroHash
       salt = "test-salt-2"
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   debug "testCallDeprecatedContractFails PASSED!"
   pure ()
@@ -252,8 +252,7 @@ testCallUpgradePendingContractFails = script do
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
         functionName = "Increment"
-        operationData = ""
-        contractIds = []]
+        operationData = ""]
   let opId = hashTimelockOpId calls zeroHash "test-salt-3"
 
   mcmsCid <- submit owner do
@@ -287,6 +286,7 @@ testCallUpgradePendingContractFails = script do
       predecessor = zeroHash
       salt = "test-salt-3"
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   debug "testCallUpgradePendingContractFails PASSED!"
   pure ()
@@ -341,8 +341,7 @@ testCallActiveRegisteredContractSucceeds = script do
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
         functionName = "Increment"
-        operationData = ""
-        contractIds = []]
+        operationData = ""]
   let opId = hashTimelockOpId calls zeroHash "test-salt-4"
 
   mcmsCid <- submit owner do
@@ -376,6 +375,7 @@ testCallActiveRegisteredContractSucceeds = script do
       predecessor = zeroHash
       salt = "test-salt-4"
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   -- Verify counter was incremented
   counterContracts <- query @Counter owner

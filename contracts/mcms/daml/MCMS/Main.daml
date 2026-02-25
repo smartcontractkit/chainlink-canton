@@ -200,6 +200,7 @@ template MCMS
         op : Op                                    -- Operation details (params in operationData)
         opProof : [BytesHex]                       -- Merkle proof
         targetCids : [ContractId MCMSReceiver]     -- For bypasser_execute_batch only (can't be serialized)
+        perCallContractIds : [[ContractId ()]]     -- CIDs per call for bypasser (e.g., oldCounterCid for upgrades)
       controller submitter
       do
         now <- getTime
@@ -245,7 +246,7 @@ template MCMS
             case decodeBypasserExecuteBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode BypasserExecuteBatch params"
               Some params ->
-                bypasserExecuteBatchInternal owner this rs params.calls targetCids
+                bypasserExecuteBatchInternal owner this rs params.calls targetCids perCallContractIds
 
           "CancelBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_CANCEL: must use Canceller" $ targetRole == Canceller
@@ -299,6 +300,7 @@ template MCMS
         predecessor : Text                         -- For validation
         salt : Text                                -- For opId verification
         targetCids : [ContractId MCMSReceiver]     -- Target contract IDs (only for external calls)
+        perCallContractIds : [[ContractId ()]]     -- CIDs per call (e.g., oldCounterCid for upgrades)
       controller submitter
       do
         now <- getTime
@@ -332,7 +334,7 @@ template MCMS
 
             -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
             -- Start with empty accumulated outputs - they get threaded between calls
-            (_, finalMcms) <- processCallsLoop owner targetCids this calls 0 []
+            (_, finalMcms) <- processCallsLoop owner targetCids perCallContractIds this calls 0 0 []
 
             -- 8. Mark as done (set to doneTimestamp)
             create (finalMcms with
@@ -697,8 +699,8 @@ scheduleBatchInternal now mcms rs calls predecessor salt delay = do
 
 -- | Execute a batch immediately via Bypasser (called by ExecuteOp for Bypasser role)
 -- Does NOT verify merkle proof - ExecuteOp already did that
-bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> [ContractId MCMSReceiver] -> Update (ContractId MCMS)
-bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids = do
+bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> [ContractId MCMSReceiver] -> [[ContractId ()]] -> Update (ContractId MCMS)
+bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids perCallContractIds = do
   -- 1. Validate external target count
   let externalCalls = filter (\c -> c.targetInstanceId /= mcms.instanceId) calls
   assertMsg "E_WRONG_TARGET_COUNT" $
@@ -706,7 +708,7 @@ bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids = do
 
   -- 2. Process all calls (self-dispatch inline, external via MCMSReceiver)
   -- Start with empty accumulated outputs - they get threaded between calls
-  (_, finalMcms) <- processCallsLoop ownerParty targetCids mcms calls 0 []
+  (_, finalMcms) <- processCallsLoop ownerParty targetCids perCallContractIds mcms calls 0 0 []
 
   -- 3. Increment bypasser opCount
   let finalRs = getRoleState Bypasser finalMcms
@@ -731,15 +733,16 @@ cancelBatchInternal mcms rs opIdToCancel = do
   create (updated with timelockTimestamps = Map.delete opIdToCancel mcms.timelockTimestamps)
 
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
+-- perCallContractIds: CIDs per call (e.g., oldCounterCid for upgrades)
 -- accumulatedOutputs: Output CIDs from previous calls in the batch, threaded to subsequent calls
 -- This enables ExecuteUpgrade to produce a receipt that CompleteUpgrade can consume
-processCallsLoop : Party -> [ContractId MCMSReceiver] -> MCMS -> [TimelockCall] -> Int -> [ContractId ()] -> Update (Int, MCMS)
-processCallsLoop _ _ mcms [] extIdx _accumulatedOutputs = pure (extIdx, mcms)
-processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx accumulatedOutputs
+processCallsLoop : Party -> [ContractId MCMSReceiver] -> [[ContractId ()]] -> MCMS -> [TimelockCall] -> Int -> Int -> [ContractId ()] -> Update (Int, MCMS)
+processCallsLoop _ _ _ mcms [] extIdx _callIdx _accumulatedOutputs = pure (extIdx, mcms)
+processCallsLoop ownerParty targetCids perCallContractIds mcms (call :: rest) extIdx callIdx accumulatedOutputs
   | call.targetInstanceId == mcms.instanceId = do
       -- Self-dispatch: pass accumulatedOutputs as contractIds for registry operations
       newMcms <- executeSelfDispatchWithOutputs mcms call accumulatedOutputs
-      processCallsLoop ownerParty targetCids newMcms rest extIdx accumulatedOutputs
+      processCallsLoop ownerParty targetCids perCallContractIds newMcms rest extIdx (callIdx + 1) accumulatedOutputs
   | otherwise = do
       -- Validate target is registered and active in registry (if configured)
       case mcms.registryCid of
@@ -764,13 +767,17 @@ processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx accumulatedOut
         Some partyIdText ->
           assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
             any (\s -> partyToText s == partyIdText) (signatory target)
+      -- Get per-call CIDs for this call index
+      let callContractIds = if callIdx < length perCallContractIds
+                            then perCallContractIds !! callIdx
+                            else []
+      let contractIds = callContractIds <> accumulatedOutputs
       -- Exercise and receive MCMSEntrypointResult
-      -- Merge accumulated outputs with call's contractIds
       result <- exercise targetCid MCMSReceiver_Entrypoint with
         caller = ownerParty
         functionName = call.functionName
         operationData = call.operationData
-        contractIds = call.contractIds <> accumulatedOutputs
+        contractIds = contractIds
       -- Accumulate this call's outputCids for subsequent calls
       let newAccumulatedOutputs = accumulatedOutputs <> result.outputCids
-      processCallsLoop ownerParty targetCids mcms rest (extIdx + 1) newAccumulatedOutputs
+      processCallsLoop ownerParty targetCids perCallContractIds mcms rest (extIdx + 1) (callIdx + 1) newAccumulatedOutputs

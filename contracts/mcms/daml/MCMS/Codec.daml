@@ -331,13 +331,12 @@ encodeTimelockCall tc =
   encodeText tc.targetInstanceId <> encodeText tc.functionName <> encodeText tc.operationData
 
 -- | Decode TimelockCall
--- Note: contractIds are set to [] here. They must be provided at execution time.
 decodeTimelockCall : BytesHex -> Int -> Optional (TimelockCall, Int)
 decodeTimelockCall encoded offset = do
   (targetInstanceId, offset1) <- decodeText encoded offset
   (functionName, offset2) <- decodeText encoded offset1
   (operationData, offset3) <- decodeText encoded offset2
-  Some (TimelockCall with { targetInstanceId, functionName, operationData, contractIds = [] }, offset3)
+  Some (TimelockCall with { targetInstanceId, functionName, operationData }, offset3)
 
 -- ===========================================================================
 -- SCHEDULE BATCH PARAMS (for schedule_batch self-dispatch)

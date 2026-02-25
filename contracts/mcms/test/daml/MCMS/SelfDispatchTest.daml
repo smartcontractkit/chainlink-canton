@@ -181,7 +181,7 @@ testScheduleBatch = script do
       signatures = timelockScheduleSignatures
 
   -- ExecuteOp with ScheduleBatch
-  let calls = [TimelockCall with targetInstanceId = timelockTestInstanceId, functionName = "UpdateMinDelay", operationData = "120", contractIds = []]
+  let calls = [TimelockCall with targetInstanceId = timelockTestInstanceId, functionName = "UpdateMinDelay", operationData = "120"]
   let salt = "test-schedule-salt-1"
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
@@ -190,6 +190,7 @@ testScheduleBatch = script do
       op = timelockScheduleOp
       opProof = timelockScheduleOpProof
       targetCids = []
+      perCallContractIds = []
 
   -- Verify operation was scheduled
   let opId = hashTimelockOpId calls zeroHash salt
@@ -212,6 +213,7 @@ testScheduleBatch = script do
       predecessor = zeroHash
       salt
       targetCids = []
+      perCallContractIds = []
 
   -- Verify minDelay was updated
   delay <- submit ccipOwner do
@@ -267,6 +269,7 @@ testBypasserExecuteBatch = script do
       op = timelockBypasserOp
       opProof = timelockBypasserOpProof
       targetCids = []
+      perCallContractIds = []
 
   -- Verify minDelay was immediately updated to 300s
   delay <- submit ccipOwner do

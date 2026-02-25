@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "28ab4c48714949050f73df2f47b54fa2379cfe3eafa9d41198853cc4818221b1"
+	PackageID   = "368fd69cab39dbacf55a89f5c34b27d2f2bf603ccc636ffbc3025731072526b4"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1756,11 +1756,12 @@ func (t *Decrement) UnmarshalHex(data string) error {
 
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	TargetRole Role                `json:"targetRole"`
-	Submitter  types.PARTY         `json:"submitter"`
-	Op         Op                  `json:"op"`
-	OpProof    []types.TEXT        `json:"opProof"`
-	TargetCids []types.CONTRACT_ID `json:"targetCids"`
+	TargetRole         Role                  `json:"targetRole"`
+	Submitter          types.PARTY           `json:"submitter"`
+	Op                 Op                    `json:"op"`
+	OpProof            []types.TEXT          `json:"opProof"`
+	TargetCids         []types.CONTRACT_ID   `json:"targetCids"`
+	PerCallContractIds [][]types.CONTRACT_ID `json:"perCallContractIds"`
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
@@ -1801,6 +1802,19 @@ func (t ExecuteOp) ToMap() map[string]any {
 		return res
 	}()
 
+	m["perCallContractIds"] = func() []any {
+		res := make([]any, 0, len(t.PerCallContractIds))
+		for _, e := range t.PerCallContractIds {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
 	return m
 }
 
@@ -1828,12 +1842,13 @@ func (t *ExecuteOp) UnmarshalHex(data string) error {
 
 // ExecuteScheduledBatch is a Record type
 type ExecuteScheduledBatch struct {
-	Submitter   types.PARTY         `json:"submitter"`
-	OpId        types.TEXT          `json:"opId"`
-	Calls       []TimelockCall      `json:"calls"`
-	Predecessor types.TEXT          `json:"predecessor"`
-	Salt        types.TEXT          `json:"salt"`
-	TargetCids  []types.CONTRACT_ID `json:"targetCids"`
+	Submitter          types.PARTY           `json:"submitter"`
+	OpId               types.TEXT            `json:"opId"`
+	Calls              []TimelockCall        `json:"calls"`
+	Predecessor        types.TEXT            `json:"predecessor"`
+	Salt               types.TEXT            `json:"salt"`
+	TargetCids         []types.CONTRACT_ID   `json:"targetCids"`
+	PerCallContractIds [][]types.CONTRACT_ID `json:"perCallContractIds"`
 }
 
 // ToMap converts ExecuteScheduledBatch to a map for DAML arguments
@@ -1865,6 +1880,19 @@ func (t ExecuteScheduledBatch) ToMap() map[string]any {
 		res := make([]any, 0, len(t.TargetCids))
 		for _, e := range t.TargetCids {
 			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["perCallContractIds"] = func() []any {
+		res := make([]any, 0, len(t.PerCallContractIds))
+		for _, e := range t.PerCallContractIds {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -5174,10 +5202,9 @@ func (t *SignerInfo) UnmarshalHex(data string) error {
 
 // TimelockCall is a Record type
 type TimelockCall struct {
-	TargetInstanceId types.TEXT          `json:"targetInstanceId"`
-	FunctionName     types.TEXT          `json:"functionName"`
-	OperationData    types.TEXT          `json:"operationData"`
-	ContractIds      []types.CONTRACT_ID `json:"contractIds"`
+	TargetInstanceId types.TEXT `json:"targetInstanceId"`
+	FunctionName     types.TEXT `json:"functionName"`
+	OperationData    types.TEXT `json:"operationData"`
 }
 
 // ToMap converts TimelockCall to a map for DAML arguments
@@ -5189,14 +5216,6 @@ func (t TimelockCall) ToMap() map[string]any {
 	m["functionName"] = string(t.FunctionName)
 
 	m["operationData"] = string(t.OperationData)
-
-	m["contractIds"] = func() []any {
-		res := make([]any, 0, len(t.ContractIds))
-		for _, e := range t.ContractIds {
-			res = append(res, e)
-		}
-		return res
-	}()
 
 	return m
 }

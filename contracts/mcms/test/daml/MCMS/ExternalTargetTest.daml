@@ -212,6 +212,7 @@ testBypasserExternalCall = script do
       op = externalBypasserOp
       opProof = externalBypasserOpProof
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   -- Verify counter was incremented
   -- Note: Counter is archived after MCMSReceiver_Entrypoint, need to query new one
@@ -281,9 +282,10 @@ testScheduledExternalCall = script do
       op = externalScheduleOp
       opProof = externalScheduleOpProof
       targetCids = []
+      perCallContractIds = []
 
   -- Compute the opId for the scheduled batch
-  let calls = [TimelockCall with targetInstanceId = counterInstanceId, functionName = "Increment", operationData = "", contractIds = []]
+  let calls = [TimelockCall with targetInstanceId = counterInstanceId, functionName = "Increment", operationData = ""]
   let opId = hashTimelockOpId calls zeroHash externalScheduleSalt
 
   -- Verify operation was scheduled
@@ -309,6 +311,7 @@ testScheduledExternalCall = script do
       predecessor = zeroHash
       salt = externalScheduleSalt
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   -- Verify counter was incremented
   counterContracts <- query @Counter ccipOwner
@@ -374,6 +377,7 @@ testExternalCallWrongInstanceId = script do
       op = externalBypasserOp
       opProof = externalBypasserOpProof
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   debug "testExternalCallWrongInstanceId PASSED!"
   pure ()
@@ -437,6 +441,7 @@ testExternalCallForgedSignatory = script do
       op = externalBypasserOp
       opProof = externalBypasserOpProof
       targetCids = [counterAsMcmsReceiver]
+      perCallContractIds = []
 
   debug "testExternalCallForgedSignatory PASSED!"
   pure ()

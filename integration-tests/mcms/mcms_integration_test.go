@@ -521,8 +521,9 @@ func testExecuteOpFlow(
 			FunctionName:     types.TEXT(op.FunctionName),
 			OperationData:    types.TEXT(op.OperationData),
 		},
-		OpProof:    opProofTexts,
-		TargetCids: []types.CONTRACT_ID{types.CONTRACT_ID(counterCid)},
+		OpProof:            opProofTexts,
+		TargetCids:         []types.CONTRACT_ID{types.CONTRACT_ID(counterCid)},
+		PerCallContractIds: [][]types.CONTRACT_ID{{}}, // Empty per-call CIDs for single call
 	}
 
 	executeOpRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1089,6 +1090,7 @@ func testExecuteMCMSOp(
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
 									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
+									{Label: "perCallContractIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
 								},
 							}}},
 						},
@@ -1451,6 +1453,9 @@ func testSignatoryCheck(
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
 									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 										{Sum: &apiv2.Value_ContractId{ContractId: counterCid}},
+									}}}}},
+									{Label: "perCallContractIds", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+										{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}, // Empty CIDs for the single call
 									}}}}},
 								},
 							}}},

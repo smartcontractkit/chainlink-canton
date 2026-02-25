@@ -465,8 +465,9 @@ func scheduleBatch(
 			FunctionName:     types.TEXT(op.FunctionName),
 			OperationData:    types.TEXT(op.OperationData),
 		},
-		OpProof:    toTextSlice(opProof),
-		TargetCids: []types.CONTRACT_ID{},
+		OpProof:            toTextSlice(opProof),
+		TargetCids:         []types.CONTRACT_ID{},
+		PerCallContractIds: [][]types.CONTRACT_ID{{}}, // Empty per-call CIDs for single call
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -533,8 +534,9 @@ func scheduleBatchExpectError(
 			FunctionName:     types.TEXT(op.FunctionName),
 			OperationData:    types.TEXT(op.OperationData),
 		},
-		OpProof:    toTextSlice(opProof),
-		TargetCids: []types.CONTRACT_ID{},
+		OpProof:            toTextSlice(opProof),
+		TargetCids:         []types.CONTRACT_ID{},
+		PerCallContractIds: [][]types.CONTRACT_ID{{}}, // Empty per-call CIDs for single call
 	}
 
 	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -577,13 +579,19 @@ func executeScheduledBatch(
 	t.Helper()
 
 	// Use bindings for type safety - calls is already []mcms.TimelockCall
+	// Build perCallContractIds - empty slice for each call (no per-call CIDs needed for basic tests)
+	perCallContractIds := make([][]types.CONTRACT_ID, len(calls))
+	for i := range perCallContractIds {
+		perCallContractIds[i] = []types.CONTRACT_ID{}
+	}
 	executeArgs := mcms.ExecuteScheduledBatch{
-		Submitter:   types.PARTY(owner),
-		OpId:        types.TEXT(opID),
-		Calls:       calls,
-		Predecessor: types.TEXT(predecessor),
-		Salt:        types.TEXT(salt),
-		TargetCids:  toContractIDSlice(targetCids),
+		Submitter:          types.PARTY(owner),
+		OpId:               types.TEXT(opID),
+		Calls:              calls,
+		Predecessor:        types.TEXT(predecessor),
+		Salt:               types.TEXT(salt),
+		TargetCids:         toContractIDSlice(targetCids),
+		PerCallContractIds: perCallContractIds,
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -641,13 +649,19 @@ func executeScheduledBatchExpectError(
 ) error {
 	t.Helper()
 
+	// Build perCallContractIds - empty slice for each call
+	perCallContractIds := make([][]types.CONTRACT_ID, len(calls))
+	for i := range perCallContractIds {
+		perCallContractIds[i] = []types.CONTRACT_ID{}
+	}
 	executeArgs := mcms.ExecuteScheduledBatch{
-		Submitter:   types.PARTY(owner),
-		OpId:        types.TEXT(opID),
-		Calls:       calls,
-		Predecessor: types.TEXT(predecessor),
-		Salt:        types.TEXT(salt),
-		TargetCids:  toContractIDSlice(targetCids),
+		Submitter:          types.PARTY(owner),
+		OpId:               types.TEXT(opID),
+		Calls:              calls,
+		Predecessor:        types.TEXT(predecessor),
+		Salt:               types.TEXT(salt),
+		TargetCids:         toContractIDSlice(targetCids),
+		PerCallContractIds: perCallContractIds,
 	}
 
 	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -696,8 +710,9 @@ func cancelBatch(
 			FunctionName:     types.TEXT(op.FunctionName),
 			OperationData:    types.TEXT(op.OperationData),
 		},
-		OpProof:    toTextSlice(opProof),
-		TargetCids: []types.CONTRACT_ID{},
+		OpProof:            toTextSlice(opProof),
+		TargetCids:         []types.CONTRACT_ID{},
+		PerCallContractIds: [][]types.CONTRACT_ID{{}}, // Empty per-call CIDs for single call
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -772,6 +787,11 @@ func bypasserExecuteBatch(
 	t.Helper()
 
 	// BypasserExecuteBatch is dispatched via ExecuteOp with targetRole=Bypasser
+	// Build perCallContractIds - empty slice for each call
+	perCallCids := make([][]types.CONTRACT_ID, len(targetCids))
+	for i := range perCallCids {
+		perCallCids[i] = []types.CONTRACT_ID{}
+	}
 	executeOpArgs := mcms.ExecuteOp{
 		TargetRole: mcms.RoleBypasser,
 		Submitter:  types.PARTY(owner),
@@ -783,8 +803,9 @@ func bypasserExecuteBatch(
 			FunctionName:     types.TEXT(op.FunctionName),
 			OperationData:    types.TEXT(op.OperationData),
 		},
-		OpProof:    toTextSlice(opProof),
-		TargetCids: toContractIDSlice(targetCids),
+		OpProof:            toTextSlice(opProof),
+		TargetCids:         toContractIDSlice(targetCids),
+		PerCallContractIds: perCallCids,
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
