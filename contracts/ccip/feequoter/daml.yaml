@@ -1,7 +1,7 @@
 sdk-version: 3.4.10
 name: ccip-feequoter
 source: daml
-version: 1.0.0
+version: 0.0.1
 build-options:
   - "-Wno-crypto-text-is-alpha"
 data-dependencies:
@@ -12,5 +12,5 @@ data-dependencies:
 dependencies:
   - daml-prim
   - daml-stdlib
-  - ../common/.daml/dist/ccip-common-1.0.0.dar
-  - ../rmn/.daml/dist/ccip-rmn-1.0.0.dar
+  - ../common/.daml/dist/ccip-common-0.0.1.dar
+  - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
