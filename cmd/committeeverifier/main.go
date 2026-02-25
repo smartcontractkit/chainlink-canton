@@ -10,14 +10,15 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-canton/ccip"
-	"github.com/smartcontractkit/chainlink-canton/ccip/accessors"
 	"github.com/smartcontractkit/chainlink-ccv/bootstrap"
 	cmd "github.com/smartcontractkit/chainlink-ccv/cmd/verifier"
 	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/blockchain"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/verifier/commit"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/ccip"
+	"github.com/smartcontractkit/chainlink-canton/ccip/accessors"
 )
 
 const CantonConfigPathEnv = "CANTON_CONFIG_PATH"
@@ -29,6 +30,7 @@ func loadConfig(path string) (*ccip.Config, error) {
 	} else if len(md.Undecoded()) > 0 {
 		return nil, fmt.Errorf("unknown fields in config: %v", md.Undecoded())
 	}
+
 	return &cfg, nil
 }
 

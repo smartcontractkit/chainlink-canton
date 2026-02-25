@@ -63,6 +63,7 @@ func (c *ReaderConfig) GetTemplateID() (*ledgerv2.Identifier, error) {
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid template ID format, expected packageId:moduleName:entityName, got: %s", c.CCIPMessageSentTemplateID)
 	}
+
 	return &ledgerv2.Identifier{
 		PackageId:  parts[0],
 		ModuleName: parts[1],
@@ -172,6 +173,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 			if errors.Is(err, io.EOF) {
 				break
 			}
+
 			return nil, fmt.Errorf("failed to get updates: %w", err)
 		}
 		transactions = append(transactions, update.GetTransaction())
@@ -434,6 +436,7 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 			// Timestamp: time.Time{},
 		}
 	}
+
 	return headers, nil
 }
 
@@ -453,6 +456,7 @@ func (c *sourceReader) LatestAndFinalizedBlock(ctx context.Context) (latest, fin
 	offsetUint64 := uint64(end.GetOffset()) //nolint:gosec // offset is always non-negative
 	h := intToBytes32(offsetUint64)
 	parentHash := parentHash(offsetUint64)
+
 	return &protocol.BlockHeader{
 			Number:     offsetUint64,
 			Hash:       h,
@@ -475,6 +479,7 @@ func (c *sourceReader) authCtx(ctx context.Context) context.Context {
 func intToBytes32(i uint64) protocol.Bytes32 {
 	var b protocol.Bytes32
 	binary.BigEndian.PutUint64(b[:], i)
+
 	return b
 }
 
@@ -484,6 +489,7 @@ func parentHash(i uint64) protocol.Bytes32 {
 	if i == 0 {
 		return protocol.Bytes32{}
 	}
+
 	return intToBytes32(i - 1)
 }
 

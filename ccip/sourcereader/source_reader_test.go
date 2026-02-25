@@ -15,8 +15,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+
+	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 )
 
 func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
@@ -33,6 +34,7 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 					return false
 				}
 				values := md.Get("authorization")
+
 				return len(values) == 1 && values[0] == "Bearer "+jwt
 			}),
 			mock.Anything,
@@ -407,6 +409,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 				if req.EndInclusive == nil || *req.EndInclusive != 2 {
 					return false
 				}
+
 				return true
 			}),
 		).Return(stream, nil)
@@ -876,11 +879,13 @@ func (s *fakeUpdateStream) Recv() (*ledgerv2.GetUpdatesResponse, error) {
 	if s.idx < len(s.responses) {
 		resp := s.responses[s.idx]
 		s.idx++
+
 		return resp, nil
 	}
 	if s.err != nil {
 		return nil, s.err
 	}
+
 	return nil, io.EOF
 }
 
@@ -900,6 +905,7 @@ func (s *fakeUpdateStream) Context() context.Context {
 	if s.ctx != nil {
 		return s.ctx
 	}
+
 	return context.Background()
 }
 
