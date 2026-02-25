@@ -11,7 +11,6 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/blockchain"
-	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/sourcereader/canton"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -55,11 +54,11 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 	}
 	netData := bhi.NetworkSpecificData
 
-	sourceReader, err := canton.NewSourceReader(
+	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Named(f.lggr, fmt.Sprintf("CantonSourceReader.%d", chainSelector)),
 		netData.CantonEndpoints.GRPCLedgerAPIURL,
 		netData.CantonEndpoints.JWT,
-		canton.ReaderConfig{
+		sourcereader.ReaderConfig{
 			CCIPOwnerParty:            cantonConfig.CCIPOwnerParty,
 			CCIPMessageSentTemplateID: cantonConfig.CCIPMessageSentTemplateID,
 			Authority:                 cantonConfig.Authority,
