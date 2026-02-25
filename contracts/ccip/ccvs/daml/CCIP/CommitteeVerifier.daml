@@ -4,6 +4,7 @@ import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1Wi
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
@@ -12,6 +13,8 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Crypto.DerEncoding
+
+import qualified Splice.Api.Token.MetadataV1
 
 versionTagV1_7_0 : BytesHex = "49ff34ed"
 
@@ -27,6 +30,14 @@ data CCVFeeConfig = CCVFeeConfig
         payloadSizeBytes : Int
     deriving (Eq, Show)
 
+-- | Per-source-chain signature config for inbound message verification.
+data SignatureConfig = SignatureConfig
+    with
+        sourceChainSelector : Numeric 0
+        threshold : Int
+        signerKeys : [BytesHex]
+    deriving (Eq, Show)
+
 template CommitteeVerifier
     with
         instanceId : Text
@@ -37,13 +48,13 @@ template CommitteeVerifier
         messageSentObserver : Party
         storageLocation : Text
 
-        threshold : Int
-        signers : [BytesHex]
+        signerConfigs : Map.Map (Numeric 0) SignatureConfig
         rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         remoteChainFeeConfigs : Map.Map (Numeric 0) CCVFeeConfig
     where
         signatory owner
-        ensure storageLocation /= "" && threshold > 0 && length signers >= threshold && versionTag /= ""
+        -- Ensure that for each signerConfig the number of signer keys is >= threshold and that threshold > 0
+        ensure storageLocation /= "" && versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
@@ -53,7 +64,7 @@ template CommitteeVerifier
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
                     with
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        context = arg.context
                         executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
                         caller = arg.caller
@@ -67,24 +78,45 @@ template CommitteeVerifier
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_ForwardToVerifier
                     with
-                        rmnRemoteCid = arg.rmnRemoteCid
+                        context = arg.context
                         sendingMessageCid = arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
+
+        choice CommitteeVerifier_ApplySignatureConfigs : ContractId CommitteeVerifier
+            with
+                sourceChainSelectorsToRemove : [Numeric 0]
+                signatureConfigs : [SignatureConfig]
+            controller owner
+            do
+                -- Remove existing signer configs for specified source chains
+                let signerConfigsAfterRemoval = foldr Map.delete signerConfigs sourceChainSelectorsToRemove
+                -- Add new signer configs - for each config, check that threshold > 0 and number of signer keys >= threshold
+                assertMsg "invalid signature config: threshold must be > 0 and signerKeys must be >= threshold"
+                    (all (\config -> (config.threshold > 0) && (length config.signerKeys >= config.threshold)) signatureConfigs)
+                let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
+                create this with signerConfigs = newSignerConfigs
 
         -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
         -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
         -- for signature verification (encoding is deterministic).
         nonconsuming choice CommitteeVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 verifierResults : BytesHex
                 caller : Party
             controller caller
             do
+                -- Get Cids from context
+                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+
                 execMsg <- fetch executingMessageCid
                 let message = execMsg.message
+
+                -- Get source chain signature config
+                let signerConfig = fromSomeNote "source chain not configured"
+                        (Map.lookup message.sourceChainSelector signerConfigs)
 
                 -- Validate RMN instance and check source chain curse
                 rmnRemote <- fetch rmnRemoteCid
@@ -102,7 +134,7 @@ template CommitteeVerifier
                 let signatureLength = fromSomeNote "Failed to extract signature length" (CCIP.MessageCodecV1.decodeUint16 (fromSomeNote "Failed to extract signature length bytes" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag) 2)))
                 assertMsg "Invalid verifierResults" ((byteCount verifierResults) == ((byteCount versionTag) + 2 + signatureLength))
                 let numberOfSignatures = signatureLength / signature_length
-                assertMsg "Insufficient signatures provided" (numberOfSignatures >= threshold)
+                assertMsg "Insufficient signatures provided" (numberOfSignatures >= signerConfig.threshold)
                 let signatureData = fromSomeNote "Failed to extract signature data" (CCIP.MessageCodecV1.extractBytes verifierResults (byteCount versionTag + 2) signatureLength)
                 let signatures = parseSignatures signatureData
 
@@ -110,15 +142,15 @@ template CommitteeVerifier
                 let signedHash = keccak256 (versionTag <> execMsg.messageId)
 
                 -- Verify signatures
-                let validSigners = findValidSigners signedHash signatures signers
+                let validSigners = findValidSigners signedHash signatures signerConfig.signerKeys
                 let validSignerCount = countValidSigners validSigners
 
                 -- Check that number of valid signers == number of signatures provided
                 assertMsg "Invalid signatures detected" (validSignerCount == numberOfSignatures)
 
                 -- Check threshold requirement
-                assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show threshold)
-                    (validSignerCount >= threshold)
+                assertMsg ("Insufficient valid signatures: " <> show validSignerCount <> " < " <> show signerConfig.threshold)
+                    (validSignerCount >= signerConfig.threshold)
 
                 -- Append CCV verification to ExecutingMessageV1
                 exercise executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
@@ -152,12 +184,15 @@ template CommitteeVerifier
         nonconsuming choice CommitteeVerifier_ForwardToVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 verifierArgs : BytesHex
                 caller : Party
             controller caller
             do
+                -- Get Cids from context
+                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse

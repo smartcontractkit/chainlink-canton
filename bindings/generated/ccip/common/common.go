@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "9eb0e49f1628804db7145e71d9afca0b18aa2c092de5c46b490ec268a410bb50"
+	PackageID   = "f73c3eced5f3dc106c9162398a76e31d4614e5c425c32d50b10ee11d89f80ba7"
 	SDKVersion  = "3.4.10"
 )
 
@@ -513,22 +514,22 @@ func (t *CrossChainVerifierCalculateFee) UnmarshalHex(data string) error {
 
 // CrossChainVerifierForwardToVerifier is a Record type
 type CrossChainVerifierForwardToVerifier struct {
-	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT        `json:"verifierArgs"`
-	Caller            types.PARTY       `json:"caller"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierForwardToVerifier to a map for DAML arguments
 func (t CrossChainVerifierForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
+	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteCid
+		return t.Context
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -570,22 +571,22 @@ func (t *CrossChainVerifierForwardToVerifier) UnmarshalHex(data string) error {
 
 // CrossChainVerifierVerifyMessage is a Record type
 type CrossChainVerifierVerifyMessage struct {
-	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	VerifierResults     types.TEXT        `json:"verifierResults"`
-	Caller              types.PARTY       `json:"caller"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	Caller              types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierVerifyMessage to a map for DAML arguments
 func (t CrossChainVerifierVerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
+	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteCid
+		return t.Context
 	}()
 
 	m["executingMessageCid"] = func() any {

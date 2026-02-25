@@ -6,13 +6,17 @@ import DA.Crypto.Text (keccak256)
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+import DA.TextMap qualified as TextMap
 
+import qualified CCIP.Context
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
+
+import qualified Splice.Api.Token.MetadataV1
 
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
@@ -76,13 +80,15 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 1
-            signers = pubKeys1
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys1)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults1
             caller = owner
@@ -102,13 +108,15 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 3
-            signers = pubKeys2
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys2)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults2
             caller = owner
@@ -127,8 +135,7 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 20
-            signers = pubKeys3
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 20, signerKeys = pubKeys3)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test3 =====")
@@ -146,13 +153,15 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 3
-            signers = pubKeys4
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys4)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults4
             caller = owner
@@ -170,13 +179,15 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 4
-            signers = pubKeys5
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 4, signerKeys = pubKeys5)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults5
             caller = owner
@@ -194,13 +205,15 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 3
-            signers = pubKeys6
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys6)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults6
             caller = owner
@@ -216,8 +229,7 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 0
-            signers = []
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 0, signerKeys = [])]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test7 =====")
@@ -232,8 +244,7 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = ""
-            threshold = 1
-            signers = PayloadBuilder.getPubkeysForIndices [0]
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = PayloadBuilder.getPubkeysForIndices [0])]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     debug ("===== Passed Test8 =====")
@@ -249,13 +260,15 @@ setup = script do
             messageSentObserver = owner
             ccipOwner = owner
             storageLocation = "ipfs://example"
-            threshold = 2
-            signers = pubKeys9
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = pubKeys9)]
             rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults =
                 "01234567" <> -- invalid version tag
@@ -264,7 +277,10 @@ setup = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
@@ -273,7 +289,10 @@ setup = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            rmnRemoteCid = rmnRemote
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
@@ -282,6 +301,67 @@ setup = script do
             caller = owner
 
     debug ("===== Passed Test9 =====")
+
+    debug ("===== Test10 =====")
+    -- Test adding/removing signers in the signer config
+    -- multiple signers, threshold 3
+    executingMessageCid <- createExecMsg owner
+    ccv10 <- submit owner do
+        createCmd CommitteeVerifier.CommitteeVerifier with
+            instanceId = "test-ccv10"
+            owner = owner
+            versionTag = CommitteeVerifier.versionTagV1_7_0
+            messageSentObserver = owner
+            ccipOwner = owner
+            storageLocation = "ipfs://example"
+            signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3])]
+            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            remoteChainFeeConfigs = Map.empty
+    submit (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
+            executingMessageCid = executingMessageCid
+            verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2]
+            caller = owner
+    -- Update signer config to 6, should fail due to threshold > number of signers
+    submitMustFail owner do
+        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+            sourceChainSelectorsToRemove = []
+            signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]]
+    -- Update signers to 6 addresses and threshold 6, should pass
+    ccv10 <- submit owner do
+        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+            sourceChainSelectorsToRemove = []
+            signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4, 5]]
+    executingMessageCid <- createExecMsg owner
+    submit (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
+            executingMessageCid = executingMessageCid
+            verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
+            caller = owner
+    -- Remove source chain config, afterward verification should fail
+    ccv10 <- submit owner do
+        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+            sourceChainSelectorsToRemove = [123.0]
+            signatureConfigs = []
+    executingMessageCid <- createExecMsg owner
+    submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
+        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
+            context = Splice.Api.Token.MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
+            executingMessageCid = executingMessageCid
+            verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
+            caller = owner
+    debug ("===== Passed Test10 =====")
 
     debug ("===== All Tests Passed =====")
 

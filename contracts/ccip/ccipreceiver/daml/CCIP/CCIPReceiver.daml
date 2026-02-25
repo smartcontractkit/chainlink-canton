@@ -21,6 +21,8 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.GlobalConfig
 import qualified CCIP.TokenAdminRegistry
 
+import qualified Splice.Api.Token.MetadataV1
+
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
 -- with the attestation data that verifier needs.
 data CCVInput = CCVInput
@@ -71,12 +73,11 @@ template CCIPReceiver
         -- TODO: consider allowing arbitrary callers
         nonconsuming choice Execute : ContractId CCIPMessageReceived
             with
+                -- CCIP Choice Context
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                
                 -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
-                offRampCid : ContractId CCIP.OffRamp.OffRamp
-                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
 
                 -- The encoded CCIP message (hex-encoded bytes)
                 encodedMessage : BytesHex
@@ -95,8 +96,7 @@ template CCIPReceiver
             do
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1
                 emCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
-                    offRampCid = offRampCid
-                    rmnRemoteCid = rmnRemoteCid
+                    context = context
                     encodedMessage = encodedMessage
                     receiverParty = owner
                     tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
@@ -106,7 +106,7 @@ template CCIPReceiver
                 emCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
-                            rmnRemoteCid
+                            context = context
                             executingMessageCid = cid
                             verifierResults = input.verifierResults
                             caller = owner
@@ -117,18 +117,15 @@ template CCIPReceiver
                     None -> pure emCid
                     Some tt -> exercise tt.tokenPoolCid
                         CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundCCVs with
+                            context = context
                             executingMessageCid = emCid
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
                             caller = owner
 
                 -- Execute with the final executingMessageCid
                 let allRequiredCCVs = dedup (requiredCCVs ++ additionalRequiredCCVs)
 
                 result <- exercise routerCid CCIP.PerPartyRouter.Execute with
-                    rmnRemoteCid
-                    offRampCid
-                    globalConfigCid
-                    tokenAdminRegistryCid
+                    context = context
                     executingMessageCid = emCid
                     receiverRequiredCCVs = allRequiredCCVs
 
@@ -137,9 +134,8 @@ template CCIPReceiver
                     (Some tt, Some ticketCid) -> do
                         releaseResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
+                                context = context
                                 tokenReceiveTicketCid = ticketCid
-                                tokenAdminRegistryCid
-                                rmnRemoteCid
                                 tokenInput = tt.tokenInput
                                 caller = owner
                         pure (Some releaseResult)

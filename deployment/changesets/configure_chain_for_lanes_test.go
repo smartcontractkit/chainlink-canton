@@ -92,12 +92,12 @@ func TestConfigureChainForLanes(t *testing.T) {
 
 	// CCV Setup
 	// Generate signer keys for CommitteeVerifier
-	ccvSignerPubKeys := make([]types.TEXT, 0, 3)
+	ccvSignerPubKeys := make([]string, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
-		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
+		ccvSignerPubKeys = append(ccvSignerPubKeys, pubKeyHex)
 	}
 	versionTag := "49ff34ed"
 	ccvQualifier := "default"
@@ -117,8 +117,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 							VersionTag:          types.TEXT(versionTag),
 							MessageSentObserver: types.PARTY(ccipOwnerParty),
 							StorageLocation:     "ipfs://test-receive",
-							Threshold:           2,
-							Signers:             ccvSignerPubKeys,
 						},
 						Qualifier: ccvQualifier,
 					},
@@ -171,12 +169,24 @@ func TestConfigureChainForLanes(t *testing.T) {
 		Participant:   0,
 		Config: ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      chainSelector,
-				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
-				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
-				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
-				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: nil,
+				ChainSelector: chainSelector,
+				GlobalConfig:  contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
+				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+					{
+						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+							chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
+							},
+						},
+					},
+				},
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {
 						AllowTrafficFrom:         true,

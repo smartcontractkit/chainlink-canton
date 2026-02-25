@@ -6,6 +6,8 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 
+import qualified Splice.Api.Token.MetadataV1
+
 interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
 
@@ -16,7 +18,7 @@ interface ICrossChainVerifier where
     -- | Verify an inbound message and append a CCV verification to ExecutingMessageV1.
     nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
-            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             verifierResults : BytesHex
             caller : Party
@@ -39,7 +41,7 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_ForwardToVerifier
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
-            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             verifierArgs : BytesHex
             caller : Party

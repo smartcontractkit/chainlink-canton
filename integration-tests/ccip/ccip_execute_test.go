@@ -225,7 +225,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipReceiverDar}
+	dars := [][]byte{rmnDar, commonDar, tokenAdminRegistryDar, offRampDar, onRampDar, feeQuoterDar, committeeVerifierDar, perPartyRouterDar, ccipReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -237,13 +237,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// CCV Setup
 	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
-	ccvSignerPubKeys := make([]types.TEXT, 0, 3)
+	ccvSignerPubKeys := make([]string, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
-		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
+		ccvSignerPubKeys = append(ccvSignerPubKeys, pubKeyHex)
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
@@ -280,8 +280,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							VersionTag:               types.TEXT(versionTag),
 							MessageSentObserver:      types.PARTY(partyCCIP),
 							StorageLocation:          "ipfs://test-receive",
-							Threshold:                2,
-							Signers:                  ccvSignerPubKeys,
+							SignerConfigs:            nil,                         // Will be configured later during lane setup
 							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
 							RemoteChainFeeConfigs:    nil,
 						},
@@ -337,12 +336,24 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Participant:   0,
 		Config: changesets.ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      env.Chain.ChainSelector(),
-				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
-				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
-				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
-				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: nil,
+				ChainSelector: env.Chain.ChainSelector(),
+				GlobalConfig:  contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
+				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+					{
+						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
+							},
+						},
+					},
+				},
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					remoteSelector: {
 						AllowTrafficFrom:         true,
@@ -486,6 +497,30 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Create context - replace with EDS
+	choiceContext := map[string]any{
+		"values": map[string]any{
+			"off-ramp": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedOffRamp.ContractId,
+			},
+			"global-config": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedGlobalConfig.ContractId,
+			},
+			"token-admin-registry": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedTar.ContractId,
+			},
+			"rmn-remote": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedRmnRemote.ContractId,
+			},
+		},
+	}
+	choiceContextValue, err := testhelpers.ChoiceContextFromData(choiceContext)
+	require.NoError(t, err)
+
 	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one transaction
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -496,11 +531,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					ContractId: ccipReceiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "context", Value: choiceContextValue},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
-						{Label: "offRampCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedOffRamp.ContractId}}},
-						{Label: "globalConfigCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedGlobalConfig.ContractId}}},
-						{Label: "tokenAdminRegistryCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedTar.ContractId}}},
-						{Label: "rmnRemoteCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedRmnRemote.ContractId}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{

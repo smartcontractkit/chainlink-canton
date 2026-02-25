@@ -7,7 +7,9 @@ import DA.Assert
 import DA.List (head)
 import DA.Map qualified as Map
 import DA.Optional
+import DA.TextMap qualified as TextMap
 
+import qualified CCIP.Context
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
@@ -174,7 +176,10 @@ testLockOrBurn = script do
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5000000.0
-            rmnRemoteCid = rmnRemote
+            context = MetadataV1.ChoiceContext with
+                values = TextMap.fromList [
+                    (CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    ]
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -312,8 +317,9 @@ testReleaseFromTicket = script do
                       <> disclose disclosedPreapproval <> disclose disclosedRmn) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
-            tokenAdminRegistryCid = tokenAdminRegistry
-            rmnRemoteCid = rmnRemote
+            context = MetadataV1.ChoiceContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.Context.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)]
             tokenInput = tokenInput
             caller = receiver
 
