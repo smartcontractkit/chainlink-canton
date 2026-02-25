@@ -11,6 +11,11 @@ generate-bindings:
 .PHONY: contracts
 contracts: compile-contracts generate-bindings
 
+.PHONY: update-contract-version
+update-contract-version: ## Update contract version and rebuild. Usage: make update-contract-version OLD=0.0.1 NEW=1.0.0
+	@./contracts/scripts/update-version.sh $(OLD) $(NEW)
+	@$(MAKE) contracts
+
 .PHONY: gomodtidy
 gomodtidy: ## Run go mod tidy on all modules.
 	go run github.com/jmank88/gomods@v0.1.7 tidy

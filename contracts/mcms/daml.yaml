@@ -1,6 +1,6 @@
 sdk-version: 3.4.10
 name: mcms
-version: 1.0.0
+version: 0.0.1
 source: daml
 dependencies:
   - daml-prim
