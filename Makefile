@@ -48,3 +48,7 @@ golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-eds golangci-lin
 ## Compiles contracts, generates bindings, runs go mod tidy, and runs golangci-lint --fix on all modules.
 .PHONY: fix-all
 fix-all: contracts gomodtidy golangci-lint-fix-all
+
+.PHONY: build-committeeverifier
+build-committeeverifier:
+	docker build -t committeeverifier-canton -f ccip/committee_verifier.Dockerfile .
