@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -108,21 +109,33 @@ func NewAuthorizationCodeProvider(ctx context.Context, authURL, clientID string)
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	fmt.Println("Waiting for authentication...")
-	go func() {
-		_ = server.ListenAndServe()
-	}()
+	// Create listener to fail fast if port is unavailable
+	listener, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		return OIDCProvider{}, fmt.Errorf("listening on port %d: %v", port, err)
+	}
+	serverErr := make(chan error, 1)
+	go func(chan<- error) {
+		serverErr <- server.Serve(listener)
+	}(serverErr)
+
 	fmt.Println("Attempting to open your default browser.\nIf the browser does not open, open the following URL:")
 	fmt.Println(authCodeURL)
 	_ = osx.OpenDefault(authCodeURL)
+
 	select {
+	case err := <-serverErr:
+		_ = server.Shutdown(ctx)
+		return OIDCProvider{}, fmt.Errorf("callback server error: %w", err)
 	case token := <-callbackChan:
 		fmt.Println("Authentication complete")
 		tokenSource := oauthCfg.TokenSource(ctx, token)
 
 		return OIDCProvider{
 			s: oauth.TokenSource{TokenSource: tokenSource},
-		}, nil
+		}, server.Shutdown(ctx)
 	case <-ctx.Done():
+		_ = server.Shutdown(ctx)
 		return OIDCProvider{}, ctx.Err()
 	}
 }
