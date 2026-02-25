@@ -206,7 +206,10 @@ func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, 
 			}
 			messageSentEvent, err := processCreatedEvent(tx, created, ccipOwnerParty, ccipMessageSentTemplateID)
 			if err != nil {
-				// TODO: should we just "continue" here, in the event of a maliciously crafted message/receipts?
+				if errors.Is(err, errMetadataMismatch) {
+					continue
+				}
+
 				return nil, err
 			}
 			if messageSentEvent != nil {
@@ -218,6 +221,10 @@ func extractEvents(transactions []*ledgerv2.Transaction, ccipOwnerParty string, 
 	return events, nil
 }
 
+// This is a sentinel error that is returned in the event of a metadata mismatch
+// in the created event.
+var errMetadataMismatch = errors.New("metadata mismatch")
+
 func processCreatedEvent(
 	tx *ledgerv2.Transaction,
 	created *ledgerv2.CreatedEvent,
@@ -225,7 +232,7 @@ func processCreatedEvent(
 	ccipMessageSentTemplateID *ledgerv2.Identifier,
 ) (*protocol.MessageSentEvent, error) {
 	if !identifiersClose(created.GetTemplateId(), ccipMessageSentTemplateID) {
-		return nil, nil
+		return nil, errMetadataMismatch
 	}
 
 	var eventRecordField *ledgerv2.RecordField
@@ -245,11 +252,11 @@ func processCreatedEvent(
 	}
 
 	if ccipOwnerParty != expectedCCIPOwnerParty {
-		return nil, nil
+		return nil, errMetadataMismatch
 	}
 
 	if eventRecordField == nil || eventRecordField.GetValue().GetRecord() == nil {
-		return nil, nil
+		return nil, errMetadataMismatch
 	}
 
 	messageSentEvent, err := processCCIPMessageSentEvent(eventRecordField)

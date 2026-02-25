@@ -21,7 +21,9 @@ import (
 )
 
 func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
+	t.Parallel()
 	t.Run("returns latest and finalized headers", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		jwt := "token"
 		offset := int64(42)
@@ -46,16 +48,18 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 		}
 
 		latest, finalized, err := reader.LatestAndFinalizedBlock(ctx)
+		offsetUint64 := uint64(offset) //nolint:gosec // offset is always non-negative
 		require.NoError(t, err)
 		require.NotNil(t, latest)
 		require.NotNil(t, finalized)
-		require.Equal(t, uint64(offset), latest.Number)
-		require.Equal(t, intToBytes32(uint64(offset)), latest.Hash)
-		require.Equal(t, parentHash(uint64(offset)), latest.ParentHash)
+		require.Equal(t, offsetUint64, latest.Number)
+		require.Equal(t, intToBytes32(offsetUint64), latest.Hash)
+		require.Equal(t, parentHash(offsetUint64), latest.ParentHash)
 		require.Equal(t, *latest, *finalized)
 	})
 
 	t.Run("surfaces ledger end error", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		stateClient := mocks.NewMockStateServiceClient(t)
 		expectedErr := errors.New("boom")
@@ -80,6 +84,7 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 
 func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 	t.Run("builds headers for requested blocks", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		stateClient := mocks.NewMockStateServiceClient(t)
 
@@ -107,6 +112,7 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 	})
 
 	t.Run("errors when block exceeds latest offset", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		stateClient := mocks.NewMockStateServiceClient(t)
 
@@ -127,15 +133,19 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 }
 
 func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
-	ccipOwner := "owner-party"
-	templateID := &ledgerv2.Identifier{
-		PackageId:  "pkg",
-		ModuleName: "CCIP",
-		EntityName: "CCIPMessageSent",
-	}
-	templateIDStr := fmt.Sprintf("%s:%s:%s", templateID.PackageId, templateID.ModuleName, templateID.EntityName)
+	t.Parallel()
+	const ccipOwner = "owner-party"
+	var (
+		templateID = &ledgerv2.Identifier{
+			PackageId:  "pkg",
+			ModuleName: "CCIP",
+			EntityName: "CCIPMessageSent",
+		}
+		templateIDStr = fmt.Sprintf("%s:%s:%s", templateID.PackageId, templateID.ModuleName, templateID.EntityName)
+	)
 
 	t.Run("ignores event when ccipOwner does not match", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		msg, err := protocol.NewMessage(
@@ -253,6 +263,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	})
 
 	t.Run("ignores event when ccipOwnerParty is not in signatories", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		msg, err := protocol.NewMessage(
@@ -369,6 +380,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	})
 
 	t.Run("returns error when stream recv fails", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 		stream := &fakeUpdateStream{
@@ -396,6 +408,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	})
 
 	t.Run("uses zero begin exclusive when fromBlock is zero", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 		updateClient := mocks.NewMockUpdateServiceClient(t)
 		stream := &fakeUpdateStream{ctx: ctx}
@@ -429,6 +442,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	})
 
 	t.Run("parses events with verifier blobs and receipts", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		verifierBlobHex := "deadbeef"
@@ -628,6 +642,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	})
 
 	t.Run("returns error when receipts fewer than verifier blobs", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		msg, err := protocol.NewMessage(
@@ -747,6 +762,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	})
 
 	t.Run("returns error on unknown receipt field", func(t *testing.T) {
+		t.Parallel()
 		ctx := context.Background()
 
 		msg, err := protocol.NewMessage(
@@ -869,7 +885,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 }
 
 type fakeUpdateStream struct {
-	ctx       context.Context
+	ctx       context.Context //nolint:containedctx
 	responses []*ledgerv2.GetUpdatesResponse
 	err       error
 	idx       int
