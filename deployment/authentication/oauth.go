@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/icza/gox/osx"
-
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 )
 
 var _ authentication.Provider = OIDCProvider{}
@@ -110,9 +110,9 @@ func NewAuthorizationCodeProvider(ctx context.Context, authURL, clientID string)
 	}
 	fmt.Println("Waiting for authentication...")
 	// Create listener to fail fast if port is unavailable
-	listener, err := net.Listen("tcp", server.Addr)
+	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", server.Addr)
 	if err != nil {
-		return OIDCProvider{}, fmt.Errorf("listening on port %d: %v", port, err)
+		return OIDCProvider{}, fmt.Errorf("listening on port %d: %w", port, err)
 	}
 	serverErr := make(chan error, 1)
 	go func(chan<- error) {
