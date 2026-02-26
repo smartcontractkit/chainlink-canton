@@ -5,6 +5,24 @@ environment that includes Canton.
 
 ## Spin up an environment
 
+### Build needed Docker images
+
+Check out `smartcontractkit/chainlink-ccv` and run the following:
+
+```bash
+# From chainlink-ccv root
+cd build/devenv
+just build-docker
+```
+
+From `chainlink-canton` run the following to build the Canton committee verifier:
+
+```bash
+make build-committeeverifier
+```
+
+### Spin up the env
+
 ```bash
 # From repo root
 cd ccip/devenv

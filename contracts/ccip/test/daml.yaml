@@ -1,7 +1,7 @@
 sdk-version: 3.4.10
 name: ccip-test
 source: daml
-version: 1.0.0
+version: 0.0.1
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Wno-template-interface-depends-on-daml-script"
@@ -15,14 +15,14 @@ dependencies:
   - daml-stdlib
   - daml-script
   - ../../coin/.daml/dist/coin-0.0.1.dar
-  - ../common/.daml/dist/ccip-common-1.0.0.dar
-  - ../rmn/.daml/dist/ccip-rmn-1.0.0.dar
-  - ../ccvs/.daml/dist/ccip-committeeverifier-1.0.0.dar
-  - ../feequoter/.daml/dist/ccip-feequoter-1.0.0.dar
-  - ../onramp/.daml/dist/ccip-onramp-1.0.0.dar
-  - ../offramp/.daml/dist/ccip-offramp-1.0.0.dar
-  - ../perpartyrouter/.daml/dist/ccip-perpartyrouter-1.0.0.dar
-  - ../ccipreceiver/.daml/dist/ccip-receiver-1.0.0.dar
-  - ../pools/lockReleaseTokenPool/.daml/dist/ccip-lockreleasetokenpool-1.0.0.dar
-  - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-1.0.0.dar
-  - ../pools/interfaces/.daml/dist/ccip-tokenpool-interfaces-1.0.0.dar
+  - ../common/.daml/dist/ccip-common-0.0.1.dar
+  - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
+  - ../ccvs/.daml/dist/ccip-committeeverifier-0.0.1.dar
+  - ../feequoter/.daml/dist/ccip-feequoter-0.0.1.dar
+  - ../onramp/.daml/dist/ccip-onramp-0.0.1.dar
+  - ../offramp/.daml/dist/ccip-offramp-0.0.1.dar
+  - ../perpartyrouter/.daml/dist/ccip-perpartyrouter-0.0.1.dar
+  - ../ccipreceiver/.daml/dist/ccip-receiver-0.0.1.dar
+  - ../pools/lockReleaseTokenPool/.daml/dist/ccip-lockreleasetokenpool-0.0.1.dar
+  - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-0.0.1.dar
+  - ../pools/interfaces/.daml/dist/ccip-tokenpool-interfaces-0.0.1.dar
