@@ -63,10 +63,14 @@ var committeeVerifierVersion = []byte{0x49, 0xff, 0x34, 0xed}
 //
 //nolint:paralleltest // we won't run this in parallel.
 func TestCantonSourceReader(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping CantonSourceReader test in short mode")
+	}
+
 	ctx := ccv.Plog.WithContext(t.Context())
 	l := zerolog.Ctx(ctx)
 
-	configPath := "../../../env-canton-evm-out.toml"
+	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 

@@ -28,10 +28,14 @@ import (
 
 //nolint:paralleltest // we won't run this in parallel.
 func TestEVM2Canton_Basic(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping EVM2Canton_Basic test in short mode")
+	}
+
 	ctx := ccv.Plog.WithContext(t.Context())
 	l := zerolog.Ctx(ctx)
 
-	configPath := "../../../env-canton-evm-out.toml"
+	configPath := "../../env-canton-evm-out.toml"
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
