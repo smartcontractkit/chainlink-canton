@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
@@ -36,7 +35,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	}
 
 	// Register the canton impl factory for the canton family.
-	registry.RegisterImplFactory(chain_selectors.FamilyCanton, cantondevenv.NewImplFactory())
+	registry.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
 
 	ctx := ccv.Plog.WithContext(t.Context())
 	l := zerolog.Ctx(ctx)
