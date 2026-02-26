@@ -75,6 +75,9 @@ testFullUpgradeFlow = script do
       instanceId = counterInstanceId
       value = 100
 
+  -- Coerce Counter to MCMSReceiver interface for registry
+  let counterV1AsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterV1Cid
+
   -- 2. Create MCMS with embedded registry containing Counter registration
   debug "Creating MCMS with Counter registered (version=1.0.0)..."
   let counterReg = ContractRegistration with
@@ -84,6 +87,7 @@ testFullUpgradeFlow = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = counterV1AsMcmsReceiver
   let initialRegistry = emptyRegistryState with
         registrations = Map.fromList [(counterInstanceId, counterReg)]
 
@@ -138,7 +142,6 @@ testFullUpgradeFlow = script do
       calls = [initiateCall]
       predecessor = zeroHash
       salt = "initiate-salt"
-      targetCids = []
       perCallContractIds = []
 
   -- Verify status is UpgradePending
@@ -199,7 +202,6 @@ testFullUpgradeFlow = script do
           calls = [completeCall]
           predecessor = zeroHash
           salt = "complete-salt"
-          targetCids = []
           perCallContractIds = [executeResult.outputCids]  -- Pass receipt from ExecuteUpgrade
 
       -- =========================================================================
@@ -275,6 +277,15 @@ testUpgradeCancelMidway = script do
   now <- getTime
   let counterInstanceId = mkInstanceId "counter" owner
 
+  -- Create mock counter for CID (needed for registry)
+  mockCounterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let mockCid = toInterfaceContractId @MCMSReceiver mockCounterCid
+
   -- Create registry with counter registered
   let counterReg = ContractRegistration with
         instanceId = counterInstanceId
@@ -283,6 +294,7 @@ testUpgradeCancelMidway = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = mockCid
   let initialRegistry = emptyRegistryState with
         registrations = Map.fromList [(counterInstanceId, counterReg)]
 

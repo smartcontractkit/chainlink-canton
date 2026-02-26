@@ -335,7 +335,17 @@ testNonStakeholderCanExecuteWithDisclosures = script do
   let mcmsInstanceId = mkInstanceId realTestMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create registry with counter registered as Active
+  -- Create Counter FIRST (need CID for registry)
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counterInstanceId
+      value = 0
+
+  -- Coerce Counter to MCMSReceiver interface
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry with counter registered as Active (now with CID)
   let counterReg = ContractRegistration with
         instanceId = counterInstanceId
         version = "1.0.0"
@@ -343,6 +353,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = counterAsMcmsReceiver
   let registryState = emptyRegistryState with
         registrations = Map.fromList [(counterInstanceId, counterReg)]
 
@@ -359,13 +370,6 @@ testNonStakeholderCanExecuteWithDisclosures = script do
       blockedFunctions = []
       timelockTimestamps = Map.empty
       registry = registryState
-
-  -- Create Counter owned by ccipOwner
-  counterCid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = counterInstanceId
-      value = 0
 
   -- Use the external bypasser vectors
   let externalBypasserOp = Op
@@ -410,18 +414,15 @@ testNonStakeholderCanExecuteWithDisclosures = script do
       metadataProof = externalBypasserMetadataProof
       signatures = externalBypasserSignatures
 
-  -- Coerce Counter to MCMSReceiver interface
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
   -- Third party submits ExecuteOp with ccipOwner as actAs party (disclosure)
   -- This tests that anyone with proper disclosure can submit the transaction
+  -- NOTE: targetCids removed - CID is looked up from registry
   mcmsCid <- submitMulti [ccipOwner] [thirdParty] do
     exerciseCmd mcmsCid ExecuteOp with
       targetRole = Bypasser
       submitter = ccipOwner  -- The submitter in the choice is still ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   -- Verify counter was incremented

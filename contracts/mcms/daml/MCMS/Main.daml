@@ -58,6 +58,8 @@ import MCMS.MCMSRegistry
   , isRegistered
   , isRegisteredAndActive
   , getContractInfo
+  , getContractCid
+  , updateContractCid
   , getPendingUpgrade
   , getUpgradeHistory
   , hasPendingUpgrade
@@ -218,7 +220,7 @@ template MCMS
     --   2. Parameters decoded from op.operationData (cryptographically bound)
     --   3. Role validation (each function requires specific role)
     --
-    -- Note: targetCids must be passed separately since ContractIds cannot be serialized.
+    -- Note: External target CIDs are looked up from registry (no longer passed as parameter).
     --       The calls themselves are validated from op.operationData.
     choice ExecuteOp : ContractId MCMS
       with
@@ -226,8 +228,7 @@ template MCMS
         submitter : Party                          -- Anyone can submit
         op : Op                                    -- Operation details (params in operationData)
         opProof : [BytesHex]                       -- Merkle proof
-        targetCids : [ContractId MCMSReceiver]     -- For bypasser_execute_batch only (can't be serialized)
-        perCallContractIds : [[ContractId ()]]     -- CIDs per call for bypasser (e.g., oldCounterCid for upgrades)
+        perCallContractIds : [[ContractId ()]]     -- CIDs per call (e.g., oldCounterCid for upgrades, initial CID for RegisterContract)
       controller submitter
       do
         now <- getTime
@@ -273,7 +274,7 @@ template MCMS
             case decodeBypasserExecuteBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode BypasserExecuteBatch params"
               Some params ->
-                bypasserExecuteBatchInternal owner this rs params.calls targetCids perCallContractIds
+                bypasserExecuteBatchInternal owner this rs params.calls perCallContractIds
 
           "CancelBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_CANCEL: must use Canceller" $ targetRole == Canceller
@@ -319,6 +320,7 @@ template MCMS
     -- | Execute a scheduled batch after delay has passed
     -- This is a public entry point - anyone can execute once ready
     -- (matches Aptos timelock_execute_batch which is also public)
+    -- NOTE: targetCids no longer needed - CIDs are tracked in registry
     choice ExecuteScheduledBatch : ContractId MCMS
       with
         submitter : Party                          -- Anyone can execute
@@ -326,8 +328,7 @@ template MCMS
         calls : [TimelockCall]                     -- Caller provides (for execution)
         predecessor : Text                         -- For validation
         salt : Text                                -- For opId verification
-        targetCids : [ContractId MCMSReceiver]     -- Target contract IDs (only for external calls)
-        perCallContractIds : [[ContractId ()]]     -- CIDs per call (e.g., oldCounterCid for upgrades)
+        perCallContractIds : [[ContractId ()]]     -- CIDs per call (e.g., oldCounterCid for upgrades, initial CID for RegisterContract)
       controller submitter
       do
         now <- getTime
@@ -354,16 +355,12 @@ template MCMS
                 Some predTime ->
                   assertMsg "E_PREDECESSOR_NOT_DONE" $ predTime == doneTimestamp
 
-            -- 6. Validate external target count
-            let externalCalls = filter (\c -> c.targetInstanceId /= instanceId) calls
-            assertMsg "E_WRONG_TARGET_COUNT" $
-              length targetCids == length externalCalls
-
-            -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
+            -- 6. Process all calls (self-dispatch inline, external via MCMSReceiver)
+            -- External target CIDs are looked up from registry, no longer passed as parameter
             -- Start with empty accumulated outputs - they get threaded between calls
-            (_, finalMcms) <- processCallsLoop owner targetCids perCallContractIds this calls 0 0 []
+            finalMcms <- processCallsLoop owner perCallContractIds this calls 0 []
 
-            -- 8. Mark as done (set to doneTimestamp)
+            -- 7. Mark as done (set to doneTimestamp)
             create (finalMcms with
               timelockTimestamps = Map.insert opId doneTimestamp finalMcms.timelockTimestamps)
 
@@ -604,6 +601,17 @@ executeSelfDispatchWithOutputs mcms call accumulatedOutputs =
                     Left err -> abort err
                     Right newRegistry -> pure $ mcms with registry = newRegistry
 
+    -- RegisterContract needs initial CID from contractIds (perCallContractIds slot)
+    "RegisterContract" -> do
+      now <- getTime
+      case accumulatedOutputs of
+        [] -> abort "E_MISSING_INITIAL_CID: RegisterContract requires initial CID in perCallContractIds"
+        (cidUntyped :: _) -> do
+          let initialCid : ContractId MCMSReceiver = coerceContractId cidUntyped
+          case processRegisterContract mcms.registry call.operationData initialCid now of
+            Left err -> abort err
+            Right newRegistry -> pure $ mcms with registry = newRegistry
+
     -- All other functions delegate to executeSelfDispatch (no outputs needed)
     _ -> executeSelfDispatch mcms call
 
@@ -692,12 +700,8 @@ executeSelfDispatch mcms call =
     -- These operations modify the embedded registry state directly
     -- =========================================================================
 
-    "RegisterContract" -> do
-      -- Register a new contract in the registry
-      now <- getTime
-      case processRegisterContract mcms.registry call.operationData now of
-        Left err -> abort err
-        Right newRegistry -> pure $ mcms with registry = newRegistry
+    -- NOTE: RegisterContract is handled by executeSelfDispatchWithOutputs
+    -- because it needs initial CID from perCallContractIds
 
     "InitiateUpgrade" -> do
       -- Mark a contract as pending upgrade in the registry
@@ -757,18 +761,15 @@ scheduleBatchInternal now mcms rs calls predecessor salt delay = do
 
 -- | Execute a batch immediately via Bypasser (called by ExecuteOp for Bypasser role)
 -- Does NOT verify merkle proof - ExecuteOp already did that
-bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> [ContractId MCMSReceiver] -> [[ContractId ()]] -> Update (ContractId MCMS)
-bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids perCallContractIds = do
-  -- 1. Validate external target count
-  let externalCalls = filter (\c -> c.targetInstanceId /= mcms.instanceId) calls
-  assertMsg "E_WRONG_TARGET_COUNT" $
-    length targetCids == length externalCalls
-
-  -- 2. Process all calls (self-dispatch inline, external via MCMSReceiver)
+-- NOTE: targetCids no longer needed - CIDs are tracked in registry
+bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> [[ContractId ()]] -> Update (ContractId MCMS)
+bypasserExecuteBatchInternal ownerParty mcms rs calls perCallContractIds = do
+  -- 1. Process all calls (self-dispatch inline, external via MCMSReceiver)
+  -- External target CIDs are looked up from registry, no longer passed as parameter
   -- Start with empty accumulated outputs - they get threaded between calls
-  (_, finalMcms) <- processCallsLoop ownerParty targetCids perCallContractIds mcms calls 0 0 []
+  finalMcms <- processCallsLoop ownerParty perCallContractIds mcms calls 0 []
 
-  -- 3. Increment bypasser opCount
+  -- 2. Increment bypasser opCount
   let finalRs = getRoleState Bypasser finalMcms
   let newRs = finalRs with
         expiringRoot = finalRs.expiringRoot with opCount = finalRs.expiringRoot.opCount + 1
@@ -791,15 +792,16 @@ cancelBatchInternal mcms rs opIdToCancel = do
   create (updated with timelockTimestamps = Map.delete opIdToCancel mcms.timelockTimestamps)
 
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
--- perCallContractIds: CIDs per call (e.g., oldCounterCid for upgrades)
+-- perCallContractIds: CIDs per call (e.g., oldCounterCid for upgrades, initial CID for RegisterContract)
 -- accumulatedOutputs: Output CIDs from previous calls in the batch, threaded to subsequent calls
 -- This enables ExecuteUpgrade to produce a receipt that CompleteUpgrade can consume
 --
 -- REGISTRY VALIDATION: All external calls must target registered+active contracts
+-- CID TRACKING: External target CIDs are looked up from registry, and updated after each call
 -- This is mandatory (like Aptos mcms_registry::start_dispatch) - no optional check
-processCallsLoop : Party -> [ContractId MCMSReceiver] -> [[ContractId ()]] -> MCMS -> [TimelockCall] -> Int -> Int -> [ContractId ()] -> Update (Int, MCMS)
-processCallsLoop _ _ _ mcms [] extIdx _callIdx _accumulatedOutputs = pure (extIdx, mcms)
-processCallsLoop ownerParty targetCids perCallContractIds mcms (call :: rest) extIdx callIdx accumulatedOutputs
+processCallsLoop : Party -> [[ContractId ()]] -> MCMS -> [TimelockCall] -> Int -> [ContractId ()] -> Update MCMS
+processCallsLoop _ _ mcms [] _callIdx _accumulatedOutputs = pure mcms
+processCallsLoop ownerParty perCallContractIds mcms (call :: rest) callIdx accumulatedOutputs
   | call.targetInstanceId == mcms.instanceId = do
       -- Self-dispatch: use perCallContractIds for this call + accumulatedOutputs from previous calls
       let callContractIds = if callIdx < length perCallContractIds
@@ -807,16 +809,20 @@ processCallsLoop ownerParty targetCids perCallContractIds mcms (call :: rest) ex
                             else []
       let contractIds = callContractIds <> accumulatedOutputs
       newMcms <- executeSelfDispatchWithOutputs mcms call contractIds
-      processCallsLoop ownerParty targetCids perCallContractIds newMcms rest extIdx (callIdx + 1) accumulatedOutputs
+      processCallsLoop ownerParty perCallContractIds newMcms rest (callIdx + 1) accumulatedOutputs
   | otherwise = do
       -- MANDATORY: Validate target is registered and active in registry
-      -- Unlike before (optional check when registryCid is Some), this is now always enforced
       assertMsg ("E_TARGET_NOT_REGISTERED: " <> call.targetInstanceId) $
         isRegistered mcms.registry call.targetInstanceId
       assertMsg ("E_TARGET_NOT_ACTIVE: " <> call.targetInstanceId) $
         isRegisteredAndActive mcms.registry call.targetInstanceId
 
-      let targetCid = targetCids !! extIdx
+      -- Get current CID from registry (single source of truth)
+      targetCid <- case getContractCid mcms.registry call.targetInstanceId of
+        None -> abort $ "E_NO_CID_FOR_INSTANCE: " <> call.targetInstanceId
+        Some cid -> pure cid
+
+      -- Validate target contract
       target <- fetch targetCid
       let targetView = view target
       assertMsg ("E_WRONG_TARGET: expected " <> call.targetInstanceId <> " got " <> targetView.instanceId) $
@@ -826,17 +832,24 @@ processCallsLoop ownerParty targetCids perCallContractIds mcms (call :: rest) ex
         Some partyIdText ->
           assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
             any (\s -> partyToText s == partyIdText) (signatory target)
+
       -- Get per-call CIDs for this call index
       let callContractIds = if callIdx < length perCallContractIds
                             then perCallContractIds !! callIdx
                             else []
       let contractIds = callContractIds <> accumulatedOutputs
+
       -- Exercise and receive MCMSEntrypointResult
       result <- exercise targetCid MCMSReceiver_Entrypoint with
         caller = ownerParty
         functionName = call.functionName
         operationData = call.operationData
         contractIds = contractIds
+
+      -- UPDATE REGISTRY with new CID (contracts are immutable, each call creates new CID)
+      let updatedRegistry = updateContractCid mcms.registry call.targetInstanceId result.selfCid
+      let updatedMcms = mcms with registry = updatedRegistry
+
       -- Accumulate this call's outputCids for subsequent calls
       let newAccumulatedOutputs = accumulatedOutputs <> result.outputCids
-      processCallsLoop ownerParty targetCids perCallContractIds mcms rest (extIdx + 1) (callIdx + 1) newAccumulatedOutputs
+      processCallsLoop ownerParty perCallContractIds updatedMcms rest (callIdx + 1) newAccumulatedOutputs

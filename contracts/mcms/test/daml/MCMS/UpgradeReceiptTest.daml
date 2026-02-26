@@ -13,9 +13,10 @@ import DA.Map qualified as Map
 import DA.Time (seconds, addRelTime)
 import Daml.Script
 import MCMS.Main (MCMS(..), ExecuteScheduledBatch(..))
-import MCMS.MCMSReceiver (UpgradeReceipt(..))
+import MCMS.MCMSReceiver (MCMSReceiver, UpgradeReceipt(..))
 import MCMS.MCMSRegistry
 import MCMS.RegistryCodec
+import MCMS.Counter (Counter(..))
 import MCMS.TestHelpers (mkInstanceId)
 import MCMS.Types (TimelockCall(..), zeroHash, emptyRoleState)
 import MCMS.Crypto (hashTimelockOpId)
@@ -32,6 +33,15 @@ testCompleteUpgradeWithoutReceipt = script do
   let mcmsInstanceId = mkInstanceId "mcms" owner
   let counterInstanceId = mkInstanceId "counter" owner
 
+  -- Create mock counter for CID (needed for registry)
+  mockCounterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let mockCid = toInterfaceContractId @MCMSReceiver mockCounterCid
+
   -- Create registry with counter registered and UpgradePending
   let counterReg = ContractRegistration with
         instanceId = counterInstanceId
@@ -40,6 +50,7 @@ testCompleteUpgradeWithoutReceipt = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = mockCid
   let pendingUpgrade = PendingUpgrade with
         instanceId = counterInstanceId
         fromVersion = "1.0.0"
@@ -81,7 +92,6 @@ testCompleteUpgradeWithoutReceipt = script do
       calls = [completeCall]
       predecessor = zeroHash
       salt = "complete-salt"
-      targetCids = []
       perCallContractIds = []  -- No receipt!
 
   debug "testCompleteUpgradeWithoutReceipt PASSED!"
@@ -97,6 +107,15 @@ testCompleteUpgradeWithWrongReceipt = script do
   let wrongInstanceId = mkInstanceId "wrong-counter" owner
   let serviceInstanceId = mkInstanceId "upgrade-service" owner
 
+  -- Create mock counter for CID (needed for registry)
+  mockCounterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let mockCid = toInterfaceContractId @MCMSReceiver mockCounterCid
+
   -- Create registry with counter registered and UpgradePending
   let counterReg = ContractRegistration with
         instanceId = counterInstanceId
@@ -105,6 +124,7 @@ testCompleteUpgradeWithWrongReceipt = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = mockCid
   let pendingUpgrade = PendingUpgrade with
         instanceId = counterInstanceId
         fromVersion = "1.0.0"
@@ -158,7 +178,6 @@ testCompleteUpgradeWithWrongReceipt = script do
       calls = [completeCall]
       predecessor = zeroHash
       salt = "complete-salt"
-      targetCids = []
       perCallContractIds = [[wrongReceiptCidUntyped]]
 
   debug "testCompleteUpgradeWithWrongReceipt PASSED!"
@@ -173,6 +192,15 @@ testReceiptCannotBeReused = script do
   let counterInstanceId = mkInstanceId "counter" owner
   let serviceInstanceId = mkInstanceId "upgrade-service" owner
 
+  -- Create mock counter for CID (needed for registry)
+  mockCounterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let mockCid = toInterfaceContractId @MCMSReceiver mockCounterCid
+
   -- Create registry with counter registered and UpgradePending (first upgrade)
   let counterReg = ContractRegistration with
         instanceId = counterInstanceId
@@ -181,6 +209,7 @@ testReceiptCannotBeReused = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = mockCid
   let pendingUpgrade = PendingUpgrade with
         instanceId = counterInstanceId
         fromVersion = "1.0.0"
@@ -234,7 +263,6 @@ testReceiptCannotBeReused = script do
       calls = [completeCall]
       predecessor = zeroHash
       salt = "complete-salt"
-      targetCids = []
       perCallContractIds = [[receiptCidUntyped]]
 
   -- Verify receipt is consumed
@@ -280,7 +308,6 @@ testReceiptCannotBeReused = script do
           calls = [completeCall2]
           predecessor = zeroHash
           salt = "complete-salt-2"
-          targetCids = []
           perCallContractIds = [[receiptCidUntyped]]  -- Trying to reuse consumed receipt
 
       debug "testReceiptCannotBeReused PASSED!"

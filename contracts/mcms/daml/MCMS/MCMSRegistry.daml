@@ -18,7 +18,7 @@ import MCMS.RegistryCodec
   , decodeCompleteUpgradeParams
   , decodeCancelUpgradeParams
   )
-import MCMS.MCMSReceiver (UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
+import MCMS.MCMSReceiver (MCMSReceiver, UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
 import DA.Text qualified as T
 
 -- ===========================================================================
@@ -41,6 +41,7 @@ data ContractRegistration = ContractRegistration
     deployedAt : Time              -- When contract was registered
     contractType : Text            -- Template name
     metadata : Map.Map Text Text   -- Additional metadata
+    currentCid : ContractId MCMSReceiver  -- Current contract ID (updated after each call)
   deriving (Show, Eq)
 
 -- | Information about a pending upgrade
@@ -110,13 +111,30 @@ hasPendingUpgrade state instanceId = Map.member instanceId state.pendingUpgrades
 listRegistrations : RegistryState -> [ContractRegistration]
 listRegistrations state = map snd (Map.toList state.registrations)
 
+-- | Get the current CID for a registered contract
+getContractCid : RegistryState -> Text -> Optional (ContractId MCMSReceiver)
+getContractCid state instanceId =
+  case Map.lookup instanceId state.registrations of
+    Some reg -> Some reg.currentCid
+    None -> None
+
+-- | Update the current CID for a registered contract
+-- Returns the updated state (no-op if contract not found)
+updateContractCid : RegistryState -> Text -> ContractId MCMSReceiver -> RegistryState
+updateContractCid state instanceId newCid =
+  case Map.lookup instanceId state.registrations of
+    None -> state  -- Contract not found, no-op
+    Some reg -> state with
+      registrations = Map.insert instanceId (reg with currentCid = newCid) state.registrations
+
 -- ===========================================================================
 -- PURE STATE TRANSITION FUNCTIONS
 -- ===========================================================================
 
 -- | Register a new contract
-registerContract : RegistryState -> RegisterContractParams -> Time -> Either Text RegistryState
-registerContract state params now =
+-- initialCid: The contract's current CID, passed via perCallContractIds during RegisterContract
+registerContract : RegistryState -> RegisterContractParams -> ContractId MCMSReceiver -> Time -> Either Text RegistryState
+registerContract state params initialCid now =
   if Map.member params.instanceId state.registrations
     then Left $ "E_ALREADY_REGISTERED: " <> params.instanceId
     else Right $ state with
@@ -128,6 +146,7 @@ registerContract state params now =
           deployedAt = now
           contractType = params.contractType
           metadata = buildMetadataMap params.metadataKeys params.metadataValues
+          currentCid = initialCid
         ) state.registrations
 
 -- | Initiate an upgrade (mark contract as UpgradePending)
@@ -210,11 +229,12 @@ buildMetadataMap (k :: ks) (v :: vs) =
 -- ===========================================================================
 
 -- | Process RegisterContract operation
-processRegisterContract : RegistryState -> Text -> Time -> Either Text RegistryState
-processRegisterContract state operationData now =
+-- initialCid: The contract's current CID, passed via perCallContractIds
+processRegisterContract : RegistryState -> Text -> ContractId MCMSReceiver -> Time -> Either Text RegistryState
+processRegisterContract state operationData initialCid now =
   case decodeRegisterContractParams operationData of
     None -> Left "E_INVALID_OPERATION_DATA: failed to decode RegisterContract params"
-    Some params -> registerContract state params now
+    Some params -> registerContract state params initialCid now
 
 -- | Process InitiateUpgrade operation
 processInitiateUpgrade : RegistryState -> Text -> Time -> Either Text RegistryState

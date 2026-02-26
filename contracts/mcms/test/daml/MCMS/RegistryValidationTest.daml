@@ -74,7 +74,6 @@ testCallUnregisteredContractFails = script do
       calls
       predecessor = zeroHash
       salt = "test-salt"
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   debug "testCallUnregisteredContractFails PASSED!"
@@ -90,7 +89,16 @@ testCallDeprecatedContractFails = script do
 
   now <- getTime
 
-  -- Create registry state with deprecated counter
+  -- Create Counter FIRST (need CID for registry)
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry state with deprecated counter (now with CID)
   let registration = ContractRegistration with
         instanceId = counterInstanceId
         version = "1.0.0"
@@ -98,6 +106,7 @@ testCallDeprecatedContractFails = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = counterAsMcmsReceiver
   let registryState = emptyRegistryState with
         registrations = Map.fromList [(counterInstanceId, registration)]
 
@@ -122,15 +131,6 @@ testCallDeprecatedContractFails = script do
       timelockTimestamps = Map.fromList [(opId, readyTime)]
       registry = registryState
 
-  -- Create Counter (registered but deprecated)
-  counterCid <- submit owner do
-    createCmd Counter with
-      owner
-      instanceId = counterInstanceId
-      value = 0
-
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
   -- ExecuteScheduledBatch should fail because counter is Deprecated (not Active)
   submitMustFail owner do
     exerciseCmd mcmsCid ExecuteScheduledBatch with
@@ -139,7 +139,6 @@ testCallDeprecatedContractFails = script do
       calls
       predecessor = zeroHash
       salt = "test-salt-2"
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   debug "testCallDeprecatedContractFails PASSED!"
@@ -155,7 +154,16 @@ testCallUpgradePendingContractFails = script do
 
   now <- getTime
 
-  -- Create registry state with UpgradePending counter
+  -- Create Counter FIRST (need CID for registry)
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry state with UpgradePending counter (now with CID)
   let registration = ContractRegistration with
         instanceId = counterInstanceId
         version = "1.0.0"
@@ -163,6 +171,7 @@ testCallUpgradePendingContractFails = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = counterAsMcmsReceiver
   let pendingUpgrade = PendingUpgrade with
         instanceId = counterInstanceId
         fromVersion = "1.0.0"
@@ -194,15 +203,6 @@ testCallUpgradePendingContractFails = script do
       timelockTimestamps = Map.fromList [(opId, readyTime)]
       registry = registryState
 
-  -- Create Counter
-  counterCid <- submit owner do
-    createCmd Counter with
-      owner
-      instanceId = counterInstanceId
-      value = 0
-
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
   -- ExecuteScheduledBatch should fail because counter is UpgradePending (not Active)
   submitMustFail owner do
     exerciseCmd mcmsCid ExecuteScheduledBatch with
@@ -211,7 +211,6 @@ testCallUpgradePendingContractFails = script do
       calls
       predecessor = zeroHash
       salt = "test-salt-3"
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   debug "testCallUpgradePendingContractFails PASSED!"
@@ -227,7 +226,16 @@ testCallActiveRegisteredContractSucceeds = script do
 
   now <- getTime
 
-  -- Create registry state with Active counter
+  -- Create Counter FIRST (need CID for registry)
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner
+      instanceId = counterInstanceId
+      value = 0
+
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry state with Active counter (now with CID)
   let registration = ContractRegistration with
         instanceId = counterInstanceId
         version = "1.0.0"
@@ -235,6 +243,7 @@ testCallActiveRegisteredContractSucceeds = script do
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = counterAsMcmsReceiver
   let registryState = emptyRegistryState with
         registrations = Map.fromList [(counterInstanceId, registration)]
 
@@ -259,16 +268,8 @@ testCallActiveRegisteredContractSucceeds = script do
       timelockTimestamps = Map.fromList [(opId, readyTime)]
       registry = registryState
 
-  -- Create Counter (registered and Active)
-  counterCid <- submit owner do
-    createCmd Counter with
-      owner
-      instanceId = counterInstanceId
-      value = 0
-
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
   -- ExecuteScheduledBatch should succeed because counter is Active
+  -- CID is looked up from registry, no targetCids needed
   submit owner do
     exerciseCmd mcmsCid ExecuteScheduledBatch with
       submitter = owner
@@ -276,7 +277,6 @@ testCallActiveRegisteredContractSucceeds = script do
       calls
       predecessor = zeroHash
       salt = "test-salt-4"
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   -- Verify counter was incremented

@@ -47,8 +47,9 @@ mkInstanceId : Text -> Party -> Text
 mkInstanceId base party = base <> "@" <> partyToText party
 
 -- Helper to create a registry with a counter registered as Active
-mkRegistryWithActiveCounter : Text -> Time -> RegistryState
-mkRegistryWithActiveCounter counterInstanceId now =
+-- Now includes currentCid for CID tracking
+mkRegistryWithActiveCounter : Text -> ContractId MCMSReceiver -> Time -> RegistryState
+mkRegistryWithActiveCounter counterInstanceId counterCid now =
   let registration = ContractRegistration with
         instanceId = counterInstanceId
         version = "1.0.0"
@@ -56,6 +57,7 @@ mkRegistryWithActiveCounter counterInstanceId now =
         deployedAt = now
         contractType = "Counter"
         metadata = Map.empty
+        currentCid = counterCid
   in emptyRegistryState with
     registrations = Map.fromList [(counterInstanceId, registration)]
 
@@ -181,8 +183,18 @@ testBypasserExternalCall = script do
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create registry with counter registered as Active
-  let registryState = mkRegistryWithActiveCounter counterInstanceId now
+  -- Create Counter FIRST (need CID for registry)
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counterInstanceId
+      value = 0
+
+  -- Coerce Counter to MCMSReceiver interface
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry with counter registered as Active (now with CID)
+  let registryState = mkRegistryWithActiveCounter counterInstanceId counterAsMcmsReceiver now
 
   -- Create MCMS with bypasser config and registry
   mcmsCid <- submit ccipOwner do
@@ -197,13 +209,6 @@ testBypasserExternalCall = script do
       blockedFunctions = []
       timelockTimestamps = Map.empty
       registry = registryState
-
-  -- Create Counter (external MCMSReceiver target)
-  counterCid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = counterInstanceId
-      value = 0
 
   -- Verify initial counter value
   initialValue <- submit ccipOwner do
@@ -221,17 +226,14 @@ testBypasserExternalCall = script do
       metadataProof = externalBypasserMetadataProof
       signatures = externalBypasserSignatures
 
-  -- Coerce Counter to MCMSReceiver interface
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
   -- ExecuteOp with bypasser_execute_batch (targets Counter.increment)
+  -- NOTE: targetCids removed - CID is looked up from registry
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
       targetRole = Bypasser
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   -- Verify counter was incremented
@@ -258,8 +260,18 @@ testScheduledExternalCall = script do
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create registry with counter registered as Active
-  let registryState = mkRegistryWithActiveCounter counterInstanceId now
+  -- Create Counter FIRST (need CID for registry)
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counterInstanceId
+      value = 0
+
+  -- Coerce Counter to MCMSReceiver interface
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry with counter registered as Active (now with CID)
+  let registryState = mkRegistryWithActiveCounter counterInstanceId counterAsMcmsReceiver now
 
   -- Create MCMS with proposer config and registry
   mcmsCid <- submit ccipOwner do
@@ -274,13 +286,6 @@ testScheduledExternalCall = script do
       blockedFunctions = []
       timelockTimestamps = Map.empty
       registry = registryState
-
-  -- Create Counter
-  counterCid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = counterInstanceId
-      value = 0
 
   -- Verify initial counter value
   initialValue <- submit ccipOwner do
@@ -299,13 +304,13 @@ testScheduledExternalCall = script do
       signatures = externalScheduleSignatures
 
   -- ExecuteOp with schedule_batch (this schedules the Counter.increment call)
+  -- NOTE: targetCids removed - CIDs looked up from registry
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
       targetRole = Proposer
       submitter = ccipOwner
       op = externalScheduleOp
       opProof = externalScheduleOpProof
-      targetCids = []
       perCallContractIds = []
 
   -- Compute the opId for the scheduled batch
@@ -323,10 +328,8 @@ testScheduledExternalCall = script do
   -- Set time to after the delay
   setTime (addRelTime externalTestValidUntil (seconds (-3600)))
 
-  -- Coerce Counter to MCMSReceiver interface
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
   -- ExecuteScheduledBatch (this executes the Counter.increment call)
+  -- NOTE: targetCids removed - CID is looked up from registry
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteScheduledBatch with
       submitter = ccipOwner
@@ -334,7 +337,6 @@ testScheduledExternalCall = script do
       calls
       predecessor = zeroHash
       salt = externalScheduleSalt
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   -- Verify counter was incremented
@@ -348,7 +350,7 @@ testScheduledExternalCall = script do
   pure ()
 
 -- | Test that external call fails if targetInstanceId doesn't match
--- The op expects "counter@ccip_owner-9cefe94d" but we provide a different counter
+-- The op expects "counter@ccip_owner-9cefe94d" but registry CID points to different contract
 testExternalCallWrongInstanceId : Script ()
 testExternalCallWrongInstanceId = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
@@ -360,9 +362,19 @@ testExternalCallWrongInstanceId = script do
   -- The expected instanceId from the operationData
   let expectedCounterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create registry with EXPECTED counter registered (so registry check passes)
-  -- The failure should happen when comparing actual vs expected instanceId
-  let registryState = mkRegistryWithActiveCounter expectedCounterInstanceId now
+  -- Create Counter with wrong instanceId FIRST (to get CID for registry)
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = wrongCounterInstanceId  -- This doesn't match "counter@ccip_owner-9cefe94d" in the op
+      value = 0
+
+  -- Coerce Counter to MCMSReceiver interface
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry with EXPECTED counter registered, but with WRONG counter's CID
+  -- This simulates a CID mismatch - registry points to wrong contract
+  let registryState = mkRegistryWithActiveCounter expectedCounterInstanceId counterAsMcmsReceiver now
 
   -- Create MCMS with bypasser config and registry
   mcmsCid <- submit ccipOwner do
@@ -378,13 +390,6 @@ testExternalCallWrongInstanceId = script do
       timelockTimestamps = Map.empty
       registry = registryState
 
-  -- Create Counter with wrong instanceId
-  counterCid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = wrongCounterInstanceId  -- This doesn't match "counter@ccip_owner-9cefe94d" in the op
-      value = 0
-
   -- SetRoot for bypasser
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid SetRoot with
@@ -396,18 +401,15 @@ testExternalCallWrongInstanceId = script do
       metadataProof = externalBypasserMetadataProof
       signatures = externalBypasserSignatures
 
-  -- Coerce Counter to MCMSReceiver interface
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
-
-  -- ExecuteOp should fail because the Counter's instanceId doesn't match
+  -- ExecuteOp should fail because the Counter's actual instanceId doesn't match
   -- what's encoded in the operationData ("counter@ccip_owner-9cefe94d")
+  -- CID is looked up from registry, but fetched contract has wrong instanceId
   submitMustFail ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
       targetRole = Bypasser
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   debug "testExternalCallWrongInstanceId PASSED!"
@@ -425,8 +427,19 @@ testExternalCallForgedSignatory = script do
   -- Counter owned by malicious party but with forged instanceId claiming to be ccipOwner's
   let forgedInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create registry with expected counter registered (so registry check passes)
-  let registryState = mkRegistryWithActiveCounter forgedInstanceId now
+  -- Create Counter owned by malicious party FIRST (to get CID for registry)
+  -- but claiming the forged instanceId
+  counterCid <- submit maliciousParty do
+    createCmd Counter with
+      owner = maliciousParty  -- Different owner!
+      instanceId = forgedInstanceId  -- Claims to be ccipOwner's counter
+      value = 0
+
+  -- Coerce Counter to MCMSReceiver interface
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry with forged counter's CID (this is the malicious scenario)
+  let registryState = mkRegistryWithActiveCounter forgedInstanceId counterAsMcmsReceiver now
 
   -- Create MCMS owned by ccipOwner
   mcmsCid <- submit ccipOwner do
@@ -442,14 +455,6 @@ testExternalCallForgedSignatory = script do
       timelockTimestamps = Map.empty
       registry = registryState
 
-  -- Create Counter owned by malicious party (ccipOwner is NOT a signatory)
-  -- but claiming the forged instanceId
-  counterCid <- submit maliciousParty do
-    createCmd Counter with
-      owner = maliciousParty  -- Different owner!
-      instanceId = forgedInstanceId  -- Claims to be ccipOwner's counter
-      value = 0
-
   -- SetRoot for bypasser
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid SetRoot with
@@ -460,9 +465,6 @@ testExternalCallForgedSignatory = script do
       metadata = externalBypasserMetadata
       metadataProof = externalBypasserMetadataProof
       signatures = externalBypasserSignatures
-
-  -- Coerce Counter to MCMSReceiver interface
-  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
 
   -- ExecuteOp should fail because:
   -- 1. The instanceId in operationData is "counter@ccip_owner-9cefe94d"
@@ -475,7 +477,6 @@ testExternalCallForgedSignatory = script do
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
       perCallContractIds = []
 
   debug "testExternalCallForgedSignatory PASSED!"
@@ -492,9 +493,26 @@ testMultipleExternalTargets = script do
   let counter1InstanceId = "counter1@" <> partyToText ccipOwner
   let counter2InstanceId = "counter2@" <> partyToText ccipOwner
 
-  -- Create registry with both counters registered
-  let reg1 = ContractRegistration counter1InstanceId "1.0.0" Active now "Counter" Map.empty
-  let reg2 = ContractRegistration counter2InstanceId "1.0.0" Active now "Counter" Map.empty
+  -- Create two Counter targets FIRST (to get CIDs for registry)
+  counter1Cid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counter1InstanceId
+      value = 0
+
+  counter2Cid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counter2InstanceId
+      value = 10
+
+  -- Coerce to MCMSReceiver interface
+  let counter1AsMcmsReceiver = toInterfaceContractId @MCMSReceiver counter1Cid
+  let counter2AsMcmsReceiver = toInterfaceContractId @MCMSReceiver counter2Cid
+
+  -- Create registry with both counters registered (now with CIDs)
+  let reg1 = ContractRegistration counter1InstanceId "1.0.0" Active now "Counter" Map.empty counter1AsMcmsReceiver
+  let reg2 = ContractRegistration counter2InstanceId "1.0.0" Active now "Counter" Map.empty counter2AsMcmsReceiver
   let registryState = emptyRegistryState with
         registrations = Map.fromList [(counter1InstanceId, reg1), (counter2InstanceId, reg2)]
 
@@ -511,19 +529,6 @@ testMultipleExternalTargets = script do
       blockedFunctions = []
       timelockTimestamps = Map.empty
       registry = registryState
-
-  -- Create two Counter targets
-  counter1Cid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = counter1InstanceId
-      value = 0
-
-  counter2Cid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = counter2InstanceId
-      value = 10
 
   -- Note: This test requires vectors for a batch with 2 external calls.
   -- The current vectors only have 1 call. Would need to generate new vectors
@@ -542,8 +547,18 @@ testMixedSelfDispatchAndExternal = script do
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create registry with counter registered
-  let registryState = mkRegistryWithActiveCounter counterInstanceId now
+  -- Create Counter target FIRST (to get CID for registry)
+  counterCid <- submit ccipOwner do
+    createCmd Counter with
+      owner = ccipOwner
+      instanceId = counterInstanceId
+      value = 0
+
+  -- Coerce to MCMSReceiver interface
+  let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
+
+  -- Create registry with counter registered (now with CID)
+  let registryState = mkRegistryWithActiveCounter counterInstanceId counterAsMcmsReceiver now
 
   -- Create MCMS with minDelay = 0
   mcmsCid <- submit ccipOwner do
@@ -558,13 +573,6 @@ testMixedSelfDispatchAndExternal = script do
       blockedFunctions = []
       timelockTimestamps = Map.empty
       registry = registryState
-
-  -- Create Counter target
-  counterCid <- submit ccipOwner do
-    createCmd Counter with
-      owner = ccipOwner
-      instanceId = counterInstanceId
-      value = 0
 
   -- Note: This test requires vectors for a mixed batch with both self-dispatch
   -- and external calls. The current vectors have either self-dispatch OR external.

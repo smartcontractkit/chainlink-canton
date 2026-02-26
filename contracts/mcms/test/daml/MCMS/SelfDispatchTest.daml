@@ -190,7 +190,6 @@ testScheduleBatch = script do
       submitter = ccipOwner
       op = timelockScheduleOp
       opProof = timelockScheduleOpProof
-      targetCids = []
       perCallContractIds = []
 
   -- Verify operation was scheduled
@@ -213,7 +212,6 @@ testScheduleBatch = script do
       calls
       predecessor = zeroHash
       salt
-      targetCids = []
       perCallContractIds = []
 
   -- Verify minDelay was updated
@@ -269,7 +267,6 @@ testBypasserExecuteBatch = script do
       submitter = ccipOwner
       op = timelockBypasserOp
       opProof = timelockBypasserOpProof
-      targetCids = []
       perCallContractIds = []
 
   -- Verify minDelay was immediately updated to 300s

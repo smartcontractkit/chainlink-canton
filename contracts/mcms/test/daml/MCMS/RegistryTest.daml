@@ -17,9 +17,22 @@ import DA.Optional (isSome)
 import DA.Date (datetime, Month(..))
 import Daml.Script
 import MCMS.MCMSRegistry
+import MCMS.MCMSReceiver (MCMSReceiver)
 import MCMS.RegistryCodec
+import MCMS.Counter (Counter(..))
 import DA.Text qualified
 import DA.Time (seconds, addRelTime)
+
+-- | Helper to create a mock contract CID for testing registerContract
+-- Creates a Counter and returns its CID coerced to MCMSReceiver
+createMockContractCid : Party -> Text -> Script (ContractId MCMSReceiver)
+createMockContractCid owner instanceId = do
+  counterCid <- submit owner do
+    createCmd Counter with
+      owner = owner
+      instanceId = instanceId
+      value = 0
+  pure $ toInterfaceContractId @MCMSReceiver counterCid
 
 -- ===========================================================================
 -- PURE FUNCTION TESTS (RegistryState transitions)
@@ -28,8 +41,12 @@ import DA.Time (seconds, addRelTime)
 -- | Test: Register a contract, verify it appears with status=Active
 testRegistryRegisterContract : Script ()
 testRegistryRegisterContract = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register contract using pure function
   let params = RegisterContractParams
@@ -39,7 +56,7 @@ testRegistryRegisterContract = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let result = registerContract emptyRegistryState params now
+  let result = registerContract emptyRegistryState params mockCid now
 
   case result of
     Left err -> abort $ "Expected success, got error: " <> err
@@ -61,8 +78,12 @@ testRegistryRegisterContract = script do
 -- | Test: Attempt to register same instanceId twice, expect failure
 testRegistryRegisterDuplicate : Script ()
 testRegistryRegisterDuplicate = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   let params = RegisterContractParams
         { instanceId = counterInstanceId
@@ -73,13 +94,13 @@ testRegistryRegisterDuplicate = script do
         }
 
   -- Register first time
-  let result1 = registerContract emptyRegistryState params now
+  let result1 = registerContract emptyRegistryState params mockCid now
   case result1 of
     Left err -> abort $ "First registration should succeed: " <> err
     Right state1 -> do
       -- Try to register same instanceId again
       let params2 = params with version = "1.1.0"
-      let result2 = registerContract state1 params2 now
+      let result2 = registerContract state1 params2 mockCid now
 
       case result2 of
         Left err -> do
@@ -93,8 +114,12 @@ testRegistryRegisterDuplicate = script do
 -- | Test: Initiate upgrade, verify status=UpgradePending, PendingUpgrade created
 testRegistryInitiateUpgrade : Script ()
 testRegistryInitiateUpgrade = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- First register the contract
   let regParams = RegisterContractParams
@@ -104,7 +129,7 @@ testRegistryInitiateUpgrade = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   -- Initiate upgrade
   let upgradeParams = InitiateUpgradeParams
@@ -137,8 +162,12 @@ testRegistryInitiateUpgrade = script do
 -- | Test: InitiateUpgrade on non-Active contract, expect failure
 testRegistryInitiateUpgradeNotActive : Script ()
 testRegistryInitiateUpgradeNotActive = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register and initiate first upgrade
   let regParams = RegisterContractParams
@@ -148,7 +177,7 @@ testRegistryInitiateUpgradeNotActive = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   let upgrade1Params = InitiateUpgradeParams
         { instanceId = counterInstanceId
@@ -179,8 +208,12 @@ testRegistryInitiateUpgradeNotActive = script do
 -- | Test: InitiateUpgrade with wrong fromVersion, expect failure
 testRegistryInitiateUpgradeVersionMismatch : Script ()
 testRegistryInitiateUpgradeVersionMismatch = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register contract at version 1.0.0
   let regParams = RegisterContractParams
@@ -190,7 +223,7 @@ testRegistryInitiateUpgradeVersionMismatch = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   -- Try to initiate upgrade with wrong fromVersion
   let upgradeParams = InitiateUpgradeParams
@@ -213,9 +246,13 @@ testRegistryInitiateUpgradeVersionMismatch = script do
 -- | Test: Complete upgrade, verify version updated, status=Active, history added
 testRegistryCompleteUpgrade : Script ()
 testRegistryCompleteUpgrade = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
   let later = addRelTime now (seconds 3600)
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register and initiate upgrade
   let regParams = RegisterContractParams
@@ -225,7 +262,7 @@ testRegistryCompleteUpgrade = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   let upgradeParams = InitiateUpgradeParams
         { instanceId = counterInstanceId
@@ -269,8 +306,12 @@ testRegistryCompleteUpgrade = script do
 -- | Test: CompleteUpgrade without pending upgrade, expect failure
 testRegistryCompleteUpgradeNoPending : Script ()
 testRegistryCompleteUpgradeNoPending = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register contract (no upgrade initiated)
   let regParams = RegisterContractParams
@@ -280,7 +321,7 @@ testRegistryCompleteUpgradeNoPending = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   -- Try to complete upgrade without initiating
   let completeParams = CompleteUpgradeParams
@@ -301,8 +342,12 @@ testRegistryCompleteUpgradeNoPending = script do
 -- | Test: Cancel pending upgrade, verify status restored to Active
 testRegistryCancelUpgrade : Script ()
 testRegistryCancelUpgrade = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register and initiate upgrade
   let regParams = RegisterContractParams
@@ -312,7 +357,7 @@ testRegistryCancelUpgrade = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   let upgradeParams = InitiateUpgradeParams
         { instanceId = counterInstanceId
@@ -345,8 +390,12 @@ testRegistryCancelUpgrade = script do
 -- | Test: Deprecate contract, verify status=Deprecated
 testRegistryDeprecateContract : Script ()
 testRegistryDeprecateContract = script do
-  let counterInstanceId = "counter@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register contract
   let regParams = RegisterContractParams
@@ -356,7 +405,7 @@ testRegistryDeprecateContract = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state1 = registerContract emptyRegistryState regParams now
+  let Right state1 = registerContract emptyRegistryState regParams mockCid now
 
   -- Deprecate contract
   let result = deprecateContract state1 counterInstanceId
@@ -376,9 +425,13 @@ testRegistryDeprecateContract = script do
 -- | Test: Query functions (getContractInfo, isRegistered, etc.)
 testRegistryQueryFunctions : Script ()
 testRegistryQueryFunctions = script do
-  let counterInstanceId = "counter@ccip_owner"
-  let nonExistentId = "nonexistent@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let nonExistentId = "nonexistent@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contract to get a CID
+  mockCid <- createMockContractCid ccipOwner counterInstanceId
 
   -- Register contract
   let regParams = RegisterContractParams
@@ -388,7 +441,7 @@ testRegistryQueryFunctions = script do
         , metadataKeys = []
         , metadataValues = []
         }
-  let Right state = registerContract emptyRegistryState regParams now
+  let Right state = registerContract emptyRegistryState regParams mockCid now
 
   -- Test isRegistered
   assertMsg "counter should be registered" $ isRegistered state counterInstanceId
@@ -418,9 +471,14 @@ testRegistryQueryFunctions = script do
 -- | Test: Multiple contracts and operations
 testRegistryMultipleContracts : Script ()
 testRegistryMultipleContracts = script do
-  let counter1Id = "counter1@ccip_owner"
-  let counter2Id = "counter2@ccip_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  let counter1Id = "counter1@" <> partyToText ccipOwner
+  let counter2Id = "counter2@" <> partyToText ccipOwner
   now <- getTime
+
+  -- Create mock contracts to get CIDs
+  mockCid1 <- createMockContractCid ccipOwner counter1Id
+  mockCid2 <- createMockContractCid ccipOwner counter2Id
 
   -- Register two contracts
   let regParams1 = RegisterContractParams
@@ -438,8 +496,8 @@ testRegistryMultipleContracts = script do
         , metadataValues = ["prod"]
         }
 
-  let Right state1 = registerContract emptyRegistryState regParams1 now
-  let Right state2 = registerContract state1 regParams2 now
+  let Right state1 = registerContract emptyRegistryState regParams1 mockCid1 now
+  let Right state2 = registerContract state1 regParams2 mockCid2 now
 
   -- Verify both registrations
   let registrations = listRegistrations state2
