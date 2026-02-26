@@ -20,27 +20,33 @@ jobs:
         with:
           repository: smartcontractkit/chainlink-canton
           path: chainlink-canton
-          ref: bd15cccf316a8cc20f8d7be9d1a3234fa1723d68
 
       - name: Check out chainlink-ccv
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
+          ref: bd15cccf316a8cc20f8d7be9d1a3234fa1723d68
     
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Install Just
         uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
+      
+      - name: Authenticate to AWS ECR (JD)
+        uses: ./.github/actions/aws-ecr-auth
+        with:
+          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
+          aws-region: us-west-2
+          registry-type: private
+          registries: ${{ secrets.JD_REGISTRY }}
 
       - name: Build CCIP Docker images
         working-directory: chainlink-ccv/build/devenv
         run: |
           # Build all dependent services docker images
           just build-docker
-          # Build the JD docker image
-          just build-jd-docker
         env:
           DOCKER_BUILDKIT: 1
       
@@ -65,6 +71,8 @@ jobs:
 
       - name: Spin up CCIP environment
         working-directory: chainlink-canton/ccip/devenv
+        env:
+          JD_IMAGE: ${{ secrets.JD_IMAGE }}
         run: |
           go run cmd/ccv/main.go up env-canton-evm.toml
 
