@@ -9,6 +9,10 @@ concurrency:
 
 jobs:
   test-ccip-e2e:
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
     name: CCIP E2E tests
     runs-on: ubuntu-latest
     steps:
