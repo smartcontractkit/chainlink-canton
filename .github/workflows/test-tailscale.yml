@@ -60,6 +60,11 @@ jobs:
           echo "=== IP that will be used for canton-devnet.bcy-v.metalhosts.com  ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
           echo ""
+          echo "=== Adding LB routes manually (test if missing routes cause 403) ==="
+          sudo ip route add 99.79.185.238/32 dev tailscale0  2>/dev/null || true
+          sudo ip route add 16.54.113.197/32 dev tailscale0  2>/dev/null || true
+          sudo ip route add 3.99.93.80/32 dev tailscale0     2>/dev/null || true
+          echo ""
           echo "=== IP route show table all ==="
           ip route show table all || true
           echo ""
