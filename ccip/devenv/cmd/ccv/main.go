@@ -27,9 +27,9 @@ var rootCmd = &cobra.Command{
 	Short: "A CCV local environment tool",
 }
 
-// TODO: this is currently copy/pasted from chainlink-ccv, but instead devenv
-// should probably export a library of CLI functions that have hooks (e.g. registering
-// modifiers, chain families etc.) so that other tools can use it.
+// TODO: the commands below are currently copy/pasted from chainlink-ccv, but instead, chainlink-ccv/devenv
+// should probably export a library of CLI functions that can be selectively imported
+// by other CLIs.
 var upCmd = &cobra.Command{
 	Use:     "up",
 	Aliases: []string{"u"},
@@ -69,6 +69,26 @@ var downCmd = &cobra.Command{
 	},
 }
 
+var dumpLogsCmd = &cobra.Command{
+	Use:     "dump-logs",
+	Aliases: []string{"dl"},
+	Short:   "Dump the logs of the development environment",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dirSuffix, _ := cmd.Flags().GetString("dir-suffix")
+		if dirSuffix == "" {
+			return fmt.Errorf("dir-suffix is required")
+		}
+
+		framework.L.Info().Msg("Dumping the logs of all docker containers in the development environment")
+		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, dirSuffix))
+		if err != nil {
+			return fmt.Errorf("failed to dump logs: %w", err)
+		}
+		framework.L.Info().Msg("Logs dumped successfully")
+		return nil
+	},
+}
+
 func checkDockerIsRunning() {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
@@ -87,6 +107,7 @@ func main() {
 	checkDockerIsRunning()
 	rootCmd.AddCommand(upCmd)
 	rootCmd.AddCommand(downCmd)
+	rootCmd.AddCommand(dumpLogsCmd)
 	if err := rootCmd.Execute(); err != nil {
 		ccv.Plog.Err(err).Send()
 		os.Exit(1)

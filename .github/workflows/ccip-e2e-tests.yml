@@ -10,13 +10,17 @@ concurrency:
 jobs:
   test-ccip-e2e:
     name: CCIP E2E tests
-    runs-on: ubuntu-latest
+    runs-on: runs-on=${{ github.run_id }}/family=c6i/cpu=32+48/ram=64+96/spot=false/image=ubuntu24-full-x64/extras=s3-cache+tmpfs
     steps:
+      - name: Enable S3 Cache for Self-Hosted Runners
+        uses: runs-on/action@cd2b598b0515d39d78c38a02d529db87d2196d1e # v2.0.3
+
       - name: Check out chainlink-canton
         uses: actions/checkout@v4
         with:
           repository: smartcontractkit/chainlink-canton
           path: chainlink-canton
+          ref: bd15cccf316a8cc20f8d7be9d1a3234fa1723d68
 
       - name: Check out chainlink-ccv
         uses: actions/checkout@v4
@@ -84,6 +88,7 @@ jobs:
         run: |
           if [ ! -d "logs" ] || [ -z "$(ls -A logs)" ]; then
             echo "Logs not found or empty. Dumping logs manually..."
+            cd chainlink-canton/ccip/devenv
             go run cmd/ccv/main.go dl --dir-suffix "ccip-e2e-tests"
           else
             echo "Logs already exist. Skipping manual dump."
