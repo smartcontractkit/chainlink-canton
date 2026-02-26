@@ -32,42 +32,34 @@ jobs:
           tags: tag:bcy-validators-gha
 
       # Required for app connectors: Linux nodes don't accept advertised routes by default.
-      # This allows the runner to receive routes from the app connector (e.g. canton-devnet IPs via tailscale0).
       - name: Accept app connector routes
         run: |
           sudo tailscale set --accept-routes=true
           sudo tailscale set --operator=$USER
 
-      - name: Troubleshoot DNS (Tailscale resolution + 20s sleep)
+      # Workaround for missing routes on ephemeral runners (tailscale/github-action#266).
+      # Forces tailscaled to reconnect and re-fetch route advertisements from the coordination server.
+      - name: Reconnect Tailscale to pick up app connector routes
         run: |
-          echo "=== Tailscale DNS status ==="
-          tailscale dns status || true
+          echo "=== tailscale down && tailscale up ==="
+          sudo tailscale down
+          sudo tailscale up --accept-routes
           echo ""
-          echo "=== Resolving canton-devnet.bcy-v.metalhosts.com ==="
-          tailscale dns resolve canton-devnet.bcy-v.metalhosts.com 2>/dev/null || true
+          echo "=== Waiting 10s for routes to propagate ==="
+          sleep 10
           echo ""
-          echo "=== System resolver (getent) ==="
-          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+          echo "=== Tailscale status ==="
+          tailscale status || true
           echo ""
-          echo "=== /etc/resolv.conf ==="
-          cat /etc/resolv.conf
-          echo ""
-          echo "=== Sleeping 20s before curl ==="
-          sleep 20
+          echo "=== Routes (grep tailscale0) ==="
+          ip route show table all | grep tailscale || true
 
       - name: Test Canton Devnet connectivity
         run: |
-          echo "=== IP that will be used for canton-devnet.bcy-v.metalhosts.com  ==="
+          echo "=== Resolved IPs ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
           echo ""
-          echo "=== Adding LB routes manually (test if missing routes cause 403) ==="
-          sudo ip route add 99.79.185.238/32 dev tailscale0  2>/dev/null || true
-          sudo ip route add 16.54.113.197/32 dev tailscale0  2>/dev/null || true
-          sudo ip route add 3.99.93.80/32 dev tailscale0     2>/dev/null || true
-          echo ""
-          echo "=== IP route show table all ==="
+          echo "=== All routes ==="
           ip route show table all || true
           echo ""
-          curl -v -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant || true
-          echo ""
-          echo "✅ If you see 403: request reached AWS (awselb) but was rejected server-side (ELB/WAF/app allowlist or auth)."
+          curl -v --connect-timeout 30 -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant || true
