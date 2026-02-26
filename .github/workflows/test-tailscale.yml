@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "=== tailscale down && tailscale up ==="
           sudo tailscale down
-          sudo tailscale up --accept-routes
+          sudo tailscale up --reset --accept-routes
           echo ""
           echo "=== Waiting 10s for routes to propagate ==="
           sleep 10
