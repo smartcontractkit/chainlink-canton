@@ -35,7 +35,7 @@ jobs:
         uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
       
       - name: Authenticate to AWS ECR (JD)
-        uses: chainlink-canton/.github/actions/aws-ecr-auth
+        uses: ./chainlink-canton/.github/actions/aws-ecr-auth
         with:
           role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
           aws-region: us-west-2
