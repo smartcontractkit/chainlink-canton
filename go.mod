@@ -12,14 +12,11 @@ replace (
 	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
 
-replace github.com/smartcontractkit/chainlink-ccv/build/devenv => ../chainlink-ccv/build/devenv
-
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aws/smithy-go v1.24.1
 	github.com/digital-asset/dazl-client/v8 v8.9.0
-	github.com/docker/docker v28.5.2+incompatible
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/google/uuid v1.6.0
 	github.com/icza/gox v0.2.5
@@ -32,13 +29,12 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260219214941-b6d2149fb063
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260219214941-b6d2149fb063
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260225091500-bd15cccf316a
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260226155121-9f0bcc209ac0
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260226164129-8878396c7c25
 	github.com/smartcontractkit/chainlink-ccv/deployments v0.0.0-20260225091500-bd15cccf316a
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217084735-307a5770c4f6
 	github.com/smartcontractkit/chainlink-deployments-framework v0.82.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.3
 	github.com/smartcontractkit/go-daml v0.0.0-20260217070730-8baea5c5955e
-	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	go.uber.org/zap v1.27.1
@@ -143,6 +139,7 @@ require (
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
+	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
@@ -321,7 +318,6 @@ require (
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/oklog/ulid/v2 v2.1.0 // indirect
-	github.com/onsi/ginkgo/v2 v2.23.3 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/exp/metrics v0.124.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.124.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/deltatocumulativeprocessor v0.124.1 // indirect
