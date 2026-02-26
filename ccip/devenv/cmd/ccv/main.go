@@ -85,6 +85,7 @@ var dumpLogsCmd = &cobra.Command{
 			return fmt.Errorf("failed to dump logs: %w", err)
 		}
 		framework.L.Info().Msg("Logs dumped successfully")
+
 		return nil
 	},
 }
