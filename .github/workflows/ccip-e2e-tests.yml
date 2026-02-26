@@ -1,0 +1,97 @@
+name: CCIP E2E Tests
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-ccip-e2e:
+    name: CCIP E2E tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out chainlink-canton
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink-canton
+          path: chainlink-canton
+
+      - name: Check out chainlink-ccv
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink-ccv
+          path: chainlink-ccv
+    
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Install Just
+        uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
+
+      - name: Build CCIP Docker images
+        run: |
+          cd chainlink-ccv/build/devenv
+          # Build all dependent services docker images
+          just build-docker
+          # Build the JD docker image
+          just build-jd-docker
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: chainlink-canton/go.mod
+          cache-dependency-path: chainlink-canton/go.sum
+
+      - name: Download Go dependencies
+        working-directory: chainlink-canton
+        run: |
+          go mod download
+
+      - name: Spin up CCIP environment
+        working-directory: chainlink-canton/ccip/devenv
+        run: |
+          go run cmd/ccv/main.go up env-canton-evm.toml
+
+      - name: Run CCIP TestEVM2Canton_Basic test
+        working-directory: chainlink-canton/ccip/devenv
+        run: |
+          go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic
+        continue-on-error: true
+        id: test_run_evm2canton_basic
+
+      - name: Run CCIP TestCantonSourceReader test
+        working-directory: chainlink-canton/ccip/devenv
+        run: |
+          go test -timeout 5m -v -count 1 -run TestCantonSourceReader
+        continue-on-error: true
+        id: test_run_canton_source_reader
+
+      - name: Dump logs if they're not already dumped
+        if: always()
+        working-directory: chainlink-canton/ccip/devenv/tests/e2e
+        run: |
+          if [ ! -d "logs" ] || [ -z "$(ls -A logs)" ]; then
+            echo "Logs not found or empty. Dumping logs manually..."
+            go run cmd/ccv/main.go dl --dir-suffix "ccip-e2e-tests"
+          else
+            echo "Logs already exist. Skipping manual dump."
+          fi
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs-ccip-e2e-tests
+          path: chainlink-canton/ccip/devenv/tests/e2e/logs
+          retention-days: 1
+
+      - name: Check test results
+        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton_source_reader.outcome == 'failure')
+        run: |
+          echo "CCIP E2E tests failed."
+          exit 1
