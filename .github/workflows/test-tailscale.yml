@@ -21,37 +21,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # If you see "sudo failed with exit code 1", the real error is often
-      # "requested tags [...] are invalid or not permitted". Create the tag
-      # in Tailscale Admin → ACL (Visual) → Tags and set owner to autogroup:admin.
       - name: Connect to Tailscale
         uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON_DEVNET }}
           audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
           tags: tag:bcy-validators-gha
+          args: --accept-routes
 
-      # Required for app connectors: Linux nodes don't accept advertised routes by default.
-      - name: Accept app connector routes
+      - name: Wait for app connector route discovery
         run: |
-          sudo tailscale set --accept-routes=true
           sudo tailscale set --operator=$USER
-
-      # Workaround for missing routes on ephemeral runners (tailscale/github-action#266).
-      # Forces tailscaled to reconnect and re-fetch route advertisements from the coordination server.
-      - name: Reconnect Tailscale to pick up app connector routes
-        run: |
-          echo "=== tailscale down && tailscale up ==="
-          sudo tailscale down
-          sudo tailscale up --reset --accept-routes
-          echo ""
-          echo "=== Waiting 10s for routes to propagate ==="
-          sleep 10
-          echo ""
           echo "=== Tailscale status ==="
           tailscale status || true
           echo ""
-          echo "=== Routes (grep tailscale0) ==="
+          echo "=== Trigger DNS resolution to kick app connector route discovery ==="
+          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+          echo ""
+          echo "=== Waiting 15s for routes to propagate ==="
+          sleep 15
+          echo ""
+          echo "=== Routes (grep tailscale) ==="
           ip route show table all | grep tailscale || true
 
       - name: Test Canton Devnet connectivity
