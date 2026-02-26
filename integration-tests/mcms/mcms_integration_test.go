@@ -74,6 +74,37 @@ func buildMCMSBindingFromConfig(config MCMSConfig, owner, instanceID string, cha
 		MinDelay:           types.RELTIME(0),
 		BlockedFunctions:   []mcms.BlockedFunction{},
 		TimelockTimestamps: types.GENMAP{},
+		Registry: mcms.RegistryState{
+			Registrations:   types.GENMAP{},
+			PendingUpgrades: types.GENMAP{},
+			UpgradeHistory:  types.GENMAP{},
+		},
+	}
+}
+
+// buildContractRegistration creates a ContractRegistration for pre-populating the MCMS registry.
+// This is needed because external calls now require the target contract to be registered.
+func buildContractRegistration(instanceID, version, contractType string) mcms.ContractRegistration {
+	return mcms.ContractRegistration{
+		InstanceId:   types.TEXT(instanceID),
+		Version:      types.TEXT(version),
+		Status:       mcms.ContractStatusActive,
+		DeployedAt:   types.TIMESTAMP(time.Now()),
+		ContractType: types.TEXT(contractType),
+		Metadata:     types.GENMAP{},
+	}
+}
+
+// buildRegistryWithContracts creates a RegistryState with the given contracts pre-registered.
+func buildRegistryWithContracts(registrations ...mcms.ContractRegistration) mcms.RegistryState {
+	regs := types.GENMAP{}
+	for _, reg := range registrations {
+		regs[string(reg.InstanceId)] = reg
+	}
+	return mcms.RegistryState{
+		Registrations:   regs,
+		PendingUpgrades: types.GENMAP{},
+		UpgradeHistory:  types.GENMAP{},
 	}
 }
 
@@ -86,9 +117,27 @@ func createMCMSContract(
 	owner, baseMcmsID string,
 	chainID int64,
 ) string {
+	return createMCMSContractWithRegistry(t, participant, mcmsPkgID, config, owner, baseMcmsID, chainID)
+}
+
+// createMCMSContractWithRegistry creates an MCMS contract with pre-registered contracts in the registry.
+func createMCMSContractWithRegistry(
+	t *testing.T,
+	participant canton.Participant,
+	mcmsPkgID string,
+	config MCMSConfig,
+	owner, baseMcmsID string,
+	chainID int64,
+	registrations ...mcms.ContractRegistration,
+) string {
 	t.Helper()
 	instanceID := fmt.Sprintf("%s@%s", baseMcmsID, owner)
 	mcmsContract := buildMCMSBindingFromConfig(config, owner, instanceID, chainID)
+
+	// Override registry with pre-registered contracts if any
+	if len(registrations) > 0 {
+		mcmsContract.Registry = buildRegistryWithContracts(registrations...)
+	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -308,6 +357,9 @@ func testExecuteOpFlow(
 		},
 	}
 
+	// Pre-register the Counter contract in the registry (required for external calls)
+	counterReg := buildContractRegistration(counterInstanceId, "1.0.0", "Counter")
+
 	mcmsContract := mcms.MCMS{
 		Owner:              types.PARTY(ccipOwnerParty),
 		InstanceId:         types.TEXT(fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)),
@@ -318,6 +370,7 @@ func testExecuteOpFlow(
 		MinDelay:           types.RELTIME(0),
 		BlockedFunctions:   []mcms.BlockedFunction{},
 		TimelockTimestamps: types.GENMAP{},
+		Registry:           buildRegistryWithContracts(counterReg),
 	}
 
 	mcmsCreateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1267,7 +1320,9 @@ func testSignatoryCheck(
 	// ========================
 
 	t.Log("Creating MCMS contract owned by ccipOwner...")
-	mcmsCid := createMCMSContract(t, ccipParticipant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
+	// Pre-register the Counter in the MCMS registry (required for external calls)
+	counterReg := buildContractRegistration(counterInstanceId, "1.0.0", "Counter")
+	mcmsCid := createMCMSContractWithRegistry(t, ccipParticipant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId, counterReg)
 	t.Logf("Created MCMS contract: %s", mcmsCid)
 
 	// ========================

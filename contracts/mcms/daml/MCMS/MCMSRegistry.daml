@@ -1,17 +1,25 @@
--- | MCMS Registry for Contract Upgrade Support
--- Tracks MCMS-governed contracts and manages upgrade lifecycle
+-- | MCMS Registry - Data Types for Contract Upgrade Support
+-- Embedded in MCMS contract state (no longer a separate template)
+--
+-- Following the Splice framework pattern (AmuletConfig.daml), this module
+-- provides data types and pure functions for managing contract registrations
+-- and upgrade lifecycle.
 module MCMS.MCMSRegistry where
 
 import DA.Map qualified as Map
 import DA.Optional (fromOptional)
-import DA.Text qualified as T
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSEntrypointResult(..), UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
 import MCMS.RegistryCodec
-  ( decodeRegisterContractParams
+  ( RegisterContractParams(..)
+  , InitiateUpgradeParams(..)
+  , CompleteUpgradeParams(..)
+  , CancelUpgradeParams(..)
+  , decodeRegisterContractParams
   , decodeInitiateUpgradeParams
   , decodeCompleteUpgradeParams
   , decodeCancelUpgradeParams
   )
+import MCMS.MCMSReceiver (UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
+import DA.Text qualified as T
 
 -- ===========================================================================
 -- DATA TYPES
@@ -54,247 +62,135 @@ data UpgradeHistoryEntry = UpgradeHistoryEntry
     migrationParams : Text         -- Parameters used
   deriving (Show, Eq)
 
--- ===========================================================================
--- MCMS REGISTRY TEMPLATE
--- ===========================================================================
-
--- | Central registry for MCMS-governed contracts
--- Implements MCMSReceiver to be controllable via MCMS governance
-template MCMSRegistry
+-- | Aggregate registry state (embedded in MCMS, like AmuletConfig)
+data RegistryState = RegistryState
   with
-    owner : Party                                           -- ccip_owner party
-    instanceId : Text                                       -- Registry's stable identifier
-    registrations : Map.Map Text ContractRegistration       -- instanceId -> registration
-    pendingUpgrades : Map.Map Text PendingUpgrade           -- instanceId -> pending upgrade
-    upgradeHistory : Map.Map Text [UpgradeHistoryEntry]     -- instanceId -> history
-  where
-    signatory owner
+    registrations : Map.Map Text ContractRegistration
+    pendingUpgrades : Map.Map Text PendingUpgrade
+    upgradeHistory : Map.Map Text [UpgradeHistoryEntry]
+  deriving (Show, Eq)
 
-    -- =========================================================================
-    -- MCMS RECEIVER INTERFACE
-    -- =========================================================================
+-- | Empty initial registry state
+emptyRegistryState : RegistryState
+emptyRegistryState = RegistryState Map.empty Map.empty Map.empty
 
-    interface instance MCMSReceiver for MCMSRegistry where
-      view = MCMSReceiverView with
-        owner
-        instanceId
-        version = "1.0.0"            -- Version for registry
-        contractType = "MCMSRegistry"  -- Type for identification
+-- ===========================================================================
+-- PURE QUERY FUNCTIONS
+-- ===========================================================================
 
-      mcmsEntrypoint selfCid functionName operationData contractIds = do
-        now <- getTime
-        -- Archive old contract (MCMSReceiver_Entrypoint is non-consuming)
-        let selfRegistryCid : ContractId MCMSRegistry = coerceContractId selfCid
-        exercise selfRegistryCid ArchiveRegistry
-        case functionName of
-          "RegisterContract" ->
-            case decodeRegisterContractParams operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode RegisterContract params"
-              Some params -> do
-                assertMsg "E_ALREADY_REGISTERED" $
-                  not $ Map.member params.instanceId registrations
-                let metadata = buildMetadataMap params.metadataKeys params.metadataValues
-                let registration = ContractRegistration with
-                      instanceId = params.instanceId
-                      version = params.version
-                      status = Active
-                      deployedAt = now
-                      contractType = params.contractType
-                      metadata
-                let newRegistrations = Map.insert params.instanceId registration registrations
-                newCid <- create this with registrations = newRegistrations
-                pure MCMSEntrypointResult with
-                  selfCid = toInterfaceContractId @MCMSReceiver newCid
-                  outputCids = []
+-- | Check if a contract is registered
+isRegistered : RegistryState -> Text -> Bool
+isRegistered state instanceId = Map.member instanceId state.registrations
 
-          "InitiateUpgrade" ->
-            case decodeInitiateUpgradeParams operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode InitiateUpgrade params"
-              Some params -> do
-                -- Verify contract exists and is active
-                case Map.lookup params.instanceId registrations of
-                  None -> abort $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
-                  Some reg -> do
-                    assertMsg "E_NOT_ACTIVE" $ reg.status == Active
-                    assertMsg "E_VERSION_MISMATCH" $ reg.version == params.fromVersion
-                    -- Check no pending upgrade
-                    assertMsg "E_UPGRADE_ALREADY_PENDING" $
-                      not $ Map.member params.instanceId pendingUpgrades
-                    -- Create pending upgrade
-                    let upgrade = PendingUpgrade with
-                          instanceId = params.instanceId
-                          fromVersion = params.fromVersion
-                          toVersion = params.toVersion
-                          initiatedAt = now
-                          migrationParams = params.migrationParams
-                    let newPending = Map.insert params.instanceId upgrade pendingUpgrades
-                    -- Mark registration as upgrade pending
-                    let updatedReg = reg with status = UpgradePending
-                    let newRegistrations = Map.insert params.instanceId updatedReg registrations
-                    newCid <- create this with
-                      registrations = newRegistrations
-                      pendingUpgrades = newPending
-                    pure MCMSEntrypointResult with
-                      selfCid = toInterfaceContractId @MCMSReceiver newCid
-                      outputCids = []
+-- | Check if a contract is registered AND active
+isRegisteredAndActive : RegistryState -> Text -> Bool
+isRegisteredAndActive state instanceId =
+  case Map.lookup instanceId state.registrations of
+    Some reg -> reg.status == Active
+    None -> False
 
-          "CompleteUpgrade" ->
-            case decodeCompleteUpgradeParams operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode CompleteUpgrade params"
-              Some params -> do
-                -- Verify pending upgrade exists
-                case Map.lookup params.instanceId pendingUpgrades of
-                  None -> abort $ "E_NO_PENDING_UPGRADE: " <> params.instanceId
-                  Some pending -> do
-                    assertMsg "E_VERSION_MISMATCH" $ pending.toVersion == params.newVersion
+-- | Get contract registration info
+getContractInfo : RegistryState -> Text -> Optional ContractRegistration
+getContractInfo state instanceId = Map.lookup instanceId state.registrations
 
-                    -- NEW: Require UpgradeReceipt from ExecuteUpgrade
-                    case contractIds of
-                      [] -> abort "E_MISSING_UPGRADE_RECEIPT"
-                      (receiptCidUntyped :: _) -> do
-                        -- Cast to UpgradeReceipt and fetch
-                        let receiptCid : ContractId UpgradeReceipt = coerceContractId receiptCidUntyped
-                        receipt <- fetch receiptCid
+-- | Get pending upgrade info
+getPendingUpgrade : RegistryState -> Text -> Optional PendingUpgrade
+getPendingUpgrade state instanceId = Map.lookup instanceId state.pendingUpgrades
 
-                        -- Validate receipt matches pending upgrade
-                        assertMsg "E_RECEIPT_INSTANCE_MISMATCH" $
-                          receipt.instanceId == params.instanceId
-                        assertMsg "E_RECEIPT_FROM_VERSION_MISMATCH" $
-                          receipt.fromVersion == pending.fromVersion
-                        assertMsg "E_RECEIPT_TO_VERSION_MISMATCH" $
-                          receipt.toVersion == pending.toVersion
-                        assertMsg "E_RECEIPT_OWNER_MISMATCH" $
-                          receipt.owner == owner
+-- | Get upgrade history for a contract
+getUpgradeHistory : RegistryState -> Text -> [UpgradeHistoryEntry]
+getUpgradeHistory state instanceId =
+  fromOptional [] (Map.lookup instanceId state.upgradeHistory)
 
-                        -- Consume receipt (prevents reuse)
-                        exercise receiptCid ConsumeUpgradeReceipt
+-- | Check if a contract has a pending upgrade
+hasPendingUpgrade : RegistryState -> Text -> Bool
+hasPendingUpgrade state instanceId = Map.member instanceId state.pendingUpgrades
 
-                        -- Get current registration
-                        case Map.lookup params.instanceId registrations of
-                          None -> abort $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
-                          Some reg -> do
-                            -- Update registration to new version
-                            let updatedReg = reg with
-                                  version = params.newVersion
-                                  status = Active
-                            let newRegistrations = Map.insert params.instanceId updatedReg registrations
-                            -- Remove pending upgrade
-                            let newPending = Map.delete params.instanceId pendingUpgrades
-                            -- Add to history
-                            let historyEntry = UpgradeHistoryEntry with
-                                  fromVersion = pending.fromVersion
-                                  toVersion = pending.toVersion
-                                  upgradedAt = now
-                                  migrationParams = pending.migrationParams
-                            let existingHistory = fromOptional [] (Map.lookup params.instanceId upgradeHistory)
-                            let newHistory = Map.insert params.instanceId (historyEntry :: existingHistory) upgradeHistory
-                            newCid <- create this with
-                              registrations = newRegistrations
-                              pendingUpgrades = newPending
-                              upgradeHistory = newHistory
-                            pure MCMSEntrypointResult with
-                              selfCid = toInterfaceContractId @MCMSReceiver newCid
-                              outputCids = []
+-- | List all registrations
+listRegistrations : RegistryState -> [ContractRegistration]
+listRegistrations state = map snd (Map.toList state.registrations)
 
-          "CancelUpgrade" ->
-            case decodeCancelUpgradeParams operationData of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode CancelUpgrade params"
-              Some params -> do
-                -- Verify pending upgrade exists
-                assertMsg ("E_NO_PENDING_UPGRADE: " <> params.instanceId) $
-                  Map.member params.instanceId pendingUpgrades
-                -- Get current registration
-                case Map.lookup params.instanceId registrations of
-                  None -> abort $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
-                  Some reg -> do
-                    -- Restore to active status
-                    let updatedReg = reg with status = Active
-                    let newRegistrations = Map.insert params.instanceId updatedReg registrations
-                    -- Remove pending upgrade
-                    let newPending = Map.delete params.instanceId pendingUpgrades
-                    newCid <- create this with
-                      registrations = newRegistrations
-                      pendingUpgrades = newPending
-                    pure MCMSEntrypointResult with
-                      selfCid = toInterfaceContractId @MCMSReceiver newCid
-                      outputCids = []
+-- ===========================================================================
+-- PURE STATE TRANSITION FUNCTIONS
+-- ===========================================================================
 
-          "DeprecateContract" -> do
-            -- Deprecate a contract (usually after successful upgrade)
-            (targetInstanceId, _) <- case decodeTextSimple operationData 0 of
-              None -> abort "E_INVALID_OPERATION_DATA: failed to decode instanceId"
-              Some r -> pure r
-            case Map.lookup targetInstanceId registrations of
-              None -> abort $ "E_CONTRACT_NOT_FOUND: " <> targetInstanceId
-              Some reg -> do
-                let updatedReg = reg with status = Deprecated
-                let newRegistrations = Map.insert targetInstanceId updatedReg registrations
-                newCid <- create this with registrations = newRegistrations
-                pure MCMSEntrypointResult with
-                  selfCid = toInterfaceContractId @MCMSReceiver newCid
-                  outputCids = []
+-- | Register a new contract
+registerContract : RegistryState -> RegisterContractParams -> Time -> Either Text RegistryState
+registerContract state params now =
+  if Map.member params.instanceId state.registrations
+    then Left $ "E_ALREADY_REGISTERED: " <> params.instanceId
+    else Right $ state with
+      registrations = Map.insert params.instanceId
+        (ContractRegistration with
+          instanceId = params.instanceId
+          version = params.version
+          status = Active
+          deployedAt = now
+          contractType = params.contractType
+          metadata = buildMetadataMap params.metadataKeys params.metadataValues
+        ) state.registrations
 
-          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+-- | Initiate an upgrade (mark contract as UpgradePending)
+initiateUpgrade : RegistryState -> InitiateUpgradeParams -> Time -> Either Text RegistryState
+initiateUpgrade state params now =
+  case Map.lookup params.instanceId state.registrations of
+    None -> Left $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
+    Some reg ->
+      if reg.status /= Active
+        then Left $ "E_NOT_ACTIVE: " <> params.instanceId
+        else if reg.version /= params.fromVersion
+          then Left $ "E_VERSION_MISMATCH: expected " <> reg.version <> " got " <> params.fromVersion
+          else if Map.member params.instanceId state.pendingUpgrades
+            then Left $ "E_UPGRADE_ALREADY_PENDING: " <> params.instanceId
+            else Right $ state with
+              registrations = Map.insert params.instanceId (reg with status = UpgradePending) state.registrations
+              pendingUpgrades = Map.insert params.instanceId
+                (PendingUpgrade with
+                  instanceId = params.instanceId
+                  fromVersion = params.fromVersion
+                  toVersion = params.toVersion
+                  initiatedAt = now
+                  migrationParams = params.migrationParams
+                ) state.pendingUpgrades
 
-    -- =========================================================================
-    -- INTERNAL CHOICES
-    -- =========================================================================
+-- | Complete an upgrade (update version, status=Active, add history)
+completeUpgrade : RegistryState -> CompleteUpgradeParams -> Time -> Either Text RegistryState
+completeUpgrade state params now =
+  case Map.lookup params.instanceId state.pendingUpgrades of
+    None -> Left $ "E_NO_PENDING_UPGRADE: " <> params.instanceId
+    Some pending ->
+      if pending.toVersion /= params.newVersion
+        then Left "E_VERSION_MISMATCH"
+        else case Map.lookup params.instanceId state.registrations of
+          None -> Left $ "E_CONTRACT_NOT_FOUND: " <> params.instanceId
+          Some reg ->
+            let historyEntry = UpgradeHistoryEntry pending.fromVersion pending.toVersion now pending.migrationParams
+                existingHistory = fromOptional [] (Map.lookup params.instanceId state.upgradeHistory)
+            in Right $ state with
+              registrations = Map.insert params.instanceId
+                (reg with version = params.newVersion, status = Active)
+                state.registrations
+              pendingUpgrades = Map.delete params.instanceId state.pendingUpgrades
+              upgradeHistory = Map.insert params.instanceId (historyEntry :: existingHistory) state.upgradeHistory
 
-    -- | Archive choice for state transitions (called by mcmsEntrypoint)
-    choice ArchiveRegistry : ()
-      controller owner
-      do pure ()
+-- | Cancel a pending upgrade (restore to Active status)
+cancelUpgrade : RegistryState -> Text -> Either Text RegistryState
+cancelUpgrade state instanceId =
+  if not (Map.member instanceId state.pendingUpgrades)
+    then Left $ "E_NO_PENDING_UPGRADE: " <> instanceId
+    else case Map.lookup instanceId state.registrations of
+      None -> Left $ "E_CONTRACT_NOT_FOUND: " <> instanceId
+      Some reg -> Right $ state with
+        registrations = Map.insert instanceId (reg with status = Active) state.registrations
+        pendingUpgrades = Map.delete instanceId state.pendingUpgrades
 
-    -- =========================================================================
-    -- VIEW CHOICES
-    -- =========================================================================
-
-    -- | Get information about a registered contract
-    nonconsuming choice GetContractInfo : Optional ContractRegistration
-      with
-        viewer : Party
-        targetInstanceId : Text
-      controller viewer
-      do pure $ Map.lookup targetInstanceId registrations
-
-    -- | Get pending upgrade information for a contract
-    nonconsuming choice GetPendingUpgrade : Optional PendingUpgrade
-      with
-        viewer : Party
-        targetInstanceId : Text
-      controller viewer
-      do pure $ Map.lookup targetInstanceId pendingUpgrades
-
-    -- | List all registered contracts
-    nonconsuming choice ListRegistrations : [ContractRegistration]
-      with
-        viewer : Party
-      controller viewer
-      do pure $ map snd (Map.toList registrations)
-
-    -- | Get upgrade history for a contract
-    nonconsuming choice GetUpgradeHistory : [UpgradeHistoryEntry]
-      with
-        viewer : Party
-        targetInstanceId : Text
-      controller viewer
-      do pure $ fromOptional [] (Map.lookup targetInstanceId upgradeHistory)
-
-    -- | Check if a contract is registered
-    nonconsuming choice IsRegistered : Bool
-      with
-        viewer : Party
-        targetInstanceId : Text
-      controller viewer
-      do pure $ Map.member targetInstanceId registrations
-
-    -- | Check if a contract has a pending upgrade
-    nonconsuming choice HasPendingUpgrade : Bool
-      with
-        viewer : Party
-        targetInstanceId : Text
-      controller viewer
-      do pure $ Map.member targetInstanceId pendingUpgrades
+-- | Deprecate a contract
+deprecateContract : RegistryState -> Text -> Either Text RegistryState
+deprecateContract state instanceId =
+  case Map.lookup instanceId state.registrations of
+    None -> Left $ "E_CONTRACT_NOT_FOUND: " <> instanceId
+    Some reg -> Right $ state with
+      registrations = Map.insert instanceId (reg with status = Deprecated) state.registrations
 
 -- ===========================================================================
 -- HELPER FUNCTIONS
@@ -306,6 +202,59 @@ buildMetadataMap [] _ = Map.empty
 buildMetadataMap _ [] = Map.empty
 buildMetadataMap (k :: ks) (v :: vs) =
   Map.insert k v (buildMetadataMap ks vs)
+
+-- ===========================================================================
+-- UPDATE-CONTEXT STATE TRANSITION FUNCTIONS
+-- These functions are designed to be called within MCMS's Update context
+-- They decode parameters, perform state transitions, and handle side effects
+-- ===========================================================================
+
+-- | Process RegisterContract operation
+processRegisterContract : RegistryState -> Text -> Time -> Either Text RegistryState
+processRegisterContract state operationData now =
+  case decodeRegisterContractParams operationData of
+    None -> Left "E_INVALID_OPERATION_DATA: failed to decode RegisterContract params"
+    Some params -> registerContract state params now
+
+-- | Process InitiateUpgrade operation
+processInitiateUpgrade : RegistryState -> Text -> Time -> Either Text RegistryState
+processInitiateUpgrade state operationData now =
+  case decodeInitiateUpgradeParams operationData of
+    None -> Left "E_INVALID_OPERATION_DATA: failed to decode InitiateUpgrade params"
+    Some params -> initiateUpgrade state params now
+
+-- | Process CancelUpgrade operation
+processCancelUpgrade : RegistryState -> Text -> Either Text RegistryState
+processCancelUpgrade state operationData =
+  case decodeCancelUpgradeParams operationData of
+    None -> Left "E_INVALID_OPERATION_DATA: failed to decode CancelUpgrade params"
+    Some params -> cancelUpgrade state params.instanceId
+
+-- | Process DeprecateContract operation
+processDeprecateContract : RegistryState -> Text -> Either Text RegistryState
+processDeprecateContract state operationData =
+  case decodeTextSimple operationData 0 of
+    None -> Left "E_INVALID_OPERATION_DATA: failed to decode instanceId"
+    Some (targetInstanceId, _) -> deprecateContract state targetInstanceId
+
+-- | Validate UpgradeReceipt and complete upgrade
+-- Returns the updated RegistryState and the receipt CID to consume
+validateAndCompleteUpgrade : Party -> RegistryState -> Text -> [ContractId ()] -> Either Text (RegistryState, ContractId UpgradeReceipt, CompleteUpgradeParams)
+validateAndCompleteUpgrade ownerParty state operationData contractIds =
+  case decodeCompleteUpgradeParams operationData of
+    None -> Left "E_INVALID_OPERATION_DATA: failed to decode CompleteUpgrade params"
+    Some params ->
+      case contractIds of
+        [] -> Left "E_MISSING_UPGRADE_RECEIPT"
+        (receiptCidUntyped :: _) ->
+          let receiptCid : ContractId UpgradeReceipt = coerceContractId receiptCidUntyped
+          in case getPendingUpgrade state params.instanceId of
+            None -> Left $ "E_NO_PENDING_UPGRADE: " <> params.instanceId
+            Some _ -> Right (state, receiptCid, params)
+
+-- ===========================================================================
+-- TEXT DECODING HELPERS (for DeprecateContract)
+-- ===========================================================================
 
 -- | Simple text decoder for single text parameter
 -- Format: len (1 byte) + text bytes

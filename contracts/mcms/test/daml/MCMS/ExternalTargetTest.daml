@@ -1,5 +1,7 @@
 -- | Tests for MCMS executing operations on external MCMSReceiver contracts (Counter)
 -- These tests verify the processCallsLoop external dispatch path.
+--
+-- With embedded registry, external calls MUST target registered+active contracts.
 module MCMS.ExternalTargetTest where
 
 import DA.Map qualified as Map
@@ -11,6 +13,7 @@ import MCMS.Main
 import MCMS.MCMSReceiver (MCMSReceiver)
 import MCMS.Counter
 import MCMS.Crypto (RawSignature(..), hashTimelockOpId)
+import MCMS.MCMSRegistry (emptyRegistryState, RegistryState(..), ContractRegistration(..), ContractStatus(..))
 
 -- ===========================================================================
 -- TEST CONFIGURATION (Shared with FlowTest.daml)
@@ -42,6 +45,19 @@ externalTestBaseMcmsId = "mcms-daml-test"
 -- Helper to create instanceId
 mkInstanceId : Text -> Party -> Text
 mkInstanceId base party = base <> "@" <> partyToText party
+
+-- Helper to create a registry with a counter registered as Active
+mkRegistryWithActiveCounter : Text -> Time -> RegistryState
+mkRegistryWithActiveCounter counterInstanceId now =
+  let registration = ContractRegistration with
+        instanceId = counterInstanceId
+        version = "1.0.0"
+        status = Active
+        deployedAt = now
+        contractType = "Counter"
+        metadata = Map.empty
+  in emptyRegistryState with
+    registrations = Map.fromList [(counterInstanceId, registration)]
 
 -- ===========================================================================
 -- EXTERNAL CALL TEST VECTORS
@@ -160,11 +176,15 @@ externalScheduleSalt = "test-external-schedule-salt-1"
 testBypasserExternalCall : Script ()
 testBypasserExternalCall = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  now <- getTime
 
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create MCMS with bypasser config
+  -- Create registry with counter registered as Active
+  let registryState = mkRegistryWithActiveCounter counterInstanceId now
+
+  -- Create MCMS with bypasser config and registry
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
@@ -176,7 +196,7 @@ testBypasserExternalCall = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = registryState
 
   -- Create Counter (external MCMSReceiver target)
   counterCid <- submit ccipOwner do
@@ -233,11 +253,15 @@ testBypasserExternalCall = script do
 testScheduledExternalCall : Script ()
 testScheduledExternalCall = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  now <- getTime
 
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create MCMS with proposer config
+  -- Create registry with counter registered as Active
+  let registryState = mkRegistryWithActiveCounter counterInstanceId now
+
+  -- Create MCMS with proposer config and registry
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
@@ -249,7 +273,7 @@ testScheduledExternalCall = script do
       minDelay = seconds 0  -- No delay for testing
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = registryState
 
   -- Create Counter
   counterCid <- submit ccipOwner do
@@ -328,12 +352,19 @@ testScheduledExternalCall = script do
 testExternalCallWrongInstanceId : Script ()
 testExternalCallWrongInstanceId = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  now <- getTime
 
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   -- Create Counter with WRONG instanceId (doesn't match what's in the signed op)
   let wrongCounterInstanceId = "different-counter@" <> partyToText ccipOwner
+  -- The expected instanceId from the operationData
+  let expectedCounterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- Create MCMS with bypasser config
+  -- Create registry with EXPECTED counter registered (so registry check passes)
+  -- The failure should happen when comparing actual vs expected instanceId
+  let registryState = mkRegistryWithActiveCounter expectedCounterInstanceId now
+
+  -- Create MCMS with bypasser config and registry
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
@@ -345,7 +376,7 @@ testExternalCallWrongInstanceId = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = registryState
 
   -- Create Counter with wrong instanceId
   counterCid <- submit ccipOwner do
@@ -388,10 +419,14 @@ testExternalCallForgedSignatory : Script ()
 testExternalCallForgedSignatory = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
   maliciousParty <- allocateParty "malicious"
+  now <- getTime
 
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   -- Counter owned by malicious party but with forged instanceId claiming to be ccipOwner's
   let forgedInstanceId = "counter@" <> partyToText ccipOwner
+
+  -- Create registry with expected counter registered (so registry check passes)
+  let registryState = mkRegistryWithActiveCounter forgedInstanceId now
 
   -- Create MCMS owned by ccipOwner
   mcmsCid <- submit ccipOwner do
@@ -405,7 +440,7 @@ testExternalCallForgedSignatory = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = registryState
 
   -- Create Counter owned by malicious party (ccipOwner is NOT a signatory)
   -- but claiming the forged instanceId
@@ -451,10 +486,17 @@ testExternalCallForgedSignatory = script do
 testMultipleExternalTargets : Script ()
 testMultipleExternalTargets = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  now <- getTime
 
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counter1InstanceId = "counter1@" <> partyToText ccipOwner
   let counter2InstanceId = "counter2@" <> partyToText ccipOwner
+
+  -- Create registry with both counters registered
+  let reg1 = ContractRegistration counter1InstanceId "1.0.0" Active now "Counter" Map.empty
+  let reg2 = ContractRegistration counter2InstanceId "1.0.0" Active now "Counter" Map.empty
+  let registryState = emptyRegistryState with
+        registrations = Map.fromList [(counter1InstanceId, reg1), (counter2InstanceId, reg2)]
 
   -- Create MCMS
   mcmsCid <- submit ccipOwner do
@@ -468,7 +510,7 @@ testMultipleExternalTargets = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = registryState
 
   -- Create two Counter targets
   counter1Cid <- submit ccipOwner do
@@ -495,9 +537,13 @@ testMultipleExternalTargets = script do
 testMixedSelfDispatchAndExternal : Script ()
 testMixedSelfDispatchAndExternal = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
+  now <- getTime
 
   let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
   let counterInstanceId = "counter@" <> partyToText ccipOwner
+
+  -- Create registry with counter registered
+  let registryState = mkRegistryWithActiveCounter counterInstanceId now
 
   -- Create MCMS with minDelay = 0
   mcmsCid <- submit ccipOwner do
@@ -511,7 +557,7 @@ testMixedSelfDispatchAndExternal = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = registryState
 
   -- Create Counter target
   counterCid <- submit ccipOwner do

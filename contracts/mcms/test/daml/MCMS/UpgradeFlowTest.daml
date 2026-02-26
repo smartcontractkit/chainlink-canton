@@ -1,19 +1,20 @@
 -- | Full Upgrade Flow Tests for MCMS Contract Upgrade Pattern
 --
--- These tests demonstrate the complete MCMS contract upgrade workflow:
+-- These tests demonstrate the complete MCMS contract upgrade workflow
+-- using the embedded registry pattern.
 --
 -- INITIAL DEPLOYMENT (Day 1):
---   - Deploy V1 contracts (Counter, MCMSRegistry)
---   - Register V1 with registry
+--   - Deploy V1 contracts (Counter)
+--   - Create MCMS with registry containing Counter registration
 --   - No upgrade service exists yet
 --
 -- UPGRADE TIME (Day 30):
 --   - Deploy V2 additions (CounterV2, CounterUpgradeService)
 --   - Create upgrade service instance
 --   - Execute 3-step upgrade:
---     1. InitiateUpgrade on Registry
+--     1. InitiateUpgrade self-dispatch on MCMS
 --     2. ExecuteUpgrade on Service (fetches state, archives V1, creates V2)
---     3. CompleteUpgrade on Registry
+--     3. CompleteUpgrade self-dispatch on MCMS (validates receipt)
 --
 -- Key design: The upgrade service is created at upgrade time, not during initial deployment.
 -- This avoids circular dependencies - V1 doesn't know V2.
@@ -21,65 +22,52 @@
 module MCMS.UpgradeFlowTest where
 
 import DA.Map qualified as Map
+import DA.Time (seconds, addRelTime)
 import Daml.Script
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.Main (MCMS(..), ExecuteScheduledBatch(..), GetContractInfo(..), GetUpgradeHistory(..))
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), UpgradeReceipt(..))
 import MCMS.MCMSRegistry
 import MCMS.Counter (Counter(..))
 import MCMS.CounterV2
 import MCMS.RegistryCodec
 import MCMS.TestHelpers (mkInstanceId)
+import MCMS.Types (TimelockCall(..), zeroHash, emptyRoleState)
+import MCMS.Crypto (hashTimelockOpId)
 
 -- ===========================================================================
--- FULL UPGRADE FLOW TESTS (Realistic Timeline)
+-- FULL UPGRADE FLOW TESTS (Using Embedded Registry)
 -- ===========================================================================
 
--- | Test: Complete upgrade flow with realistic timeline
+-- | Test: Complete upgrade flow with embedded registry
 --
--- This test demonstrates the actual workflow for upgrading contracts:
+-- This test demonstrates the workflow for upgrading contracts:
 --
 -- === INITIAL DEPLOYMENT (Day 1) ===
--- At this point, only V1 exists. No upgrade service, no V2.
---   1. Deploy mcms.dar (contains MCMS, MCMSRegistry, Counter V1)
---   2. Create MCMSRegistry contract
---   3. Create Counter contract with initial value
---   4. Register Counter with registry (version=1.0.0, status=Active)
+--   1. Create Counter V1 with initial value
+--   2. Create MCMS with registry containing Counter registration (Active)
 --
 -- === UPGRADE TIME (Day 30) ===
--- When ready to upgrade, deploy V2 additions and execute upgrade.
---   5. Deploy updated mcms.dar (now includes CounterV2, CounterUpgradeService)
---   6. Create CounterUpgradeService contract (the upgrade executor)
---   7. Execute 3-step upgrade via MCMS:
---      a. InitiateUpgrade on Registry -> status=UpgradePending
---      b. ExecuteUpgrade on Service with [oldCounterCid] -> archives V1, creates V2
---      c. CompleteUpgrade on Registry -> status=Active, version=2.0.0
---
--- Key insight: The upgrade service is created at upgrade time, not during
--- initial deployment. Counter V1 doesn't know about V2 or the upgrade service.
+--   3. Create CounterUpgradeService contract (the upgrade executor)
+--   4. Execute 3-step upgrade via MCMS:
+--      a. InitiateUpgrade self-dispatch -> status=UpgradePending
+--      b. ExecuteUpgrade on Service with [oldCounterCid] -> archives V1, creates V2, emits receipt
+--      c. CompleteUpgrade self-dispatch with receipt -> status=Active, version=2.0.0
 --
 testFullUpgradeFlow : Script ()
 testFullUpgradeFlow = script do
   owner <- allocateParty "ccip_owner"
-  let registryInstanceId = mkInstanceId "registry" owner
+  now <- getTime
+  let mcmsInstanceId = mkInstanceId "mcms" owner
   let counterInstanceId = mkInstanceId "counter" owner
   let serviceInstanceId = mkInstanceId "upgrade-service" owner
 
   -- =========================================================================
   -- INITIAL DEPLOYMENT (Day 1)
-  -- Only V1 contracts exist. No upgrade service yet.
+  -- Counter V1 is deployed and registered in the embedded registry
   -- =========================================================================
   debug "=== INITIAL DEPLOYMENT (Day 1) ==="
 
-  -- 1. Create MCMSRegistry
-  debug "Creating MCMSRegistry..."
-  registryCid <- submit owner do
-    createCmd MCMSRegistry with
-      owner
-      instanceId = registryInstanceId
-      registrations = Map.empty
-      pendingUpgrades = Map.empty
-      upgradeHistory = Map.empty
-
-  -- 2. Create Counter V1 with initial value
+  -- 1. Create Counter V1 with initial value
   debug "Creating Counter V1 with value=100..."
   counterV1Cid <- submit owner do
     createCmd Counter with
@@ -87,60 +75,82 @@ testFullUpgradeFlow = script do
       instanceId = counterInstanceId
       value = 100
 
-  -- 3. Register Counter with registry
-  debug "Registering Counter with registry (version=1.0.0)..."
-  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
-  result1 <- submit owner do
-    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "RegisterContract"
-      operationData = encodeRegisterContractParams $ RegisterContractParams
-        { instanceId = counterInstanceId
-        , version = "1.0.0"
-        , contractType = "Counter"
-        , metadataKeys = []
-        , metadataValues = []
-        }
-      contractIds = []
+  -- 2. Create MCMS with embedded registry containing Counter registration
+  debug "Creating MCMS with Counter registered (version=1.0.0)..."
+  let counterReg = ContractRegistration with
+        instanceId = counterInstanceId
+        version = "1.0.0"
+        status = Active
+        deployedAt = now
+        contractType = "Counter"
+        metadata = Map.empty
+  let initialRegistry = emptyRegistryState with
+        registrations = Map.fromList [(counterInstanceId, counterReg)]
 
-  -- At this point, Counter V1 is operational. The registry tracks it.
-  -- No CounterUpgradeService exists. No CounterV2 exists.
+  -- Set up timelock with scheduled operations for the upgrade
+  let initiateCall = TimelockCall mcmsInstanceId "InitiateUpgrade"
+        (encodeInitiateUpgradeParams $ InitiateUpgradeParams
+          { instanceId = counterInstanceId
+          , fromVersion = "1.0.0"
+          , toVersion = "2.0.0"
+          , migrationParams = ""
+          })
+  let initiateOpId = hashTimelockOpId [initiateCall] zeroHash "initiate-salt"
+  let readyTime = addRelTime now (seconds (-1))
+
+  mcmsCid <- submit owner do
+    createCmd MCMS with
+      owner
+      instanceId = mcmsInstanceId
+      chainId = 1
+      proposer = emptyRoleState
+      canceller = emptyRoleState
+      bypasser = emptyRoleState
+      minDelay = seconds 0
+      blockedFunctions = []
+      timelockTimestamps = Map.fromList [(initiateOpId, readyTime)]
+      registry = initialRegistry
+
   debug "Initial deployment complete. Counter V1 is operational."
 
   -- =========================================================================
   -- UPGRADE TIME (Day 30)
-  -- Now we want to upgrade. Deploy V2 and create upgrade service.
+  -- Deploy V2 additions and execute upgrade
   -- =========================================================================
   debug "=== UPGRADE TIME (Day 30) ==="
 
-  -- 4. Create CounterUpgradeService (deployed with V2 additions)
-  -- In reality, this comes from an updated DAR that includes CounterV2.
+  -- 3. Create CounterUpgradeService
   debug "Creating CounterUpgradeService (upgrade executor)..."
   serviceCid <- submit owner do
     createCmd CounterUpgradeService with
       owner
       serviceInstanceId
 
-  -- 5. Execute 3-step upgrade
+  -- 4. Execute 3-step upgrade
   debug "Executing 3-step upgrade..."
 
-  -- Step 5a: InitiateUpgrade on Registry
-  debug "  Step 1/3: InitiateUpgrade on Registry"
-  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
-  result2 <- submit owner do
-    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "InitiateUpgrade"
-      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
-        { instanceId = counterInstanceId
-        , fromVersion = "1.0.0"
-        , toVersion = "2.0.0"
-        , migrationParams = ""
-        }
-      contractIds = []
+  -- Step 4a: InitiateUpgrade via ExecuteScheduledBatch (self-dispatch)
+  debug "  Step 1/3: InitiateUpgrade via timelock"
+  mcmsCid <- submit owner do
+    exerciseCmd mcmsCid ExecuteScheduledBatch with
+      submitter = owner
+      opId = initiateOpId
+      calls = [initiateCall]
+      predecessor = zeroHash
+      salt = "initiate-salt"
+      targetCids = []
+      perCallContractIds = []
 
-  -- Step 5b: ExecuteUpgrade on UpgradeService
-  -- This is the atomic operation: fetch state -> validate -> archive V1 -> create V2 -> receipt
+  -- Verify status is UpgradePending
+  regInfo1 <- submit owner do
+    exerciseCmd mcmsCid GetContractInfo with
+      viewer = owner
+      targetInstanceId = counterInstanceId
+  case regInfo1 of
+    Some reg -> assertMsg "Status should be UpgradePending" $ reg.status == UpgradePending
+    None -> abort "Registration should exist"
+
+  -- Step 4b: ExecuteUpgrade on UpgradeService
   debug "  Step 2/3: ExecuteUpgrade on UpgradeService"
   let serviceIfaceCid = toInterfaceContractId @MCMSReceiver serviceCid
   let counterV1CidUntyped : ContractId () = coerceContractId counterV1Cid
@@ -155,60 +165,73 @@ testFullUpgradeFlow = script do
   -- ExecuteUpgrade returns [receiptCid, newCounterV2Cid] in outputCids
   assertMsg "ExecuteUpgrade should return 2 outputCids" $ length executeResult.outputCids == 2
 
-  -- Step 5c: CompleteUpgrade on Registry
-  -- Pass the receipt (first outputCid) from ExecuteUpgrade
-  debug "  Step 3/3: CompleteUpgrade on Registry"
-  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
-  result3 <- submit owner do
-    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "CompleteUpgrade"
-      operationData = encodeCompleteUpgradeParams $ CompleteUpgradeParams
-        { instanceId = counterInstanceId
-        , newVersion = "2.0.0"
-        }
-      contractIds = executeResult.outputCids  -- Pass receipt from ExecuteUpgrade
+  -- Step 4c: CompleteUpgrade via timelock (passing receipt from ExecuteUpgrade)
+  debug "  Step 3/3: CompleteUpgrade via timelock"
 
-  -- =========================================================================
-  -- VERIFICATION
-  -- =========================================================================
-  debug "=== VERIFICATION ==="
+  -- Schedule CompleteUpgrade call
+  let completeCall = TimelockCall mcmsInstanceId "CompleteUpgrade"
+        (encodeCompleteUpgradeParams $ CompleteUpgradeParams
+          { instanceId = counterInstanceId
+          , newVersion = "2.0.0"
+          })
+  let completeOpId = hashTimelockOpId [completeCall] zeroHash "complete-salt"
 
-  let finalRegCid : ContractId MCMSRegistry = coerceContractId result3.selfCid
+  -- Add the complete operation to timelockTimestamps (simulating it was pre-scheduled)
+  -- In a real scenario, this would be scheduled via ExecuteOp(ScheduleBatch)
+  -- For this test, we directly create a new MCMS with the operation already scheduled
+  mcmsData <- queryContractId owner mcmsCid
+  case mcmsData of
+    None -> abort "MCMS should exist"
+    Some mcms -> do
+      -- Archive old MCMS and create new one with CompleteUpgrade scheduled
+      submit owner do
+        archiveCmd mcmsCid
 
-  -- Verify registry shows version=2.0.0, status=Active
-  regInfo <- submit owner do
-    exerciseCmd finalRegCid GetContractInfo with
-      viewer = owner
-      targetInstanceId = counterInstanceId
+      let newTimelockTimestamps = Map.insert completeOpId readyTime mcms.timelockTimestamps
+      mcmsCid2 <- submit owner do
+        createCmd mcms with timelockTimestamps = newTimelockTimestamps
 
-  case regInfo of
-    None -> abort "Registration should exist"
-    Some reg -> do
-      assertMsg "Status should be Active" $ reg.status == Active
-      assertMsg "Version should be 2.0.0" $ reg.version == "2.0.0"
-      debug $ "  Registry: version=" <> reg.version <> ", status=Active"
+      -- Execute CompleteUpgrade passing the receipt
+      mcmsCid3 <- submit owner do
+        exerciseCmd mcmsCid2 ExecuteScheduledBatch with
+          submitter = owner
+          opId = completeOpId
+          calls = [completeCall]
+          predecessor = zeroHash
+          salt = "complete-salt"
+          targetCids = []
+          perCallContractIds = [executeResult.outputCids]  -- Pass receipt from ExecuteUpgrade
 
-  -- Verify upgrade history has 1 entry
-  history <- submit owner do
-    exerciseCmd finalRegCid GetUpgradeHistory with
-      viewer = owner
-      targetInstanceId = counterInstanceId
-  assertMsg "History should have 1 entry" $ length history == 1
-  debug "  Upgrade history: 1 entry (1.0.0 -> 2.0.0)"
+      -- =========================================================================
+      -- VERIFICATION
+      -- =========================================================================
+      debug "=== VERIFICATION ==="
 
-  debug "testFullUpgradeFlow PASSED!"
-  pure ()
+      -- Verify registry shows version=2.0.0, status=Active
+      regInfo <- submit owner do
+        exerciseCmd mcmsCid3 GetContractInfo with
+          viewer = owner
+          targetInstanceId = counterInstanceId
+
+      case regInfo of
+        None -> abort "Registration should exist"
+        Some reg -> do
+          assertMsg "Status should be Active" $ reg.status == Active
+          assertMsg "Version should be 2.0.0" $ reg.version == "2.0.0"
+          debug $ "  Registry: version=" <> reg.version <> ", status=Active"
+
+      -- Verify upgrade history has 1 entry
+      history <- submit owner do
+        exerciseCmd mcmsCid3 GetUpgradeHistory with
+          viewer = owner
+          targetInstanceId = counterInstanceId
+      assertMsg "History should have 1 entry" $ length history == 1
+      debug "  Upgrade history: 1 entry (1.0.0 -> 2.0.0)"
+
+      debug "testFullUpgradeFlow PASSED!"
+      pure ()
 
 -- | Test: State migration preserves counter value
---
--- This test verifies that the upgrade service correctly reads state from
--- the old contract and transfers it to the new contract.
---
--- The key insight: State is read directly from the old contract at execution
--- time (zero staleness). The upgrade service calls `fetch oldCounterCid` and
--- reads `oldCounter.value` directly.
---
 testUpgradeWithNonZeroValue : Script ()
 testUpgradeWithNonZeroValue = script do
   owner <- allocateParty "ccip_owner"
@@ -245,73 +268,51 @@ testUpgradeWithNonZeroValue = script do
   debug "testUpgradeWithNonZeroValue PASSED!"
   pure ()
 
--- | Test: Start upgrade, cancel before completion, verify contract still Active
+-- | Test: Cancel upgrade via embedded registry
 testUpgradeCancelMidway : Script ()
 testUpgradeCancelMidway = script do
   owner <- allocateParty "ccip_owner"
-  let registryInstanceId = mkInstanceId "registry" owner
+  now <- getTime
   let counterInstanceId = mkInstanceId "counter" owner
 
-  -- Create registry and register contract
-  registryCid <- submit owner do
-    createCmd MCMSRegistry with
-      owner
-      instanceId = registryInstanceId
-      registrations = Map.empty
-      pendingUpgrades = Map.empty
-      upgradeHistory = Map.empty
+  -- Create registry with counter registered
+  let counterReg = ContractRegistration with
+        instanceId = counterInstanceId
+        version = "1.0.0"
+        status = Active
+        deployedAt = now
+        contractType = "Counter"
+        metadata = Map.empty
+  let initialRegistry = emptyRegistryState with
+        registrations = Map.fromList [(counterInstanceId, counterReg)]
 
-  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
-  result1 <- submit owner do
-    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "RegisterContract"
-      operationData = encodeRegisterContractParams $ RegisterContractParams
-        { instanceId = counterInstanceId
-        , version = "1.0.0"
-        , contractType = "Counter"
-        , metadataKeys = []
-        , metadataValues = []
-        }
-      contractIds = []
-
-  -- Initiate upgrade
-  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
-  result2 <- submit owner do
-    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "InitiateUpgrade"
-      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
+  -- Test pure function: initiate then cancel
+  let upgradeParams = InitiateUpgradeParams
         { instanceId = counterInstanceId
         , fromVersion = "1.0.0"
         , toVersion = "2.0.0"
         , migrationParams = ""
         }
-      contractIds = []
+  let Right afterInitiate = initiateUpgrade initialRegistry upgradeParams now
 
-  -- Cancel upgrade (before ExecuteUpgrade or CompleteUpgrade)
-  let regIfaceCid3 = toInterfaceContractId @MCMSReceiver (coerceContractId result2.selfCid : ContractId MCMSRegistry)
-  result3 <- submit owner do
-    exerciseCmd regIfaceCid3 MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "CancelUpgrade"
-      operationData = encodeCancelUpgradeParams $ CancelUpgradeParams
-        { instanceId = counterInstanceId
-        }
-      contractIds = []
-
-  -- Verify contract is still Active with original version
-  let finalRegCid : ContractId MCMSRegistry = coerceContractId result3.selfCid
-  regInfo <- submit owner do
-    exerciseCmd finalRegCid GetContractInfo with
-      viewer = owner
-      targetInstanceId = counterInstanceId
-
-  case regInfo of
+  -- Verify status is UpgradePending
+  case getContractInfo afterInitiate counterInstanceId of
+    Some reg -> assertMsg "Status should be UpgradePending" $ reg.status == UpgradePending
     None -> abort "Registration should exist"
+
+  -- Cancel the upgrade
+  let Right afterCancel = cancelUpgrade afterInitiate counterInstanceId
+
+  -- Verify status is restored to Active
+  case getContractInfo afterCancel counterInstanceId of
     Some reg -> do
       assertMsg "Status should be Active" $ reg.status == Active
       assertMsg "Version should still be 1.0.0" $ reg.version == "1.0.0"
+    None -> abort "Registration should exist"
+
+  -- Verify no pending upgrade
+  assertMsg "Should not have pending upgrade" $
+    not $ hasPendingUpgrade afterCancel counterInstanceId
 
   debug "testUpgradeCancelMidway PASSED!"
   pure ()

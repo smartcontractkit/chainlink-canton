@@ -78,7 +78,8 @@ testAll () = script do
   RegistryTest.testRegistryCompleteUpgradeNoPending
   RegistryTest.testRegistryCancelUpgrade
   RegistryTest.testRegistryDeprecateContract
-  RegistryTest.testRegistryViewFunctions
+  RegistryTest.testRegistryQueryFunctions
+  RegistryTest.testRegistryMultipleContracts
 
   -- Upgrade service tests
   debug ""

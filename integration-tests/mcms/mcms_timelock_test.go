@@ -47,13 +47,16 @@ func TestMCMS_Timelock(t *testing.T) {
 	baseMcmsID := "mcms-timelock-" + uuid.New().String()[:8]
 	mcmsInstanceID := fmt.Sprintf("%s@%s", baseMcmsID, ccipOwner)
 
-	// Deploy MCMS with minDelay=0 for testing (self-dispatch tests will update it)
-	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, baseMcmsID, cfg, 0, nil)
+	// Define Counter instance ID before MCMS creation (needed for registry pre-population)
+	counterInstanceID := fmt.Sprintf("counter-timelock-%s@%s", uuid.New().String()[:8], ccipOwner)
+	counterTargetInstanceID := counterInstanceID
+
+	// Deploy MCMS with minDelay=0 for testing and Counter pre-registered
+	counterReg := buildContractRegistrationTL(counterInstanceID, "1.0.0", "Counter")
+	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, baseMcmsID, cfg, 0, nil, counterReg)
 
 	// Deploy Counter
-	counterInstanceID := fmt.Sprintf("counter-timelock-%s@%s", uuid.New().String()[:8], ccipOwner)
 	counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterInstanceID)
-	counterTargetInstanceID := counterInstanceID
 
 	t.Run("ScheduleAndExecute", func(t *testing.T) {
 		t.Parallel()
@@ -110,7 +113,9 @@ func TestMCMS_Timelock(t *testing.T) {
 		// Fresh MCMS for this subtest (avoid cross-subtest opCount coupling)
 		base := "mcms-timelock-cancel-" + uuid.New().String()[:8]
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid2 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
+		// Pre-register the shared counter
+		counterReg := buildContractRegistrationTL(counterTargetInstanceID, "1.0.0", "Counter")
+		mcmsCid2 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil, counterReg)
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
@@ -172,9 +177,11 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		base := "mcms-timelock-blocked-" + uuid.New().String()[:8]
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		// Pre-register the shared counter
+		counterReg := buildContractRegistrationTL(counterTargetInstanceID, "1.0.0", "Counter")
 		mcmsCid3 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, []BlockedFunction{
 			{TargetInstanceId: counterTargetInstanceID, FunctionName: "dangerous_function"},
-		})
+		}, counterReg)
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
@@ -210,6 +217,18 @@ func TestMCMS_Timelock(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "E_FUNCTION_BLOCKED", "expected E_FUNCTION_BLOCKED, got: %v", err)
 	})
+}
+
+// buildContractRegistrationTL creates a ContractRegistration for pre-populating the MCMS registry.
+func buildContractRegistrationTL(instanceID, version, contractType string) mcms.ContractRegistration {
+	return mcms.ContractRegistration{
+		InstanceId:   types.TEXT(instanceID),
+		Version:      types.TEXT(version),
+		Status:       mcms.ContractStatusActive,
+		DeployedAt:   types.TIMESTAMP(time.Now()),
+		ContractType: types.TEXT(contractType),
+		Metadata:     types.GENMAP{},
+	}
 }
 
 func createSigners(t *testing.T, count int) []*MCMSSigner {
@@ -267,6 +286,7 @@ func createMCMSMultiRole(
 	config MCMSConfig,
 	minDelayMicros int64,
 	blockedFunctions []BlockedFunction,
+	registrations ...mcms.ContractRegistration,
 ) string {
 	t.Helper()
 	instanceID := fmt.Sprintf("%s@%s", baseMcmsID, owner)
@@ -325,6 +345,20 @@ func createMCMSMultiRole(
 		}
 	}
 
+	// Build registry with pre-registered contracts if any
+	registry := mcms.RegistryState{
+		Registrations:   types.GENMAP{},
+		PendingUpgrades: types.GENMAP{},
+		UpgradeHistory:  types.GENMAP{},
+	}
+	if len(registrations) > 0 {
+		regs := types.GENMAP{}
+		for _, reg := range registrations {
+			regs[string(reg.InstanceId)] = reg
+		}
+		registry.Registrations = regs
+	}
+
 	// Build MCMS contract using bindings
 	mcmsContract := mcms.MCMS{
 		Owner:              types.PARTY(owner),
@@ -336,6 +370,7 @@ func createMCMSMultiRole(
 		MinDelay:           types.RELTIME(time.Duration(minDelayMicros) * time.Microsecond),
 		BlockedFunctions:   blockedFuncs,
 		TimelockTimestamps: types.GENMAP{},
+		Registry:           registry,
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1100,11 +1135,16 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		base := "mcms-sd-mixed-" + uuid.New().String()[:8]
 		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
+		// Define Counter instance ID before MCMS creation (needed for registry pre-population)
 		counterInstanceID := fmt.Sprintf("counter-mixed-%s@%s", uuid.New().String()[:8], ccipOwner)
-		counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterInstanceID)
 		counterTargetInstanceID := counterInstanceID
+
+		// Create MCMS with Counter pre-registered
+		counterReg := buildContractRegistrationTL(counterInstanceID, "1.0.0", "Counter")
+		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil, counterReg)
+
+		counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterInstanceID)
 
 		// Define mixed calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{

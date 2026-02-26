@@ -39,7 +39,7 @@ import MCMS.Types
   )
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSEntrypointResult(..), parsePartyIdText)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSEntrypointResult(..), parsePartyIdText, UpgradeReceipt(..), ConsumeUpgradeReceipt(..))
 import MCMS.Codec
   ( decodeSetConfigParams
   , decodeBlockedFunction
@@ -48,8 +48,35 @@ import MCMS.Codec
   , decodeBypasserExecuteBatchParams
   , decodeCancelBatchParams
   )
-import MCMS.MCMSRegistry (MCMSRegistry, GetContractInfo(..), ContractStatus(..), ContractRegistration)
-import MCMS.RegistryCodec ()
+import MCMS.MCMSRegistry
+  ( RegistryState(..)
+  , emptyRegistryState
+  , ContractStatus(..)
+  , ContractRegistration(..)
+  , PendingUpgrade(..)
+  , UpgradeHistoryEntry(..)
+  , isRegistered
+  , isRegisteredAndActive
+  , getContractInfo
+  , getPendingUpgrade
+  , getUpgradeHistory
+  , hasPendingUpgrade
+  , listRegistrations
+  , registerContract
+  , initiateUpgrade
+  , completeUpgrade
+  , cancelUpgrade
+  , deprecateContract
+  , processRegisterContract
+  , processInitiateUpgrade
+  , processCancelUpgrade
+  , processDeprecateContract
+  , decodeTextSimple
+  )
+import MCMS.RegistryCodec
+  ( CompleteUpgradeParams(..)
+  , decodeCompleteUpgradeParams
+  )
 
 template MCMS
   with
@@ -63,8 +90,8 @@ template MCMS
     minDelay : RelTime                         -- Minimum delay for scheduled operations
     blockedFunctions : [BlockedFunction]         -- Functions that cannot be scheduled (per-target)
     timelockTimestamps : Map.Map Text Time     -- opId -> readyTime (or doneTimestamp if done)
-    -- Registry reference for contract upgrade support
-    registryCid : Optional (ContractId MCMSRegistry)  -- Optional reference to contract registry
+    -- Registry state embedded in MCMS (mandatory validation)
+    registry : RegistryState                   -- Embedded registry state (replaces registryCid)
   where
     signatory owner
 
@@ -450,25 +477,56 @@ template MCMS
       controller submitter
       do pure $ length blockedFunctions
 
-    -- | Get registry contract ID (if configured)
-    nonconsuming choice GetRegistryCid : Optional (ContractId MCMSRegistry)
-      with
-        submitter : Party
-      controller submitter
-      do pure registryCid
+    -- =========================================================================
+    -- Registry View Functions (Embedded Registry)
+    -- =========================================================================
 
-    -- | Set registry contract ID (admin operation)
-    -- This links the MCMS instance to a contract registry for upgrade support
-    choice SetRegistryCid : ContractId MCMS
+    -- | Get information about a registered contract
+    nonconsuming choice GetContractInfo : Optional ContractRegistration
       with
-        newRegistryCid : ContractId MCMSRegistry
-      controller owner
-      do create this with registryCid = Some newRegistryCid
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ getContractInfo registry targetInstanceId
 
-    -- | Clear registry contract ID (admin operation)
-    choice ClearRegistryCid : ContractId MCMS
-      controller owner
-      do create this with registryCid = None
+    -- | Get pending upgrade information for a contract
+    nonconsuming choice GetPendingUpgrade : Optional PendingUpgrade
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ getPendingUpgrade registry targetInstanceId
+
+    -- | List all registered contracts
+    nonconsuming choice ListRegistrations : [ContractRegistration]
+      with
+        viewer : Party
+      controller viewer
+      do pure $ listRegistrations registry
+
+    -- | Get upgrade history for a contract
+    nonconsuming choice GetUpgradeHistory : [UpgradeHistoryEntry]
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ getUpgradeHistory registry targetInstanceId
+
+    -- | Check if a contract is registered
+    nonconsuming choice IsRegistered : Bool
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ isRegistered registry targetInstanceId
+
+    -- | Check if a contract has a pending upgrade
+    nonconsuming choice HasPendingUpgrade : Bool
+      with
+        viewer : Party
+        targetInstanceId : Text
+      controller viewer
+      do pure $ hasPendingUpgrade registry targetInstanceId
 
 -- ===========================================================================
 -- VIEW TYPES
@@ -515,17 +573,36 @@ executeSelfDispatchWithOutputs : MCMS -> TimelockCall -> [ContractId ()] -> Upda
 executeSelfDispatchWithOutputs mcms call accumulatedOutputs =
   case call.functionName of
     -- Registry operations that need accumulated outputs
-    "CompleteUpgrade" ->
+    "CompleteUpgrade" -> do
       -- Finalize an upgrade in the registry - requires receipt from ExecuteUpgrade
-      case mcms.registryCid of
-        None -> abort "E_NO_REGISTRY: registryCid not configured"
-        Some regCid -> do
-          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
-            caller = mcms.owner
-            functionName = "CompleteUpgrade"
-            operationData = call.operationData
-            contractIds = accumulatedOutputs  -- Pass accumulated outputs (includes receipt)
-          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+      now <- getTime
+      case decodeCompleteUpgradeParams call.operationData of
+        None -> abort "E_INVALID_OPERATION_DATA: failed to decode CompleteUpgrade params"
+        Some params -> do
+          -- Require UpgradeReceipt from ExecuteUpgrade
+          case accumulatedOutputs of
+            [] -> abort "E_MISSING_UPGRADE_RECEIPT"
+            (receiptCidUntyped :: _) -> do
+              -- Cast to UpgradeReceipt and fetch
+              let receiptCid : ContractId UpgradeReceipt = coerceContractId receiptCidUntyped
+              receipt <- fetch receiptCid
+
+              -- Validate receipt matches pending upgrade
+              case getPendingUpgrade mcms.registry params.instanceId of
+                None -> abort $ "E_NO_PENDING_UPGRADE: " <> params.instanceId
+                Some pending -> do
+                  assertMsg "E_RECEIPT_INSTANCE_MISMATCH" $ receipt.instanceId == params.instanceId
+                  assertMsg "E_RECEIPT_FROM_VERSION_MISMATCH" $ receipt.fromVersion == pending.fromVersion
+                  assertMsg "E_RECEIPT_TO_VERSION_MISMATCH" $ receipt.toVersion == pending.toVersion
+                  assertMsg "E_RECEIPT_OWNER_MISMATCH" $ receipt.owner == mcms.owner
+
+                  -- Consume receipt (prevents reuse)
+                  exercise receiptCid ConsumeUpgradeReceipt
+
+                  -- Complete upgrade in registry state
+                  case completeUpgrade mcms.registry params now of
+                    Left err -> abort err
+                    Right newRegistry -> pure $ mcms with registry = newRegistry
 
     -- All other functions delegate to executeSelfDispatch (no outputs needed)
     _ -> executeSelfDispatch mcms call
@@ -545,7 +622,8 @@ executeSelfDispatchWithOutputs mcms call accumulatedOutputs =
 --      Security: Bypasser's merkle proof validated the calls.
 --
 -- Supported functions: UpdateMinDelay, BlockFunction, UnblockFunction,
---                      SetConfig, ScheduleBatch, CancelBatch
+--                      SetConfig, ScheduleBatch, CancelBatch,
+--                      RegisterContract, InitiateUpgrade, CancelUpgradeRegistry, DeprecateContract
 executeSelfDispatch : MCMS -> TimelockCall -> Update MCMS
 executeSelfDispatch mcms call =
   case call.functionName of
@@ -611,57 +689,37 @@ executeSelfDispatch mcms call =
 
     -- =========================================================================
     -- REGISTRY OPERATIONS (Contract Upgrade Support)
-    -- These operations dispatch to the MCMSRegistry for contract lifecycle management
+    -- These operations modify the embedded registry state directly
     -- =========================================================================
 
-    "RegisterContract" ->
+    "RegisterContract" -> do
       -- Register a new contract in the registry
-      -- Requires registryCid to be set
-      case mcms.registryCid of
-        None -> abort "E_NO_REGISTRY: registryCid not configured"
-        Some regCid -> do
-          -- Dispatch to registry via MCMSReceiver interface
-          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
-            caller = mcms.owner
-            functionName = "RegisterContract"
-            operationData = call.operationData
-            contractIds = []
-          -- Update registry CID with the new one from result
-          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+      now <- getTime
+      case processRegisterContract mcms.registry call.operationData now of
+        Left err -> abort err
+        Right newRegistry -> pure $ mcms with registry = newRegistry
 
-    "InitiateUpgrade" ->
+    "InitiateUpgrade" -> do
       -- Mark a contract as pending upgrade in the registry
-      case mcms.registryCid of
-        None -> abort "E_NO_REGISTRY: registryCid not configured"
-        Some regCid -> do
-          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
-            caller = mcms.owner
-            functionName = "InitiateUpgrade"
-            operationData = call.operationData
-            contractIds = []
-          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+      now <- getTime
+      case processInitiateUpgrade mcms.registry call.operationData now of
+        Left err -> abort err
+        Right newRegistry -> pure $ mcms with registry = newRegistry
 
     -- NOTE: CompleteUpgrade is handled by executeSelfDispatchWithOutputs
     -- because it needs accumulated outputs (UpgradeReceipt) from previous calls
 
-    "CancelUpgradeRegistry" ->
+    "CancelUpgradeRegistry" -> do
       -- Cancel a pending upgrade in the registry
-      case mcms.registryCid of
-        None -> abort "E_NO_REGISTRY: registryCid not configured"
-        Some regCid -> do
-          result <- exercise (toInterfaceContractId @MCMSReceiver regCid) MCMSReceiver_Entrypoint with
-            caller = mcms.owner
-            functionName = "CancelUpgrade"
-            operationData = call.operationData
-            contractIds = []
-          pure mcms with registryCid = Some (coerceContractId result.selfCid)
+      case processCancelUpgrade mcms.registry call.operationData of
+        Left err -> abort err
+        Right newRegistry -> pure $ mcms with registry = newRegistry
 
-    "SetRegistry" ->
-      -- Set or update the registry contract ID
-      -- operationData contains the registry instanceId for verification
-      -- The actual ContractId must be provided externally
-      -- This is a self-contained operation that doesn't require existing registry
-      pure mcms  -- Placeholder - actual registry CID would be updated via contract recreation
+    "DeprecateContract" -> do
+      -- Deprecate a contract in the registry
+      case processDeprecateContract mcms.registry call.operationData of
+        Left err -> abort err
+        Right newRegistry -> pure $ mcms with registry = newRegistry
 
     _ -> abort $ "E_UNKNOWN_SELF_DISPATCH: " <> call.functionName
 
@@ -736,26 +794,27 @@ cancelBatchInternal mcms rs opIdToCancel = do
 -- perCallContractIds: CIDs per call (e.g., oldCounterCid for upgrades)
 -- accumulatedOutputs: Output CIDs from previous calls in the batch, threaded to subsequent calls
 -- This enables ExecuteUpgrade to produce a receipt that CompleteUpgrade can consume
+--
+-- REGISTRY VALIDATION: All external calls must target registered+active contracts
+-- This is mandatory (like Aptos mcms_registry::start_dispatch) - no optional check
 processCallsLoop : Party -> [ContractId MCMSReceiver] -> [[ContractId ()]] -> MCMS -> [TimelockCall] -> Int -> Int -> [ContractId ()] -> Update (Int, MCMS)
 processCallsLoop _ _ _ mcms [] extIdx _callIdx _accumulatedOutputs = pure (extIdx, mcms)
 processCallsLoop ownerParty targetCids perCallContractIds mcms (call :: rest) extIdx callIdx accumulatedOutputs
   | call.targetInstanceId == mcms.instanceId = do
-      -- Self-dispatch: pass accumulatedOutputs as contractIds for registry operations
-      newMcms <- executeSelfDispatchWithOutputs mcms call accumulatedOutputs
+      -- Self-dispatch: use perCallContractIds for this call + accumulatedOutputs from previous calls
+      let callContractIds = if callIdx < length perCallContractIds
+                            then perCallContractIds !! callIdx
+                            else []
+      let contractIds = callContractIds <> accumulatedOutputs
+      newMcms <- executeSelfDispatchWithOutputs mcms call contractIds
       processCallsLoop ownerParty targetCids perCallContractIds newMcms rest extIdx (callIdx + 1) accumulatedOutputs
   | otherwise = do
-      -- Validate target is registered and active in registry (if configured)
-      case mcms.registryCid of
-        Some regCid -> do
-          regInfo <- exercise regCid GetContractInfo with
-            viewer = mcms.owner
-            targetInstanceId = call.targetInstanceId
-          case regInfo of
-            None -> abort $ "E_TARGET_NOT_REGISTERED: " <> call.targetInstanceId
-            Some info ->
-              assertMsg ("E_TARGET_NOT_ACTIVE: " <> call.targetInstanceId <> " status=" <> show info.status) $
-                info.status == Active
-        None -> pure ()  -- No registry configured, skip validation
+      -- MANDATORY: Validate target is registered and active in registry
+      -- Unlike before (optional check when registryCid is Some), this is now always enforced
+      assertMsg ("E_TARGET_NOT_REGISTERED: " <> call.targetInstanceId) $
+        isRegistered mcms.registry call.targetInstanceId
+      assertMsg ("E_TARGET_NOT_ACTIVE: " <> call.targetInstanceId) $
+        isRegisteredAndActive mcms.registry call.targetInstanceId
 
       let targetCid = targetCids !! extIdx
       target <- fetch targetCid

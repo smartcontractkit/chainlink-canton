@@ -10,6 +10,7 @@ import Daml.Script
 import MCMS.Types
 import MCMS.Main
 import MCMS.Crypto (RawSignature(..), hashTimelockOpId)
+import MCMS.MCMSRegistry (emptyRegistryState)
 
 -- ===========================================================================
 -- TEST CONFIGURATION
@@ -167,7 +168,7 @@ testScheduleBatch = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = emptyRegistryState
 
   -- SetRoot for proposer (schedule_batch authorization)
   mcmsCid <- submit ccipOwner do
@@ -248,7 +249,7 @@ testBypasserExecuteBatch = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = emptyRegistryState
 
   -- SetRoot for bypasser
   mcmsCid <- submit ccipOwner do
@@ -303,7 +304,7 @@ testUpdateMinDelay = script do
       minDelay = seconds 60
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = emptyRegistryState
 
   delay <- submit ccipOwner do
     exerciseCmd mcmsCid GetMinDelay with submitter = ccipOwner
@@ -332,7 +333,7 @@ testBlockUnblockFunction = script do
       minDelay = seconds 0
       blockedFunctions = [bf]
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = emptyRegistryState
 
   -- Query blocked functions
   blocked <- submit ccipOwner do
@@ -366,7 +367,7 @@ testSetConfigDirect = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.empty
-      registryCid = None
+      registry = emptyRegistryState
 
   -- SetConfig on proposer role
   mcmsCid <- submit ccipOwner do
@@ -415,7 +416,7 @@ testCancelBatch = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.fromList [(testOpId, futureTime)]
-      registryCid = None
+      registry = emptyRegistryState
 
   -- Verify operation exists and is pending
   isOp <- submit ccipOwner do
@@ -464,7 +465,7 @@ testTimelockViewFunctions = script do
         [ (testOpId, readyTime)
         , (doneOpId, doneTimestamp)
         ]
-      registryCid = None
+      registry = emptyRegistryState
 
   -- Test GetMinDelay
   minDelayVal <- submit ccipOwner do

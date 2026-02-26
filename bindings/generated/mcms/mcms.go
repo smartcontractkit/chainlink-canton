@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "368fd69cab39dbacf55a89f5c34b27d2f2bf603ccc636ffbc3025731072526b4"
+	PackageID   = "26c5722b0d0da99bdefc9fe1346b10aa2b0c45a183297d0cc17e0e77d5ce0e53"
 	SDKVersion  = "3.4.10"
 )
 
@@ -223,38 +223,6 @@ func (t ArchiveCounter) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ArchiveCounter from hex string (Canton MCMS format)
 func (t *ArchiveCounter) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ArchiveRegistry is a Record type
-type ArchiveRegistry struct {
-}
-
-// ToMap converts ArchiveRegistry to a map for DAML arguments
-func (t ArchiveRegistry) ToMap() map[string]any {
-	m := make(map[string]any)
-	return m
-}
-
-func (t ArchiveRegistry) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ArchiveRegistry) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ArchiveRegistry to hex string (Canton MCMS format)
-func (t ArchiveRegistry) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ArchiveRegistry from hex string (Canton MCMS format)
-func (t *ArchiveRegistry) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -586,38 +554,6 @@ func (t CancelUpgradeParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CancelUpgradeParams from hex string (Canton MCMS format)
 func (t *CancelUpgradeParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ClearRegistryCid is a Record type
-type ClearRegistryCid struct {
-}
-
-// ToMap converts ClearRegistryCid to a map for DAML arguments
-func (t ClearRegistryCid) ToMap() map[string]any {
-	m := make(map[string]any)
-	return m
-}
-
-func (t ClearRegistryCid) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ClearRegistryCid) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ClearRegistryCid to hex string (Canton MCMS format)
-func (t ClearRegistryCid) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ClearRegistryCid from hex string (Canton MCMS format)
-func (t *ClearRegistryCid) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2339,42 +2275,6 @@ func (t *GetPendingUpgrade) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetRegistryCid is a Record type
-type GetRegistryCid struct {
-	Submitter types.PARTY `json:"submitter"`
-}
-
-// ToMap converts GetRegistryCid to a map for DAML arguments
-func (t GetRegistryCid) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["submitter"] = t.Submitter.ToMap()
-
-	return m
-}
-
-func (t GetRegistryCid) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GetRegistryCid) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GetRegistryCid to hex string (Canton MCMS format)
-func (t GetRegistryCid) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetRegistryCid from hex string (Canton MCMS format)
-func (t *GetRegistryCid) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // GetState is a Record type
 type GetState struct {
 	Submitter  types.PARTY `json:"submitter"`
@@ -2919,16 +2819,16 @@ func (t *ListRegistrations) UnmarshalHex(data string) error {
 
 // MCMS is a Template type
 type MCMS struct {
-	Owner              types.PARTY        `json:"owner"`
-	InstanceId         types.TEXT         `json:"instanceId"`
-	ChainId            types.INT64        `json:"chainId"`
-	Proposer           RoleState          `json:"proposer"`
-	Canceller          RoleState          `json:"canceller"`
-	Bypasser           RoleState          `json:"bypasser"`
-	MinDelay           types.RELTIME      `json:"minDelay"`
-	BlockedFunctions   []BlockedFunction  `json:"blockedFunctions"`
-	TimelockTimestamps types.GENMAP       `json:"timelockTimestamps"`
-	RegistryCid        *types.CONTRACT_ID `json:"registryCid"`
+	Owner              types.PARTY       `json:"owner"`
+	InstanceId         types.TEXT        `json:"instanceId"`
+	ChainId            types.INT64       `json:"chainId"`
+	Proposer           RoleState         `json:"proposer"`
+	Canceller          RoleState         `json:"canceller"`
+	Bypasser           RoleState         `json:"bypasser"`
+	MinDelay           types.RELTIME     `json:"minDelay"`
+	BlockedFunctions   []BlockedFunction `json:"blockedFunctions"`
+	TimelockTimestamps types.GENMAP      `json:"timelockTimestamps"`
+	Registry           RegistryState     `json:"registry"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -3012,16 +2912,14 @@ func (t MCMS) CreateCommand() *model.CreateCommand {
 		return map[string]any{"_type": "genmap", "value": t.TimelockTimestamps}
 	}()
 
-	if t.RegistryCid != nil {
-		args["registryCid"] = map[string]any{
-			"_type": "optional",
-			"value": *t.RegistryCid,
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["registry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Registry).(mapper); ok {
+			return m.toMap()
 		}
-	} else {
-		args["registryCid"] = map[string]any{
-			"_type": "optional",
-		}
-	}
+		return t.Registry
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -3100,16 +2998,14 @@ func (t MCMS) CreateCommandWithPackageID(packageID string) *model.CreateCommand 
 		return map[string]any{"_type": "genmap", "value": t.TimelockTimestamps}
 	}()
 
-	if t.RegistryCid != nil {
-		args["registryCid"] = map[string]any{
-			"_type": "optional",
-			"value": *t.RegistryCid,
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["registry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Registry).(mapper); ok {
+			return m.toMap()
 		}
-	} else {
-		args["registryCid"] = map[string]any{
-			"_type": "optional",
-		}
-	}
+		return t.Registry
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -3456,65 +3352,128 @@ func (t MCMS) GetBlockedFunctionsCountWithPackageID(contractID string, packageID
 	}
 }
 
-// GetRegistryCid exercises the GetRegistryCid choice on this MCMS contract
+// GetContractInfo exercises the GetContractInfo choice on this MCMS contract
 // This method uses the package name in the template ID
-func (t MCMS) GetRegistryCid(contractID string, args GetRegistryCid) *model.ExerciseCommand {
+func (t MCMS) GetContractInfo(contractID string, args GetContractInfo) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "GetRegistryCid",
+		Choice:     "GetContractInfo",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetRegistryCidWithPackageID exercises the GetRegistryCid choice using the provided package ID instead of package name
-func (t MCMS) GetRegistryCidWithPackageID(contractID string, packageID string, args GetRegistryCid) *model.ExerciseCommand {
+// GetContractInfoWithPackageID exercises the GetContractInfo choice using the provided package ID instead of package name
+func (t MCMS) GetContractInfoWithPackageID(contractID string, packageID string, args GetContractInfo) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "GetRegistryCid",
+		Choice:     "GetContractInfo",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetRegistryCid exercises the SetRegistryCid choice on this MCMS contract
+// GetPendingUpgrade exercises the GetPendingUpgrade choice on this MCMS contract
 // This method uses the package name in the template ID
-func (t MCMS) SetRegistryCid(contractID string, args SetRegistryCid) *model.ExerciseCommand {
+func (t MCMS) GetPendingUpgrade(contractID string, args GetPendingUpgrade) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "SetRegistryCid",
+		Choice:     "GetPendingUpgrade",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetRegistryCidWithPackageID exercises the SetRegistryCid choice using the provided package ID instead of package name
-func (t MCMS) SetRegistryCidWithPackageID(contractID string, packageID string, args SetRegistryCid) *model.ExerciseCommand {
+// GetPendingUpgradeWithPackageID exercises the GetPendingUpgrade choice using the provided package ID instead of package name
+func (t MCMS) GetPendingUpgradeWithPackageID(contractID string, packageID string, args GetPendingUpgrade) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "SetRegistryCid",
+		Choice:     "GetPendingUpgrade",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ClearRegistryCid exercises the ClearRegistryCid choice on this MCMS contract
+// ListRegistrations exercises the ListRegistrations choice on this MCMS contract
 // This method uses the package name in the template ID
-func (t MCMS) ClearRegistryCid(contractID string, args ClearRegistryCid) *model.ExerciseCommand {
+func (t MCMS) ListRegistrations(contractID string, args ListRegistrations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "ClearRegistryCid",
+		Choice:     "ListRegistrations",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ClearRegistryCidWithPackageID exercises the ClearRegistryCid choice using the provided package ID instead of package name
-func (t MCMS) ClearRegistryCidWithPackageID(contractID string, packageID string, args ClearRegistryCid) *model.ExerciseCommand {
+// ListRegistrationsWithPackageID exercises the ListRegistrations choice using the provided package ID instead of package name
+func (t MCMS) ListRegistrationsWithPackageID(contractID string, packageID string, args ListRegistrations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
-		Choice:     "ClearRegistryCid",
+		Choice:     "ListRegistrations",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetUpgradeHistory exercises the GetUpgradeHistory choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) GetUpgradeHistory(contractID string, args GetUpgradeHistory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetUpgradeHistory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetUpgradeHistoryWithPackageID exercises the GetUpgradeHistory choice using the provided package ID instead of package name
+func (t MCMS) GetUpgradeHistoryWithPackageID(contractID string, packageID string, args GetUpgradeHistory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "GetUpgradeHistory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsRegistered exercises the IsRegistered choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) IsRegistered(contractID string, args IsRegistered) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsRegistered",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IsRegisteredWithPackageID exercises the IsRegistered choice using the provided package ID instead of package name
+func (t MCMS) IsRegisteredWithPackageID(contractID string, packageID string, args IsRegistered) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "IsRegistered",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// HasPendingUpgrade exercises the HasPendingUpgrade choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) HasPendingUpgrade(contractID string, args HasPendingUpgrade) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "HasPendingUpgrade",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// HasPendingUpgradeWithPackageID exercises the HasPendingUpgrade choice using the provided package ID instead of package name
+func (t MCMS) HasPendingUpgradeWithPackageID(contractID string, packageID string, args HasPendingUpgrade) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "HasPendingUpgrade",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -3885,364 +3844,6 @@ func (t *MCMSReceiverGetView) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// MCMSRegistry is a Template type
-type MCMSRegistry struct {
-	Owner           types.PARTY  `json:"owner"`
-	InstanceId      types.TEXT   `json:"instanceId"`
-	Registrations   types.GENMAP `json:"registrations"`
-	PendingUpgrades types.GENMAP `json:"pendingUpgrades"`
-	UpgradeHistory  types.GENMAP `json:"upgradeHistory"`
-}
-
-// GetTemplateID returns the template ID for this template using the package name
-func (t MCMSRegistry) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry")
-}
-
-// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
-func (t MCMSRegistry) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry")
-}
-
-// CreateCommand returns a CreateCommand for this template using the package name
-func (t MCMSRegistry) CreateCommand() *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["registrations"] = func() any {
-		if t.Registrations == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.Registrations}
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["pendingUpgrades"] = func() any {
-		if t.PendingUpgrades == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.PendingUpgrades}
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["upgradeHistory"] = func() any {
-		if t.UpgradeHistory == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.UpgradeHistory}
-	}()
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateID(),
-		Arguments:  args,
-	}
-}
-
-// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
-func (t MCMSRegistry) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["registrations"] = func() any {
-		if t.Registrations == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.Registrations}
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["pendingUpgrades"] = func() any {
-		if t.PendingUpgrades == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.PendingUpgrades}
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["upgradeHistory"] = func() any {
-		if t.UpgradeHistory == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.UpgradeHistory}
-	}()
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateIDWithPackageID(packageID),
-		Arguments:  args,
-	}
-}
-
-func (t MCMSRegistry) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *MCMSRegistry) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes MCMSRegistry to hex string (Canton MCMS format)
-func (t MCMSRegistry) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes MCMSRegistry from hex string (Canton MCMS format)
-func (t *MCMSRegistry) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Choice methods for MCMSRegistry
-
-// GetContractInfo exercises the GetContractInfo choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) GetContractInfo(contractID string, args GetContractInfo) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "GetContractInfo",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetContractInfoWithPackageID exercises the GetContractInfo choice using the provided package ID instead of package name
-func (t MCMSRegistry) GetContractInfoWithPackageID(contractID string, packageID string, args GetContractInfo) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "GetContractInfo",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetPendingUpgrade exercises the GetPendingUpgrade choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) GetPendingUpgrade(contractID string, args GetPendingUpgrade) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "GetPendingUpgrade",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetPendingUpgradeWithPackageID exercises the GetPendingUpgrade choice using the provided package ID instead of package name
-func (t MCMSRegistry) GetPendingUpgradeWithPackageID(contractID string, packageID string, args GetPendingUpgrade) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "GetPendingUpgrade",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetUpgradeHistory exercises the GetUpgradeHistory choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) GetUpgradeHistory(contractID string, args GetUpgradeHistory) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "GetUpgradeHistory",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetUpgradeHistoryWithPackageID exercises the GetUpgradeHistory choice using the provided package ID instead of package name
-func (t MCMSRegistry) GetUpgradeHistoryWithPackageID(contractID string, packageID string, args GetUpgradeHistory) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "GetUpgradeHistory",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsRegistered exercises the IsRegistered choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) IsRegistered(contractID string, args IsRegistered) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "IsRegistered",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsRegisteredWithPackageID exercises the IsRegistered choice using the provided package ID instead of package name
-func (t MCMSRegistry) IsRegisteredWithPackageID(contractID string, packageID string, args IsRegistered) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "IsRegistered",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// HasPendingUpgrade exercises the HasPendingUpgrade choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) HasPendingUpgrade(contractID string, args HasPendingUpgrade) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "HasPendingUpgrade",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// HasPendingUpgradeWithPackageID exercises the HasPendingUpgrade choice using the provided package ID instead of package name
-func (t MCMSRegistry) HasPendingUpgradeWithPackageID(contractID string, packageID string, args HasPendingUpgrade) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "HasPendingUpgrade",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Archive exercises the Archive choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t MCMSRegistry) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveRegistry exercises the ArchiveRegistry choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) ArchiveRegistry(contractID string, args ArchiveRegistry) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "ArchiveRegistry",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ArchiveRegistryWithPackageID exercises the ArchiveRegistry choice using the provided package ID instead of package name
-func (t MCMSRegistry) ArchiveRegistryWithPackageID(contractID string, packageID string, args ArchiveRegistry) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "ArchiveRegistry",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ListRegistrations exercises the ListRegistrations choice on this MCMSRegistry contract
-// This method uses the package name in the template ID
-func (t MCMSRegistry) ListRegistrations(contractID string, args ListRegistrations) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "ListRegistrations",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ListRegistrationsWithPackageID exercises the ListRegistrations choice using the provided package ID instead of package name
-func (t MCMSRegistry) ListRegistrationsWithPackageID(contractID string, packageID string, args ListRegistrations) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSRegistry"),
-		ContractID: contractID,
-		Choice:     "ListRegistrations",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this MCMSRegistry contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t MCMSRegistry) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_Entrypoint",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t MCMSRegistry) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_Entrypoint",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this MCMSRegistry contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t MCMSRegistry) MCMSReceiverGetInstanceId(contractID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
-func (t MCMSRegistry) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetView exercises the MCMSReceiver_GetView choice on this MCMSRegistry contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t MCMSRegistry) MCMSReceiverGetView(contractID string, args MCMSReceiverGetView) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.MCMSRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetView",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetViewWithPackageID exercises the MCMSReceiver_GetView choice using the provided package ID instead of package name
-func (t MCMSRegistry) MCMSReceiverGetViewWithPackageID(contractID string, packageID string, args MCMSReceiverGetView) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.MCMSRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetView",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Verify interface implementations for MCMSRegistry
-
-var _ IMCMSReceiver = (*MCMSRegistry)(nil)
-
 // MCMSState is a Record type
 type MCMSState struct {
 	Role          Role            `json:"role"`
@@ -4562,6 +4163,63 @@ func (t RegisterContractParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes RegisterContractParams from hex string (Canton MCMS format)
 func (t *RegisterContractParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RegistryState is a Record type
+type RegistryState struct {
+	Registrations   types.GENMAP `json:"registrations"`
+	PendingUpgrades types.GENMAP `json:"pendingUpgrades"`
+	UpgradeHistory  types.GENMAP `json:"upgradeHistory"`
+}
+
+// ToMap converts RegistryState to a map for DAML arguments
+func (t RegistryState) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["registrations"] = func() any {
+		if t.Registrations == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.Registrations}
+	}()
+
+	m["pendingUpgrades"] = func() any {
+		if t.PendingUpgrades == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.PendingUpgrades}
+	}()
+
+	m["upgradeHistory"] = func() any {
+		if t.UpgradeHistory == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.UpgradeHistory}
+	}()
+
+	return m
+}
+
+func (t RegistryState) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RegistryState) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RegistryState to hex string (Canton MCMS format)
+func (t RegistryState) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RegistryState from hex string (Canton MCMS format)
+func (t *RegistryState) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -4997,48 +4655,6 @@ func (t *SetLabel) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// SetRegistryCid is a Record type
-type SetRegistryCid struct {
-	NewRegistryCid types.CONTRACT_ID `json:"newRegistryCid"`
-}
-
-// ToMap converts SetRegistryCid to a map for DAML arguments
-func (t SetRegistryCid) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.NewRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.NewRegistryCid
-	}()
-
-	return m
-}
-
-func (t SetRegistryCid) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *SetRegistryCid) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes SetRegistryCid to hex string (Canton MCMS format)
-func (t SetRegistryCid) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetRegistryCid from hex string (Canton MCMS format)
-func (t *SetRegistryCid) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // SetRoot is a Record type
 type SetRoot struct {
 	TargetRole    Role            `json:"targetRole"`
@@ -5462,13 +5078,11 @@ func IMCMSReceiverInterfaceIDWithPackageID(packageID string) string {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ArchiveCounter(args ArchiveCounter) (*bind.EncodedChoice, error)
-	ArchiveRegistry(args ArchiveRegistry) (*bind.EncodedChoice, error)
 	ArchiveMCMSEntrypointEvent(args ArchiveMCMSEntrypointEvent) (*bind.EncodedChoice, error)
 	BypasserExecuteBatch(args BypasserExecuteBatchParams) (*bind.EncodedChoice, error)
 	CanExecuteOp(args CanExecuteOp) (*bind.EncodedChoice, error)
 	CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, error)
 	CancelUpgrade(args CancelUpgradeParams) (*bind.EncodedChoice, error)
-	ClearRegistryCid(args ClearRegistryCid) (*bind.EncodedChoice, error)
 	CompleteUpgrade(args CompleteUpgradeParams) (*bind.EncodedChoice, error)
 	ConsumeUpgradeReceipt(args ConsumeUpgradeReceipt) (*bind.EncodedChoice, error)
 	Decrement(args Decrement) (*bind.EncodedChoice, error)
@@ -5484,7 +5098,6 @@ type MCMSEncoder interface {
 	GetLastModifiedV2(args GetLastModifiedV2) (*bind.EncodedChoice, error)
 	GetMinDelay(args GetMinDelay) (*bind.EncodedChoice, error)
 	GetPendingUpgrade(args GetPendingUpgrade) (*bind.EncodedChoice, error)
-	GetRegistryCid(args GetRegistryCid) (*bind.EncodedChoice, error)
 	GetState(args GetState) (*bind.EncodedChoice, error)
 	GetTimestamp(args GetTimestamp) (*bind.EncodedChoice, error)
 	GetUpgradeHistory(args GetUpgradeHistory) (*bind.EncodedChoice, error)
@@ -5507,7 +5120,6 @@ type MCMSEncoder interface {
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
 	SetLabel(args SetLabel) (*bind.EncodedChoice, error)
-	SetRegistryCid(args SetRegistryCid) (*bind.EncodedChoice, error)
 	SetRoot(args SetRoot) (*bind.EncodedChoice, error)
 	SetValue(args SetValue) (*bind.EncodedChoice, error)
 }
@@ -5544,11 +5156,6 @@ func (e *encoder) ArchiveCounter(args ArchiveCounter) (*bind.EncodedChoice, erro
 	return e.EncodeChoiceArgs("ArchiveCounter", args)
 }
 
-// ArchiveRegistry encodes parameters for the ArchiveRegistry choice.
-func (e *encoder) ArchiveRegistry(args ArchiveRegistry) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ArchiveRegistry", args)
-}
-
 // ArchiveMCMSEntrypointEvent encodes parameters for the ArchiveMCMSEntrypointEvent choice.
 func (e *encoder) ArchiveMCMSEntrypointEvent(args ArchiveMCMSEntrypointEvent) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ArchiveMCMSEntrypointEvent", args)
@@ -5572,11 +5179,6 @@ func (e *encoder) CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, erro
 // CancelUpgrade encodes parameters for the CancelUpgrade choice.
 func (e *encoder) CancelUpgrade(args CancelUpgradeParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CancelUpgrade", args)
-}
-
-// ClearRegistryCid encodes parameters for the ClearRegistryCid choice.
-func (e *encoder) ClearRegistryCid(args ClearRegistryCid) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ClearRegistryCid", args)
 }
 
 // CompleteUpgrade encodes parameters for the CompleteUpgrade choice.
@@ -5652,11 +5254,6 @@ func (e *encoder) GetMinDelay(args GetMinDelay) (*bind.EncodedChoice, error) {
 // GetPendingUpgrade encodes parameters for the GetPendingUpgrade choice.
 func (e *encoder) GetPendingUpgrade(args GetPendingUpgrade) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetPendingUpgrade", args)
-}
-
-// GetRegistryCid encodes parameters for the GetRegistryCid choice.
-func (e *encoder) GetRegistryCid(args GetRegistryCid) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetRegistryCid", args)
 }
 
 // GetState encodes parameters for the GetState choice.
@@ -5767,11 +5364,6 @@ func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
 // SetLabel encodes parameters for the SetLabel choice.
 func (e *encoder) SetLabel(args SetLabel) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetLabel", args)
-}
-
-// SetRegistryCid encodes parameters for the SetRegistryCid choice.
-func (e *encoder) SetRegistryCid(args SetRegistryCid) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetRegistryCid", args)
 }
 
 // SetRoot encodes parameters for the SetRoot choice.

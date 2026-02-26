@@ -6,15 +6,15 @@
 --   - Calling UpgradePending contract fails
 --   - Calling Active registered contract succeeds
 --
--- When MCMS has a registry configured, external calls must target
--- registered contracts with Active status.
+-- With embedded registry, external calls MUST target registered contracts
+-- with Active status. This is now mandatory (not optional).
 --
 module MCMS.RegistryValidationTest where
 
 import DA.Map qualified as Map
 import DA.Time (seconds, addRelTime)
 import Daml.Script
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.MCMSReceiver (MCMSReceiver(..))
 import MCMS.MCMSRegistry
 import MCMS.Counter (Counter(..))
 import MCMS.Main (MCMS(..), ExecuteScheduledBatch(..))
@@ -28,24 +28,14 @@ import MCMS.TestHelpers (mkInstanceId)
 -- ===========================================================================
 
 -- | Test: Calling unregistered contract via MCMS fails with E_TARGET_NOT_REGISTERED
--- When MCMS has a registry configured, external calls must target registered contracts
+-- With embedded registry, external calls must target registered contracts
 testCallUnregisteredContractFails : Script ()
 testCallUnregisteredContractFails = script do
   owner <- allocateParty "ccip_owner"
-  let registryInstanceId = mkInstanceId "registry" owner
   let mcmsInstanceId = mkInstanceId "mcms" owner
   let counterInstanceId = mkInstanceId "counter" owner
 
-  -- Create registry (empty - no contracts registered)
-  registryCid <- submit owner do
-    createCmd MCMSRegistry with
-      owner
-      instanceId = registryInstanceId
-      registrations = Map.empty
-      pendingUpgrades = Map.empty
-      upgradeHistory = Map.empty
-
-  -- Create MCMS with registry configured
+  -- Create MCMS with empty registry (no contracts registered)
   now <- getTime
   let readyTime = addRelTime now (seconds (-1))  -- Already ready
   let calls = [TimelockCall with
@@ -65,7 +55,7 @@ testCallUnregisteredContractFails = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.fromList [(opId, readyTime)]
-      registryCid = Some registryCid
+      registry = emptyRegistryState  -- No contracts registered
 
   -- Create Counter (NOT registered in registry)
   counterCid <- submit owner do
@@ -91,60 +81,27 @@ testCallUnregisteredContractFails = script do
   pure ()
 
 -- | Test: Calling deprecated contract via MCMS fails with E_TARGET_NOT_ACTIVE
--- When MCMS has a registry configured, external calls must target Active contracts
+-- External calls must target Active contracts
 testCallDeprecatedContractFails : Script ()
 testCallDeprecatedContractFails = script do
   owner <- allocateParty "ccip_owner"
-  let registryInstanceId = mkInstanceId "registry" owner
   let mcmsInstanceId = mkInstanceId "mcms" owner
   let counterInstanceId = mkInstanceId "counter" owner
 
-  -- Create registry and register+deprecate the counter
-  registryCid <- submit owner do
-    createCmd MCMSRegistry with
-      owner
-      instanceId = registryInstanceId
-      registrations = Map.empty
-      pendingUpgrades = Map.empty
-      upgradeHistory = Map.empty
-
-  -- Register contract
-  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
-  result1 <- submit owner do
-    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "RegisterContract"
-      operationData = encodeRegisterContractParams $ RegisterContractParams
-        { instanceId = counterInstanceId
-        , version = "1.0.0"
-        , contractType = "Counter"
-        , metadataKeys = []
-        , metadataValues = []
-        }
-      contractIds = []
-
-  -- Deprecate the contract
-  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
-  result2 <- submit owner do
-    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "DeprecateContract"
-      operationData = encodeCancelUpgradeParams $ CancelUpgradeParams { instanceId = counterInstanceId }
-      contractIds = []
-
-  let finalRegCid : ContractId MCMSRegistry = coerceContractId result2.selfCid
-
-  -- Verify status is Deprecated
-  regInfo <- submit owner do
-    exerciseCmd finalRegCid GetContractInfo with
-      viewer = owner
-      targetInstanceId = counterInstanceId
-  case regInfo of
-    Some reg -> assertMsg "Status should be Deprecated" $ reg.status == Deprecated
-    None -> abort "Registration should exist"
-
-  -- Create MCMS with registry configured (pointing to registry with deprecated contract)
   now <- getTime
+
+  -- Create registry state with deprecated counter
+  let registration = ContractRegistration with
+        instanceId = counterInstanceId
+        version = "1.0.0"
+        status = Deprecated  -- Contract is deprecated
+        deployedAt = now
+        contractType = "Counter"
+        metadata = Map.empty
+  let registryState = emptyRegistryState with
+        registrations = Map.fromList [(counterInstanceId, registration)]
+
+  -- Create MCMS with registry containing deprecated contract
   let readyTime = addRelTime now (seconds (-1))  -- Already ready
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
@@ -163,7 +120,7 @@ testCallDeprecatedContractFails = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.fromList [(opId, readyTime)]
-      registryCid = Some finalRegCid
+      registry = registryState
 
   -- Create Counter (registered but deprecated)
   counterCid <- submit owner do
@@ -193,61 +150,30 @@ testCallDeprecatedContractFails = script do
 testCallUpgradePendingContractFails : Script ()
 testCallUpgradePendingContractFails = script do
   owner <- allocateParty "ccip_owner"
-  let registryInstanceId = mkInstanceId "registry" owner
   let mcmsInstanceId = mkInstanceId "mcms" owner
   let counterInstanceId = mkInstanceId "counter" owner
 
-  -- Create registry and register+initiate upgrade on the counter
-  registryCid <- submit owner do
-    createCmd MCMSRegistry with
-      owner
-      instanceId = registryInstanceId
-      registrations = Map.empty
-      pendingUpgrades = Map.empty
-      upgradeHistory = Map.empty
-
-  -- Register contract
-  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
-  result1 <- submit owner do
-    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "RegisterContract"
-      operationData = encodeRegisterContractParams $ RegisterContractParams
-        { instanceId = counterInstanceId
-        , version = "1.0.0"
-        , contractType = "Counter"
-        , metadataKeys = []
-        , metadataValues = []
-        }
-      contractIds = []
-
-  -- Initiate upgrade (status becomes UpgradePending)
-  let regIfaceCid2 = toInterfaceContractId @MCMSReceiver (coerceContractId result1.selfCid : ContractId MCMSRegistry)
-  result2 <- submit owner do
-    exerciseCmd regIfaceCid2 MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "InitiateUpgrade"
-      operationData = encodeInitiateUpgradeParams $ InitiateUpgradeParams
-        { instanceId = counterInstanceId
-        , fromVersion = "1.0.0"
-        , toVersion = "2.0.0"
-        , migrationParams = ""
-        }
-      contractIds = []
-
-  let finalRegCid : ContractId MCMSRegistry = coerceContractId result2.selfCid
-
-  -- Verify status is UpgradePending
-  regInfo <- submit owner do
-    exerciseCmd finalRegCid GetContractInfo with
-      viewer = owner
-      targetInstanceId = counterInstanceId
-  case regInfo of
-    Some reg -> assertMsg "Status should be UpgradePending" $ reg.status == UpgradePending
-    None -> abort "Registration should exist"
-
-  -- Create MCMS with registry configured
   now <- getTime
+
+  -- Create registry state with UpgradePending counter
+  let registration = ContractRegistration with
+        instanceId = counterInstanceId
+        version = "1.0.0"
+        status = UpgradePending  -- Contract has pending upgrade
+        deployedAt = now
+        contractType = "Counter"
+        metadata = Map.empty
+  let pendingUpgrade = PendingUpgrade with
+        instanceId = counterInstanceId
+        fromVersion = "1.0.0"
+        toVersion = "2.0.0"
+        initiatedAt = now
+        migrationParams = ""
+  let registryState = emptyRegistryState with
+        registrations = Map.fromList [(counterInstanceId, registration)]
+        pendingUpgrades = Map.fromList [(counterInstanceId, pendingUpgrade)]
+
+  -- Create MCMS with registry
   let readyTime = addRelTime now (seconds (-1))
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
@@ -266,7 +192,7 @@ testCallUpgradePendingContractFails = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.fromList [(opId, readyTime)]
-      registryCid = Some finalRegCid
+      registry = registryState
 
   -- Create Counter
   counterCid <- submit owner do
@@ -296,47 +222,23 @@ testCallUpgradePendingContractFails = script do
 testCallActiveRegisteredContractSucceeds : Script ()
 testCallActiveRegisteredContractSucceeds = script do
   owner <- allocateParty "ccip_owner"
-  let registryInstanceId = mkInstanceId "registry" owner
   let mcmsInstanceId = mkInstanceId "mcms" owner
   let counterInstanceId = mkInstanceId "counter" owner
 
-  -- Create registry and register the counter
-  registryCid <- submit owner do
-    createCmd MCMSRegistry with
-      owner
-      instanceId = registryInstanceId
-      registrations = Map.empty
-      pendingUpgrades = Map.empty
-      upgradeHistory = Map.empty
-
-  -- Register contract (stays Active)
-  let regIfaceCid = toInterfaceContractId @MCMSReceiver registryCid
-  result1 <- submit owner do
-    exerciseCmd regIfaceCid MCMSReceiver_Entrypoint with
-      caller = owner
-      functionName = "RegisterContract"
-      operationData = encodeRegisterContractParams $ RegisterContractParams
-        { instanceId = counterInstanceId
-        , version = "1.0.0"
-        , contractType = "Counter"
-        , metadataKeys = []
-        , metadataValues = []
-        }
-      contractIds = []
-
-  let finalRegCid : ContractId MCMSRegistry = coerceContractId result1.selfCid
-
-  -- Verify status is Active
-  regInfo <- submit owner do
-    exerciseCmd finalRegCid GetContractInfo with
-      viewer = owner
-      targetInstanceId = counterInstanceId
-  case regInfo of
-    Some reg -> assertMsg "Status should be Active" $ reg.status == Active
-    None -> abort "Registration should exist"
-
-  -- Create MCMS with registry configured
   now <- getTime
+
+  -- Create registry state with Active counter
+  let registration = ContractRegistration with
+        instanceId = counterInstanceId
+        version = "1.0.0"
+        status = Active  -- Contract is active
+        deployedAt = now
+        contractType = "Counter"
+        metadata = Map.empty
+  let registryState = emptyRegistryState with
+        registrations = Map.fromList [(counterInstanceId, registration)]
+
+  -- Create MCMS with registry containing active contract
   let readyTime = addRelTime now (seconds (-1))
   let calls = [TimelockCall with
         targetInstanceId = counterInstanceId
@@ -355,7 +257,7 @@ testCallActiveRegisteredContractSucceeds = script do
       minDelay = seconds 0
       blockedFunctions = []
       timelockTimestamps = Map.fromList [(opId, readyTime)]
-      registryCid = Some finalRegCid
+      registry = registryState
 
   -- Create Counter (registered and Active)
   counterCid <- submit owner do
