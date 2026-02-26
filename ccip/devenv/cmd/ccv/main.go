@@ -8,11 +8,12 @@ import (
 	"github.com/docker/docker/client"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/spf13/cobra"
+
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 )
 
 func init() {
@@ -63,6 +64,7 @@ var downCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to clean Docker resources: %w", err)
 		}
+
 		return nil
 	},
 }
