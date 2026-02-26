@@ -31,12 +31,19 @@ jobs:
         uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
 
       - name: Build CCIP Docker images
+        working-directory: chainlink-ccv/build/devenv
         run: |
-          cd chainlink-ccv/build/devenv
           # Build all dependent services docker images
           just build-docker
           # Build the JD docker image
           just build-jd-docker
+        env:
+          DOCKER_BUILDKIT: 1
+      
+      - name: Build canton committee verifier docker image
+        working-directory: chainlink-canton
+        run: |
+          docker build -t committeeverifier-canton -f ccip/committee_verifier.Dockerfile .
         env:
           DOCKER_BUILDKIT: 1
 
