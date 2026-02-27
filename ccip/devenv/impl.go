@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
@@ -43,6 +44,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/deployments"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
@@ -52,7 +54,31 @@ import (
 var (
 	_ cciptestinterfaces.CCIP17              = &Chain{}
 	_ cciptestinterfaces.CCIP17Configuration = &Chain{}
+	_ registry.ImplFactory                   = &ImplFactory{}
 )
+
+type ImplFactory struct{}
+
+func NewImplFactory() *ImplFactory {
+	return &ImplFactory{}
+}
+
+// New implements [registry.ImplFactory].
+func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, lggr, env, bc.ChainID)
+}
+
+// NewEmpty implements [registry.ImplFactory].
+func (i *ImplFactory) NewEmpty() cciptestinterfaces.CCIP17Configuration {
+	return NewEmptyCCIP17Canton(
+		log.
+			Output(zerolog.ConsoleWriter{Out: os.Stderr}).
+			Level(zerolog.DebugLevel).
+			With().
+			Fields(map[string]any{"component": "Canton"}).
+			Logger(),
+	)
+}
 
 type Chain struct {
 	e            *deployment.Environment
