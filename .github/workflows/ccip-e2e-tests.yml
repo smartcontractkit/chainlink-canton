@@ -84,14 +84,14 @@ jobs:
           go run cmd/ccv/main.go up env-canton-evm.toml
 
       - name: Run CCIP TestEVM2Canton_Basic test
-        working-directory: chainlink-canton/ccip/devenv
+        working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
           go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic
         continue-on-error: true
         id: test_run_evm2canton_basic
 
       - name: Run CCIP TestCantonSourceReader test
-        working-directory: chainlink-canton/ccip/devenv
+        working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
           go test -timeout 5m -v -count 1 -run TestCantonSourceReader
         continue-on-error: true
@@ -103,8 +103,7 @@ jobs:
         run: |
           if [ ! -d "logs" ] || [ -z "$(ls -A logs)" ]; then
             echo "Logs not found or empty. Dumping logs manually..."
-            cd chainlink-canton/ccip/devenv
-            go run cmd/ccv/main.go dl --dir-suffix "ccip-e2e-tests"
+            cd ../.. && go run cmd/ccv/main.go dl --dir-suffix "ccip-e2e-tests"
           else
             echo "Logs already exist. Skipping manual dump."
           fi
