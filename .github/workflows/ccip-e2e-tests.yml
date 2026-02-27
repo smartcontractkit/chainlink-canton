@@ -1,0 +1,123 @@
+name: CCIP E2E Tests
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-ccip-e2e:
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+    name: CCIP E2E tests
+    runs-on: ubuntu-latest-8cores-32GB
+    steps:
+      - name: Free up disk space
+        uses: smartcontractkit/.github/actions/free-disk-space@free-disk-space/v1
+
+      - name: Enable S3 Cache for Self-Hosted Runners
+        uses: runs-on/action@cd2b598b0515d39d78c38a02d529db87d2196d1e # v2.0.3
+
+      - name: Check out chainlink-canton
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink-canton
+          path: chainlink-canton
+
+      - name: Check out chainlink-ccv
+        uses: actions/checkout@v4
+        with:
+          repository: smartcontractkit/chainlink-ccv
+          path: chainlink-ccv
+          ref: 3adccc3259209c31a1a7320c0afd975ea42a5f44
+    
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Install Just
+        uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
+      
+      - name: Authenticate to AWS ECR (JD)
+        uses: ./chainlink-canton/.github/actions/aws-ecr-auth
+        with:
+          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
+          aws-region: us-west-2
+          registry-type: private
+          registries: ${{ secrets.JD_REGISTRY }}
+
+      - name: Build CCIP Docker images
+        working-directory: chainlink-ccv/build/devenv
+        run: |
+          # Build all dependent services docker images
+          just build-docker
+        env:
+          DOCKER_BUILDKIT: 1
+      
+      - name: Build canton committee verifier docker image
+        working-directory: chainlink-canton
+        run: |
+          docker build -t committeeverifier-canton -f ccip/committee_verifier.Dockerfile .
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: chainlink-canton/go.mod
+          cache-dependency-path: chainlink-canton/go.sum
+
+      - name: Download Go dependencies
+        working-directory: chainlink-canton
+        run: |
+          go mod download
+
+      - name: Spin up CCIP environment
+        working-directory: chainlink-canton/ccip/devenv
+        env:
+          JD_IMAGE: ${{ secrets.JD_IMAGE }}
+        run: |
+          go run cmd/ccv/main.go up env-canton-evm.toml
+
+      - name: Run CCIP TestEVM2Canton_Basic test
+        working-directory: chainlink-canton/ccip/devenv/tests/e2e
+        run: |
+          go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic
+        continue-on-error: true
+        id: test_run_evm2canton_basic
+
+      - name: Run CCIP TestCantonSourceReader test
+        working-directory: chainlink-canton/ccip/devenv/tests/e2e
+        run: |
+          go test -timeout 5m -v -count 1 -run TestCantonSourceReader
+        continue-on-error: true
+        id: test_run_canton_source_reader
+
+      - name: Dump logs if they're not already dumped
+        if: always()
+        working-directory: chainlink-canton/ccip/devenv/tests/e2e
+        run: |
+          if [ ! -d "logs" ] || [ -z "$(ls -A logs)" ]; then
+            echo "Logs not found or empty. Dumping logs manually..."
+            cd ../.. && go run cmd/ccv/main.go dl --dir-suffix "ccip-e2e-tests"
+          else
+            echo "Logs already exist. Skipping manual dump."
+          fi
+
+      - name: Upload Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-logs-ccip-e2e-tests
+          path: chainlink-canton/ccip/devenv/tests/e2e/logs
+          retention-days: 1
+
+      - name: Check test results
+        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton_source_reader.outcome == 'failure')
+        run: |
+          echo "CCIP E2E tests failed."
+          exit 1
