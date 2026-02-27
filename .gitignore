@@ -9,3 +9,6 @@ navigator.log
 
 go.work
 go.work.sum
+
+*-out.toml
+logs/

@@ -1,0 +1,32 @@
+name: Mocks Check
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mocks:
+    name: Mocks up to date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Generate mocks
+        run: go run github.com/vektra/mockery/v2@v2.53.5
+      - name: Check mocks are up to date
+        run: |
+          if ! git diff --quiet HEAD; then
+            echo "❌ Generated mocks are out of date. Run \`go run github.com/vektra/mockery/v2@v2.53.5\` and commit the changes."
+            echo "❌ Generated mocks are out of date. Run \`go run github.com/vektra/mockery/v2@v2.53.5\` and commit the changes:" >> $GITHUB_STEP_SUMMARY
+            git diff --name-only | while read -r n; do
+              echo "- $n" >> $GITHUB_STEP_SUMMARY
+            done
+            exit 1
+          fi
