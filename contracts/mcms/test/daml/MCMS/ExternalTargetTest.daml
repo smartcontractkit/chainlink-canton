@@ -210,7 +210,7 @@ testBypasserExternalCall = script do
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
+      targetCids = Map.fromList [(counterInstanceId, counterAsMcmsReceiver)]
 
   -- Verify counter was incremented
   -- Note: Counter is archived after MCMSReceiver_Entrypoint, need to query new one
@@ -278,7 +278,7 @@ testScheduledExternalCall = script do
       submitter = ccipOwner
       op = externalScheduleOp
       opProof = externalScheduleOpProof
-      targetCids = []
+      targetCids = Map.empty
 
   -- Compute the opId for the scheduled batch
   let calls = [TimelockCall counterInstanceId "Increment" ""]
@@ -306,7 +306,7 @@ testScheduledExternalCall = script do
       calls
       predecessor = zeroHash
       salt = externalScheduleSalt
-      targetCids = [counterAsMcmsReceiver]
+      targetCids = Map.fromList [(counterInstanceId, counterAsMcmsReceiver)]
 
   -- Verify counter was incremented
   counterContracts <- query @Counter ccipOwner
@@ -362,6 +362,9 @@ testExternalCallWrongInstanceId = script do
   -- Coerce Counter to MCMSReceiver interface
   let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
 
+  -- The operationData encodes calls to "counter@ccip_owner-9cefe94d" so use that as the key
+  let expectedCounterInstanceId = "counter@" <> partyToText ccipOwner
+
   -- ExecuteOp should fail because the Counter's instanceId doesn't match
   -- what's encoded in the operationData ("counter@ccip_owner-9cefe94d")
   submitMustFail ccipOwner do
@@ -370,7 +373,7 @@ testExternalCallWrongInstanceId = script do
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
+      targetCids = Map.fromList [(expectedCounterInstanceId, counterAsMcmsReceiver)]
 
   debug "testExternalCallWrongInstanceId PASSED!"
   pure ()
@@ -432,7 +435,7 @@ testExternalCallForgedSignatory = script do
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
+      targetCids = Map.fromList [(forgedInstanceId, counterAsMcmsReceiver)]
 
   debug "testExternalCallForgedSignatory PASSED!"
   pure ()

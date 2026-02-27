@@ -188,7 +188,7 @@ testScheduleBatch = script do
       submitter = ccipOwner
       op = timelockScheduleOp
       opProof = timelockScheduleOpProof
-      targetCids = []
+      targetCids = Map.empty
 
   -- Verify operation was scheduled
   let opId = hashTimelockOpId calls zeroHash salt
@@ -210,7 +210,7 @@ testScheduleBatch = script do
       calls
       predecessor = zeroHash
       salt
-      targetCids = []
+      targetCids = Map.empty
 
   -- Verify minDelay was updated
   delay <- submit ccipOwner do
@@ -264,7 +264,7 @@ testBypasserExecuteBatch = script do
       submitter = ccipOwner
       op = timelockBypasserOp
       opProof = timelockBypasserOpProof
-      targetCids = []
+      targetCids = Map.empty
 
   -- Verify minDelay was immediately updated to 300s
   delay <- submit ccipOwner do
