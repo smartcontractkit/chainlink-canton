@@ -21,7 +21,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/icza/gox v0.2.5
 	github.com/lib/pq v1.10.9
-	github.com/oapi-codegen/runtime v1.1.2
+	github.com/oapi-codegen/runtime v1.2.0
 	github.com/prometheus/client_golang v1.23.0
 	github.com/rs/zerolog v1.34.0
 	github.com/schollz/progressbar/v3 v3.19.0
