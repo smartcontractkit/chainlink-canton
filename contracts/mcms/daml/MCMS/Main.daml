@@ -192,10 +192,10 @@ template MCMS
     choice ExecuteOp : ContractId MCMS
       with
         targetRole : Role
-        submitter : Party                          -- Anyone can submit
-        op : Op                                    -- Operation details (params in operationData)
-        opProof : [BytesHex]                       -- Merkle proof
-        targetCids : [ContractId MCMSReceiver]     -- For bypasser_execute_batch only (can't be serialized)
+        submitter : Party                                         -- Anyone can submit
+        op : Op                                                   -- Operation details (params in operationData)
+        opProof : [BytesHex]                                      -- Merkle proof
+        targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceId to contract ID
       controller submitter
       do
         now <- getTime
@@ -289,12 +289,12 @@ template MCMS
     -- (matches Aptos timelock_execute_batch which is also public)
     choice ExecuteScheduledBatch : ContractId MCMS
       with
-        submitter : Party                          -- Anyone can execute
-        opId : Text                                -- Operation ID to execute
-        calls : [TimelockCall]                     -- Caller provides (for execution)
-        predecessor : Text                         -- For validation
-        salt : Text                                -- For opId verification
-        targetCids : [ContractId MCMSReceiver]     -- Target contract IDs (only for external calls)
+        submitter : Party                                         -- Anyone can execute
+        opId : Text                                               -- Operation ID to execute
+        calls : [TimelockCall]                                    -- Caller provides (for execution)
+        predecessor : Text                                        -- For validation
+        salt : Text                                               -- For opId verification
+        targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceId to contract ID
       controller submitter
       do
         now <- getTime
@@ -321,15 +321,10 @@ template MCMS
                 Some predTime ->
                   assertMsg "E_PREDECESSOR_NOT_DONE" $ predTime == doneTimestamp
 
-            -- 6. Validate external target count
-            let externalCalls = filter (\c -> c.targetInstanceId /= instanceId) calls
-            assertMsg "E_WRONG_TARGET_COUNT" $
-              length targetCids == length externalCalls
+            -- 6. Process all calls (self-dispatch inline, external via MCMSReceiver)
+            (_, finalMcms) <- processCallsLoop owner targetCids this calls
 
-            -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
-            (_, finalMcms) <- processCallsLoop owner targetCids this calls 0
-
-            -- 8. Mark as done (set to doneTimestamp)
+            -- 7. Mark as done (set to doneTimestamp)
             create (finalMcms with
               timelockTimestamps = Map.insert opId doneTimestamp finalMcms.timelockTimestamps)
 
@@ -596,17 +591,12 @@ scheduleBatchInternal now mcms rs calls predecessor salt delay = do
 
 -- | Execute a batch immediately via Bypasser (called by ExecuteOp for Bypasser role)
 -- Does NOT verify merkle proof - ExecuteOp already did that
-bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> [ContractId MCMSReceiver] -> Update (ContractId MCMS)
+bypasserExecuteBatchInternal : Party -> MCMS -> RoleState -> [TimelockCall] -> Map.Map Text (ContractId MCMSReceiver) -> Update (ContractId MCMS)
 bypasserExecuteBatchInternal ownerParty mcms rs calls targetCids = do
-  -- 1. Validate external target count
-  let externalCalls = filter (\c -> c.targetInstanceId /= mcms.instanceId) calls
-  assertMsg "E_WRONG_TARGET_COUNT" $
-    length targetCids == length externalCalls
+  -- 1. Process all calls (self-dispatch inline, external via MCMSReceiver)
+  (_, finalMcms) <- processCallsLoop ownerParty targetCids mcms calls
 
-  -- 2. Process all calls (self-dispatch inline, external via MCMSReceiver)
-  (_, finalMcms) <- processCallsLoop ownerParty targetCids mcms calls 0
-
-  -- 3. Increment bypasser opCount
+  -- 2. Increment bypasser opCount
   let finalRs = getRoleState Bypasser finalMcms
   let newRs = finalRs with
         expiringRoot = finalRs.expiringRoot with opCount = finalRs.expiringRoot.opCount + 1
@@ -629,14 +619,22 @@ cancelBatchInternal mcms rs opIdToCancel = do
   create (updated with timelockTimestamps = Map.delete opIdToCancel mcms.timelockTimestamps)
 
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
-processCallsLoop : Party -> [ContractId MCMSReceiver] -> MCMS -> [TimelockCall] -> Int -> Update (Int, MCMS)
-processCallsLoop _ _ mcms [] extIdx = pure (extIdx, mcms)
-processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx
+-- Uses a map keyed by instanceId to support multiple calls to the same contract.
+-- After each external call, the map is updated with the new CID returned from MCMSReceiver_Entrypoint.
+processCallsLoop : Party -> Map.Map Text (ContractId MCMSReceiver) -> MCMS -> [TimelockCall] -> Update (Map.Map Text (ContractId MCMSReceiver), MCMS)
+processCallsLoop _ cidMap mcms [] = pure (cidMap, mcms)
+processCallsLoop ownerParty cidMap mcms (call :: rest)
   | call.targetInstanceId == mcms.instanceId = do
+      -- Self-dispatch: no CID lookup needed
       newMcms <- executeSelfDispatch mcms call
-      processCallsLoop ownerParty targetCids newMcms rest extIdx
+      processCallsLoop ownerParty cidMap newMcms rest
   | otherwise = do
-      let targetCid = targetCids !! extIdx
+      -- External call: look up CID from map by instanceId
+      targetCid <- case Map.lookup call.targetInstanceId cidMap of
+        None -> abort $ "E_NO_CID_FOR_INSTANCE: " <> call.targetInstanceId
+        Some cid -> pure cid
+
+      -- Validate target
       target <- fetch targetCid
       let targetView = view target
       assertMsg ("E_WRONG_TARGET: expected " <> call.targetInstanceId <> " got " <> targetView.instanceId) $
@@ -646,9 +644,20 @@ processCallsLoop ownerParty targetCids mcms (call :: rest) extIdx
         Some partyIdText ->
           assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
             any (\s -> partyToText s == partyIdText) (signatory target)
-      _ <- exercise targetCid MCMSReceiver_Entrypoint with
+
+      -- Convert typed map to untyped for interface
+      let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList cidMap]
+
+      -- Execute call and get updated map from entrypoint
+      -- The entrypoint returns a Map with all updated CIDs (including self)
+      returnedCidMap <- exercise targetCid MCMSReceiver_Entrypoint with
         caller = ownerParty
         functionName = call.functionName
         operationData = call.operationData
-        contractIds = []
-      processCallsLoop ownerParty targetCids mcms rest (extIdx + 1)
+        contractIds = untypedCidMap
+
+      -- Convert returned map back to typed for next iteration
+      let updatedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList returnedCidMap]
+
+      -- Continue with merged map
+      processCallsLoop ownerParty updatedCidMap mcms rest

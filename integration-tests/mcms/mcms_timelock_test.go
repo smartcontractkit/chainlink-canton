@@ -97,7 +97,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		// 3) Execute immediately (delay is 0, so it's ready right away)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, []string{counterCid})
+		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceID: counterCid})
 
 		// 4) Verify counter incremented
 		val := queryCounterValue(t, participant, mcmsPkgID, counterInstanceID)
@@ -162,7 +162,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid2 = cancelBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, cancelProposal.Operations[0], cancelProof)
 
 		// Should now be gone; ExecuteScheduledBatch should fail with not found.
-		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, []string{counterCid})
+		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceID: counterCid})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "E_OPERATION_NOT_FOUND", "expected E_OPERATION_NOT_FOUND, got: %v", err)
 	})
@@ -466,7 +466,7 @@ func scheduleBatch(
 			OperationData:    types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: []types.CONTRACT_ID{},
+		TargetCids: types.GENMAP{},
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -534,7 +534,7 @@ func scheduleBatchExpectError(
 			OperationData:    types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: []types.CONTRACT_ID{},
+		TargetCids: types.GENMAP{},
 	}
 
 	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -572,7 +572,7 @@ func executeScheduledBatch(
 	calls []mcms.TimelockCall,
 	predecessor string,
 	salt string,
-	targetCids []string,
+	targetCids map[string]string,
 ) string {
 	t.Helper()
 
@@ -583,7 +583,7 @@ func executeScheduledBatch(
 		Calls:       calls,
 		Predecessor: types.TEXT(predecessor),
 		Salt:        types.TEXT(salt),
-		TargetCids:  toContractIDSlice(targetCids),
+		TargetCids:  toContractIDMap(targetCids),
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -617,11 +617,16 @@ func executeScheduledBatch(
 	return ""
 }
 
-// toContractIDSlice converts a []string to []types.CONTRACT_ID for binding compatibility
-func toContractIDSlice(s []string) []types.CONTRACT_ID {
-	result := make([]types.CONTRACT_ID, len(s))
-	for i, v := range s {
-		result[i] = types.CONTRACT_ID(v)
+// toContractIDMap converts a map[string]string to types.GENMAP for binding compatibility
+// The key is the instanceId and the value is the contract ID wrapped as CONTRACT_ID type
+// so it serializes as Value_ContractId rather than Value_Text
+func toContractIDMap(m map[string]string) types.GENMAP {
+	if m == nil {
+		return types.GENMAP{}
+	}
+	result := make(types.GENMAP, len(m))
+	for instanceID, cid := range m {
+		result[instanceID] = types.CONTRACT_ID(cid)
 	}
 
 	return result
@@ -637,7 +642,7 @@ func executeScheduledBatchExpectError(
 	calls []mcms.TimelockCall,
 	predecessor string,
 	salt string,
-	targetCids []string,
+	targetCids map[string]string,
 ) error {
 	t.Helper()
 
@@ -647,7 +652,7 @@ func executeScheduledBatchExpectError(
 		Calls:       calls,
 		Predecessor: types.TEXT(predecessor),
 		Salt:        types.TEXT(salt),
-		TargetCids:  toContractIDSlice(targetCids),
+		TargetCids:  toContractIDMap(targetCids),
 	}
 
 	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -697,7 +702,7 @@ func cancelBatch(
 			OperationData:    types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: []types.CONTRACT_ID{},
+		TargetCids: types.GENMAP{},
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -765,7 +770,7 @@ func bypasserExecuteBatch(
 	mcmsPkgID string,
 	owner string,
 	mcmsCid string,
-	targetCids []string,
+	targetCids map[string]string,
 	op MCMSOp,
 	opProof []string,
 ) string {
@@ -784,7 +789,7 @@ func bypasserExecuteBatch(
 			OperationData:    types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
-		TargetCids: toContractIDSlice(targetCids),
+		TargetCids: toContractIDMap(targetCids),
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -1119,7 +1124,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		time.Sleep(1500 * time.Millisecond)
 
 		// targetCids only has 1 entry (for the external counter call)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, []string{counterCid})
+		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceID: counterCid})
 
 		delay := queryMinDelay(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
 		require.Equal(t, int64(1_000_000), delay, "minDelay should be 1s after mixed batch")

@@ -19,5 +19,5 @@ template ForgedReceiver
         owner
         instanceId = baseId <> "@" <> forgedPartyIdText
 
-      mcmsEntrypoint _functionName _operationData _contractIds =
+      mcmsEntrypoint _selfCid _functionName _operationData _contractIds =
         abort "ForgedReceiver: entrypoint should not be called in this test"
