@@ -48,6 +48,18 @@ jobs:
           aws-region: us-west-2
           registry-type: private
           registries: ${{ secrets.JD_REGISTRY }}
+      
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: chainlink-canton/go.mod
+          cache-dependency-path: chainlink-canton/go.sum
+
+      - name: Download Go dependencies
+        working-directory: chainlink-canton
+        run: |
+          go mod download
 
       - name: Build CCIP Docker images
         working-directory: chainlink-ccv/build/devenv
@@ -63,18 +75,6 @@ jobs:
           docker build -t committeeverifier-canton -f ccip/committee_verifier.Dockerfile .
         env:
           DOCKER_BUILDKIT: 1
-
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          cache: true
-          go-version-file: chainlink-canton/go.mod
-          cache-dependency-path: chainlink-canton/go.sum
-
-      - name: Download Go dependencies
-        working-directory: chainlink-canton
-        run: |
-          go mod download
 
       - name: Spin up CCIP environment
         working-directory: chainlink-canton/ccip/devenv
