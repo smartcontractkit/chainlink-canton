@@ -11,10 +11,8 @@ jobs:
     name: Test Tailscale Connectivity
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    # Required: your Tailscale OIDC subject is repo:...:environment:* so the job must use an environment
-    # environment: canton-devnet
     permissions:
-      id-token: write  # Required for OIDC
+      id-token: write  
       contents: read
 
     steps:
@@ -27,29 +25,48 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON_DEVNET }}
           audience: ${{ secrets.TS_AUDIENCE_CANTON_DEVNET }}
           tags: tag:bcy-validators-gha
-          args: --accept-routes
 
-      - name: Wait for app connector route discovery
+      - name: Configure Tailscale for app connector routes
         run: |
+          sudo tailscale set --accept-routes=true
           sudo tailscale set --operator=$USER
-          echo "=== Tailscale status ==="
+
+      - name: "[DEBUG] 1 - Tailscale node info"
+        run: |
+          echo "=== Tailscale status (this node + peers) ==="
           tailscale status || true
           echo ""
-          echo "=== Trigger DNS resolution to kick app connector route discovery ==="
-          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+          echo "=== This node's Tailscale IP ==="
+          tailscale ip -4 || true
           echo ""
-          echo "=== Waiting 15s for routes to propagate ==="
-          sleep 15
-          echo ""
-          echo "=== Routes (grep tailscale) ==="
-          ip route show table all | grep tailscale || true
+          echo "=== Tailscale debug prefs (confirm AcceptRoutes=true) ==="
+          tailscale debug prefs 2>&1 | head -30 || true
 
-      - name: Test Canton Devnet connectivity
+      - name: "[DEBUG] 2 - DNS configuration (Split DNS shows app connector DoH)"
         run: |
-          echo "=== Resolved IPs ==="
+          echo "=== Tailscale DNS status ==="
+          tailscale dns status || true
+          echo ""
+          echo "=== /etc/resolv.conf ==="
+          cat /etc/resolv.conf
+
+      - name: "[DEBUG] 3 - DNS resolution (LB IPs returned by app connector DoH)"
+        run: |
+          echo "=== getent hosts canton-devnet.bcy-v.metalhosts.com ==="
           getent hosts canton-devnet.bcy-v.metalhosts.com || true
+
+      - name: "[DEBUG] 4 - Wait 15s for app connector route advertisement"
+        run: sleep 15
+
+      - name: "[DEBUG] 5 - Routes (expect LB IPs via tailscale0, but they are MISSING)"
+        run: |
+          echo "=== All routes via tailscale ==="
+          ip route show table all | grep tailscale || echo "(no tailscale routes found)"
           echo ""
-          echo "=== All routes ==="
-          ip route show table all || true
-          echo ""
-          curl -v --connect-timeout 30 -H "Content-Type: application/json" https://canton-devnet.bcy-v.metalhosts.com/metrics/participant || true
+          echo "=== Full routing table ==="
+          ip route show table all
+
+      - name: "[DEBUG] 6 - Connectivity test (403 = reached ALB via public internet, not via app connector)"
+        run: |
+          curl -v --connect-timeout 30 -H "Content-Type: application/json" \
+            https://canton-devnet.bcy-v.metalhosts.com/metrics/participant 2>&1 || true
