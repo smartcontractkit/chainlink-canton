@@ -1,0 +1,213 @@
+-- | Daml script unit tests for GlobalConfig V1 → V2 upgrade
+-- Tests the upgrade logic within the v2.0.0 package:
+--   1. V1 direct operations and MCMSReceiver interface
+--   2. Non-consuming MigrateToV2 (V1 stays alive, V2 created)
+--   3. V2-specific operations post-migration
+--   4. Explicit V1 archival after migration
+module MCMS.GlobalConfig.UpgradeTest where
+
+import DA.Map qualified as Map
+import Daml.Script
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSReceiver_GetInstanceId(..))
+import MCMS.GlobalConfig.Types
+import MCMS.GlobalConfig.V1
+import MCMS.GlobalConfig.V2
+
+testV1DirectOperations : Script ()
+testV1DirectOperations = script do
+    ccipOwner <- allocateParty "ccip_owner"
+
+    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+
+    v1Cid <- submit ccipOwner do
+        createCmd GlobalConfigV1 with
+            instanceId = configInstanceId
+            ccipOwner
+            chainSelector = 1
+            onRampAddress = "aa"
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.empty
+
+    let destConfig = DestChainConfig with
+            isEnabled = True
+            offRampAddress = "bb"
+            laneMandatedCCVs = []
+    v1Cid <- submit ccipOwner do
+        exerciseCmd v1Cid UpdateDestChainConfigV1 with
+            destChainSelector = 42
+            config = destConfig
+
+    result <- submit ccipOwner do
+        exerciseCmd v1Cid GetDestChainConfigV1 with
+            destChainSelector = 42
+            caller = ccipOwner
+    assertMsg "dest config should exist" $ result == Some destConfig
+
+    instId <- submit ccipOwner do
+        exerciseCmd v1Cid GetInstanceIdV1 with viewer = ccipOwner
+    assertMsg "instanceId should match" $ instId == configInstanceId
+
+    debug "testV1DirectOperations PASSED!"
+
+testV1ViaMcmsReceiver : Script ()
+testV1ViaMcmsReceiver = script do
+    ccipOwner <- allocateParty "ccip_owner"
+
+    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+
+    v1Cid <- submit ccipOwner do
+        createCmd GlobalConfigV1 with
+            instanceId = configInstanceId
+            ccipOwner
+            chainSelector = 1
+            onRampAddress = "aa"
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.empty
+
+    let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
+
+    instId <- submit ccipOwner do
+        exerciseCmd v1AsReceiver MCMSReceiver_GetInstanceId with c = ccipOwner
+    assertMsg "instanceId via interface should match" $ instId == configInstanceId
+
+    returnedMap <- submit ccipOwner do
+        exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
+            caller = ccipOwner
+            functionName = "UpdateDestChainConfig"
+            operationData = ""
+            contractIds = Map.empty
+
+    assertMsg "returned map should contain instanceId" $
+        Map.member configInstanceId returnedMap
+
+    -- Sub-choice consumed old V1 and created new V1
+    v1Contracts <- query @GlobalConfigV1 ccipOwner
+    assertMsg "should have exactly 1 V1 contract" $ length v1Contracts == 1
+
+    debug "testV1ViaMcmsReceiver PASSED!"
+
+testNonConsumingMigrateV1ToV2 : Script ()
+testNonConsumingMigrateV1ToV2 = script do
+    ccipOwner <- allocateParty "ccip_owner"
+
+    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+
+    let destConfig = DestChainConfig with
+            isEnabled = True
+            offRampAddress = "bb"
+            laneMandatedCCVs = ["ccv1"]
+    let sourceConfig = SourceChainConfig with
+            isEnabled = True
+            onRampAddress = "cc"
+            laneMandatedCCVs = ["ccv2"]
+
+    v1Cid <- submit ccipOwner do
+        createCmd GlobalConfigV1 with
+            instanceId = configInstanceId
+            ccipOwner
+            chainSelector = 1
+            onRampAddress = "aa"
+            destChainConfigs = Map.fromList [(42, destConfig)]
+            sourceChainConfigs = Map.fromList [(99, sourceConfig)]
+
+    let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
+
+    -- Migrate via MCMSReceiver_Entrypoint (non-consuming: V1 stays alive)
+    returnedMap <- submit ccipOwner do
+        exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
+            caller = ccipOwner
+            functionName = "MigrateToV2"
+            operationData = ""
+            contractIds = Map.empty
+
+    assertMsg "returned map should contain instanceId" $
+        Map.member configInstanceId returnedMap
+
+    -- V1 should STILL exist (non-consuming migration)
+    v1Contracts <- query @GlobalConfigV1 ccipOwner
+    assertMsg "V1 should still exist after non-consuming migration" $ length v1Contracts == 1
+
+    -- V2 should also exist
+    v2Contracts <- query @GlobalConfigV2 ccipOwner
+    assertMsg "should have exactly 1 V2 contract" $ length v2Contracts == 1
+
+    case v2Contracts of
+        [(v2Cid, v2)] -> do
+            assertMsg "instanceId preserved" $ v2.instanceId == configInstanceId
+            assertMsg "ccipOwner preserved" $ v2.ccipOwner == ccipOwner
+            assertMsg "chainSelector preserved" $ v2.chainSelector == 1
+            assertMsg "onRampAddress preserved" $ v2.onRampAddress == "aa"
+            assertMsg "newFeatureEnabled defaults to None" $ v2.newFeatureEnabled == None
+
+            destResult <- submit ccipOwner do
+                exerciseCmd v2Cid GetDestChainConfigV2 with
+                    destChainSelector = 42
+                    caller = ccipOwner
+            assertMsg "dest config migrated" $ destResult == Some destConfig
+
+            sourceResult <- submit ccipOwner do
+                exerciseCmd v2Cid GetSourceChainConfigV2 with
+                    sourceChainSelector = 99
+                    caller = ccipOwner
+            assertMsg "source config migrated" $ sourceResult == Some sourceConfig
+
+            -- V2 operations via MCMSReceiver_Entrypoint
+            let v2AsReceiver = toInterfaceContractId @MCMSReceiver v2Cid
+            _returnedMap2 <- submit ccipOwner do
+                exerciseCmd v2AsReceiver MCMSReceiver_Entrypoint with
+                    caller = ccipOwner
+                    functionName = "SetNewFeature"
+                    operationData = "true"
+                    contractIds = Map.empty
+
+            v2ContractsAfter <- query @GlobalConfigV2 ccipOwner
+            case v2ContractsAfter of
+                [(_, v2After)] ->
+                    assertMsg "newFeatureEnabled should be Some True" $ v2After.newFeatureEnabled == Some True
+                _ -> abort "Expected exactly 1 V2 contract after SetNewFeature"
+
+            debug "testNonConsumingMigrateV1ToV2 PASSED!"
+
+        _ -> abort "Expected exactly 1 V2 contract"
+
+testArchiveV1AfterMigration : Script ()
+testArchiveV1AfterMigration = script do
+    ccipOwner <- allocateParty "ccip_owner"
+
+    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+
+    v1Cid <- submit ccipOwner do
+        createCmd GlobalConfigV1 with
+            instanceId = configInstanceId
+            ccipOwner
+            chainSelector = 1
+            onRampAddress = "aa"
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.empty
+
+    -- Migrate (non-consuming)
+    let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
+    _returnedMap <- submit ccipOwner do
+        exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
+            caller = ccipOwner
+            functionName = "MigrateToV2"
+            operationData = ""
+            contractIds = Map.empty
+
+    -- V1 and V2 coexist
+    v1Contracts <- query @GlobalConfigV1 ccipOwner
+    v2Contracts <- query @GlobalConfigV2 ccipOwner
+    assertMsg "V1 should exist" $ length v1Contracts == 1
+    assertMsg "V2 should exist" $ length v2Contracts == 1
+
+    -- Explicitly archive V1
+    submit ccipOwner do
+        exerciseCmd v1Cid ArchiveGlobalConfigV1
+
+    -- V1 gone, V2 remains
+    v1ContractsAfter <- query @GlobalConfigV1 ccipOwner
+    v2ContractsAfter <- query @GlobalConfigV2 ccipOwner
+    assertMsg "V1 should be archived" $ null v1ContractsAfter
+    assertMsg "V2 should still exist" $ length v2ContractsAfter == 1
+
+    debug "testArchiveV1AfterMigration PASSED!"

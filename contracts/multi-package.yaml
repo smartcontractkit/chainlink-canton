@@ -16,6 +16,8 @@ packages:
 
   - mcms
   - mcms/test
+  - mcms/test/globalconfig-v1
+  - mcms/test/globalconfig-v1-upgraded
 
   - test/interfaces
   - test/proxy
