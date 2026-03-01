@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "dff4b375038f0cb98af8a53754cacfb21f8cf761060462378e6374965c02750c"
+	PackageID   = "08d3ac6f8f4095f2720d8a3af0a0d7ec5101a55a7c2a70e1d06b70b79a2a7ca9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -670,17 +670,25 @@ func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPoolLockOrBurn is a Record type
 type LockReleaseTokenPoolLockOrBurn struct {
-	SendingMessageCid types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput        interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount            types.NUMERIC         `json:"amount"`
-	RmnRemoteCid      types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	Caller            types.PARTY           `json:"caller"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	TokenInput        interfaces.TokenInput                      `json:"tokenInput"`
+	SenderInputCids   []types.CONTRACT_ID                        `json:"senderInputCids"`
+	Amount            types.NUMERIC                              `json:"amount"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolLockOrBurn to a map for DAML arguments
 func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
 
 	m["sendingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -707,14 +715,6 @@ func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]any {
 	}()
 
 	m["amount"] = t.Amount
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
-	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -745,16 +745,23 @@ func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPoolReleaseFromTicket is a Record type
 type LockReleaseTokenPoolReleaseFromTicket struct {
-	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	TokenInput            interfaces.TokenInput `json:"tokenInput"`
-	Caller                types.PARTY           `json:"caller"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	TokenInput            interfaces.TokenInput                      `json:"tokenInput"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolReleaseFromTicket to a map for DAML arguments
 func (t LockReleaseTokenPoolReleaseFromTicket) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
 
 	m["tokenReceiveTicketCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -762,22 +769,6 @@ func (t LockReleaseTokenPoolReleaseFromTicket) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.TokenReceiveTicketCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	m["rmnRemoteCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteCid
 	}()
 
 	m["tokenInput"] = func() any {
@@ -858,14 +849,22 @@ func (t *LockReleaseTokenPoolUpdateChainCCVRequirements) UnmarshalHex(data strin
 
 // LockReleaseTokenPoolVerifyInboundCCVs is a Record type
 type LockReleaseTokenPoolVerifyInboundCCVs struct {
-	ExecutingMessageCid   types.CONTRACT_ID `json:"executingMessageCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	Caller                types.PARTY       `json:"caller"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Caller              types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolVerifyInboundCCVs to a map for DAML arguments
 func (t LockReleaseTokenPoolVerifyInboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
 
 	m["executingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -873,14 +872,6 @@ func (t LockReleaseTokenPoolVerifyInboundCCVs) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.ExecutingMessageCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
 	}()
 
 	m["caller"] = t.Caller.ToMap()

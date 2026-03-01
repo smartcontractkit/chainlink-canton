@@ -6,6 +6,8 @@ module CCIP.CCIPSender where
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (isSome)
+
+import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
@@ -18,6 +20,7 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
 
 -- | Per-CCV send input. Pairs a verifier contract (via interface)
 -- with the CCV's raw address and optional per-CCV arguments.
@@ -51,12 +54,11 @@ template CCIPSender
         -- | Sends an outbound CCIP message end-to-end.
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult
             with
+                -- CCIP Choice Context
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
+
+                -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
-                onRampCid : ContractId CCIP.OnRamp.OnRamp
-                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
 
                 destChainSelector : Numeric 0
                 receiver : BytesHex
@@ -72,6 +74,9 @@ template CCIPSender
                 ccvSendInputs : [CCVSendInput]
             controller owner
             do
+                -- Get Cids from context
+                feeQuoterCid <- CCIP.Context.getFromContextU @(ContractId CCIP.FeeQuoter.FeeQuoter) context CCIP.Context.feeQuoterKey
+
                 let withTokenTransfer = isSome tokenTransfer
 
                 let tokenReceiver = case tokenTransfer of
@@ -80,11 +85,7 @@ template CCIPSender
 
                 -- PrepareSend
                 smCid <- exercise routerCid CCIP.PerPartyRouter.PrepareSend with
-                    onRampCid
-                    globalConfigCid
-                    tokenAdminRegistryCid
-                    feeQuoterCid
-                    rmnRemoteCid
+                    context
                     destChainSelector
                     receiver
                     payload
@@ -121,11 +122,11 @@ template CCIPSender
                     Some tt -> do
                         lockResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
+                                context = context
                                 sendingMessageCid = smCid
                                 tokenInput = tt.tokenInput
                                 senderInputCids = tt.senderInputCids
                                 amount = tt.amount
-                                rmnRemoteCid
                                 caller = owner
                         pure lockResult.sendingMessageCid
 
@@ -133,7 +134,7 @@ template CCIPSender
                 smCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_ForwardToVerifier with
-                            rmnRemoteCid
+                            context = context
                             sendingMessageCid = cid
                             verifierArgs = input.verifierArgs
                             caller = owner
@@ -141,10 +142,7 @@ template CCIPSender
 
                 -- CCIPSend (collects total fee from sender)
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with
-                    onRampCid
-                    rmnRemoteCid
-                    globalConfigCid
-                    tokenAdminRegistryCid
+                    context
                     sendingMessageCid = smCid
                     feeTokenInput
                     feeTokenHoldingCids

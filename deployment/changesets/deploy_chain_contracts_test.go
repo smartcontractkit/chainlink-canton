@@ -93,6 +93,7 @@ func TestDeployChainContracts(t *testing.T) {
 		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
 	}
 	versionTag := "49ff34ed"
+	_ = ccvSignerPubKeys // The signers are set during lane deployment
 	// ccvID := versionTag + "@" + user.PrimaryParty
 
 	chainSelector := types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10))
@@ -110,8 +111,6 @@ func TestDeployChainContracts(t *testing.T) {
 							VersionTag:          types.TEXT(versionTag),
 							MessageSentObserver: types.PARTY(ccipOwnerParty),
 							StorageLocation:     "ipfs://test-receive",
-							Threshold:           2,
-							Signers:             ccvSignerPubKeys,
 						},
 					},
 				},

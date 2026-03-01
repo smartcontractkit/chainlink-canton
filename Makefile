@@ -11,9 +11,19 @@ generate-bindings:
 .PHONY: contracts
 contracts: compile-contracts generate-bindings
 
+.PHONY: update-contract-version
+update-contract-version: ## Update contract version and rebuild. Usage: make update-contract-version OLD=0.0.1 NEW=1.0.0
+	@./contracts/scripts/update-version.sh $(OLD) $(NEW)
+	@$(MAKE) contracts
+
 .PHONY: gomodtidy
 gomodtidy: ## Run go mod tidy on all modules.
 	go run github.com/jmank88/gomods@v0.1.7 tidy
+
+.PHONY: test-daml-contracts
+test-daml-contracts:
+	cd contracts && dpm build --all
+	go run ./contracts/cmd/test --root ./contracts --color
 
 # GolangCI-Lint targets
 
@@ -43,3 +53,7 @@ golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-eds golangci-lin
 ## Compiles contracts, generates bindings, runs go mod tidy, and runs golangci-lint --fix on all modules.
 .PHONY: fix-all
 fix-all: contracts gomodtidy golangci-lint-fix-all
+
+.PHONY: build-committeeverifier
+build-committeeverifier:
+	docker build -t committeeverifier-canton:latest -f ccip/committee_verifier.Dockerfile .

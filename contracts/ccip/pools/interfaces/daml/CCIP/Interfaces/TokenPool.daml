@@ -13,8 +13,6 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
-
-
 -- | Direction of token transfer for CCV requirement lookup.
 data TransferDirection = Outbound | Inbound
     deriving (Eq, Show)
@@ -44,8 +42,8 @@ interface ITokenPool where
     -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1 via TAR.
     nonconsuming choice TokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             caller : Party
         controller caller
         do tokenPool_verifyInboundCCVsImpl this self arg
@@ -54,9 +52,8 @@ interface ITokenPool where
     -- The pool should consume the ticket via TokenAdminRegistry_ConsumeReceiveTicket.
     nonconsuming choice TokenPool_ReleaseFromTicket : ReleaseOrMintResult
         with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
-            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             tokenInput : TokenInput
             caller : Party
         controller caller
@@ -66,11 +63,11 @@ interface ITokenPool where
     -- truth for the locked amount, which it records via SendingMessageV1.AddTokenSend.
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             tokenInput : TokenInput
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
             amount : Numeric 0
-            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
             caller : Party
         controller caller
         do tokenPool_lockOrBurnImpl this self arg

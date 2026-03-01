@@ -4,18 +4,20 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -36,7 +38,7 @@ type ConfigureChainForLanesInput struct {
 
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []adapters.CommitteeVerifierConfig[datastore.AddressRef]
+	CommitteeVerifiers []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]
 	// The configuration for each remote chain that we want to connect to.
 	RemoteChains map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]
 }
@@ -116,16 +118,39 @@ var ConfigureChainForLanes = operations.NewSequence(
 			}
 		}
 
-		// Apply DestChainConfigs to GlobalConfig
-		for i, arg := range globalConfigDestChainConfigArgs {
-			_, err := operations.ExecuteOperation(b, global_config.UpdateDestChainConfig, deps, contract.ChoiceInput[common.UpdateDestChainConfig]{
-				ChainSelector:   deps.Chain.Selector,
-				InstanceAddress: input.GlobalConfig,
-				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-				Args:            arg,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.DestChainSelector), err)
+		// Apply signature configs to CommitteeVerifiers
+		for _, verifierConfig := range input.CommitteeVerifiers {
+			signatureConfigs := make([]ccvs.SignatureConfig, 0, len(verifierConfig.RemoteChains))
+			for remoteSelector, remoteConfig := range verifierConfig.RemoteChains {
+				signerKeys := make([]types.TEXT, len(remoteConfig.SignatureConfig.Signers))
+				for i, signer := range remoteConfig.SignatureConfig.Signers {
+					// Decode and encode signer pubkeys to ensure they're in the correct format
+					signerBytes, err := hex.DecodeString(strings.TrimPrefix(signer, "0x"))
+					if err != nil {
+						return sequences.OnChainOutput{}, fmt.Errorf("failed to decode signer key %d for remote chain %d: %w", i, remoteSelector, err)
+					}
+					signerKeys[i] = types.TEXT(hex.EncodeToString(signerBytes))
+				}
+
+				signatureConfigs = append(signatureConfigs, ccvs.SignatureConfig{
+					SourceChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+					Threshold:           types.INT64(remoteConfig.SignatureConfig.Threshold),
+					SignerKeys:          signerKeys,
+				})
+			}
+			for _, address := range verifierConfig.CommitteeVerifier {
+				_, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, deps, contract.ChoiceInput[ccvs.CommitteeVerifierApplySignatureConfigs]{
+					ChainSelector:   deps.Chain.Selector,
+					InstanceAddress: address,
+					ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+					Args: ccvs.CommitteeVerifierApplySignatureConfigs{
+						SourceChainSelectorsToRemove: nil, // This doesn't support removing chains
+						SignatureConfigs:             signatureConfigs,
+					},
+				})
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply signature configs to CommitteeVerifier at address %s: %w", address.Hex(), err)
+				}
 			}
 		}
 

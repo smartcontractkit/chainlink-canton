@@ -18,6 +18,7 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
@@ -104,27 +105,26 @@ template LockReleaseTokenPool
             tokenPool_verifyInboundCCVsImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyInboundCCVs
                     with
+                        context = arg.context
                         executingMessageCid = arg.executingMessageCid
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_ReleaseFromTicket
                     with
+                        context = arg.context
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
-                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
-                        rmnRemoteCid = arg.rmnRemoteCid
                         tokenInput = arg.tokenInput
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_LockOrBurn
                     with
+                        context = arg.context
                         sendingMessageCid = arg.sendingMessageCid
                         tokenInput = arg.tokenInput
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
-                        rmnRemoteCid = arg.rmnRemoteCid
                         caller = arg.caller
 
             tokenPool_calculateFeeImpl self arg = do
@@ -156,11 +156,14 @@ template LockReleaseTokenPool
         -- OffRamp performs the actual CCV coverage check.
         nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 caller : Party
             controller caller
             do
+                -- Get Cids from context
+                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
+
                 execMsg <- fetch executingMessageCid
                 let message = execMsg.message
 
@@ -189,13 +192,16 @@ template LockReleaseTokenPool
         -- atomically. If any check fails, the entire transaction rolls back.
         nonconsuming choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
             controller caller
             do
+                -- Get Cids from context
+                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
+                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+
                 -- Best-effort RMN curse check for the source chain (matches EVM
                 -- TokenPool._validateReleaseOrMint). The pool cannot validate
                 -- the RMN instance address (not a stakeholder); PrepareExecute
@@ -292,14 +298,17 @@ template LockReleaseTokenPool
         -- merging into the unified requiredCCVs list.
         nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Numeric 0
-                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 caller : Party
             controller caller, poolOwner
             do
+                -- Get Cids from context
+                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Best-effort RMN curse check

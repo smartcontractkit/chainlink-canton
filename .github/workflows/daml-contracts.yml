@@ -1,0 +1,97 @@
+name: Daml Contracts
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-contracts:
+    name: Compile Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+            go-version-file: go.mod
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Compile contracts
+        run: make compile-contracts
+      - name: Check if any files have been changed
+        run: |
+          if ! git diff --quiet HEAD; then
+              echo "The following artifacts don't match the latest compiled version, run \`make compile-contracts\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+              git diff --name-only | while read -r n ; do
+                  echo "- $n" >> $GITHUB_STEP_SUMMARY
+              done
+              exit 1
+          fi
+
+  generate-bindings:
+    name: Generate Bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Generate bindings
+        run: make generate-bindings
+      - name: Verify bindings are up-to-date
+        run: |
+          set -euo pipefail
+          
+          # Check for changes in the workspace
+          if ! git diff --quiet HEAD; then
+            echo "### Bindings are out of date!" >> $GITHUB_STEP_SUMMARY
+            echo "The bindings in the repository do not match the output of \`make generate-bindings\` using godaml (Go 1.25.5)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### To fix this, run these commands locally and commit the result:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'gvm use go1.25.5' >> $GITHUB_STEP_SUMMARY
+            echo 'make generate-bindings' >> $GITHUB_STEP_SUMMARY
+            echo 'git add . && git commit -m "chore: update generated bindings"' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            echo "#### Drifted Files:" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            git diff --name-only >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            # Show the raw diff in the CI log output for debugging
+            echo "Displaying diff for debugging..."
+            git diff
+            exit 1
+          else
+            echo "### Bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  test-contracts:
+    name: Test Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Compile multi-package
+        run: |
+          cd contracts
+          dpm build --all
+      - name: Test Daml Contracts
+        run: go run ./contracts/cmd/test --root . --color --plain --output ./summary.md
+      - name: Output test summary
+        if: always()
+        run: cat summary.md >$GITHUB_STEP_SUMMARY

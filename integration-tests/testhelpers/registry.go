@@ -23,6 +23,8 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 		return nil, fmt.Errorf("no values found in choice context")
 	}
 
+	// ref: https://docs.digitalasset.com/build/3.5/reference/json-api/lf-value-specification.html
+	// AnyValue is a variant
 	var fields []*apiv2.TextMap_Entry
 	for k, v := range values {
 		f := v.(map[string]any)
@@ -31,18 +33,12 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 
 		var value *apiv2.Value
 		switch tag {
-		case "AV_ContractId":
+		case "AV_Text":
 			valueString, ok := rawValue.(string)
 			if !ok {
-				return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
+				return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
 			}
-			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
-		case "AV_Bool":
-			valueBool, ok := rawValue.(bool)
-			if !ok {
-				return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
-			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}
+			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
 		case "AV_Int":
 			// JSON numbers come as float64
 			valueFloat, ok := rawValue.(float64)
@@ -50,13 +46,54 @@ func ChoiceContextFromData(choiceContextData map[string]any) (*apiv2.Value, erro
 				return nil, fmt.Errorf("AV_Int value is not a number: %T", rawValue)
 			}
 			value = &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}
-		case "AV_Text":
+		case "AV_Decimal":
 			valueString, ok := rawValue.(string)
 			if !ok {
-				return nil, fmt.Errorf("AV_Text value is not a string: %T", rawValue)
+				return nil, fmt.Errorf("AV_Decimal value is not a string: %T", rawValue)
 			}
-			value = &apiv2.Value{Sum: &apiv2.Value_Text{Text: valueString}}
+			value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: valueString}}
+		case "AV_Bool":
+			valueBool, ok := rawValue.(bool)
+			if !ok {
+				return nil, fmt.Errorf("AV_Bool value is not a bool: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: valueBool}}
+		case "AV_Date":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("AV_Date value is not a string: %T", rawValue)
+			}
+			t, err := time.Parse(time.RFC3339, valueString)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Date{Date: int32(t.Unix() / 86400)}} //nolint:gosec // days since epoch
+		case "AV_Time":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("AV_Time value is not a string: %T", rawValue)
+			}
+			t, err := time.Parse(time.RFC3339, valueString)
+			if err != nil {
+				return nil, fmt.Errorf("AV_Date value is not a RFC3339 time: %s", valueString)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: t.UnixMicro()}}
+		case "AV_RelTime":
+			valueFloat, ok := rawValue.(float64)
+			if !ok {
+				return nil, fmt.Errorf("AV_RelTime value is not a number: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+				{Label: "microseconds", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(valueFloat)}}},
+			}}}}
+		case "AV_ContractId":
+			valueString, ok := rawValue.(string)
+			if !ok {
+				return nil, fmt.Errorf("AV_ContractId value is not a string: %T", rawValue)
+			}
+			value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: valueString}}
 		default:
+			// Add lists and maps
 			return nil, fmt.Errorf("unimplemented tag: %v", tag)
 		}
 

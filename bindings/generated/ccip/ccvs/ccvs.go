@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "734a12924b71bc59594246101aa6d63454317960829bc8e8697c48717142277a"
+	PackageID   = "2215bd747b396de460fac1e6e20a8228da0649294573ff370956ffde3b693fd1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -102,8 +103,7 @@ type CommitteeVerifier struct {
 	VersionTag               types.TEXT                `json:"versionTag"`
 	MessageSentObserver      types.PARTY               `json:"messageSentObserver"`
 	StorageLocation          types.TEXT                `json:"storageLocation"`
-	Threshold                types.INT64               `json:"threshold"`
-	Signers                  []types.TEXT              `json:"signers"`
+	SignerConfigs            types.GENMAP              `json:"signerConfigs"`
 	RmnRemoteInstanceAddress common.RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
 	RemoteChainFeeConfigs    types.GENMAP              `json:"remoteChainFeeConfigs"`
 }
@@ -141,15 +141,11 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	args["storageLocation"] = string(t.StorageLocation)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["threshold"] = int64(t.Threshold)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["signers"] = func() []any {
-		res := make([]any, 0, len(t.Signers))
-		for _, e := range t.Signers {
-			res = append(res, string(e))
+	args["signerConfigs"] = func() any {
+		if t.SignerConfigs == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.SignerConfigs}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -198,15 +194,11 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	args["storageLocation"] = string(t.StorageLocation)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["threshold"] = int64(t.Threshold)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["signers"] = func() []any {
-		res := make([]any, 0, len(t.Signers))
-		for _, e := range t.Signers {
-			res = append(res, string(e))
+	args["signerConfigs"] = func() any {
+		if t.SignerConfigs == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.SignerConfigs}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -273,6 +265,27 @@ func (t CommitteeVerifier) CommitteeVerifierVerifyMessageWithPackageID(contractI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_VerifyMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierApplySignatureConfigs exercises the CommitteeVerifier_ApplySignatureConfigs choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigs(contractID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierApplySignatureConfigsWithPackageID exercises the CommitteeVerifier_ApplySignatureConfigs choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigsWithPackageID(contractID string, packageID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -407,6 +420,62 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(cont
 
 var _ common.IICrossChainVerifier = (*CommitteeVerifier)(nil)
 
+// CommitteeVerifierApplySignatureConfigs is a Record type
+type CommitteeVerifierApplySignatureConfigs struct {
+	SourceChainSelectorsToRemove []types.NUMERIC   `json:"sourceChainSelectorsToRemove"`
+	SignatureConfigs             []SignatureConfig `json:"signatureConfigs"`
+}
+
+// ToMap converts CommitteeVerifierApplySignatureConfigs to a map for DAML arguments
+func (t CommitteeVerifierApplySignatureConfigs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sourceChainSelectorsToRemove"] = func() []any {
+		res := make([]any, 0, len(t.SourceChainSelectorsToRemove))
+		for _, e := range t.SourceChainSelectorsToRemove {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["signatureConfigs"] = func() []any {
+		res := make([]any, 0, len(t.SignatureConfigs))
+		for _, e := range t.SignatureConfigs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t CommitteeVerifierApplySignatureConfigs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CommitteeVerifierApplySignatureConfigs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierApplySignatureConfigs to hex string (Canton MCMS format)
+func (t CommitteeVerifierApplySignatureConfigs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierApplySignatureConfigs from hex string (Canton MCMS format)
+func (t *CommitteeVerifierApplySignatureConfigs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CommitteeVerifierCalculateFee is a Record type
 type CommitteeVerifierCalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
@@ -454,22 +523,22 @@ func (t *CommitteeVerifierCalculateFee) UnmarshalHex(data string) error {
 
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
-	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT        `json:"verifierArgs"`
-	Caller            types.PARTY       `json:"caller"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
 func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
+	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteCid
+		return t.Context
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -511,22 +580,22 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	VerifierResults     types.TEXT        `json:"verifierResults"`
-	Caller              types.PARTY       `json:"caller"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	Caller              types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
 func (t CommitteeVerifierVerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["rmnRemoteCid"] = func() any {
+	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+		if m, ok := any(t.Context).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteCid
+		return t.Context
 	}()
 
 	m["executingMessageCid"] = func() any {
@@ -566,9 +635,58 @@ func (t *CommitteeVerifierVerifyMessage) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SignatureConfig is a Record type
+type SignatureConfig struct {
+	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
+	Threshold           types.INT64   `json:"threshold"`
+	SignerKeys          []types.TEXT  `json:"signerKeys"`
+}
+
+// ToMap converts SignatureConfig to a map for DAML arguments
+func (t SignatureConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sourceChainSelector"] = t.SourceChainSelector
+
+	m["threshold"] = int64(t.Threshold)
+
+	m["signerKeys"] = func() []any {
+		res := make([]any, 0, len(t.SignerKeys))
+		for _, e := range t.SignerKeys {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SignatureConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SignatureConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SignatureConfig to hex string (Canton MCMS format)
+func (t SignatureConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SignatureConfig from hex string (Canton MCMS format)
+func (t *SignatureConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
@@ -599,6 +717,11 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// CommitteeVerifierApplySignatureConfigs encodes parameters for the CommitteeVerifierApplySignatureConfigs choice.
+func (e *encoder) CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierApplySignatureConfigs", args)
 }
 
 // CommitteeVerifierCalculateFee encodes parameters for the CommitteeVerifierCalculateFee choice.
