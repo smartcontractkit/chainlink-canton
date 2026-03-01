@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "fb09ebb5ef3018c5d854b95148a959383d7468f6f3c9797f27a3929c303974bd"
+	PackageID   = "5053ce59e346a6f67e6dc167ad747cafd3230f33805df81d968af508e769c90c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1895,7 +1895,6 @@ func (t *MCMSReceiverView) UnmarshalHex(data string) error {
 
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
-	Caller        types.PARTY  `json:"caller"`
 	FunctionName  types.TEXT   `json:"functionName"`
 	OperationData types.TEXT   `json:"operationData"`
 	ContractIds   types.GENMAP `json:"contractIds"`
@@ -1904,8 +1903,6 @@ type MCMSReceiverEntrypoint struct {
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
 func (t MCMSReceiverEntrypoint) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["caller"] = t.Caller.ToMap()
 
 	m["functionName"] = string(t.FunctionName)
 
