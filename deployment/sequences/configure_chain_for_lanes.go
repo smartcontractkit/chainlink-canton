@@ -154,6 +154,19 @@ var ConfigureChainForLanes = operations.NewSequence(
 			}
 		}
 
+		// Apply DestChainConfigs to GlobalConfig
+		for i, arg := range globalConfigDestChainConfigArgs {
+			_, err := operations.ExecuteOperation(b, global_config.UpdateDestChainConfig, deps, contract.ChoiceInput[common.UpdateDestChainConfig]{
+				ChainSelector:   deps.Chain.Selector,
+				InstanceAddress: input.GlobalConfig,
+				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+				Args:            arg,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.DestChainSelector), err)
+			}
+		}
+
 		return sequences.OnChainOutput{}, nil
 	},
 )

@@ -134,8 +134,6 @@ func TestCCIPSendE2E(t *testing.T) {
 							VersionTag:               types.TEXT(versionTag),
 							MessageSentObserver:      types.PARTY(partyCCIP),
 							StorageLocation:          "ipfs://test-send",
-							Threshold:                2,
-							Signers:                  ccvSignerPubKeys,
 							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
 							// MUST be a real GENMAP, not a Go map.
 							RemoteChainFeeConfigs: types.GENMAP{
@@ -507,17 +505,18 @@ func TestCCIPSendE2E(t *testing.T) {
 		}())
 	}
 
-	choiceContextRecord := choiceContext.GetRecord()
-	var choiceContextValues types.TEXTMAP
-	if choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
+	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
+	transferFactoryContextValues := make(types.TEXTMAP)
+	if choiceContextRecord := choiceContext.GetRecord(); choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
 		valuesField := choiceContextRecord.Fields[0]
 		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
-			textMap := valuesField.GetValue().GetTextMap()
-			choiceContextValues = make(types.TEXTMAP)
-			for _, entry := range textMap.GetEntries() {
-				// Convert apiv2.Value to types.TEXT (simplified - may need more complex conversion)
-				if entry.GetValue().GetText() != "" {
-					choiceContextValues[entry.GetKey()] = types.TEXT(entry.GetValue().GetText())
+			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
+				if v := entry.GetValue().GetVariant(); v != nil {
+					cid := types.CONTRACT_ID(v.GetValue().GetContractId())
+					transferFactoryContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: &cid}
+				} else if entry.GetValue().GetText() != "" {
+					txt := types.TEXT(entry.GetValue().GetText())
+					transferFactoryContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: &txt}
 				}
 			}
 		}
@@ -531,7 +530,7 @@ func TestCCIPSendE2E(t *testing.T) {
 
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
 		Context: splice_api_token_metadata_v1.ChoiceContext{
-			Values: choiceContextValues,
+			Values: transferFactoryContextValues,
 		},
 		Meta: splice_api_token_metadata_v1.Metadata{
 			Values: types.TEXTMAP{},
@@ -544,23 +543,35 @@ func TestCCIPSendE2E(t *testing.T) {
 		TokenPoolHoldings: []types.CONTRACT_ID{},
 	}
 
+	// Build the main Send context with CCIP contract IDs (matching execute test pattern)
+	onRampCid := types.CONTRACT_ID(disclosedOnRamp.ContractId)
+	globalConfigCid := types.CONTRACT_ID(disclosedGlobalConfig.ContractId)
+	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
+	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
+	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
+	sendContext := splice_api_token_metadata_v1.ChoiceContext{
+		Values: types.TEXTMAP{
+			"on-ramp":              splice_api_token_metadata_v1.AnyValue{AVContractId: &onRampCid},
+			"global-config":        splice_api_token_metadata_v1.AnyValue{AVContractId: &globalConfigCid},
+			"token-admin-registry": splice_api_token_metadata_v1.AnyValue{AVContractId: &tarCid},
+			"fee-quoter":           splice_api_token_metadata_v1.AnyValue{AVContractId: &feeQuoterCid},
+			"rmn-remote":           splice_api_token_metadata_v1.AnyValue{AVContractId: &rmnRemoteCid},
+		},
+	}
+
 	sendArgs := ccipsender.Send{
-		RouterCid:             types.CONTRACT_ID(routerCid),
-		OnRampCid:             types.CONTRACT_ID(disclosedOnRamp.ContractId),
-		GlobalConfigCid:       types.CONTRACT_ID(disclosedGlobalConfig.ContractId),
-		TokenAdminRegistryCid: types.CONTRACT_ID(disclosedTar.ContractId),
-		RmnRemoteCid:          types.CONTRACT_ID(disclosedRmnRemote.ContractId),
-		FeeQuoterCid:          types.CONTRACT_ID(disclosedFeeQuoter.ContractId),
-		DestChainSelector:     types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:              types.TEXT(receiverHex),
-		Payload:               types.TEXT(testPayloadHex),
-		CcipReceiveGasLimit:   types.INT64(100000),
-		SenderRequiredCCVs:    []common.RawInstanceAddress{},
-		FeeToken:              feeTokenInstrumentId,
-		FeeTokenInput:         feeTokenInput,
-		FeeTokenHoldingCids:   []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
-		TokenTransfer:         nil,
-		CcvSendInputs:         []ccipsender.CCVSendInput{ccvSendInput},
+		Context:             sendContext,
+		RouterCid:           types.CONTRACT_ID(routerCid),
+		DestChainSelector:   types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Receiver:            types.TEXT(receiverHex),
+		Payload:             types.TEXT(testPayloadHex),
+		CcipReceiveGasLimit: types.INT64(100000),
+		SenderRequiredCCVs:  []common.RawInstanceAddress{},
+		FeeToken:            feeTokenInstrumentId,
+		FeeTokenInput:       feeTokenInput,
+		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
+		TokenTransfer:       nil,
+		CcvSendInputs:       []ccipsender.CCVSendInput{ccvSendInput},
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)

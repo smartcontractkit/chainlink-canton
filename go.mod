@@ -34,7 +34,7 @@ require (
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217084735-307a5770c4f6
 	github.com/smartcontractkit/chainlink-deployments-framework v0.83.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.14.8
-	github.com/smartcontractkit/go-daml v0.0.0-20260217070730-8baea5c5955e
+	github.com/smartcontractkit/go-daml v0.0.0-20260219003852-a14a57e6863b
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	go.uber.org/zap v1.27.1
