@@ -72,7 +72,6 @@ testV1ViaMcmsReceiver = script do
 
     returnedMap <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
-            caller = ccipOwner
             functionName = "UpdateDestChainConfig"
             operationData = ""
             contractIds = Map.empty
@@ -115,7 +114,6 @@ testNonConsumingMigrateV1ToV2 = script do
     -- Migrate via MCMSReceiver_Entrypoint (non-consuming: V1 stays alive)
     returnedMap <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
-            caller = ccipOwner
             functionName = "MigrateToV2"
             operationData = ""
             contractIds = Map.empty
@@ -155,7 +153,6 @@ testNonConsumingMigrateV1ToV2 = script do
             let v2AsReceiver = toInterfaceContractId @MCMSReceiver v2Cid
             _returnedMap2 <- submit ccipOwner do
                 exerciseCmd v2AsReceiver MCMSReceiver_Entrypoint with
-                    caller = ccipOwner
                     functionName = "SetNewFeature"
                     operationData = "true"
                     contractIds = Map.empty
@@ -189,7 +186,6 @@ testArchiveV1AfterMigration = script do
     let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
     _returnedMap <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
-            caller = ccipOwner
             functionName = "MigrateToV2"
             operationData = ""
             contractIds = Map.empty

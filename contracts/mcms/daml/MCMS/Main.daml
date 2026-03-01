@@ -651,7 +651,6 @@ processCallsLoop ownerParty cidMap mcms (call :: rest)
       -- Execute call and get updated map from entrypoint
       -- The entrypoint returns a Map with all updated CIDs (including self)
       returnedCidMap <- exercise targetCid MCMSReceiver_Entrypoint with
-        caller = ownerParty
         functionName = call.functionName
         operationData = call.operationData
         contractIds = untypedCidMap

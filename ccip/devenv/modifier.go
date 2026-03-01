@@ -59,6 +59,10 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 
 // hydrateAndMarshalCantonConfig hydrates the canton config with the full party ID for the CCIPOwnerParty.
 func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*blockchain.Output) ([]byte, error) {
+	cantonConfigs, err := util.OpaqueToConcreteStrict[canton.Config](in.CantonConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get canton config from opaque: %w", err)
+	}
 	for _, output := range outputs {
 		if output.Family != chainsel.FamilyCanton {
 			continue
@@ -70,14 +74,14 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		}
 
 		strSelector := strconv.FormatUint(chainDetails.ChainSelector, 10)
-		cantonConfig, ok := in.CantonConfigs.ReaderConfigs[strSelector]
+		readerConfig, ok := cantonConfigs.ReaderConfigs[strSelector]
 		if !ok {
 			return nil, fmt.Errorf("no canton config found for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
-		if cantonConfig.CCIPOwnerParty == "" {
+		if readerConfig.CCIPOwnerParty == "" {
 			return nil, fmt.Errorf("CCIPOwnerParty is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
-		if cantonConfig.CCIPMessageSentTemplateID == "" {
+		if readerConfig.CCIPMessageSentTemplateID == "" {
 			return nil, fmt.Errorf("CCIPMessageSentTemplateID is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
 
@@ -106,10 +110,10 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 
 		var found bool
 		for _, partyDetail := range resp.PartyDetails {
-			if strings.HasPrefix(partyDetail.GetParty(), cantonConfig.CCIPOwnerParty) {
-				in.CantonConfigs.ReaderConfigs[strSelector] = canton.ReaderConfig{
+			if strings.HasPrefix(partyDetail.GetParty(), readerConfig.CCIPOwnerParty) {
+				cantonConfigs.ReaderConfigs[strSelector] = canton.ReaderConfig{
 					CCIPOwnerParty:            partyDetail.GetParty(),
-					CCIPMessageSentTemplateID: cantonConfig.CCIPMessageSentTemplateID,
+					CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 					Authority:                 authority,
 				}
 				found = true
@@ -118,12 +122,12 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("expected CCIPOwnerParty %s not found for canton chain %s, please update the config appropriately if you're using canton", cantonConfig.CCIPOwnerParty, strSelector)
+			return nil, fmt.Errorf("expected CCIPOwnerParty %s not found for canton chain %s, please update the config appropriately if you're using canton", readerConfig.CCIPOwnerParty, strSelector)
 		}
 	}
 
 	// Marshal the canton config into TOML.
-	cantonConfigBytes, err := toml.Marshal(in.CantonConfigs)
+	cantonConfigBytes, err := toml.Marshal(cantonConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal canton config: %w", err)
 	}

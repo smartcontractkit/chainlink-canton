@@ -70,11 +70,10 @@ interface MCMSReceiver where
   -- Uses `self` (available in all choice bodies) to pass own CID to mcmsEntrypoint.
   nonconsuming choice MCMSReceiver_Entrypoint : Map.Map Text (ContractId ())
     with
-      caller : Party                              -- Must be ccip_owner (MCMS passes this through)
       functionName : Text                         -- Function to execute
       operationData : Text                        -- Serialized parameters (hex)
       contractIds : Map.Map Text (ContractId ())  -- Map of instanceId → contractId for target to use
-    controller caller
+    controller (view this).owner
     do
       ((((this `mcmsEntrypoint` self) functionName) operationData) contractIds)
 
@@ -89,3 +88,35 @@ parsePartyIdText instanceId =
   case T.splitOn "@" instanceId of
     [_baseId, partyId] -> Some partyId
     _ -> None
+
+-- | Parse Int from hex string (simple implementation)
+parseIntFromHex : Text -> Optional Int
+parseIntFromHex _ =
+  -- For POC, we use a simple approach: assume it's already a decimal string
+  -- In production, this would properly decode hex
+  None  -- TODO: implement proper hex parsing
+
+-- | Decode operation data for simple functions
+-- Format: "key1=value1;key2=value2"
+decodeOperationData : Text -> Map.Map Text Text
+decodeOperationData "" = Map.empty
+decodeOperationData _ =
+  -- Simple key=value parsing for POC
+  -- In production, this would use proper ABI decoding
+  Map.empty  -- Placeholder - implement proper parsing as needed
+
+-- | Extract a text value from decoded data
+getTextValue : Map.Map Text Text -> Text -> Update Text
+getTextValue m key =
+  case Map.lookup key m of
+    Some v -> pure v
+    None -> abort $ "Missing key: " <> key
+
+-- | Extract an int value from decoded data
+getIntValue : Map.Map Text Text -> Text -> Update Int
+getIntValue m key =
+  case Map.lookup key m of
+    Some v -> case parseIntFromHex v of
+      Some i -> pure i
+      None -> abort $ "Invalid int for key: " <> key
+    None -> abort $ "Missing key: " <> key
