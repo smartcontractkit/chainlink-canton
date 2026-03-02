@@ -249,7 +249,9 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 	server := http.Server{
 		Addr:              callbackURL.Host,
 		Handler:           serveMux,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: 1 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
 	}
 	// Create listener to fail fast if port is unavailable
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", server.Addr)
