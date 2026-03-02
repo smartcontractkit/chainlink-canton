@@ -12,7 +12,6 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/bootstrap"
 	cmd "github.com/smartcontractkit/chainlink-ccv/cmd/verifier"
-	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/blockchain"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/verifier/commit"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -39,7 +38,12 @@ func main() {
 		"CantonCommitteeVerifier",
 		cmd.NewServiceFactory(
 			chainsel.FamilyCanton,
-			func(ctx context.Context, lggr logger.Logger, helper *blockchain.Helper, cfg commit.Config) (chainaccess.AccessorFactory, error) {
+			func(
+				ctx context.Context,
+				lggr logger.Logger,
+				infos map[string]*ccip.BlockchainInfo,
+				cfg commit.Config,
+			) (chainaccess.AccessorFactory, error) {
 				configPath, ok := os.LookupEnv(CantonConfigPathEnv)
 				if !ok {
 					configPath = ccip.DefaultCantonConfigPath
@@ -50,7 +54,9 @@ func main() {
 					return nil, fmt.Errorf("failed to load config: %w", err)
 				}
 
-				return accessors.NewFactory(lggr, helper, cantonConfig.ReaderConfigs), nil
+				lggr.Infow("loaded canton config", "config", cantonConfig)
+
+				return accessors.NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs), nil
 			}),
 		bootstrap.WithLogLevel[commit.JobSpec](zapcore.InfoLevel),
 	); err != nil {
