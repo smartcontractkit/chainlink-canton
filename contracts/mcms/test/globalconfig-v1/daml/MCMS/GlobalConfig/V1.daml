@@ -1,0 +1,90 @@
+-- | GlobalConfigV1 - Initial version (no migration logic)
+-- Implements MCMSReceiver so MCMS can manage config operations.
+-- MigrateToV2 is NOT present here; it will be added via SCU upgrade.
+module MCMS.GlobalConfig.V1 where
+
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
+import MCMS.MCMSReceiver
+import MCMS.GlobalConfig.Types
+
+template GlobalConfigV1
+    with
+        instanceId : Text
+        ccipOwner : Party
+        chainSelector : Int
+        onRampAddress : BytesHex
+        destChainConfigs : Map.Map Int DestChainConfig
+        sourceChainConfigs : Map.Map Int SourceChainConfig
+    where
+        signatory ccipOwner
+
+        interface instance MCMSReceiver for GlobalConfigV1 where
+            view = MCMSReceiverView with
+                owner = ccipOwner
+                instanceId
+
+            mcmsEntrypoint selfCid functionName operationData contractIds = do
+                let selfV1Cid : ContractId GlobalConfigV1 = coerceContractId selfCid
+                case functionName of
+                    "UpdateDestChainConfig" -> do
+                        newCid <- exercise selfV1Cid V1_UpdateDestChainConfig
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    "UpdateSourceChainConfig" -> do
+                        newCid <- exercise selfV1Cid V1_UpdateSourceChainConfig
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        -- Consuming sub-choices (called by mcmsEntrypoint via selfCid)
+
+        choice V1_UpdateDestChainConfig : ContractId GlobalConfigV1
+            controller ccipOwner
+            do create this
+
+        choice V1_UpdateSourceChainConfig : ContractId GlobalConfigV1
+            controller ccipOwner
+            do create this
+
+        -- Query choices
+
+        nonconsuming choice GetDestChainConfigV1 : Optional DestChainConfig
+            with
+                destChainSelector : Int
+                caller : Party
+            controller caller
+            do pure (Map.lookup destChainSelector destChainConfigs)
+
+        nonconsuming choice GetSourceChainConfigV1 : Optional SourceChainConfig
+            with
+                sourceChainSelector : Int
+                caller : Party
+            controller caller
+            do pure (Map.lookup sourceChainSelector sourceChainConfigs)
+
+        nonconsuming choice GetInstanceIdV1 : Text
+            with
+                viewer : Party
+            controller viewer
+            do pure instanceId
+
+        -- Admin choices (direct access, controlled by ccipOwner)
+
+        choice UpdateDestChainConfigV1 : ContractId GlobalConfigV1
+            with
+                destChainSelector : Int
+                config : DestChainConfig
+            controller ccipOwner
+            do create this with destChainConfigs = Map.insert destChainSelector config destChainConfigs
+
+        choice UpdateSourceChainConfigV1 : ContractId GlobalConfigV1
+            with
+                sourceChainSelector : Int
+                config : SourceChainConfig
+            controller ccipOwner
+            do create this with sourceChainConfigs = Map.insert sourceChainSelector config sourceChainConfigs
+
+        choice ArchiveGlobalConfigV1 : ()
+            controller ccipOwner
+            do pure ()
