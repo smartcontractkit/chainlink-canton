@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 
@@ -60,12 +61,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	}
 	cantonChain := chain.(*canton.Chain)
 
-	updateStore, err := store.NewUpdateStore(ctx, store.UpdateStoreConfig{
-		Logger:        logger,
-		UpdateService: cantonChain.Participants[0].LedgerServices.Update,
-		StateService:  cantonChain.Participants[0].LedgerServices.State,
-		MaxRetries:    cfg.Node.MaxRetries,
-	},
+	templates := []store.RegisteredTemplate{
 		store.RegisteredTemplate{
 			TemplateID: store.TemplateIDFromBinding(perpartyrouter.PerPartyRouterFactory{}),
 			PartyID:    cfg.Contracts.OnRamp.PartyID,
@@ -90,10 +86,23 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			TemplateID: store.TemplateIDFromBinding(rmn.RMNRemote{}),
 			PartyID:    cfg.Contracts.RMNRemote.PartyID,
 		},
-		store.RegisteredTemplate{
+	}
+	ccvCids := make([]contracts.InstanceAddress, len(cfg.Contracts.CCVs))
+	for i, ccv := range cfg.Contracts.CCVs {
+		templates = append(templates, store.RegisteredTemplate{
 			TemplateID: store.TemplateIDFromBinding(ccvs.CommitteeVerifier{}),
-			PartyID:    cfg.Contracts.DefaultCCV.PartyID,
-		},
+			PartyID:    ccv.PartyID,
+		})
+		ccvCids[i] = ccv.InstanceAddress
+	}
+
+	updateStore, err := store.NewUpdateStore(ctx, store.UpdateStoreConfig{
+		Logger:        logger,
+		UpdateService: cantonChain.Participants[0].LedgerServices.Update,
+		StateService:  cantonChain.Participants[0].LedgerServices.State,
+		MaxRetries:    cfg.Node.MaxRetries,
+	},
+		templates...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create store: %w", err)
@@ -117,7 +126,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		GlobalConfig:          cfg.Contracts.GlobalConfig.InstanceAddress,
 		TokenAdminRegistry:    cfg.Contracts.TokenAdminRegistry.InstanceAddress,
 		RMNRemote:             cfg.Contracts.RMNRemote.InstanceAddress,
-		DefaultCCV:            cfg.Contracts.DefaultCCV.InstanceAddress,
+		CCVs:                  ccvCids,
 	})
 
 	server := api.NewServer(logger, disclosureSvc)

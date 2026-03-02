@@ -3,10 +3,12 @@ package api
 import (
 	"encoding/base64"
 	"fmt"
+	"net/http"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
@@ -31,13 +33,26 @@ func (s Server) CcipExecute(c *gin.Context) {
 	var req edsv1.CCIPExecuteRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(400, edsv1.ErrorResponse{Error: err.Error()})
+		return
 	}
 
-	disclosures, err := s.disclosureSvc.GetCCIPExecuteDisclosures(c.Request.Context(), disclosure.CCIPExecuteRequest{})
+	// Parse requested CCVs
+	ccvs := make([]contracts.InstanceAddress, len(req.Ccvs))
+	for i, ccv := range req.Ccvs {
+		instanceAddress := contracts.HexToInstanceAddress(ccv)
+		if (instanceAddress == contracts.InstanceAddress{}) {
+			c.JSON(400, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid CCV address: %s", ccv)})
+			return
+		}
+		ccvs[i] = instanceAddress
+	}
+
+	disclosures, err := s.disclosureSvc.GetCCIPExecuteDisclosures(c.Request.Context(), disclosure.CCIPExecuteRequest{
+		CCVs: ccvs,
+	})
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for CCIP execute")
 		c.JSON(500, edsv1.ErrorResponse{Error: "failed to get disclosures"})
-
 		return
 	}
 
@@ -69,14 +84,27 @@ func (s Server) CcipExecute(c *gin.Context) {
 		convertDisclosedContract(disclosures.GlobalConfig),
 		convertDisclosedContract(disclosures.TokenAdminRegistry),
 		convertDisclosedContract(disclosures.RMNRemote),
-		convertDisclosedContract(disclosures.DefaultCCV),
 	}
 
 	resp := edsv1.CCIPExecuteResponse{
-		ChoiceContext: &edsv1.ChoiceContext{
+		ChoiceContext: edsv1.ChoiceContext{
 			ChoiceContextData:  choiceContextData,
 			DisclosedContracts: disclosedContracts,
 		},
+		Ccvs: make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+	}
+
+	for address, contract := range disclosures.CCVs {
+		var disclosedContract *edsv1.DisclosedContract
+		if contract != nil {
+			d := convertDisclosedContract(contract)
+			disclosedContract = &d
+		}
+
+		resp.Ccvs[address.String()] = edsv1.OptionalDisclosure{
+			DisclosedContract:  disclosedContract,
+			RegisteredContract: nil,
+		}
 	}
 
 	c.JSON(200, resp)
@@ -87,7 +115,97 @@ func (s Server) CcipSend(c *gin.Context) {
 	var req edsv1.CCIPSendRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(400, edsv1.ErrorResponse{Error: err.Error()})
+		return
 	}
+
+	// Parse requested CCVs
+	ccvs := make([]contracts.InstanceAddress, len(req.Ccvs))
+	for i, ccv := range req.Ccvs {
+		instanceAddress := contracts.HexToInstanceAddress(ccv)
+		if (instanceAddress == contracts.InstanceAddress{}) {
+			c.JSON(400, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid CCV address: %s", ccv)})
+			return
+		}
+		ccvs[i] = instanceAddress
+	}
+
+	disclosures, err := s.disclosureSvc.GetCCIPSendDisclosures(c.Request.Context(), disclosure.CCIPSendRequest{
+		CCVs: ccvs,
+	})
+	if err != nil {
+		s.logger.Err(err).Msg("failed to get disclosures for CCIP send")
+		c.JSON(500, edsv1.ErrorResponse{Error: "failed to get disclosures"})
+		return
+	}
+
+	choiceContextData := map[string]any{
+		"values": map[string]struct {
+			Tag   string `json:"tag"`
+			Value string `json:"value"`
+		}{
+			"on-ramp": {
+				Tag:   "AV_ContractId",
+				Value: disclosures.OnRamp.GetContractId(),
+			},
+			"global-config": {
+				Tag:   "AV_ContractId",
+				Value: disclosures.GlobalConfig.GetContractId(),
+			},
+			"token-admin-registry": {
+				Tag:   "AV_ContractId",
+				Value: disclosures.TokenAdminRegistry.GetContractId(),
+			},
+			"rmn-remote": {
+				Tag:   "AV_ContractId",
+				Value: disclosures.RMNRemote.GetContractId(),
+			},
+		},
+	}
+	disclosedContracts := []edsv1.DisclosedContract{
+		convertDisclosedContract(disclosures.OnRamp),
+		convertDisclosedContract(disclosures.GlobalConfig),
+		convertDisclosedContract(disclosures.TokenAdminRegistry),
+		convertDisclosedContract(disclosures.RMNRemote),
+	}
+
+	resp := edsv1.CCIPSendResponse{
+		ChoiceContext: edsv1.ChoiceContext{
+			ChoiceContextData:  choiceContextData,
+			DisclosedContracts: disclosedContracts,
+		},
+		Ccvs: make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+	}
+
+	for address, contract := range disclosures.CCVs {
+		var disclosedContract *edsv1.DisclosedContract
+		if contract != nil {
+			d := convertDisclosedContract(contract)
+			disclosedContract = &d
+		}
+
+		resp.Ccvs[address.String()] = edsv1.OptionalDisclosure{
+			DisclosedContract:  disclosedContract,
+			RegisteredContract: nil,
+		}
+	}
+
+	c.JSON(200, resp)
+}
+
+// (GET /ccip/v1/disclosure/{instanceAddress})
+func (s Server) GetDisclosure(c *gin.Context, requestedInstanceAddress string) {
+	instanceAddress := contracts.HexToInstanceAddress(requestedInstanceAddress)
+	if (instanceAddress == contracts.InstanceAddress{}) {
+		c.JSON(400, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid address: %s", requestedInstanceAddress)})
+	}
+
+	disclosedContract, err := s.disclosureSvc.GetDisclosure(c, instanceAddress)
+	if err != nil {
+		c.JSON(http.StatusNotFound, edsv1.ErrorResponse{Error: fmt.Sprintf("disclosure not found for address: %s", requestedInstanceAddress)})
+		return
+	}
+
+	c.JSON(http.StatusOK, convertDisclosedContract(disclosedContract))
 }
 
 // (POST /ccip/v1/perPartyRouter/factory)
@@ -101,7 +219,6 @@ func (s Server) PerPartyRouterFactory(c *gin.Context) {
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for per party router factory")
 		c.JSON(500, edsv1.ErrorResponse{Error: "failed to get disclosures"})
-
 		return
 	}
 

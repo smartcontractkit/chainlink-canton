@@ -14,19 +14,27 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 )
 
 // CCIPExecuteRequest defines model for CCIPExecuteRequest.
 type CCIPExecuteRequest struct {
-	SourceChain *int `json:"sourceChain,omitempty"`
+	// Ccvs The list of InstanceAddresses for all CCVs which should verify the message.
+	// As part of the response, the explicit disclosures for all CCVs that this EDS knows about will be returned.
+	Ccvs []string `json:"ccvs"`
+
+	// MessageID The message ID of the CCIP message to be executed.
+	MessageID string `json:"messageID"`
 }
 
 // CCIPExecuteResponse defines model for CCIPExecuteResponse.
 type CCIPExecuteResponse struct {
+	Ccvs map[string]OptionalDisclosure `json:"ccvs"`
+
 	// ChoiceContext The context required to send/execute a message from/to Canton.
 	// Used to retrieve additional CCIP contracts which are referred to via their
 	// contract IDs in the 'choiceContextData'.
-	ChoiceContext *ChoiceContext `json:"choiceContext,omitempty"`
+	ChoiceContext ChoiceContext `json:"choiceContext"`
 }
 
 // CCIPPerPartyRouterFactoryRequest defines model for CCIPPerPartyRouterFactoryRequest.
@@ -45,15 +53,19 @@ type CCIPPerPartyRouterFactoryResponse struct {
 
 // CCIPSendRequest defines model for CCIPSendRequest.
 type CCIPSendRequest struct {
-	DestChain *int `json:"destChain,omitempty"`
+	// Ccvs The list of InstanceAddresses for all CCVs which should verify the message.
+	// As part of the response, the explicit disclosures for all CCVs that this EDS knows about will be returned.
+	Ccvs []string `json:"ccvs"`
 }
 
 // CCIPSendResponse defines model for CCIPSendResponse.
 type CCIPSendResponse struct {
+	Ccvs map[string]OptionalDisclosure `json:"ccvs"`
+
 	// ChoiceContext The context required to send/execute a message from/to Canton.
 	// Used to retrieve additional CCIP contracts which are referred to via their
 	// contract IDs in the 'choiceContextData'.
-	ChoiceContext *ChoiceContext `json:"choiceContext,omitempty"`
+	ChoiceContext ChoiceContext `json:"choiceContext"`
 }
 
 // ChoiceContext The context required to send/execute a message from/to Canton.
@@ -74,7 +86,6 @@ type DisclosedContract struct {
 	CreatedEventBlob string `json:"createdEventBlob"`
 
 	// SynchronizerId The synchronizer to which the contract is currently assigned.
-	// If the contract is in the process of being reassigned, then a "409" response is returned.
 	SynchronizerId string `json:"synchronizerId"`
 	TemplateId     string `json:"templateId"`
 }
@@ -83,6 +94,28 @@ type DisclosedContract struct {
 type ErrorResponse struct {
 	Details *string `json:"details,omitempty"`
 	Error   string  `json:"error"`
+}
+
+// OptionalDisclosure The result of the explicit disclosure lookup for a contract.
+// Will be used in places where the EDS is not guaranteed to serve the explicit disclosure itself:
+// - If the EDS can serve an explicit disclosure for the requested contract, then the 'disclosedContract' field will be returned, containing the explicit disclosure for the contract.
+// - If the contract's owner has registered the contract with the global EDS registry, but the EDS cannot serve an explicit disclosure for the contract itself, then the 'registeredContract' field will be returned, containing the information on where to query the explicit disclosure for the contract, as well as the party ID of the owner of the contract.
+type OptionalDisclosure struct {
+	DisclosedContract *DisclosedContract `json:"disclosedContract,omitempty"`
+
+	// RegisteredContract If the contract has been registered with the global EDS registry, then this object will be returned.
+	// It contains the information on where to query the explicit disclosure for the contract, as well as the party ID of the owner of the contract.
+	RegisteredContract *RegisteredContract `json:"registeredContract,omitempty"`
+}
+
+// RegisteredContract If the contract has been registered with the global EDS registry, then this object will be returned.
+// It contains the information on where to query the explicit disclosure for the contract, as well as the party ID of the owner of the contract.
+type RegisteredContract struct {
+	// EdsURL The URL of the EDS that can be used to query an explicit disclosure for the contract.
+	EdsURL string `json:"edsURL"`
+
+	// Owner The party ID of the owner of the contract.
+	Owner string `json:"owner"`
 }
 
 // N400 defines model for 400.
@@ -176,6 +209,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetDisclosure request
+	GetDisclosure(ctx context.Context, instanceAddress string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CcipExecuteWithBody request with any body
 	CcipExecuteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -190,6 +226,18 @@ type ClientInterface interface {
 	PerPartyRouterFactoryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PerPartyRouterFactory(ctx context.Context, body PerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetDisclosure(ctx context.Context, instanceAddress string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDisclosureRequest(c.Server, instanceAddress)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) CcipExecuteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -262,6 +310,40 @@ func (c *Client) PerPartyRouterFactory(ctx context.Context, body PerPartyRouterF
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetDisclosureRequest generates requests for GetDisclosure
+func NewGetDisclosureRequest(server string, instanceAddress string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "instanceAddress", runtime.ParamLocationPath, instanceAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/ccip/v1/disclosure/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewCcipExecuteRequest calls the generic CcipExecute builder with application/json body
@@ -427,6 +509,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetDisclosureWithResponse request
+	GetDisclosureWithResponse(ctx context.Context, instanceAddress string, reqEditors ...RequestEditorFn) (*GetDisclosureResp, error)
+
 	// CcipExecuteWithBodyWithResponse request with any body
 	CcipExecuteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CcipExecuteResp, error)
 
@@ -441,6 +526,31 @@ type ClientWithResponsesInterface interface {
 	PerPartyRouterFactoryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PerPartyRouterFactoryResp, error)
 
 	PerPartyRouterFactoryWithResponse(ctx context.Context, body PerPartyRouterFactoryJSONRequestBody, reqEditors ...RequestEditorFn) (*PerPartyRouterFactoryResp, error)
+}
+
+type GetDisclosureResp struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *DisclosedContract
+	JSON400      *N400
+	JSON404      *N404
+	JSON500      *N500
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDisclosureResp) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDisclosureResp) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type CcipExecuteResp struct {
@@ -518,6 +628,15 @@ func (r PerPartyRouterFactoryResp) StatusCode() int {
 	return 0
 }
 
+// GetDisclosureWithResponse request returning *GetDisclosureResp
+func (c *ClientWithResponses) GetDisclosureWithResponse(ctx context.Context, instanceAddress string, reqEditors ...RequestEditorFn) (*GetDisclosureResp, error) {
+	rsp, err := c.GetDisclosure(ctx, instanceAddress, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDisclosureResp(rsp)
+}
+
 // CcipExecuteWithBodyWithResponse request with arbitrary body returning *CcipExecuteResp
 func (c *ClientWithResponses) CcipExecuteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CcipExecuteResp, error) {
 	rsp, err := c.CcipExecuteWithBody(ctx, contentType, body, reqEditors...)
@@ -567,6 +686,53 @@ func (c *ClientWithResponses) PerPartyRouterFactoryWithResponse(ctx context.Cont
 		return nil, err
 	}
 	return ParsePerPartyRouterFactoryResp(rsp)
+}
+
+// ParseGetDisclosureResp parses an HTTP response from a GetDisclosureWithResponse call
+func ParseGetDisclosureResp(rsp *http.Response) (*GetDisclosureResp, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDisclosureResp{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DisclosedContract
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest N400
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest N404
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest N500
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseCcipExecuteResp parses an HTTP response from a CcipExecuteWithResponse call
@@ -713,6 +879,9 @@ func ParsePerPartyRouterFactoryResp(rsp *http.Response) (*PerPartyRouterFactoryR
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (GET /ccip/v1/disclosure/{instanceAddress})
+	GetDisclosure(c *gin.Context, instanceAddress string)
+
 	// (POST /ccip/v1/message/execute)
 	CcipExecute(c *gin.Context)
 
@@ -731,6 +900,30 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(c *gin.Context)
+
+// GetDisclosure operation middleware
+func (siw *ServerInterfaceWrapper) GetDisclosure(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "instanceAddress" -------------
+	var instanceAddress string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "instanceAddress", c.Param("instanceAddress"), &instanceAddress, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter instanceAddress: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetDisclosure(c, instanceAddress)
+}
 
 // CcipExecute operation middleware
 func (siw *ServerInterfaceWrapper) CcipExecute(c *gin.Context) {
@@ -798,6 +991,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
+	router.GET(options.BaseURL+"/ccip/v1/disclosure/:instanceAddress", wrapper.GetDisclosure)
 	router.POST(options.BaseURL+"/ccip/v1/message/execute", wrapper.CcipExecute)
 	router.POST(options.BaseURL+"/ccip/v1/message/send", wrapper.CcipSend)
 	router.POST(options.BaseURL+"/ccip/v1/perPartyRouter/factory", wrapper.PerPartyRouterFactory)

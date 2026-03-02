@@ -390,9 +390,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
 				},
-				DefaultCCV: config.ContractIdentifier{
-					PartyID:         partyCCIP,
-					InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+				CCVs: []config.ContractIdentifier{
+					config.ContractIdentifier{
+						PartyID:         partyCCIP,
+						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+					},
 				},
 			},
 		})
@@ -544,15 +546,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
 	// Get disclosures for CCIPReceiver.Execute
-	// TODO - should be handles by EDS as well
-	require.NoError(t, err)
-	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
-	})
-	require.NoError(t, err)
-
-	// Create context
-	disclosedContracts, choiceContext, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), edsClient)
+	disclosedContracts, choiceContext, ccvContractIDs, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
 	require.NoError(t, err)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one transaction
@@ -571,7 +565,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}}},
+								{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvContractIDs[0]}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
 							}}}},
 						}}}}},

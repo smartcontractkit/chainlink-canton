@@ -38,13 +38,13 @@ type AuthConfig struct {
 }
 
 type Contracts struct {
-	PerPartyRouterFactory ContractIdentifier `toml:"per_party_router_factory" validate:"required"`
-	OnRamp                ContractIdentifier `toml:"on_ramp" validate:"required"`
-	OffRamp               ContractIdentifier `toml:"off_ramp" validate:"required"`
-	GlobalConfig          ContractIdentifier `toml:"global_config" validate:"required"`
-	TokenAdminRegistry    ContractIdentifier `toml:"token_admin_registry" validate:"required"`
-	RMNRemote             ContractIdentifier `toml:"rmn_remote" validate:"required"`
-	DefaultCCV            ContractIdentifier `toml:"default_ccv" validate:"required"`
+	PerPartyRouterFactory ContractIdentifier   `toml:"per_party_router_factory" validate:"required"`
+	OnRamp                ContractIdentifier   `toml:"on_ramp" validate:"required"`
+	OffRamp               ContractIdentifier   `toml:"off_ramp" validate:"required"`
+	GlobalConfig          ContractIdentifier   `toml:"global_config" validate:"required"`
+	TokenAdminRegistry    ContractIdentifier   `toml:"token_admin_registry" validate:"required"`
+	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
+	CCVs                  []ContractIdentifier `toml:"ccvs" validate:""`
 }
 
 type ContractIdentifier struct {

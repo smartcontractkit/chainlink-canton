@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
+// TemplateIDFromBinding is a convenience funtion to get a TemplateID from a generated binding.
 func TemplateIDFromBinding(template common.Template) TemplateID {
 	split := strings.Split(template.GetTemplateID(), ":")
 
@@ -30,21 +31,18 @@ func TemplateIDFromBinding(template common.Template) TemplateID {
 	}
 }
 
+// TemplateID uniquely identifies a template.
 type TemplateID struct {
+	// The PackageID follow the same syntax as the protos, it can contain either the package's ID or name in '#package-name' syntax.
 	PackageID  string `json:"packageId"`
 	ModuleName string `json:"moduleName"`
 	EntityName string `json:"entityName"`
 }
 
-type DisclosedContract struct {
-	ContractID       string     `json:"contractId"`
-	InstanceID       string     `json:"instanceId"`
-	TemplateID       TemplateID `json:"templateId"`
-	CreatedEventBlob string     `json:"createdEventBlob"` // base64-encoded
-	SynchronizerID   string     `json:"synchronizerId,omitempty"`
-}
-
+// ContractStore provides access to currently active contracts on the ledger, indexed by InstanceAddress.
 type ContractStore interface {
+	// GetContract returns the currently active contract for a given InstanceAddress.
+	// Returns nil if no active contract is found.
 	GetContract(ctx context.Context, instanceAddress contracts.InstanceAddress) *apiv2.ActiveContract
 }
 
@@ -65,6 +63,9 @@ type UpdateStore struct {
 	maxRetries int
 }
 
+// RegisteredTemplate defines a template that the UpdateStore will keep track of.
+// It defines a TemplateID, as well as a Party - the latter of which must be a stakeholder (signatory or observer)
+// on the contract in order for the UpdateStore to pick up the contract.
 type RegisteredTemplate struct {
 	TemplateID TemplateID
 	PartyID    string
@@ -77,6 +78,26 @@ type UpdateStoreConfig struct {
 	MaxRetries    int
 }
 
+// NewUpdateStore returns a ContractStore implementation that keeps track of active contracts by subscribing
+// to incremental ledger updates.
+// The UpdateStore is configured with a variable list of registeredTemplates which are the only templates is will
+// keep track of. All templates must contain an 'InstanceId' field in order to calculate their InstanceAddress.
+// For example, if configured with:
+//
+//	store.RegisteredTemplate{
+//	   TemplateID: store.TemplateID{
+//	       PackageID:  "#ccip-committeeverifier",
+//	       ModuleName: "CCIP.CommitteeVerifier",
+//	       EntityName: "CommitteeVerifier",
+//	   },
+//	   PartyID: "ccvOwerParty::0x123567890",
+//	}
+//
+// The UpdateStore will list and subscribe all CommitteeVerifier contracts that the 'ccvOwnerParty' can see.
+// It will then index them by their calculated InstanceAddress using the combination of signatory + instanceId field.
+//
+// NewUpdateStore itself will perform not RPC calls, it will immediately return.
+// In order for the UpdateStore to initialize and subscribe to updates, (s *UpdateStore)Run() needs to be run.
 func NewUpdateStore(
 	ctx context.Context,
 	config UpdateStoreConfig,
@@ -113,7 +134,11 @@ func NewUpdateStore(
 	}, nil
 }
 
-// Run runs the UpdateStore
+// Run runs the UpdateStore. It will start by initializing the UpdateStore with a backfill of all existing active contracts
+// and subscribe to incremental updates afterward.
+// Run is a long-running function that needs to keep running int the background in order for the UpdateStore to keep
+// up-tp-date.
+// To terminate Run, cancel the context.
 func (s *UpdateStore) Run(ctx context.Context) error {
 	s.logger.Debug().Msg("Starting UpdateStore")
 	ledgerEndResponse, err := s.stateService.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
@@ -193,6 +218,7 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 	}
 }
 
+// backfill returns all currently-active contracts for s.filtersByParty at a given offset, indexed by InstanceAddress.
 func (s *UpdateStore) backfill(ctx context.Context, offset int64) (map[contracts.InstanceAddress]*apiv2.ActiveContract, error) {
 	activeContracts := make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
 
@@ -316,6 +342,7 @@ func getInstanceAddresses(createdEvent *apiv2.CreatedEvent) ([]contracts.Instanc
 	return instanceAddresses, nil
 }
 
+// GetContract returns the active contract for the given InstanceAddress. If no active contract is found, it returns nil.
 func (s *UpdateStore) GetContract(ctx context.Context, instanceAddress contracts.InstanceAddress) *apiv2.ActiveContract {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
