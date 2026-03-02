@@ -41,7 +41,9 @@ func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any
 			continue
 		}
 
-		grpcURL := output.NetworkSpecificData.CantonEndpoints.Participants[0].GRPCLedgerAPIURL
+		// TODO: we should get the port number programmatically somehow.
+		// This is the default nginx port for the canton ledger API.
+		grpcURL := fmt.Sprintf("%s:8080", output.ContainerName)
 		jwt := output.NetworkSpecificData.CantonEndpoints.Participants[0].JWT
 		if grpcURL == "" || jwt == "" {
 			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
