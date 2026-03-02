@@ -10,9 +10,53 @@ concurrency:
 jobs:
   build:
     name: Build committee verifier image
+    permissions:
+      id-token: write
+      contents: read
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-west-2
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+      ECR_REPOSITORY: ${{ vars.COMMITTEE_VERIFIER_ECR_REPOSITORY }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-      - name: Build image
-        run: docker build -t committeeverifier-canton -f ccip/committee_verifier.Dockerfile .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: Build image (PR validation)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ccip/committee_verifier.Dockerfile
+          push: false
+          load: true
+          tags: committeeverifier-canton:pr
+      - name: Validate ECR configuration for push
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "$ECR_REGISTRY" ]; then
+            echo "ECR registry secret (ECR_REGISTRY) is not set"
+            exit 1
+          fi
+          if [ -z "$ECR_REPOSITORY" ]; then
+            echo "Repository var COMMITTEE_VERIFIER_ECR_REPOSITORY is not set"
+            exit 1
+          fi
+      - name: Authenticate to AWS ECR
+        if: github.event_name == 'push'
+        uses: ./.github/actions/aws-ecr-auth
+        with:
+          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          registry-type: private
+      - name: Build and push image to ECR
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ccip/committee_verifier.Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
