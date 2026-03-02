@@ -28,8 +28,12 @@ const (
 )
 
 func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any, error) {
-	infos := make(map[string]any)
+	ret := make(map[string]any)
 	for _, output := range outputs {
+		if output.Family != chainsel.FamilyCanton {
+			continue
+		}
+
 		chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(output.ChainID, output.Family)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get chain details for chain %s, family %s: %w", output.ChainID, output.Family, err)
@@ -37,25 +41,14 @@ func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any
 
 		strSelector := strconv.FormatUint(chainDetails.ChainSelector, 10)
 
-		if output.Family != chainsel.FamilyCanton {
-			continue
-		}
-
-		// TODO: we should get the port number programmatically somehow.
-		// This is the default nginx port for the canton ledger API.
-		grpcURL := fmt.Sprintf("%s:8080", output.ContainerName)
-		jwt := output.NetworkSpecificData.CantonEndpoints.Participants[0].JWT
-		if grpcURL == "" || jwt == "" {
-			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
-		}
-
-		infos[strSelector] = &ccip.BlockchainInfo{
-			GRPCLedgerAPIURL: grpcURL,
-			JWT:              jwt,
+		// Return placeholder values here, the real values will be pulled from the mounted config in the container.
+		ret[strSelector] = ccip.BlockchainInfo{
+			GRPCLedgerAPIURL: "dontuse",
+			JWT:              "dontuse",
 		}
 	}
 
-	return infos, nil
+	return ret, nil
 }
 
 // CommitteeVerifierModifier modifies a testcontainers.ContainerRequest for canton.
@@ -126,6 +119,13 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
 
+		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
+			// TODO: we should get the port number programmatically somehow.
+			// This is the default nginx port for the canton ledger API.
+			GRPCLedgerAPIURL: fmt.Sprintf("%s:8080", output.ContainerName),
+			JWT:              jwt,
+		}
+
 		// find the party that starts with the prefix that is listed in the canton config.
 		conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithPerRPCCredentials(auth.NewBearerToken(jwt)))
 		if err != nil {
@@ -164,6 +164,13 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal canton config: %w", err)
 	}
+
+	// to reduce confusion, re-set the config in the input to what we generated here
+	// so that env-out.toml has the real values, not the placeholder values.
+	newOpaque := make(util.OpaqueConfig)
+	newOpaque["reader_configs"] = cantonConfigs.ReaderConfigs
+	newOpaque["blockchain_infos"] = cantonConfigs.BlockchainInfos
+	in.CantonConfigs = newOpaque
 
 	return cantonConfigBytes, nil
 }

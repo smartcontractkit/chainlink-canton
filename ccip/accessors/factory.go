@@ -19,7 +19,7 @@ import (
 
 type factory struct {
 	lggr          logger.Logger
-	helper        map[string]*ccip.BlockchainInfo
+	helper        map[string]ccip.BlockchainInfo
 	readerConfigs map[string]sourcereader.ReaderConfig
 }
 
@@ -42,7 +42,7 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 	}
 
 	strSelector := strconv.FormatUint(uint64(chainSelector), 10)
-	cantonConfig, ok := f.helper[strSelector]
+	blockchainInfo, ok := f.helper[strSelector]
 	if !ok {
 		return nil, fmt.Errorf("canton config not found for chain %d", chainSelector)
 	}
@@ -54,8 +54,8 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 
 	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Named(f.lggr, fmt.Sprintf("CantonSourceReader.%d", chainSelector)),
-		cantonConfig.GRPCLedgerAPIURL,
-		cantonConfig.JWT,
+		blockchainInfo.GRPCLedgerAPIURL,
+		blockchainInfo.JWT,
 		sourcereader.ReaderConfig{
 			CCIPOwnerParty:            readerConfig.CCIPOwnerParty,
 			CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
@@ -70,7 +70,7 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 	return newAccessor(sourceReader), nil
 }
 
-func NewFactory(lggr logger.Logger, helper map[string]*ccip.BlockchainInfo, readerConfigs map[string]sourcereader.ReaderConfig) chainaccess.AccessorFactory {
+func NewFactory(lggr logger.Logger, helper map[string]ccip.BlockchainInfo, readerConfigs map[string]sourcereader.ReaderConfig) chainaccess.AccessorFactory {
 	return &factory{
 		lggr:          lggr,
 		helper:        helper,

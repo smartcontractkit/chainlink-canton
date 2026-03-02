@@ -54,7 +54,9 @@ func main() {
 					return nil, fmt.Errorf("failed to load config: %w", err)
 				}
 
-				return accessors.NewFactory(lggr, infos, cantonConfig.ReaderConfigs), nil
+				lggr.Infow("loaded canton config", "config", cantonConfig)
+
+				return accessors.NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs), nil
 			}),
 		bootstrap.WithLogLevel[commit.JobSpec](zapcore.InfoLevel),
 	); err != nil {
