@@ -40,7 +40,6 @@ jobs:
       matrix:
         dir:
           - .
-          - eds
           - integration-tests
     runs-on: ubuntu-latest-8cores-32GB
     steps:
@@ -56,3 +55,26 @@ jobs:
           only-new-issues: "false"
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           working-directory: ${{ matrix.dir }}
+
+  go-generate:
+    name: Go generate all
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Run go generate ./...
+        run: make go-generate
+      - name: Check if any files have been changed
+        run: |
+          if ! git diff --quiet HEAD; then
+            echo "❌ Some generated files are out-of-date, run \`make go-generate\` and commit your changes."
+            echo "❌ Some generated files are out-of-date, run \`make go-generate\` and commit your changes:" >> $GITHUB_STEP_SUMMARY
+            git diff --name-only | while read -r n ; do
+                echo "- $n" >> $GITHUB_STEP_SUMMARY
+            done
+            exit 1
+          fi

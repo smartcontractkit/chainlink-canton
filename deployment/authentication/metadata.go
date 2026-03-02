@@ -1,0 +1,62 @@
+package authentication
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+// AuthorizationServerMetadata represents a subset of the metadata provided by an OAuth 2.0 Authorization Server.
+// See RFC 8414, Section 2 for the full specification:
+// https://datatracker.ietf.org/doc/html/rfc8414#section-2
+type AuthorizationServerMetadata struct {
+	// The authorization server's issuer identifier, which is a URL.
+	// Contrary to RFC 8414, this is not checked to be using the "https" scheme.
+	Issuer string `json:"issuer"`
+	// URL of the authorization server's authorization endpoint.
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	// URL of the authorization server's token endpoint.
+	TokenEndpoint string `json:"token_endpoint"`
+	// JSON array containing a list of Proof Key for Code Exchange (PKCE) code challenge methods supported by this
+	// authorization server. If omitted, the authorization server does not support PKCE.
+	// See RFC 7636, Section 4.3 for valid values:
+	// https://datatracker.ietf.org/doc/html/rfc7636#section-4.2
+	CodeChallengeMethodsSupported []string `json:"code_challenge_methods_supported"`
+}
+
+// GetAuthorizationServerMetadata retrieves the OAuth 2.0 authorization server's metadata from the well-known endpoint.
+func GetAuthorizationServerMetadata(ctx context.Context, authorizationServerURL string) (*AuthorizationServerMetadata, error) {
+	authorizationServerURL = strings.TrimSuffix(authorizationServerURL, "/")
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/.well-known/oauth-authorization-server", authorizationServerURL), nil)
+	if err != nil {
+		return nil, err
+	}
+	client := http.DefaultClient
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+
+	metadata := &AuthorizationServerMetadata{}
+	if err := json.Unmarshal(body, metadata); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body: %w", err)
+	}
+
+	// Validate that the response contains the authorization server URL as an Issuer
+	if metadata.Issuer != authorizationServerURL {
+		return nil, fmt.Errorf("metadata: unexpected issuer: %s", metadata.Issuer)
+	}
+
+	return metadata, nil
+}

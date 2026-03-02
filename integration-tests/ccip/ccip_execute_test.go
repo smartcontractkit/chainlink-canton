@@ -17,12 +17,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"strconv"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -30,9 +33,17 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/service"
+	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -326,6 +337,75 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err, "failed to get OffRamp address")
 	committeeVerifier, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(committee_verifier.ContractType), committee_verifier.Version, ccvQualifier))
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
+	tokenAdminRegistry, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(token_admin_registry.ContractType), token_admin_registry.Version, ""))
+	require.NoError(t, err, "failed to get TokenAdminRegistry address")
+	rmnRemote, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	require.NoError(t, err, "failed to get RMNRemote address")
+	perPartyRouterFactory, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
+	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+
+	// Run EDS
+	edsParticipant := env.Chain.Participants[0]
+	edsToken, _ := edsParticipant.TokenSource.Token()
+	edsPort := freeport.GetOne(t)
+	go func() {
+		log.Info().Msg("Running EDS...")
+		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
+			ChainSelector: env.Chain.ChainSelector(),
+			Server: config.ServerConfig{
+				Host: "0.0.0.0",
+				Port: uint16(edsPort), //nolint:gosec // this is a port number
+			},
+			Node: config.NodeConfig{
+				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
+				AuthConfig: config.AuthConfig{
+					Type:   "static",
+					UserID: edsParticipant.UserID,
+					JWT:    edsToken.AccessToken,
+				},
+				MaxRetries: 0,
+			},
+			Contracts: config.Contracts{
+				PerPartyRouterFactory: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
+				},
+				OnRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
+				},
+				OffRamp: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
+				},
+				GlobalConfig: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
+				},
+				TokenAdminRegistry: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
+				},
+				RMNRemote: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+				},
+				CCVs: []config.ContractIdentifier{
+					config.ContractIdentifier{
+						PartyID:         partyCCIP,
+						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
+					},
+				},
+			},
+		})
+		log.Info().Msg("EDS terminated")
+		if err != nil {
+			log.Error().Err(err).Msg("EDS server exited with error")
+		}
+	}()
+	// Create EDS client
+	edsClient, err := edsv1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPort))
+	require.NoError(t, err, "Failed to create EDS client")
 
 	// Deploy and configure lane
 	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
@@ -380,9 +460,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Log("Configured chain for lanes")
 
 	// Create PerPartyRouter for receiver
-	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
-	})
+	perPartyRouterFactoryCid, disclosedContracts, err := testhelpers.GetPerPartyRouterFactoryDisclosures(t.Context(), edsClient)
 	require.NoError(t, err)
 
 	res, err := receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -391,7 +469,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
-					ContractId: disclosedFactory.ContractId,
+					ContractId: perPartyRouterFactoryCid,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),
@@ -399,7 +477,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFactory},
+			DisclosedContracts: disclosedContracts,
 		},
 	})
 	require.NoError(t, err)
@@ -468,57 +546,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
 	// Get disclosures for CCIPReceiver.Execute
-	disclosedCCIPReceiver, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
-	})
-	require.NoError(t, err)
-	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	})
-	require.NoError(t, err)
-	disclosedOffRamp, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-offramp", ModuleName: "CCIP.OffRamp", EntityName: "OffRamp",
-	})
-	require.NoError(t, err)
-	disclosedGlobalConfig, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.GlobalConfig", EntityName: "GlobalConfig",
-	})
-	require.NoError(t, err)
-	disclosedTar, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
-	})
-	require.NoError(t, err)
-	disclosedRmnRemote, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-rmn", ModuleName: "CCIP.RMNRemote", EntityName: "RMNRemote",
-	})
-	require.NoError(t, err)
-	disclosedCCV, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-committeeverifier", ModuleName: "CCIP.CommitteeVerifier", EntityName: "CommitteeVerifier",
-	})
-	require.NoError(t, err)
-
-	// Create context - replace with EDS
-	choiceContext := map[string]any{
-		"values": map[string]any{
-			"off-ramp": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedOffRamp.ContractId,
-			},
-			"global-config": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedGlobalConfig.ContractId,
-			},
-			"token-admin-registry": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedTar.ContractId,
-			},
-			"rmn-remote": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosedRmnRemote.ContractId,
-			},
-		},
-	}
-	choiceContextValue, err := testhelpers.ChoiceContextFromData(choiceContext)
+	disclosedContracts, choiceContext, ccvContractIDs, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
 	require.NoError(t, err)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one transaction
@@ -531,13 +559,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					ContractId: ccipReceiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContextValue},
+						{Label: "context", Value: choiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: encodedMessageHex}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}}},
+								{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvContractIDs[0]}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
 							}}}},
 						}}}}},
@@ -546,7 +574,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV},
+			DisclosedContracts: disclosedContracts,
 		},
 	})
 	require.NoError(t, err)
