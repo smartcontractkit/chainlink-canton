@@ -39,7 +39,7 @@ jobs:
           go test -v -count 1 -timeout 20m -run TestLnRTokenPool_FullReceiveFlow ./...
 
   test-ccip-send:
-    name: TestCCIPSendE2E
+    name: TestCCIPSend
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -51,4 +51,4 @@ jobs:
       - name: Run Go tests
         run: | 
           cd integration-tests/ccip
-          go test -v -count 1 -timeout 20m -run TestCCIPSendE2E ./...
+          go test -v -count 1 -timeout 20m -run TestCCIPSend ./...

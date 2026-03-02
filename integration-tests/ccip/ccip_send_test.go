@@ -50,7 +50,7 @@ import (
 
 // TestCCIPSendE2E tests the full send flow without token transfers.
 // Validates that CCIPMessageSent is created with the correct message.
-func TestCCIPSendE2E(t *testing.T) {
+func TestCCIPSend(t *testing.T) {
 	t.Parallel()
 
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
