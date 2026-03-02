@@ -1,5 +1,5 @@
 # build stage
-FROM golang:1.23-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /build
 COPY . .
@@ -15,12 +15,7 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 COPY --from=builder /disclosure-server .
-COPY eds/environments.yaml .
 
-EXPOSE 8090
+ENV CONFIG_FILE=/app/config.toml
 
-ENV PORT=8090
-ENV HOST=0.0.0.0
-ENV ENVIRONMENTS_CONFIG=/app/environments.yaml
-
-CMD ["./disclosure-server"]
+CMD ["sh", "-c", "./disclosure-server", "-config", "$CONFIG_FILE"]
