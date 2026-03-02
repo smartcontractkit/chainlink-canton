@@ -45,7 +45,10 @@ instance_address = "0x7d27bb6077ef84ed2c4fce13a1a7bb1f7cf48c2b76a3e6773eb6240382
 [contracts.rmn_remote]
 party_id = "ccipOwner"
 instance_address = "0x7f2ebf216e26051335a9e132d6c013a771d8406378011ca057a6222d3fea1ee5"
-[contracts.default_ccv]
+[[contracts.ccvs]]
+party_id = "ccvOwner"
+instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
+[[contracts.ccvs]]
 party_id = "ccvOwner"
 instance_address = "0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"
 
@@ -89,9 +92,14 @@ jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6
 						PartyID:         "ccipOwner",
 						InstanceAddress: contracts.HexToInstanceAddress("0x7f2ebf216e26051335a9e132d6c013a771d8406378011ca057a6222d3fea1ee5"),
 					},
-					DefaultCCV: ContractIdentifier{
-						PartyID:         "ccvOwner",
-						InstanceAddress: contracts.HexToInstanceAddress("0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"),
+					CCVs: []ContractIdentifier{
+						{
+							PartyID:         "ccvOwner",
+							InstanceAddress: contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"),
+						}, {
+							PartyID:         "ccvOwner",
+							InstanceAddress: contracts.HexToInstanceAddress("0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"),
+						},
 					},
 				},
 				Node: NodeConfig{
