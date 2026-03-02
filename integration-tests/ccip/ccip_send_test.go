@@ -90,13 +90,11 @@ func TestCCIPSendE2E(t *testing.T) {
 
 	// CCV Setup
 	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
-	ccvSignerPubKeys := make([]types.TEXT, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
-		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
-		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
+		_ = hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
@@ -491,16 +489,19 @@ func TestCCIPSendE2E(t *testing.T) {
 		if entry.GetKey() == "amulet-rules" {
 			hasAmuletRules = true
 			t.Logf("Found 'amulet-rules' entry in choiceContext")
+
 			break
 		}
 	}
 	if !hasAmuletRules {
 		t.Logf("WARNING: 'amulet-rules' entry not found in choiceContext")
 		t.Logf("choiceContext entries: %v", func() []string {
-			var keys []string
-			for _, entry := range textMap.GetEntries() {
+			entries := textMap.GetEntries()
+			keys := make([]string, 0, len(entries))
+			for _, entry := range entries {
 				keys = append(keys, entry.GetKey())
 			}
+
 			return keys
 		}())
 	}
@@ -625,6 +626,7 @@ func TestCCIPSendE2E(t *testing.T) {
 						}
 					}
 				}
+
 				break
 			}
 		}
