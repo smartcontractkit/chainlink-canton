@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "b4fb1a2600603faba99bdca6afddd0a6656ba8cedc0a065ebb1cbec072617f4e"
+	PackageID   = "5053ce59e346a6f67e6dc167ad747cafd3230f33805df81d968af508e769c90c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -191,38 +191,6 @@ func (v AdminParams) GetVariantValue() any {
 }
 
 var _ types.VARIANT = (*AdminParams)(nil)
-
-// ArchiveMCMSEntrypointEvent is a Record type
-type ArchiveMCMSEntrypointEvent struct {
-}
-
-// ToMap converts ArchiveMCMSEntrypointEvent to a map for DAML arguments
-func (t ArchiveMCMSEntrypointEvent) ToMap() map[string]any {
-	m := make(map[string]any)
-	return m
-}
-
-func (t ArchiveMCMSEntrypointEvent) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ArchiveMCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ArchiveMCMSEntrypointEvent to hex string (Canton MCMS format)
-func (t ArchiveMCMSEntrypointEvent) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ArchiveMCMSEntrypointEvent from hex string (Canton MCMS format)
-func (t *ArchiveMCMSEntrypointEvent) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
 
 // ArgValue is a variant/union type
 type ArgValue struct {
@@ -629,6 +597,69 @@ func (t Counter) GetInstanceIdChoiceWithPackageID(contractID string, packageID s
 	}
 }
 
+// Increment exercises the Increment choice on this Counter contract
+// This method uses the package name in the template ID
+func (t Counter) Increment(contractID string, args Increment) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "Increment",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// IncrementWithPackageID exercises the Increment choice using the provided package ID instead of package name
+func (t Counter) IncrementWithPackageID(contractID string, packageID string, args Increment) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "Increment",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetValue exercises the SetValue choice on this Counter contract
+// This method uses the package name in the template ID
+func (t Counter) SetValue(contractID string, args SetValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "SetValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetValueWithPackageID exercises the SetValue choice using the provided package ID instead of package name
+func (t Counter) SetValueWithPackageID(contractID string, packageID string, args SetValue) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "SetValue",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Reset exercises the Reset choice on this Counter contract
+// This method uses the package name in the template ID
+func (t Counter) Reset(contractID string, args Reset) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "Reset",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ResetWithPackageID exercises the Reset choice using the provided package ID instead of package name
+func (t Counter) ResetWithPackageID(contractID string, packageID string, args Reset) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "Reset",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this Counter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t Counter) MCMSReceiverGetInstanceId(contractID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
@@ -677,11 +708,11 @@ var _ IMCMSReceiver = (*Counter)(nil)
 
 // ExecuteOp is a Record type
 type ExecuteOp struct {
-	TargetRole Role                `json:"targetRole"`
-	Submitter  types.PARTY         `json:"submitter"`
-	Op         Op                  `json:"op"`
-	OpProof    []types.TEXT        `json:"opProof"`
-	TargetCids []types.CONTRACT_ID `json:"targetCids"`
+	TargetRole Role         `json:"targetRole"`
+	Submitter  types.PARTY  `json:"submitter"`
+	Op         Op           `json:"op"`
+	OpProof    []types.TEXT `json:"opProof"`
+	TargetCids types.GENMAP `json:"targetCids"`
 }
 
 // ToMap converts ExecuteOp to a map for DAML arguments
@@ -714,12 +745,11 @@ func (t ExecuteOp) ToMap() map[string]any {
 		return res
 	}()
 
-	m["targetCids"] = func() []any {
-		res := make([]any, 0, len(t.TargetCids))
-		for _, e := range t.TargetCids {
-			res = append(res, e)
+	m["targetCids"] = func() any {
+		if t.TargetCids == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.TargetCids}
 	}()
 
 	return m
@@ -749,12 +779,12 @@ func (t *ExecuteOp) UnmarshalHex(data string) error {
 
 // ExecuteScheduledBatch is a Record type
 type ExecuteScheduledBatch struct {
-	Submitter   types.PARTY         `json:"submitter"`
-	OpId        types.TEXT          `json:"opId"`
-	Calls       []TimelockCall      `json:"calls"`
-	Predecessor types.TEXT          `json:"predecessor"`
-	Salt        types.TEXT          `json:"salt"`
-	TargetCids  []types.CONTRACT_ID `json:"targetCids"`
+	Submitter   types.PARTY    `json:"submitter"`
+	OpId        types.TEXT     `json:"opId"`
+	Calls       []TimelockCall `json:"calls"`
+	Predecessor types.TEXT     `json:"predecessor"`
+	Salt        types.TEXT     `json:"salt"`
+	TargetCids  types.GENMAP   `json:"targetCids"`
 }
 
 // ToMap converts ExecuteScheduledBatch to a map for DAML arguments
@@ -782,12 +812,11 @@ func (t ExecuteScheduledBatch) ToMap() map[string]any {
 
 	m["salt"] = string(t.Salt)
 
-	m["targetCids"] = func() []any {
-		res := make([]any, 0, len(t.TargetCids))
-		for _, e := range t.TargetCids {
-			res = append(res, e)
+	m["targetCids"] = func() any {
+		if t.TargetCids == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.TargetCids}
 	}()
 
 	return m
@@ -1117,6 +1146,38 @@ func (t GetValue) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetValue from hex string (Canton MCMS format)
 func (t *GetValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Increment is a Record type
+type Increment struct {
+}
+
+// ToMap converts Increment to a map for DAML arguments
+func (t Increment) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t Increment) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Increment) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Increment to hex string (Canton MCMS format)
+func (t Increment) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Increment from hex string (Canton MCMS format)
+func (t *Increment) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1793,153 +1854,6 @@ func (t MCMS) GetBlockedFunctionsCountWithPackageID(contractID string, packageID
 	}
 }
 
-// MCMSEntrypointEvent is a Template type
-type MCMSEntrypointEvent struct {
-	Owner             types.PARTY  `json:"owner"`
-	InstanceId        types.TEXT   `json:"instanceId"`
-	FunctionName      types.TEXT   `json:"functionName"`
-	OperationData     types.TEXT   `json:"operationData"`
-	ContractIdsAsText []types.TEXT `json:"contractIdsAsText"`
-}
-
-// GetTemplateID returns the template ID for this template using the package name
-func (t MCMSEntrypointEvent) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent")
-}
-
-// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
-func (t MCMSEntrypointEvent) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent")
-}
-
-// CreateCommand returns a CreateCommand for this template using the package name
-func (t MCMSEntrypointEvent) CreateCommand() *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["functionName"] = string(t.FunctionName)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["operationData"] = string(t.OperationData)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["contractIdsAsText"] = func() []any {
-		res := make([]any, 0, len(t.ContractIdsAsText))
-		for _, e := range t.ContractIdsAsText {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateID(),
-		Arguments:  args,
-	}
-}
-
-// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
-func (t MCMSEntrypointEvent) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["functionName"] = string(t.FunctionName)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["operationData"] = string(t.OperationData)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["contractIdsAsText"] = func() []any {
-		res := make([]any, 0, len(t.ContractIdsAsText))
-		for _, e := range t.ContractIdsAsText {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateIDWithPackageID(packageID),
-		Arguments:  args,
-	}
-}
-
-func (t MCMSEntrypointEvent) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *MCMSEntrypointEvent) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes MCMSEntrypointEvent to hex string (Canton MCMS format)
-func (t MCMSEntrypointEvent) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes MCMSEntrypointEvent from hex string (Canton MCMS format)
-func (t *MCMSEntrypointEvent) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Choice methods for MCMSEntrypointEvent
-
-// Archive exercises the Archive choice on this MCMSEntrypointEvent contract
-// This method uses the package name in the template ID
-func (t MCMSEntrypointEvent) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t MCMSEntrypointEvent) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveMCMSEntrypointEvent exercises the Archive_MCMSEntrypointEvent choice on this MCMSEntrypointEvent contract
-// This method uses the package name in the template ID
-func (t MCMSEntrypointEvent) ArchiveMCMSEntrypointEvent(contractID string, args ArchiveMCMSEntrypointEvent) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSEntrypointEvent"),
-		ContractID: contractID,
-		Choice:     "Archive_MCMSEntrypointEvent",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ArchiveMCMSEntrypointEventWithPackageID exercises the Archive_MCMSEntrypointEvent choice using the provided package ID instead of package name
-func (t MCMSEntrypointEvent) ArchiveMCMSEntrypointEventWithPackageID(contractID string, packageID string, args ArchiveMCMSEntrypointEvent) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSEntrypointEvent"),
-		ContractID: contractID,
-		Choice:     "Archive_MCMSEntrypointEvent",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // MCMSReceiverView is a Record type
 type MCMSReceiverView struct {
 	Owner      types.PARTY `json:"owner"`
@@ -1981,28 +1895,24 @@ func (t *MCMSReceiverView) UnmarshalHex(data string) error {
 
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
-	Caller        types.PARTY         `json:"caller"`
-	FunctionName  types.TEXT          `json:"functionName"`
-	OperationData types.TEXT          `json:"operationData"`
-	ContractIds   []types.CONTRACT_ID `json:"contractIds"`
+	FunctionName  types.TEXT   `json:"functionName"`
+	OperationData types.TEXT   `json:"operationData"`
+	ContractIds   types.GENMAP `json:"contractIds"`
 }
 
 // ToMap converts MCMSReceiverEntrypoint to a map for DAML arguments
 func (t MCMSReceiverEntrypoint) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["caller"] = t.Caller.ToMap()
-
 	m["functionName"] = string(t.FunctionName)
 
 	m["operationData"] = string(t.OperationData)
 
-	m["contractIds"] = func() []any {
-		res := make([]any, 0, len(t.ContractIds))
-		for _, e := range t.ContractIds {
-			res = append(res, e)
+	m["contractIds"] = func() any {
+		if t.ContractIds == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.ContractIds}
 	}()
 
 	return m
@@ -2277,6 +2187,38 @@ func (t RawSignature) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes RawSignature from hex string (Canton MCMS format)
 func (t *RawSignature) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Reset is a Record type
+type Reset struct {
+}
+
+// ToMap converts Reset to a map for DAML arguments
+func (t Reset) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t Reset) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Reset) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Reset to hex string (Canton MCMS format)
+func (t Reset) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Reset from hex string (Canton MCMS format)
+func (t *Reset) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2727,6 +2669,42 @@ func (t *SetRoot) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetValue is a Record type
+type SetValue struct {
+	NewValue types.INT64 `json:"newValue"`
+}
+
+// ToMap converts SetValue to a map for DAML arguments
+func (t SetValue) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newValue"] = int64(t.NewValue)
+
+	return m
+}
+
+func (t SetValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetValue to hex string (Canton MCMS format)
+func (t SetValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetValue from hex string (Canton MCMS format)
+func (t *SetValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SignerInfo is a Record type
 type SignerInfo struct {
 	SignerAddress types.TEXT  `json:"signerAddress"`
@@ -2824,7 +2802,6 @@ func IMCMSReceiverInterfaceIDWithPackageID(packageID string) string {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	ArchiveMCMSEntrypointEvent(args ArchiveMCMSEntrypointEvent) (*bind.EncodedChoice, error)
 	BypasserExecuteBatch(args BypasserExecuteBatchParams) (*bind.EncodedChoice, error)
 	CanExecuteOp(args CanExecuteOp) (*bind.EncodedChoice, error)
 	CancelBatch(args CancelBatchParams) (*bind.EncodedChoice, error)
@@ -2837,15 +2814,18 @@ type MCMSEncoder interface {
 	GetState(args GetState) (*bind.EncodedChoice, error)
 	GetTimestamp(args GetTimestamp) (*bind.EncodedChoice, error)
 	GetValue(args GetValue) (*bind.EncodedChoice, error)
+	Increment(args Increment) (*bind.EncodedChoice, error)
 	IsOperation(args IsOperation) (*bind.EncodedChoice, error)
 	IsOperationDone(args IsOperationDone) (*bind.EncodedChoice, error)
 	IsOperationPending(args IsOperationPending) (*bind.EncodedChoice, error)
 	IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, error)
 	MCMSReceiverEntrypoint(args MCMSReceiverEntrypoint) (*bind.EncodedChoice, error)
 	MCMSReceiverGetInstanceId(args MCMSReceiverGetInstanceId) (*bind.EncodedChoice, error)
+	Reset(args Reset) (*bind.EncodedChoice, error)
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
 	SetRoot(args SetRoot) (*bind.EncodedChoice, error)
+	SetValue(args SetValue) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -2873,11 +2853,6 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
-}
-
-// ArchiveMCMSEntrypointEvent encodes parameters for the ArchiveMCMSEntrypointEvent choice.
-func (e *encoder) ArchiveMCMSEntrypointEvent(args ArchiveMCMSEntrypointEvent) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ArchiveMCMSEntrypointEvent", args)
 }
 
 // BypasserExecuteBatch encodes parameters for the BypasserExecuteBatch choice.
@@ -2940,6 +2915,11 @@ func (e *encoder) GetValue(args GetValue) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetValue", args)
 }
 
+// Increment encodes parameters for the Increment choice.
+func (e *encoder) Increment(args Increment) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Increment", args)
+}
+
 // IsOperation encodes parameters for the IsOperation choice.
 func (e *encoder) IsOperation(args IsOperation) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("IsOperation", args)
@@ -2970,6 +2950,11 @@ func (e *encoder) MCMSReceiverGetInstanceId(args MCMSReceiverGetInstanceId) (*bi
 	return e.EncodeChoiceArgs("MCMSReceiverGetInstanceId", args)
 }
 
+// Reset encodes parameters for the Reset choice.
+func (e *encoder) Reset(args Reset) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Reset", args)
+}
+
 // ScheduleBatch encodes parameters for the ScheduleBatch choice.
 func (e *encoder) ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ScheduleBatch", args)
@@ -2983,6 +2968,11 @@ func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
 // SetRoot encodes parameters for the SetRoot choice.
 func (e *encoder) SetRoot(args SetRoot) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetRoot", args)
+}
+
+// SetValue encodes parameters for the SetValue choice.
+func (e *encoder) SetValue(args SetValue) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetValue", args)
 }
 
 // Verify MCMSEncoder interface implementation
