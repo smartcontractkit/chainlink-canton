@@ -52,6 +52,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 
 		// Create inputs for each operation
 		globalConfigSourceChainConfigArgs := make([]common.UpdateSourceChainConfig, 0, len(input.RemoteChains))
+		globalConfigDestChainConfigArgs := make([]common.UpdateDestChainConfig, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
@@ -79,8 +80,28 @@ var ConfigureChainForLanes = operations.NewSequence(
 				},
 			})
 
-			// Outbound / OnRamp
+			defaultOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
+			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
+				defaultOutboundCCVs = append(defaultOutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+			}
+			laneMandatedOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
+			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
+				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+			}
 
+			// Outbound / OnRamp
+			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.UpdateDestChainConfig{
+				DestChainSelector: types.NUMERIC(remoteSelectorStr),
+				Config: common.DestChainConfig{
+					IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
+					OffRampAddress:            types.TEXT(hex.EncodeToString(input.OffRamp.Bytes())), // Use hex.EncodeToString to avoid "0x" prefix
+					DefaultExecutor:           common.RawInstanceAddress{Unpack: types.TEXT(remoteConfig.DefaultExecutor)},
+					LaneMandatedCCVs:          laneMandatedOutboundCCVs,
+					DefaultCCVs:               defaultOutboundCCVs,
+					MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
+					TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
+				},
+			})
 			// TODO: Other configs once the contracts are ready
 		}
 
@@ -130,6 +151,19 @@ var ConfigureChainForLanes = operations.NewSequence(
 				if err != nil {
 					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply signature configs to CommitteeVerifier at address %s: %w", address.Hex(), err)
 				}
+			}
+		}
+
+		// Apply DestChainConfigs to GlobalConfig
+		for i, arg := range globalConfigDestChainConfigArgs {
+			_, err := operations.ExecuteOperation(b, global_config.UpdateDestChainConfig, deps, contract.ChoiceInput[common.UpdateDestChainConfig]{
+				ChainSelector:   deps.Chain.Selector,
+				InstanceAddress: input.GlobalConfig,
+				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+				Args:            arg,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.DestChainSelector), err)
 			}
 		}
 

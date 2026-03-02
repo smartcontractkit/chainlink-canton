@@ -37,3 +37,18 @@ jobs:
         run: |
           cd integration-tests/ccip
           go test -v -count 1 -timeout 20m -run TestLnRTokenPool_FullReceiveFlow ./...
+
+  test-ccip-send:
+    name: TestCCIPSend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: integration-tests/go.mod
+      - name: Run Go tests
+        run: | 
+          cd integration-tests/ccip
+          go test -v -count 1 -timeout 20m -run TestCCIPSend ./...
