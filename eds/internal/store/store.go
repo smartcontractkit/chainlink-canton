@@ -12,15 +12,15 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/jpillora/backoff"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
-// TemplateIDFromBinding is a convenience funtion to get a TemplateID from a generated binding.
+// TemplateIDFromBinding is a convenience function to get a TemplateID from a generated binding.
 func TemplateIDFromBinding(template common.Template) TemplateID {
 	split := strings.Split(template.GetTemplateID(), ":")
 

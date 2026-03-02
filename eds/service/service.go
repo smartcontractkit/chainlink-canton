@@ -8,10 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
@@ -21,8 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"

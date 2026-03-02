@@ -43,7 +43,7 @@ type DisclosureService struct {
 
 func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *DisclosureService {
 	// Create a map of all instance addresses
-	allContracts := make(map[contracts.InstanceAddress]struct{}, 6)
+	allContracts := make(map[contracts.InstanceAddress]struct{}, 6+len(config.CCVs))
 	allContracts[config.PerPartyRouterFactory] = struct{}{}
 	allContracts[config.OnRamp] = struct{}{}
 	allContracts[config.OffRamp] = struct{}{}

@@ -8,8 +8,8 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 )
@@ -53,6 +53,7 @@ func (s Server) CcipExecute(c *gin.Context) {
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for CCIP execute")
 		c.JSON(500, edsv1.ErrorResponse{Error: "failed to get disclosures"})
+
 		return
 	}
 
@@ -135,6 +136,7 @@ func (s Server) CcipSend(c *gin.Context) {
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for CCIP send")
 		c.JSON(500, edsv1.ErrorResponse{Error: "failed to get disclosures"})
+
 		return
 	}
 
@@ -219,6 +221,7 @@ func (s Server) PerPartyRouterFactory(c *gin.Context) {
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for per party router factory")
 		c.JSON(500, edsv1.ErrorResponse{Error: "failed to get disclosures"})
+
 		return
 	}
 

@@ -7,8 +7,8 @@ import (
 	"net/http"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 )
 
