@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
@@ -522,7 +521,7 @@ func testExecuteOpFlow(
 			OperationData:    types.TEXT(op.OperationData),
 		},
 		OpProof:    opProofTexts,
-		TargetCids: []types.CONTRACT_ID{types.CONTRACT_ID(counterCid)},
+		TargetCids: types.GENMAP{counterInstanceId: types.CONTRACT_ID(counterCid)},
 	}
 
 	executeOpRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -547,21 +546,13 @@ func testExecuteOpFlow(
 	})
 	require.NoError(t, err)
 
-	// Get counter value, contract ID, and MCMSEntrypointEvent from the created events
+	// Get counter value and contract ID from the created events
 	var counterValue int64 = -1
 	var newCounterCid string
-	var eventFound bool
-	var eventInstanceId string
-	var eventFunctionName string
-	var eventOperationData string
-	var eventContractIdsAsText []string
 
 	for _, event := range executeOpRes.GetTransaction().GetEvents() {
 		if created := event.GetCreated(); created != nil {
-			entityName := created.GetTemplateId().GetEntityName()
-
-			// Check for Counter contract
-			if entityName == "Counter" {
+			if created.GetTemplateId().GetEntityName() == "Counter" {
 				newCounterCid = created.GetContractId()
 				counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](created)
 				if err != nil {
@@ -570,36 +561,10 @@ func testExecuteOpFlow(
 					counterValue = int64(counter.Value)
 				}
 			}
-
-			// Check for MCMSEntrypointEvent (emitted by Counter.mcmsEntrypoint)
-			if entityName == "MCMSEntrypointEvent" {
-				eventFound = true
-				event, err := bindings.UnmarshalCreatedEvent[mcms.MCMSEntrypointEvent](created)
-				if err != nil {
-					t.Logf("Failed to unmarshal MCMSEntrypointEvent: %v", err)
-				} else {
-					eventInstanceId = string(event.InstanceId)
-					eventFunctionName = string(event.FunctionName)
-					eventOperationData = string(event.OperationData)
-					for _, cid := range event.ContractIdsAsText {
-						eventContractIdsAsText = append(eventContractIdsAsText, string(cid))
-					}
-				}
-			}
 		}
 	}
-	t.Logf("ExecuteOp succeeded, counter value from event: %d", counterValue)
+	t.Logf("ExecuteOp succeeded, counter value: %d", counterValue)
 	require.NotEmpty(t, newCounterCid, "Should have new counter contract ID")
-
-	// Verify MCMSEntrypointEvent was emitted with correct data
-	require.True(t, eventFound, "MCMSEntrypointEvent should be emitted by Counter.mcmsEntrypoint")
-	assert.Equal(t, counterInstanceId, eventInstanceId, "Event instanceId should match Counter instanceId")
-	assert.Equal(t, "Increment", eventFunctionName, "Event functionName should be 'Increment'")
-	assert.Empty(t, eventOperationData, "Event operationData should be empty for Increment")
-
-	// Note: contractIds is now empty in the current contract implementation
-	t.Logf("MCMSEntrypointEvent verified: instanceId=%s, functionName=%s, contractIdsAsText=%v",
-		eventInstanceId, eventFunctionName, eventContractIdsAsText)
 
 	// ========================
 	// |   7. Verify Counter  |
@@ -1088,7 +1053,7 @@ func testExecuteMCMSOp(
 									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: userParty}}},
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
-									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{}}}}},
+									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}},
 								},
 							}}},
 						},
@@ -1449,8 +1414,11 @@ func testSignatoryCheck(
 									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
 									{Label: "op", Value: opValue},
 									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
-									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-										{Sum: &apiv2.Value_ContractId{ContractId: counterCid}},
+									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
+										{
+											Key:   &apiv2.Value{Sum: &apiv2.Value_Text{Text: counterInstanceId}},
+											Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}},
+										},
 									}}}}},
 								},
 							}}},

@@ -405,7 +405,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
       submitter = ccipOwner  -- The submitter in the choice is still ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = [counterAsMcmsReceiver]
+      targetCids = Map.fromList [(counterInstanceId, counterAsMcmsReceiver)]
 
   -- Verify counter was incremented
   counterContracts <- query @Counter ccipOwner
