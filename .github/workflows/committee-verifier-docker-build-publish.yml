@@ -1,15 +1,14 @@
-name: Committee Verifier Docker Build
+name: Committee Verifier Docker Build and Publish
 on:
   push:
     branches: [develop, main]
-  pull_request:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    name: Build committee verifier image
+    name: Build and publish committee verifier image
     permissions:
       id-token: write
       contents: read
@@ -23,17 +22,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-      - name: Build image (PR validation)
-        if: github.event_name == 'pull_request'
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          context: .
-          file: ccip/committee_verifier.Dockerfile
-          push: false
-          load: true
-          tags: committeeverifier-canton:pr
       - name: Validate ECR configuration for push
-        if: github.event_name == 'push'
         run: |
           if [ -z "$ECR_REGISTRY" ]; then
             echo "ECR registry secret (ECR_REGISTRY) is not set"
@@ -44,14 +33,12 @@ jobs:
             exit 1
           fi
       - name: Authenticate to AWS ECR
-        if: github.event_name == 'push'
         uses: ./.github/actions/aws-ecr-auth
         with:
           role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
           registry-type: private
       - name: Build and push image to ECR
-        if: github.event_name == 'push'
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
