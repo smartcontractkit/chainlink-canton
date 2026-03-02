@@ -1,6 +1,7 @@
 module MCMS.Counter where
 
 import DA.Map qualified as Map
+import DA.Text qualified as T
 import MCMS.MCMSReceiver
 
 -- ===========================================================================
@@ -36,9 +37,11 @@ template Counter
             pure (Map.insert instanceId (coerceContractId newCid) contractIds)
 
           "SetValue" -> do
-            let newValue = parseDecimalToInt operationData
-            newCid <- exercise selfCounterCid (SetValue newValue)
-            pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+            case T.parseInt operationData of
+              Some newValue -> do
+                newCid <- exercise selfCounterCid (SetValue newValue)
+                pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+              None -> abort $ "E_INVALID_INT: " <> operationData
 
           "Reset" -> do
             newCid <- exercise selfCounterCid Reset
@@ -80,14 +83,3 @@ template Counter
       controller viewer
       do pure instanceId
 
--- ===========================================================================
--- HELPER FUNCTIONS
--- ===========================================================================
-
--- | Simple decimal string to int parser for POC
--- In production, use proper parsing
-parseDecimalToInt : Text -> Int
-parseDecimalToInt t =
-  -- For POC, default to 0 if can't parse
-  -- In real implementation, would properly parse decimal string
-  0

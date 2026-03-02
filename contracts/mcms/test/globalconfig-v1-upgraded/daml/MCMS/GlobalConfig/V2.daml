@@ -1,0 +1,101 @@
+-- | GlobalConfigV2 - Upgraded version of GlobalConfigV1
+-- Adds newFeatureEnabled field to demonstrate contract upgrade pattern
+module MCMS.GlobalConfig.V2 where
+
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
+import MCMS.MCMSReceiver
+import MCMS.GlobalConfig.Types
+
+template GlobalConfigV2
+    with
+        instanceId : Text
+        ccipOwner : Party
+        chainSelector : Int
+        onRampAddress : BytesHex
+        destChainConfigs : Map.Map Int DestChainConfig
+        sourceChainConfigs : Map.Map Int SourceChainConfig
+        newFeatureEnabled : Optional Bool
+    where
+        signatory ccipOwner
+
+        interface instance MCMSReceiver for GlobalConfigV2 where
+            view = MCMSReceiverView with
+                owner = ccipOwner
+                instanceId
+
+            mcmsEntrypoint selfCid functionName operationData contractIds = do
+                let selfV2Cid : ContractId GlobalConfigV2 = coerceContractId selfCid
+                case functionName of
+                    "UpdateDestChainConfig" -> do
+                        newCid <- exercise selfV2Cid V2_UpdateDestChainConfig
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    "UpdateSourceChainConfig" -> do
+                        newCid <- exercise selfV2Cid V2_UpdateSourceChainConfig
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    "SetNewFeature" -> do
+                        let enabled = operationData == "true"
+                        newCid <- exercise selfV2Cid (V2_SetNewFeature enabled)
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        choice V2_UpdateDestChainConfig : ContractId GlobalConfigV2
+            controller ccipOwner
+            do create this
+
+        choice V2_UpdateSourceChainConfig : ContractId GlobalConfigV2
+            controller ccipOwner
+            do create this
+
+        choice V2_SetNewFeature : ContractId GlobalConfigV2
+            with
+                enabled : Bool
+            controller ccipOwner
+            do create this with newFeatureEnabled = Some enabled
+
+        nonconsuming choice GetDestChainConfigV2 : Optional DestChainConfig
+            with
+                destChainSelector : Int
+                caller : Party
+            controller caller
+            do pure (Map.lookup destChainSelector destChainConfigs)
+
+        nonconsuming choice GetSourceChainConfigV2 : Optional SourceChainConfig
+            with
+                sourceChainSelector : Int
+                caller : Party
+            controller caller
+            do pure (Map.lookup sourceChainSelector sourceChainConfigs)
+
+        nonconsuming choice GetNewFeatureEnabled : Optional Bool
+            with
+                caller : Party
+            controller caller
+            do pure newFeatureEnabled
+
+        nonconsuming choice GetInstanceIdV2 : Text
+            with
+                viewer : Party
+            controller viewer
+            do pure instanceId
+
+        choice UpdateDestChainConfigV2 : ContractId GlobalConfigV2
+            with
+                destChainSelector : Int
+                config : DestChainConfig
+            controller ccipOwner
+            do create this with destChainConfigs = Map.insert destChainSelector config destChainConfigs
+
+        choice UpdateSourceChainConfigV2 : ContractId GlobalConfigV2
+            with
+                sourceChainSelector : Int
+                config : SourceChainConfig
+            controller ccipOwner
+            do create this with sourceChainConfigs = Map.insert sourceChainSelector config sourceChainConfigs
+
+        choice ArchiveGlobalConfigV2 : ()
+            controller ccipOwner
+            do pure ()

@@ -1,0 +1,18 @@
+-- | Shared data types for GlobalConfig contracts (stable across SCU versions)
+module MCMS.GlobalConfig.Types where
+
+import DA.Crypto.Text (BytesHex)
+
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool
+        offRampAddress : BytesHex
+        laneMandatedCCVs : [Text]
+    deriving (Eq, Show)
+
+data SourceChainConfig = SourceChainConfig
+    with
+        isEnabled : Bool
+        onRampAddress : BytesHex
+        laneMandatedCCVs : [Text]
+    deriving (Eq, Show)

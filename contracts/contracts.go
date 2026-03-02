@@ -17,8 +17,9 @@ type Package string
 const (
 	Coin = Package("coin")
 
-	MCMS     = Package("mcms")
-	MCMSTest = Package("mcms-test")
+	MCMS         = Package("mcms")
+	MCMSTest     = Package("mcms-test")
+	GlobalConfig = Package("globalconfig")
 
 	CCIPCommon               = Package("ccip-common")
 	CCIPSender               = Package("ccip-sender")
@@ -45,8 +46,9 @@ const CurrentVersion = "current"
 var Versions map[Package][]string = map[Package][]string{
 	Coin: []string{"0.0.1", CurrentVersion},
 
-	MCMS:     []string{"0.0.1", CurrentVersion},
-	MCMSTest: []string{"0.0.1", CurrentVersion},
+	MCMS:         []string{"0.0.1", CurrentVersion},
+	MCMSTest:     []string{"0.0.1", CurrentVersion},
+	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
 
 	CCIPCommon:               []string{"0.0.1", CurrentVersion},
 	CCIPSender:               []string{"0.0.1", CurrentVersion},

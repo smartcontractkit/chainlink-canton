@@ -1,0 +1,104 @@
+-- | GlobalConfigV1 - Upgraded V1 with MigrateToV2 choice added via SCU
+-- SCU-compatible changes:
+--   1. New non-consuming choice V1_MigrateToV2 (V1 stays alive, V2 created alongside)
+--   2. New "MigrateToV2" case in mcmsEntrypoint implementation
+--   3. New import of MCMS.GlobalConfig.V2
+module MCMS.GlobalConfig.V1 where
+
+import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
+import MCMS.MCMSReceiver
+import MCMS.GlobalConfig.Types
+import MCMS.GlobalConfig.V2 (GlobalConfigV2(..))
+
+template GlobalConfigV1
+    with
+        instanceId : Text
+        ccipOwner : Party
+        chainSelector : Int
+        onRampAddress : BytesHex
+        destChainConfigs : Map.Map Int DestChainConfig
+        sourceChainConfigs : Map.Map Int SourceChainConfig
+    where
+        signatory ccipOwner
+
+        interface instance MCMSReceiver for GlobalConfigV1 where
+            view = MCMSReceiverView with
+                owner = ccipOwner
+                instanceId
+
+            mcmsEntrypoint selfCid functionName operationData contractIds = do
+                let selfV1Cid : ContractId GlobalConfigV1 = coerceContractId selfCid
+                case functionName of
+                    "UpdateDestChainConfig" -> do
+                        newCid <- exercise selfV1Cid V1_UpdateDestChainConfig
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    "UpdateSourceChainConfig" -> do
+                        newCid <- exercise selfV1Cid V1_UpdateSourceChainConfig
+                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+
+                    "MigrateToV2" -> do
+                        newV2Cid <- exercise selfV1Cid V1_MigrateToV2
+                        pure (Map.insert instanceId (coerceContractId newV2Cid) contractIds)
+
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        choice V1_UpdateDestChainConfig : ContractId GlobalConfigV1
+            controller ccipOwner
+            do create this
+
+        choice V1_UpdateSourceChainConfig : ContractId GlobalConfigV1
+            controller ccipOwner
+            do create this
+
+        -- Non-consuming: V1 stays alive, V2 is created alongside
+        nonconsuming choice V1_MigrateToV2 : ContractId GlobalConfigV2
+            controller ccipOwner
+            do
+                create GlobalConfigV2 with
+                    instanceId
+                    ccipOwner
+                    chainSelector
+                    onRampAddress
+                    destChainConfigs
+                    sourceChainConfigs
+                    newFeatureEnabled = None
+
+        nonconsuming choice GetDestChainConfigV1 : Optional DestChainConfig
+            with
+                destChainSelector : Int
+                caller : Party
+            controller caller
+            do pure (Map.lookup destChainSelector destChainConfigs)
+
+        nonconsuming choice GetSourceChainConfigV1 : Optional SourceChainConfig
+            with
+                sourceChainSelector : Int
+                caller : Party
+            controller caller
+            do pure (Map.lookup sourceChainSelector sourceChainConfigs)
+
+        nonconsuming choice GetInstanceIdV1 : Text
+            with
+                viewer : Party
+            controller viewer
+            do pure instanceId
+
+        choice UpdateDestChainConfigV1 : ContractId GlobalConfigV1
+            with
+                destChainSelector : Int
+                config : DestChainConfig
+            controller ccipOwner
+            do create this with destChainConfigs = Map.insert destChainSelector config destChainConfigs
+
+        choice UpdateSourceChainConfigV1 : ContractId GlobalConfigV1
+            with
+                sourceChainSelector : Int
+                config : SourceChainConfig
+            controller ccipOwner
+            do create this with sourceChainConfigs = Map.insert sourceChainSelector config sourceChainConfigs
+
+        choice ArchiveGlobalConfigV1 : ()
+            controller ccipOwner
+            do pure ()
