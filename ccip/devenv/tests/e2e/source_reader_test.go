@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
+	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -37,7 +38,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e"
-	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/sourcereader/canton"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
@@ -139,11 +139,11 @@ func TestCantonSourceReader(t *testing.T) {
 	createResp := ts.createTestRouter(t, ccipOwner, partyOwner)
 	require.NotNil(t, createResp)
 
-	sourceReader, err := canton.NewSourceReader(
+	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Test(t),
 		grpcURL,
 		jwt,
-		canton.ReaderConfig{
+		sourcereader.ReaderConfig{
 			CCIPOwnerParty:            ccipOwner,
 			CCIPMessageSentTemplateID: fmt.Sprintf("%s:%s:%s", ccipMessageSentTemplateID.PackageId, ccipMessageSentTemplateID.ModuleName, ccipMessageSentTemplateID.EntityName),
 		},

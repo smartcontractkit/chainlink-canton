@@ -11,9 +11,10 @@ import (
 	"github.com/BurntSushi/toml"
 	ledgerv2admin "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-canton/ccip"
+	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
-	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/sourcereader/canton"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/testcontainers/testcontainers-go"
@@ -24,6 +25,35 @@ import (
 const (
 	DefaultCantonCommitteVerifierImage = "committeeverifier-canton:latest"
 )
+
+func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any, error) {
+	infos := make(map[string]any)
+	for _, output := range outputs {
+		chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(output.ChainID, output.Family)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain details for chain %s, family %s: %w", output.ChainID, output.Family, err)
+		}
+
+		strSelector := strconv.FormatUint(chainDetails.ChainSelector, 10)
+
+		if output.Family != chainsel.FamilyCanton {
+			continue
+		}
+
+		grpcURL := output.NetworkSpecificData.CantonEndpoints.Participants[0].GRPCLedgerAPIURL
+		jwt := output.NetworkSpecificData.CantonEndpoints.Participants[0].JWT
+		if grpcURL == "" || jwt == "" {
+			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
+		}
+
+		infos[strSelector] = &ccip.BlockchainInfo{
+			GRPCLedgerAPIURL: grpcURL,
+			JWT:              jwt,
+		}
+	}
+
+	return infos, nil
+}
 
 // CommitteeVerifierModifier modifies a testcontainers.ContainerRequest for canton.
 func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInput *committeeverifier.Input, outputs []*blockchain.Output) (testcontainers.ContainerRequest, error) {
@@ -51,7 +81,7 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 	//nolint:staticcheck // we're still using it...
 	req.Mounts = append(req.Mounts, testcontainers.BindMount(
 		cantonConfigFilePath,
-		canton.DefaultCantonConfigPath,
+		ccip.DefaultCantonConfigPath,
 	))
 
 	return req, nil
@@ -59,7 +89,7 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 
 // hydrateAndMarshalCantonConfig hydrates the canton config with the full party ID for the CCIPOwnerParty.
 func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*blockchain.Output) ([]byte, error) {
-	cantonConfigs, err := util.OpaqueToConcreteStrict[canton.Config](in.CantonConfigs)
+	cantonConfigs, err := util.OpaqueToConcreteStrict[ccip.Config](in.CantonConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get canton config from opaque: %w", err)
 	}
@@ -111,7 +141,7 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		var found bool
 		for _, partyDetail := range resp.PartyDetails {
 			if strings.HasPrefix(partyDetail.GetParty(), readerConfig.CCIPOwnerParty) {
-				cantonConfigs.ReaderConfigs[strSelector] = canton.ReaderConfig{
+				cantonConfigs.ReaderConfigs[strSelector] = sourcereader.ReaderConfig{
 					CCIPOwnerParty:            partyDetail.GetParty(),
 					CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 					Authority:                 authority,
