@@ -2,184 +2,209 @@ package disclosure
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/config"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/ledger"
-	"github.com/smartcontractkit/chainlink-canton/eds/internal/types"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 )
 
-type ContractType string
+type DisclosureServiceConfig struct {
+	ContractStore store.ContractStore
 
-const (
-	ContractTypeRouter             ContractType = "Router"
-	ContractTypeOnRamp             ContractType = "OnRamp"
-	ContractTypeFeeQuoter          ContractType = "FeeQuoter"
-	ContractTypeOffRamp            ContractType = "OffRamp"
-	ContractTypeCCV                ContractType = "CommitteeVerifier"
-	ContractTypeTokenAdminRegistry ContractType = "TokenAdminRegistry"
-	ContractTypeTokenPool          ContractType = "LockReleaseTokenPool"
-)
-
-type ModuleInfo struct {
-	ModuleName string
-	EntityName string
+	// Contracts
+	PerPartyRouterFactory contracts.InstanceAddress
+	OnRamp                contracts.InstanceAddress
+	OffRamp               contracts.InstanceAddress
+	GlobalConfig          contracts.InstanceAddress
+	TokenAdminRegistry    contracts.InstanceAddress
+	RMNRemote             contracts.InstanceAddress
+	CCVs                  []contracts.InstanceAddress
 }
 
-// maps contract types to module:entity names
-var ContractTypeToModule = map[ContractType]ModuleInfo{
-	ContractTypeRouter:             {"CCIP.Router", "Router"},
-	ContractTypeOnRamp:             {"CCIP.OnRamp", "OnRamp"},
-	ContractTypeFeeQuoter:          {"CCIP.FeeQuoter", "FeeQuoter"},
-	ContractTypeOffRamp:            {"CCIP.OffRamp", "OffRamp"},
-	ContractTypeCCV:                {"CCIP.CommitteeVerifier", "CommitteeVerifier"},
-	ContractTypeTokenAdminRegistry: {"CCIP.TokenAdminRegistry", "TokenAdminRegistry"},
-	ContractTypeTokenPool:          {"CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"},
+// The DisclosureService returns explicit disclosures for CCIP contracts.
+// It uses a store.ContractStore to retrieve active contracts from the ledger and provides explicit disclosures for them.
+// It is configured with a fixed list of InstanceAddresses for all CCIP contracts.
+type DisclosureService struct {
+	contractStore store.ContractStore
+
+	perPartyRouterFactory contracts.InstanceAddress
+	onRamp                contracts.InstanceAddress
+	offRamp               contracts.InstanceAddress
+	globalConfig          contracts.InstanceAddress
+	tokenAdminRegistry    contracts.InstanceAddress
+	rmnRemote             contracts.InstanceAddress
+	ccvs                  []contracts.InstanceAddress
+
+	// Contains all configured instance addresses, to allow looking up if a requested disclosure should be returned.
+	allContracts map[contracts.InstanceAddress]struct{}
 }
 
-type ContractQuerier interface {
-	GetAllContractsForParty(ctx context.Context, party string) ([]*ledger.ActiveContract, error)
-}
+func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *DisclosureService {
+	// Create a map of all instance addresses
+	allContracts := make(map[contracts.InstanceAddress]struct{}, 6+len(config.CCVs))
+	allContracts[config.PerPartyRouterFactory] = struct{}{}
+	allContracts[config.OnRamp] = struct{}{}
+	allContracts[config.OffRamp] = struct{}{}
+	allContracts[config.GlobalConfig] = struct{}{}
+	allContracts[config.TokenAdminRegistry] = struct{}{}
+	allContracts[config.RMNRemote] = struct{}{}
+	for _, ccv := range config.CCVs {
+		allContracts[ccv] = struct{}{}
+	}
 
-type Service struct {
-	querier   ContractQuerier
-	envConfig *config.EnvironmentsConfig
-}
+	return &DisclosureService{
+		contractStore: config.ContractStore,
 
-func NewService(querier ContractQuerier, envConfig *config.EnvironmentsConfig) *Service {
-	return &Service{
-		querier:   querier,
-		envConfig: envConfig,
+		perPartyRouterFactory: config.PerPartyRouterFactory,
+		onRamp:                config.OnRamp,
+		offRamp:               config.OffRamp,
+		globalConfig:          config.GlobalConfig,
+		tokenAdminRegistry:    config.TokenAdminRegistry,
+		rmnRemote:             config.RMNRemote,
+		ccvs:                  config.CCVs,
+
+		allContracts: allContracts,
 	}
 }
 
-func (s *Service) GetCCIPSendDisclosures(ctx context.Context, environmentID string) (*types.CCIPSendDisclosures, error) {
-	env, ok := s.envConfig.GetEnvironment(environmentID)
-	if !ok {
-		return nil, fmt.Errorf("unknown environment: %s", environmentID)
+type CCIPSendRequest struct {
+	CCVs []contracts.InstanceAddress
+}
+
+type CCIPSendDisclosures struct {
+	OnRamp             *apiv2.DisclosedContract
+	GlobalConfig       *apiv2.DisclosedContract
+	TokenAdminRegistry *apiv2.DisclosedContract
+	RMNRemote          *apiv2.DisclosedContract
+	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
+}
+
+// GetDisclosure returns the explicit disclosure for a given contract address, or an error if the contract is not found or not configured for disclosure.
+func (s *DisclosureService) GetDisclosure(ctx context.Context, address contracts.InstanceAddress) (*apiv2.DisclosedContract, error) {
+	// Only allow looking up contracts that have explicitly been configured.
+	// Since there could be multiple contracts of the same template deployed on any given network, the ContractStore will
+	// return all of them. This could expose contracts that should be kept private, therefore we're only returning
+	// explicitly configured contracts.
+	if _, ok := s.allContracts[address]; !ok {
+		return nil, fmt.Errorf("contract %s not found", address)
 	}
 
-	contracts, err := s.querier.GetAllContractsForParty(ctx, env.Party)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query contracts: %w", err)
+	activeContract := s.contractStore.GetContract(ctx, address)
+	if activeContract == nil {
+		return nil, fmt.Errorf("contract %s not found", address)
 	}
 
-	router, err := s.findContract(contracts, ContractTypeRouter, env.Contracts.Router)
-	if err != nil {
-		return nil, fmt.Errorf("router not found: %w", err)
-	}
-
-	onRamp, err := s.findContract(contracts, ContractTypeOnRamp, env.Contracts.OnRamp)
-	if err != nil {
-		return nil, fmt.Errorf("onRamp not found: %w", err)
-	}
-
-	feeQuoter, err := s.findContract(contracts, ContractTypeFeeQuoter, env.Contracts.FeeQuoter)
-	if err != nil {
-		return nil, fmt.Errorf("feeQuoter not found: %w", err)
-	}
-
-	return &types.CCIPSendDisclosures{
-		EnvironmentID: environmentID,
-		Contracts: types.CCIPSendContracts{
-			Router:    router,
-			OnRamp:    onRamp,
-			FeeQuoter: feeQuoter,
-		},
+	return &apiv2.DisclosedContract{
+		TemplateId:       activeContract.GetCreatedEvent().GetTemplateId(),
+		ContractId:       activeContract.GetCreatedEvent().GetContractId(),
+		CreatedEventBlob: activeContract.GetCreatedEvent().GetCreatedEventBlob(),
+		SynchronizerId:   activeContract.GetSynchronizerId(),
 	}, nil
 }
 
-func (s *Service) GetCCIPExecuteDisclosures(ctx context.Context, environmentID string) (*types.CCIPExecuteDisclosures, error) {
-	env, ok := s.envConfig.GetEnvironment(environmentID)
-	if !ok {
-		return nil, fmt.Errorf("unknown environment: %s", environmentID)
-	}
-
-	contracts, err := s.querier.GetAllContractsForParty(ctx, env.Party)
+func (s *DisclosureService) GetCCIPSendDisclosures(ctx context.Context, request CCIPSendRequest) (CCIPSendDisclosures, error) {
+	onRamp, err := s.GetDisclosure(ctx, s.onRamp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query contracts: %w", err)
+		return CCIPSendDisclosures{}, fmt.Errorf("onRamp: %w", err)
 	}
-
-	offRamp, err := s.findContract(contracts, ContractTypeOffRamp, env.Contracts.OffRamp)
+	globalConfig, err := s.GetDisclosure(ctx, s.globalConfig)
 	if err != nil {
-		return nil, fmt.Errorf("offRamp not found: %w", err)
+		return CCIPSendDisclosures{}, fmt.Errorf("globalConfig: %w", err)
 	}
-
-	ccv, err := s.findContract(contracts, ContractTypeCCV, env.Contracts.CCV)
+	tokenAdminRegistry, err := s.GetDisclosure(ctx, s.tokenAdminRegistry)
 	if err != nil {
-		return nil, fmt.Errorf("ccv not found: %w", err)
+		return CCIPSendDisclosures{}, fmt.Errorf("tokenAdminRegistry: %w", err)
 	}
-
-	tokenAdminRegistry, err := s.findContract(contracts, ContractTypeTokenAdminRegistry, env.Contracts.TokenAdminRegistry)
+	rmnRemote, err := s.GetDisclosure(ctx, s.rmnRemote)
 	if err != nil {
-		return nil, fmt.Errorf("tokenAdminRegistry not found: %w", err)
+		return CCIPSendDisclosures{}, fmt.Errorf("rmnRemote: %w", err)
 	}
 
-	return &types.CCIPExecuteDisclosures{
-		EnvironmentID: environmentID,
-		Contracts: types.CCIPExecuteContracts{
-			OffRamp:            offRamp,
-			CCV:                ccv,
-			TokenAdminRegistry: tokenAdminRegistry,
-		},
+	// CCVs
+	ccvs := make(map[contracts.InstanceAddress]*apiv2.DisclosedContract, len(request.CCVs))
+	for _, requestedCCV := range request.CCVs {
+		ccv, err := s.GetDisclosure(ctx, requestedCCV)
+		if err != nil {
+			return CCIPSendDisclosures{}, fmt.Errorf("ccv: %w", err)
+		}
+
+		ccvs[requestedCCV] = ccv
+	}
+
+	return CCIPSendDisclosures{
+		OnRamp:             onRamp,
+		GlobalConfig:       globalConfig,
+		TokenAdminRegistry: tokenAdminRegistry,
+		RMNRemote:          rmnRemote,
+		CCVs:               ccvs,
 	}, nil
 }
 
-// find contract by type and instanceId, matching module:entity (ignores packageId for upgrade resilience)
-func (s *Service) findContract(
-	contracts []*ledger.ActiveContract,
-	contractType ContractType,
-	expectedEnvID string,
-) (*types.DisclosedContract, error) {
-	moduleInfo, ok := ContractTypeToModule[contractType]
-	if !ok {
-		return nil, fmt.Errorf("unknown contract type: %s", contractType)
-	}
-
-	for _, c := range contracts {
-		event := c.CreatedEvent
-		templateID := event.GetTemplateId()
-
-		if templateID.GetModuleName() != moduleInfo.ModuleName ||
-			templateID.GetEntityName() != moduleInfo.EntityName {
-			continue
-		}
-
-		envID := ExtractInstanceID(event.GetCreateArguments())
-		if envID != expectedEnvID {
-			continue
-		}
-
-		return &types.DisclosedContract{
-			ContractID: event.GetContractId(),
-			InstanceID: envID,
-			TemplateID: types.TemplateID{
-				PackageID:  templateID.GetPackageId(),
-				ModuleName: templateID.GetModuleName(),
-				EntityName: templateID.GetEntityName(),
-			},
-			CreatedEventBlob: base64.StdEncoding.EncodeToString(event.GetCreatedEventBlob()),
-			SynchronizerID:   c.SynchronizerID,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("no contract found with type %s and instanceId %s", contractType, expectedEnvID)
+type CCIPExecuteRequest struct {
+	CCVs []contracts.InstanceAddress
 }
 
-func ExtractInstanceID(args *apiv2.Record) string {
-	if args == nil {
-		return ""
+type CCIPExecuteDisclosures struct {
+	OffRamp            *apiv2.DisclosedContract
+	GlobalConfig       *apiv2.DisclosedContract
+	TokenAdminRegistry *apiv2.DisclosedContract
+	RMNRemote          *apiv2.DisclosedContract
+	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
+}
+
+func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, request CCIPExecuteRequest) (CCIPExecuteDisclosures, error) {
+	offRamp, err := s.GetDisclosure(ctx, s.offRamp)
+	if err != nil {
+		return CCIPExecuteDisclosures{}, fmt.Errorf("offRamp: %w", err)
 	}
-	for _, field := range args.GetFields() {
-		if field.GetLabel() == "instanceId" {
-			if textVal, ok := field.GetValue().GetSum().(*apiv2.Value_Text); ok {
-				return textVal.Text
-			}
-		}
+	globalConfig, err := s.GetDisclosure(ctx, s.globalConfig)
+	if err != nil {
+		return CCIPExecuteDisclosures{}, fmt.Errorf("globalConfig: %w", err)
+	}
+	tokenAdminRegistry, err := s.GetDisclosure(ctx, s.tokenAdminRegistry)
+	if err != nil {
+		return CCIPExecuteDisclosures{}, fmt.Errorf("tokenAdminRegistry: %w", err)
+	}
+	rmnRemote, err := s.GetDisclosure(ctx, s.rmnRemote)
+	if err != nil {
+		return CCIPExecuteDisclosures{}, fmt.Errorf("rmnRemote: %w", err)
 	}
 
-	return ""
+	// CCVs
+	ccvs := make(map[contracts.InstanceAddress]*apiv2.DisclosedContract, len(request.CCVs))
+	for _, requestedCCV := range request.CCVs {
+		ccv, err := s.GetDisclosure(ctx, requestedCCV)
+		if err != nil {
+			return CCIPExecuteDisclosures{}, fmt.Errorf("ccv: %w", err)
+		}
+
+		ccvs[requestedCCV] = ccv
+	}
+
+	return CCIPExecuteDisclosures{
+		OffRamp:            offRamp,
+		GlobalConfig:       globalConfig,
+		TokenAdminRegistry: tokenAdminRegistry,
+		RMNRemote:          rmnRemote,
+		CCVs:               ccvs,
+	}, nil
+}
+
+type PerPartyRouterFactoryRequest struct{}
+
+type PerPartyRouterFactoryDisclosures struct {
+	PerPartyRouterFactory *apiv2.DisclosedContract
+}
+
+func (s *DisclosureService) GetPerPartyRouterFactory(ctx context.Context, _ PerPartyRouterFactoryRequest) (PerPartyRouterFactoryDisclosures, error) {
+	perPartyRouterFactory, err := s.GetDisclosure(ctx, s.perPartyRouterFactory)
+	if err != nil {
+		return PerPartyRouterFactoryDisclosures{}, fmt.Errorf("perPartyRouterFactory: %w", err)
+	}
+
+	return PerPartyRouterFactoryDisclosures{
+		PerPartyRouterFactory: perPartyRouterFactory,
+	}, nil
 }
