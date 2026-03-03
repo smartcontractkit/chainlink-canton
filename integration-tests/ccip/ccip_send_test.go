@@ -561,9 +561,8 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	ccvSendInput := ccipsender.CCVSendInput{
-		CcvCid:        types.CONTRACT_ID(disclosedCCV.ContractId),
-		CcvRawAddress: committeeVerifierRawAddr.Binding(),
-		VerifierArgs:  types.TEXT(""),
+		CcvCid:       types.CONTRACT_ID(disclosedCCV.ContractId),
+		VerifierArgs: types.TEXT(""),
 	}
 
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
