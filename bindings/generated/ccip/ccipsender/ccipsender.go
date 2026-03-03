@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "d820a08c1564c3b50831e665f3a7518d6dd0f926bca645152e95db5c622c244c"
+	PackageID   = "00e0042db7f6dc044e2a2dd5a9b7af7e53425ca2d8d9468469939d8e6d95e553"
 	SDKVersion  = "3.4.10"
 )
 
@@ -171,9 +171,8 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
-	CcvCid        types.CONTRACT_ID         `json:"ccvCid"`
-	CcvRawAddress common.RawInstanceAddress `json:"ccvRawAddress"`
-	VerifierArgs  types.TEXT                `json:"verifierArgs"`
+	CcvCid       types.CONTRACT_ID `json:"ccvCid"`
+	VerifierArgs types.TEXT        `json:"verifierArgs"`
 }
 
 // ToMap converts CCVSendInput to a map for DAML arguments
@@ -186,14 +185,6 @@ func (t CCVSendInput) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.CcvCid
-	}()
-
-	m["ccvRawAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.CcvRawAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.CcvRawAddress
 	}()
 
 	m["verifierArgs"] = string(t.VerifierArgs)
@@ -232,6 +223,8 @@ type Send struct {
 	Receiver            types.TEXT                                 `json:"receiver"`
 	Payload             types.TEXT                                 `json:"payload"`
 	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
+	BlockConfirmations  *types.INT64                               `json:"blockConfirmations"`
+	ExecutorArgs        *types.TEXT                                `json:"executorArgs"`
 	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
 	FeeTokenInput       interfaces.TokenInput                      `json:"feeTokenInput"`
@@ -275,6 +268,28 @@ func (t Send) ToMap() map[string]any {
 	m["payload"] = string(t.Payload)
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	if t.BlockConfirmations != nil {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.BlockConfirmations),
+		}
+	} else {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.ExecutorArgs != nil {
+		m["executorArgs"] = map[string]any{
+			"_type": "optional",
+			"value": string(*t.ExecutorArgs),
+		}
+	} else {
+		m["executorArgs"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["senderRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.SenderRequiredCCVs))
@@ -370,6 +385,7 @@ type TokenTransferInput struct {
 	Amount            types.NUMERIC                            `json:"amount"`
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 	TokenReceiver     *types.TEXT                              `json:"tokenReceiver"`
+	TokenArgs         types.TEXT                               `json:"tokenArgs"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -420,6 +436,8 @@ func (t TokenTransferInput) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["tokenArgs"] = string(t.TokenArgs)
 
 	return m
 }

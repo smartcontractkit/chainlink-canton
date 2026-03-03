@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "1416bb6a76868e58cd29a3c7522a8526840be4153d66dbf104a4e6a0a4713c7d"
+	PackageID   = "d585dcc60094cc0f0ed3455d84a6b877ac8ac9be05b79febb34a2f7c4a0e45ea"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1593,6 +1593,7 @@ type PrepareSend struct {
 	Receiver            types.TEXT                                 `json:"receiver"`
 	Payload             types.TEXT                                 `json:"payload"`
 	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
+	BlockConfirmations  *types.INT64                               `json:"blockConfirmations"`
 	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
 	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId  `json:"tokenInstrumentId"`
 	TokenReceiver       *types.TEXT                                `json:"tokenReceiver"`
@@ -1618,6 +1619,17 @@ func (t PrepareSend) ToMap() map[string]any {
 	m["payload"] = string(t.Payload)
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	if t.BlockConfirmations != nil {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.BlockConfirmations),
+		}
+	} else {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["senderRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.SenderRequiredCCVs))

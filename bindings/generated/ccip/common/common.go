@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "185da165b29b2ab2dc58f23e91f8f3a491f19ba25c3a258b356a1424c1e46ee6"
+	PackageID   = "952ea6d8783d8edc063b80b817cd8d0d778b5b8bf32abbe90f27f59f8dc5716d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -169,20 +169,26 @@ func (t *AddCCVVerification) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// AddExecutorFee is a Record type
-type AddExecutorFee struct {
+// AddExecutorWithFee is a Record type
+type AddExecutorWithFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
+	ExecutorArgs       types.TEXT    `json:"executorArgs"`
+	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
 	Caller             types.PARTY   `json:"caller"`
 }
 
-// ToMap converts AddExecutorFee to a map for DAML arguments
-func (t AddExecutorFee) ToMap() map[string]any {
+// ToMap converts AddExecutorWithFee to a map for DAML arguments
+func (t AddExecutorWithFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["executorInstanceId"] = string(t.ExecutorInstanceId)
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	m["feeUSDCents"] = t.FeeUSDCents
 
@@ -195,24 +201,24 @@ func (t AddExecutorFee) ToMap() map[string]any {
 	return m
 }
 
-func (t AddExecutorFee) MarshalJSON() ([]byte, error) {
+func (t AddExecutorWithFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *AddExecutorFee) UnmarshalJSON(data []byte) error {
+func (t *AddExecutorWithFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes AddExecutorFee to hex string (Canton MCMS format)
-func (t AddExecutorFee) MarshalHex() (string, error) {
+// MarshalHex encodes AddExecutorWithFee to hex string (Canton MCMS format)
+func (t AddExecutorWithFee) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes AddExecutorFee from hex string (Canton MCMS format)
-func (t *AddExecutorFee) UnmarshalHex(data string) error {
+// UnmarshalHex decodes AddExecutorWithFee from hex string (Canton MCMS format)
+func (t *AddExecutorWithFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -673,7 +679,6 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 // DestChainConfig is a Record type
 type DestChainConfig struct {
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	DefaultExecutor           RawInstanceAddress   `json:"defaultExecutor"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -686,14 +691,6 @@ func (t DestChainConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
-
-	m["defaultExecutor"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.DefaultExecutor).(mapper); ok {
-			return m.toMap()
-		}
-		return t.DefaultExecutor
-	}()
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
@@ -1195,12 +1192,9 @@ func (t *ExecutorView) UnmarshalHex(data string) error {
 
 // ExecutorCalculateFee is a Record type
 type ExecutorCalculateFee struct {
-	SendingMessageCid   types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	DestChainSelector   types.NUMERIC                            `json:"destChainSelector"`
-	RequestedBlockDepth types.INT64                              `json:"requestedBlockDepth"`
-	ExecutorArgs        types.TEXT                               `json:"executorArgs"`
-	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	Caller              types.PARTY                              `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT        `json:"executorArgs"`
+	Caller            types.PARTY       `json:"caller"`
 }
 
 // ToMap converts ExecutorCalculateFee to a map for DAML arguments
@@ -1215,19 +1209,7 @@ func (t ExecutorCalculateFee) ToMap() map[string]any {
 		return t.SendingMessageCid
 	}()
 
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["requestedBlockDepth"] = int64(t.RequestedBlockDepth)
-
 	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
-	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1938,7 +1920,7 @@ type SendingMessageV1 struct {
 	Payload                           types.TEXT                                `json:"payload"`
 	ExecutionGasLimit                 types.INT64                               `json:"executionGasLimit"`
 	CcipReceiveGasLimit               types.INT64                               `json:"ccipReceiveGasLimit"`
-	Finality                          types.INT64                               `json:"finality"`
+	BlockConfirmations                types.INT64                               `json:"blockConfirmations"`
 	CcvAndExecutorHash                types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress                     types.TEXT                                `json:"onRampAddress"`
 	OffRampAddress                    types.TEXT                                `json:"offRampAddress"`
@@ -2062,7 +2044,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["finality"] = int64(t.Finality)
+	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -2319,7 +2301,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["finality"] = int64(t.Finality)
+	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -2575,23 +2557,23 @@ func (t SendingMessageV1) SetOutboundPoolCCVsWithPackageID(contractID string, pa
 	}
 }
 
-// AddExecutorFee exercises the AddExecutorFee choice on this SendingMessageV1 contract
+// AddExecutorWithFee exercises the AddExecutorWithFee choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
-func (t SendingMessageV1) AddExecutorFee(contractID string, args AddExecutorFee) *model.ExerciseCommand {
+func (t SendingMessageV1) AddExecutorWithFee(contractID string, args AddExecutorWithFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
-		Choice:     "AddExecutorFee",
+		Choice:     "AddExecutorWithFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// AddExecutorFeeWithPackageID exercises the AddExecutorFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddExecutorFeeWithPackageID(contractID string, packageID string, args AddExecutorFee) *model.ExerciseCommand {
+// AddExecutorWithFeeWithPackageID exercises the AddExecutorWithFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddExecutorWithFeeWithPackageID(contractID string, packageID string, args AddExecutorWithFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
-		Choice:     "AddExecutorFee",
+		Choice:     "AddExecutorWithFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -3345,7 +3327,7 @@ func IIExecutorInterfaceIDWithPackageID(packageID string) string {
 type MCMSEncoder interface {
 	AddCCVFee(args AddCCVFee) (*bind.EncodedChoice, error)
 	AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error)
-	AddExecutorFee(args AddExecutorFee) (*bind.EncodedChoice, error)
+	AddExecutorWithFee(args AddExecutorWithFee) (*bind.EncodedChoice, error)
 	AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error)
 	AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error)
 	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
@@ -3397,9 +3379,9 @@ func (e *encoder) AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoi
 	return e.EncodeChoiceArgs("AddCCVVerification", args)
 }
 
-// AddExecutorFee encodes parameters for the AddExecutorFee choice.
-func (e *encoder) AddExecutorFee(args AddExecutorFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddExecutorFee", args)
+// AddExecutorWithFee encodes parameters for the AddExecutorWithFee choice.
+func (e *encoder) AddExecutorWithFee(args AddExecutorWithFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddExecutorWithFee", args)
 }
 
 // AddTokenSend encodes parameters for the AddTokenSend choice.

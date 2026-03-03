@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "2e346a413bafa48885020da67eef1be5007eea40b6ebf00206e65df660ffcad9"
+	PackageID   = "58ebdbf8369b6a0adcad70d8d2488795699d70317faeb2cf6bb7210ad45f7671"
 	SDKVersion  = "3.4.10"
 )
 
@@ -948,8 +948,7 @@ type LockReleaseTokenPoolVerifyOutboundCCVs struct {
 	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	Amount            types.NUMERIC                              `json:"amount"`
-	Finality          types.INT64                                `json:"finality"`
-	ExtraData         types.TEXT                                 `json:"extraData"`
+	TokenArgs         types.TEXT                                 `json:"tokenArgs"`
 	Caller            types.PARTY                                `json:"caller"`
 }
 
@@ -975,9 +974,7 @@ func (t LockReleaseTokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 
 	m["amount"] = t.Amount
 
-	m["finality"] = int64(t.Finality)
-
-	m["extraData"] = string(t.ExtraData)
+	m["tokenArgs"] = string(t.TokenArgs)
 
 	m["caller"] = t.Caller.ToMap()
 
