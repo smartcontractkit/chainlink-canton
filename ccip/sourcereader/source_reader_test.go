@@ -461,7 +461,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			// First receipt - has corresponding verifier blob
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: ccipMessageSentEventReceiptIssuerLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(ccvIssuer[:])}}},
+					{Label: ccipMessageSentEventReceiptIssuerAddressLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(ccvIssuer[:])}}},
 					{Label: ccipMessageSentEventReceiptDestGasLimitLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 100000}}},
 					{Label: ccipMessageSentEventReceiptDestBytesOverheadLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 500}}},
 					{Label: ccipMessageSentEventReceiptFeeTokenAmountLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "1000000."}}},
@@ -471,7 +471,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			// Second receipt - executor receipt
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: ccipMessageSentEventReceiptIssuerLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(execIssuer[:])}}},
+					{Label: ccipMessageSentEventReceiptIssuerAddressLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(execIssuer[:])}}},
 					{Label: ccipMessageSentEventReceiptDestGasLimitLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptDestBytesOverheadLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptFeeTokenAmountLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "500000."}}},
@@ -481,7 +481,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			// Second receipt - no verifier blob (e.g., network fee receipt)
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: ccipMessageSentEventReceiptIssuerLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(networkIssuer[:])}}},
+					{Label: ccipMessageSentEventReceiptIssuerAddressLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(networkIssuer[:])}}},
 					{Label: ccipMessageSentEventReceiptDestGasLimitLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptDestBytesOverheadLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptFeeTokenAmountLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "500000."}}},

@@ -38,11 +38,20 @@ template TestRouter
           ccipMessageSent = ccipMessageSentCid
           messageId = messageId
 
+data IssuerType
+    = IssuerType_CCV
+    | IssuerType_Pool
+    | IssuerType_Executor
+    | IssuerType_Network
+    deriving (Eq, Show)
+
 -- | Fee/gas accounting for a single entity (CCV, pool, executor, or network).
--- Matches EVM Receipt structure for cross-chain fee transparency.
+-- Matches CCIP Canton receipt structure.
 data Receipt = Receipt
     with
-        issuer : Text              -- CCV ID (e.g., "49ff34ed@party"), pool ID, or "network"
+        issuerType : IssuerType        -- Type of issuer
+        issuerAddress : BytesHex       -- 32-byte instance address
+        versionTag : Optional BytesHex -- 4-byte version tag for CCVs, None for pools/network
         destGasLimit : Int         -- Gas allocated for dest chain execution
         destBytesOverhead : Int    -- Data availability overhead in bytes
         feeTokenAmount : Numeric 0 -- Fee amount in fee token units

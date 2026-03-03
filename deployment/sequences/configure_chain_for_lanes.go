@@ -94,7 +94,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				DestChainSelector: types.NUMERIC(remoteSelectorStr),
 				Config: common.DestChainConfig{
 					IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
-					OffRampAddress:            types.TEXT(hex.EncodeToString(input.OffRamp.Bytes())), // Use hex.EncodeToString to avoid "0x" prefix
+					OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)),
 					LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 					DefaultCCVs:               defaultOutboundCCVs,
 					MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),

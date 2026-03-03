@@ -11,7 +11,7 @@ import (
 )
 
 type Config struct {
-	ChainSelector uint64       `toml:"chain_selector" validate:"required"`
+	ChainSelector string       `toml:"chain_selector" validate:"required"`
 	Server        ServerConfig `toml:"server" validate:"required"`
 	Node          NodeConfig   `toml:"node" validate:"required"`
 	Contracts     Contracts    `toml:"contracts" validate:"required"`
@@ -44,6 +44,7 @@ type Contracts struct {
 	GlobalConfig          ContractIdentifier   `toml:"global_config" validate:"required"`
 	TokenAdminRegistry    ContractIdentifier   `toml:"token_admin_registry" validate:"required"`
 	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
+	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
 	CCVs                  []ContractIdentifier `toml:"ccvs"`
 }
 
@@ -52,16 +53,20 @@ type ContractIdentifier struct {
 	InstanceAddress contracts.InstanceAddress `toml:"instance_address" validate:"required"`
 }
 
+func (cfg *Config) Validate() error {
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	if err := validate.Struct(cfg); err != nil {
+		return fmt.Errorf("failed to validate config: %w", err)
+	}
+
+	return nil
+}
+
 func Read(configData io.Reader) (*Config, error) {
 	var config Config
 	decoder := toml.NewDecoder(configData)
 	if _, err := decoder.Decode(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	if err := validate.Struct(config); err != nil {
-		return nil, fmt.Errorf("failed to validate config: %w", err)
 	}
 
 	return &config, nil

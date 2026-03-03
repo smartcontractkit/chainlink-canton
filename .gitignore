@@ -12,3 +12,5 @@ go.work.sum
 
 *-out.toml
 logs/
+
+vendor/
