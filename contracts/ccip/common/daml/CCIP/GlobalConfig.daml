@@ -11,7 +11,6 @@ import CCIP.RawInstanceAddress (RawInstanceAddress)
 data DestChainConfig = DestChainConfig
     with
         isEnabled : Bool
-        defaultExecutor : RawInstanceAddress
         offRampAddress : BytesHex
         laneMandatedCCVs : [RawInstanceAddress]
         defaultCCVs : [RawInstanceAddress]

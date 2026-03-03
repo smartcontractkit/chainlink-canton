@@ -115,8 +115,7 @@ template LockReleaseTokenPool
                         context = arg.context
                         sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
-                        finality = arg.finality
-                        extraData = arg.extraData
+                        tokenArgs = arg.tokenArgs
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
@@ -203,8 +202,7 @@ template LockReleaseTokenPool
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 amount : Numeric 0
-                finality : Int
-                extraData : BytesHex
+                tokenArgs : BytesHex
                 caller : Party
             controller caller
             do

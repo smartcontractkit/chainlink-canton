@@ -1,7 +1,7 @@
 -- | OnRamp for CCIP message sending, called by PerPartyRouter.
 module CCIP.OnRamp where
 
-import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Optional (fromOptional, isSome)
@@ -48,9 +48,7 @@ template OnRamp
 
         -- | Build SendingMessageV1 for outbound message.
         -- Validates fee token is accepted, reads network fee from DestChainConfig.
-        -- ccvAndExecutorHash is deferred to the executor step (AddExecutorFee) for both
-        -- message-only and token sends. Message construction for token sends is deferred
-        -- to AddTokenSend after LockOrBurn.
+        -- Message construction is deferred to AddExecutorWithFee for all sends.
         nonconsuming choice PrepareSendFromRouter : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 routerPartyOwner : Party
@@ -63,6 +61,7 @@ template OnRamp
                 receiver : BytesHex
                 payload : BytesHex
                 ccipReceiveGasLimit : Int
+                blockConfirmations : Optional Int
                 currentSequenceNumber : Numeric 0
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
@@ -101,13 +100,17 @@ template OnRamp
                     instrumentId = feeToken
                     caller = ccipOwner
 
+                let hasTokenTransfer = isSome tokenInstrumentId
+                let isTokenOnlyTransfer = hasTokenTransfer
+                        && payload == ""
+                        && ccipReceiveGasLimit == 0
                 let resolvedCCVs = dedup (
                         (if null senderRequiredCCVs
-                            then destConfig.defaultCCVs
+                            then if isTokenOnlyTransfer
+                                then []
+                                else destConfig.defaultCCVs
                             else senderRequiredCCVs)
                         ++ destConfig.laneMandatedCCVs)
-
-                let hasTokenTransfer = isSome tokenInstrumentId
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
@@ -115,30 +118,7 @@ template OnRamp
                 let resolvedTokenReceiver = if hasTokenTransfer
                         then fromOptional receiver tokenReceiver
                         else ""
-
-                -- For token transfers, defer message construction to AddTokenSend.
-                -- ccvAndExecutorHash is always deferred to the executor step.
-                let (msgOpt, encoded, msgId) =
-                        if hasTokenTransfer
-                        then (None, "", "")
-                        else
-                            let messageV1 = CCIP.MessageCodecV1.MessageV1 with
-                                    sourceChainSelector = globalConfig.chainSelector
-                                    destChainSelector = destChainSelector
-                                    sequenceNumber = newSequenceNumber
-                                    executionGasLimit = 0
-                                    ccipReceiveGasLimit = ccipReceiveGasLimit
-                                    finality = 2000
-                                    ccvAndExecutorHash = ""
-                                    onRampAddress = onRampAddr
-                                    offRampAddress = destConfig.offRampAddress
-                                    sender = senderAddr
-                                    receiver = receiver
-                                    destBlob = ""
-                                    tokenTransfer = None
-                                    messageData = payload
-                                enc = CCIP.MessageCodecV1.encodeMessageV1 messageV1
-                            in (Some messageV1, enc, keccak256 enc)
+                let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
 
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
@@ -153,24 +133,24 @@ template OnRamp
                     destChainSelector
                     sequenceNumber = newSequenceNumber
                     requiredCCVs = resolvedCCVs
-                    executorAddress = destConfig.defaultExecutor
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
                     receiver, payload
                     executionGasLimit = 0
                     ccipReceiveGasLimit
-                    finality = 2000
+                    blockConfirmations = resolvedBlockConfirmations
                     ccvAndExecutorHash = ""
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
                     tokenReceiver = resolvedTokenReceiver
-                    message = msgOpt
-                    encodedMessage = encoded
-                    messageId = msgId
+                    message = None
+                    encodedMessage = ""
+                    messageId = ""
                     feeToken
                     networkFeeUSDCents = networkFeeUSD
                     expectedTokenInstrumentId = tokenInstrumentId
                     outboundPoolCCVs = None
+                    executorAddress = CCIP.RawInstanceAddress.make "" ccipOwner
                     executorArgs = ""
                     executorFee = None
                     executorFeeTokenAmount = 0.0

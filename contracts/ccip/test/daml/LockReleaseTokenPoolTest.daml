@@ -132,7 +132,7 @@ testLockOrBurn = script do
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
+            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
@@ -157,15 +157,6 @@ testLockOrBurn = script do
             tokenSendData = None
             observingParties = [sender]
 
-    -- Finalize ccvAndExecutorHash before LockOrBurn (AddTokenSend requires it)
-    sendingMessageCid <- submit ccipOwner do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
-            executorInstanceId = "default-executor"
-            feeUSDCents = 0.0
-            destGasLimit = 0
-            destBytesOverhead = 0
-            caller = ccipOwner
-
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
             extraArgs = MetadataV1.ExtraArgs with
@@ -180,7 +171,7 @@ testLockOrBurn = script do
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Call LockOrBurn
+    -- LockOrBurn stores token data via AddTokenSend
     result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval

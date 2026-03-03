@@ -3,8 +3,6 @@ module CCIP.Interfaces.Executor where
 import DA.Crypto.Text (BytesHex)
 import qualified CCIP.SendingMessageV1
 
-import qualified Splice.Api.Token.HoldingV1
-
 interface IExecutor where
     viewtype ExecutorView
 
@@ -16,10 +14,7 @@ interface IExecutor where
     nonconsuming choice Executor_CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            destChainSelector : Numeric 0
-            requestedBlockDepth : Int
             executorArgs : BytesHex
-            feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             caller : Party
         controller caller
         do executor_calculateFeeImpl this self arg

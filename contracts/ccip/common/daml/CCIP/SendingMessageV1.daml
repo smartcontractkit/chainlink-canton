@@ -79,7 +79,7 @@ template SendingMessageV1
         payload : BytesHex
         executionGasLimit : Int
         ccipReceiveGasLimit : Int
-        finality : Int
+        blockConfirmations : Int
         ccvAndExecutorHash : BytesHex
         onRampAddress : BytesHex
         offRampAddress : BytesHex
@@ -91,9 +91,9 @@ template SendingMessageV1
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
         outboundPoolCCVs : Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
-        -- Executor arguments from extra args
+        -- Executor arguments, set by AddExecutorWithFee
         executorArgs : BytesHex
-        -- Executor fee, set by AddExecutorFee
+        -- Executor fee, set by AddExecutorWithFee
         executorFee : Optional ExecutorFee
         executorFeeTokenAmount : Numeric 0
         -- Appended to by AddVerifierData
@@ -118,9 +118,7 @@ template SendingMessageV1
         -- Populated by AddVerifierData
         verifierData : [VerifierData]
 
-        -- External CCIP message
-        -- For message-only: populated at PrepareSend.
-        -- For token transfers: None/"" until AddTokenSend.
+        -- External CCIP message, populated by AddExecutorWithFee.
         message : Optional CCIP.MessageCodecV1.MessageV1
         encodedMessage : BytesHex
         messageId : BytesHex
@@ -172,26 +170,29 @@ template SendingMessageV1
                 assertMsg "setOutboundPoolCCVs: already set" (outboundPoolCCVs == None)
                 create this with outboundPoolCCVs = Some poolCCVs
 
-        -- Executor fee and final CCV/executor hash computation.
-        -- Merges outbound pool CCVs into requiredCCVs, computes ccvAndExecutorHash.
-        -- For message-only sends (message already constructed at PrepareSend), also
-        -- rebuilds the message and recomputes encodedMessage/messageId with the final hash.
-        choice AddExecutorFee : ContractId SendingMessageV1
+        -- Executor fee, final CCV/executor hash computation, and message finalization.
+        -- Merges outbound pool CCVs into requiredCCVs, derives executor address from
+        -- (executorInstanceId, caller), computes ccvAndExecutorHash, and builds MessageV1.
+        choice AddExecutorWithFee : ContractId SendingMessageV1
             with
                 executorInstanceId : Text
+                executorArgs : BytesHex
+                blockConfirmations : Int
                 feeUSDCents : Decimal
                 destGasLimit : Int
                 destBytesOverhead : Int
                 caller : Party
             controller caller
             do
-                assertMsg "addExecutorFee: fees already finalized" (not feesFinalized)
-                assertMsg "addExecutorFee: already set" (executorFee == None)
+                assertMsg "addExecutorWithFee: fees already finalized" (not feesFinalized)
+                assertMsg "addExecutorWithFee: already set" (executorFee == None)
 
                 let poolCCVs = fromOptional [] outboundPoolCCVs
                 let finalCCVs = dedup (requiredCCVs ++ poolCCVs)
+                let derivedExecutor = CCIP.RawInstanceAddress.make executorInstanceId caller
+
                 let ccvAddrs = map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
-                let execAddr = CCIP.RawInstanceAddress.toInstanceAddress executorAddress
+                let execAddr = CCIP.RawInstanceAddress.toInstanceAddress derivedExecutor
                 let finalHash = CCIP.MessageCodecV1.computeCCVAndExecutorHash ccvAddrs execAddr
 
                 let ef = ExecutorFee with
@@ -201,22 +202,45 @@ template SendingMessageV1
                         destGasLimit = destGasLimit
                         destBytesOverhead = destBytesOverhead
 
-                -- For message-only sends, update the already-constructed message
-                -- with the finalized hash and recompute encoded/messageId.
-                let (updatedMsg, updatedEncoded, updatedMsgId) = case message of
-                        Some msg ->
-                            let newMsg = msg with ccvAndExecutorHash = finalHash
-                                enc = CCIP.MessageCodecV1.encodeMessageV1 newMsg
-                            in (Some newMsg, enc, keccak256 enc)
-                        None -> (None, encodedMessage, messageId)
+                let tokenTransferV1Opt = case tokenSendData of
+                        None -> None
+                        Some tsd -> Some (CCIP.MessageCodecV1.TokenTransferV1 with
+                            sourcePoolAddress = CCIP.MessageCodecV1.encodeInstanceAddress tsd.poolInstanceId tsd.poolOwner
+                            sourceTokenAddress = CCIP.MessageCodecV1.encodeInstrumentId tsd.instrumentId
+                            destTokenAddress = tsd.destTokenAddress
+                            tokenReceiver = tokenReceiver
+                            amount = tsd.amount
+                            extraData = tsd.extraData)
+
+                let messageV1 = CCIP.MessageCodecV1.MessageV1 with
+                        sourceChainSelector
+                        destChainSelector
+                        sequenceNumber
+                        executionGasLimit
+                        ccipReceiveGasLimit
+                        finality = blockConfirmations
+                        ccvAndExecutorHash = finalHash
+                        onRampAddress
+                        offRampAddress
+                        sender = senderAddress
+                        receiver
+                        destBlob = executorArgs
+                        tokenTransfer = tokenTransferV1Opt
+                        messageData = payload
+
+                let encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
+                let msgId = keccak256 encoded
 
                 create this with
                     requiredCCVs = finalCCVs
+                    executorAddress = derivedExecutor
+                    executorArgs = executorArgs
+                    blockConfirmations = blockConfirmations
                     ccvAndExecutorHash = finalHash
                     executorFee = Some ef
-                    message = updatedMsg
-                    encodedMessage = updatedEncoded
-                    messageId = updatedMsgId
+                    message = Some messageV1
+                    encodedMessage = encoded
+                    messageId = msgId
 
         choice AddVerifierData : ContractId SendingMessageV1
             with
@@ -238,9 +262,7 @@ template SendingMessageV1
                     observingParties =
                         dedup (observingParties ++ messageSentObservers)
 
-        -- Constructs MessageV1 from SendingMessageV1 fields with pool-provided
-        -- destTokenAddress and extraData (destPoolData). Requires ccvAndExecutorHash
-        -- to be finalized by AddExecutorFee before this step.
+        -- Stores token send data only. Final message is built in AddExecutorWithFee.
         choice AddTokenSend : ContractId SendingMessageV1
             with
                 poolInstanceId : Text
@@ -253,41 +275,12 @@ template SendingMessageV1
             controller caller
             do
                 assertMsg "token send already set" (isNone tokenSendData)
-                assertMsg "message already constructed" (isNone message)
-                assertMsg "addTokenSend: ccvAndExecutorHash not finalized" (ccvAndExecutorHash /= "")
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
                         destTokenAddress, extraData
 
-                let sourcePoolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
-                        poolInstanceId poolOwner
-                let sourceTokenAddr = CCIP.MessageCodecV1.encodeInstrumentId
-                        instrumentId
-                let tokenTransferV1 = CCIP.MessageCodecV1.TokenTransferV1 with
-                        sourcePoolAddress = sourcePoolAddr
-                        sourceTokenAddress = sourceTokenAddr
-                        destTokenAddress, tokenReceiver, amount, extraData
-                let messageV1 = CCIP.MessageCodecV1.MessageV1 with
-                        sourceChainSelector, destChainSelector, sequenceNumber
-                        executionGasLimit, ccipReceiveGasLimit
-                        finality
-                        ccvAndExecutorHash
-                        onRampAddress, offRampAddress
-                        sender = senderAddress
-                        receiver
-                        destBlob = ""
-                        tokenTransfer = Some tokenTransferV1
-                        messageData = payload
-
-                let encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
-                let msgId = keccak256 encoded
-
-                create this with
-                    tokenSendData = Some tsd
-                    message = Some messageV1
-                    encodedMessage = encoded
-                    messageId = msgId
+                create this with tokenSendData = Some tsd
 
         -- Batch-converts all USD fees to fee token units at a single
         -- price point, applying the fee token's premium multiplier.

@@ -55,8 +55,7 @@ interface ITokenPool where
             context : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             amount : Numeric 0
-            finality : Int
-            extraData : BytesHex
+            tokenArgs : BytesHex
             caller : Party
         controller caller
         do tokenPool_verifyOutboundCCVsImpl this self arg
