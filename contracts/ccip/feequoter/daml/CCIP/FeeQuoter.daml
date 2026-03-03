@@ -96,6 +96,7 @@ template FeeQuoter
                 caller : Party
             controller caller
             do
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
                 let tokenPrice = fromSomeNote
                         ("No price found for " <> sm.feeToken.id)

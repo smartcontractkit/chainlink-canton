@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "08d3ac6f8f4095f2720d8a3af0a0d7ec5101a55a7c2a70e1d06b70b79a2a7ca9"
+	PackageID   = "2e346a413bafa48885020da67eef1be5007eea40b6ebf00206e65df660ffcad9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -394,6 +394,27 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyInboundCCVsWithPackageID
 	}
 }
 
+// LockReleaseTokenPoolVerifyOutboundCCVs exercises the LockReleaseTokenPool_VerifyOutboundCCVs choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyOutboundCCVs(contractID string, args LockReleaseTokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_VerifyOutboundCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolVerifyOutboundCCVsWithPackageID exercises the LockReleaseTokenPool_VerifyOutboundCCVs choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyOutboundCCVsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_VerifyOutboundCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // LockReleaseTokenPoolUpdateChainCCVRequirements exercises the LockReleaseTokenPool_UpdateChainCCVRequirements choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainCCVRequirements(contractID string, args LockReleaseTokenPoolUpdateChainCCVRequirements) *model.ExerciseCommand {
@@ -495,6 +516,27 @@ func (t LockReleaseTokenPool) TokenPoolVerifyInboundCCVsWithPackageID(contractID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
 		ContractID: contractID,
 		Choice:     "TokenPool_VerifyInboundCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenPoolVerifyOutboundCCVs exercises the TokenPool_VerifyOutboundCCVs choice on this LockReleaseTokenPool contract via the IITokenPool interface
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) TokenPoolVerifyOutboundCCVs(contractID string, args interfaces.TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "ITokenPool"),
+		ContractID: contractID,
+		Choice:     "TokenPool_VerifyOutboundCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenPoolVerifyOutboundCCVsWithPackageID exercises the TokenPool_VerifyOutboundCCVs choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) TokenPoolVerifyOutboundCCVsWithPackageID(contractID string, packageID string, args interfaces.TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
+		ContractID: contractID,
+		Choice:     "TokenPool_VerifyOutboundCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -901,6 +943,69 @@ func (t *LockReleaseTokenPoolVerifyInboundCCVs) UnmarshalHex(data string) error 
 	return hexCodec.Unmarshal(data, t)
 }
 
+// LockReleaseTokenPoolVerifyOutboundCCVs is a Record type
+type LockReleaseTokenPoolVerifyOutboundCCVs struct {
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Amount            types.NUMERIC                              `json:"amount"`
+	Finality          types.INT64                                `json:"finality"`
+	ExtraData         types.TEXT                                 `json:"extraData"`
+	Caller            types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts LockReleaseTokenPoolVerifyOutboundCCVs to a map for DAML arguments
+func (t LockReleaseTokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["amount"] = t.Amount
+
+	m["finality"] = int64(t.Finality)
+
+	m["extraData"] = string(t.ExtraData)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t LockReleaseTokenPoolVerifyOutboundCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LockReleaseTokenPoolVerifyOutboundCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LockReleaseTokenPoolVerifyOutboundCCVs to hex string (Canton MCMS format)
+func (t LockReleaseTokenPoolVerifyOutboundCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolVerifyOutboundCCVs from hex string (Canton MCMS format)
+func (t *LockReleaseTokenPoolVerifyOutboundCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // PoolFeeConfig is a Record type
 type PoolFeeConfig struct {
 	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
@@ -1012,6 +1117,7 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolUpdateChainCCVRequirements(args LockReleaseTokenPoolUpdateChainCCVRequirements) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyInboundCCVs(args LockReleaseTokenPoolVerifyInboundCCVs) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1069,6 +1175,11 @@ func (e *encoder) LockReleaseTokenPoolUpdateChainCCVRequirements(args LockReleas
 // LockReleaseTokenPoolVerifyInboundCCVs encodes parameters for the LockReleaseTokenPoolVerifyInboundCCVs choice.
 func (e *encoder) LockReleaseTokenPoolVerifyInboundCCVs(args LockReleaseTokenPoolVerifyInboundCCVs) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyInboundCCVs", args)
+}
+
+// LockReleaseTokenPoolVerifyOutboundCCVs encodes parameters for the LockReleaseTokenPoolVerifyOutboundCCVs choice.
+func (e *encoder) LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyOutboundCCVs", args)
 }
 
 // Verify MCMSEncoder interface implementation

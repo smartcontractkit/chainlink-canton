@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "d17ab23962b4c2814144b9b415f71bdee31d813dcb28ef9218fe602a32207667"
+	PackageID   = "fe67cdfd510139b01e7b42ca22dc831bda8fe1eb9a2bc2161a3c02e9a0f79bb8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -345,6 +345,27 @@ func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicketWithPackageID(
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetOutboundPoolCCVs exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVs(contractID string, args TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetOutboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -753,6 +774,68 @@ func (t *TokenAdminRegistrySetInboundPoolCCVs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TokenAdminRegistrySetOutboundPoolCCVs is a Record type
+type TokenAdminRegistrySetOutboundPoolCCVs struct {
+	SendingMessageCid types.CONTRACT_ID           `json:"sendingMessageCid"`
+	PoolInstanceId    types.TEXT                  `json:"poolInstanceId"`
+	PoolCCVs          []common.RawInstanceAddress `json:"poolCCVs"`
+	Caller            types.PARTY                 `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistrySetOutboundPoolCCVs to a map for DAML arguments
+func (t TokenAdminRegistrySetOutboundPoolCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["poolCCVs"] = func() []any {
+		res := make([]any, 0, len(t.PoolCCVs))
+		for _, e := range t.PoolCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistrySetOutboundPoolCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistrySetOutboundPoolCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistrySetOutboundPoolCCVs to hex string (Canton MCMS format)
+func (t TokenAdminRegistrySetOutboundPoolCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistrySetOutboundPoolCCVs from hex string (Canton MCMS format)
+func (t *TokenAdminRegistrySetOutboundPoolCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistrySetPool is a Record type
 type TokenAdminRegistrySetPool struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
@@ -937,6 +1020,7 @@ type MCMSEncoder interface {
 	TokenAdminRegistryIssueReceiveTicket(args TokenAdminRegistryIssueReceiveTicket) (*bind.EncodedChoice, error)
 	TokenAdminRegistryProposeAdministrator(args TokenAdminRegistryProposeAdministrator) (*bind.EncodedChoice, error)
 	TokenAdminRegistrySetInboundPoolCCVs(args TokenAdminRegistrySetInboundPoolCCVs) (*bind.EncodedChoice, error)
+	TokenAdminRegistrySetOutboundPoolCCVs(args TokenAdminRegistrySetOutboundPoolCCVs) (*bind.EncodedChoice, error)
 	TokenAdminRegistrySetPool(args TokenAdminRegistrySetPool) (*bind.EncodedChoice, error)
 	TokenAdminRegistryTransferAdminRole(args TokenAdminRegistryTransferAdminRole) (*bind.EncodedChoice, error)
 }
@@ -1001,6 +1085,11 @@ func (e *encoder) TokenAdminRegistryProposeAdministrator(args TokenAdminRegistry
 // TokenAdminRegistrySetInboundPoolCCVs encodes parameters for the TokenAdminRegistrySetInboundPoolCCVs choice.
 func (e *encoder) TokenAdminRegistrySetInboundPoolCCVs(args TokenAdminRegistrySetInboundPoolCCVs) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TokenAdminRegistrySetInboundPoolCCVs", args)
+}
+
+// TokenAdminRegistrySetOutboundPoolCCVs encodes parameters for the TokenAdminRegistrySetOutboundPoolCCVs choice.
+func (e *encoder) TokenAdminRegistrySetOutboundPoolCCVs(args TokenAdminRegistrySetOutboundPoolCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("TokenAdminRegistrySetOutboundPoolCCVs", args)
 }
 
 // TokenAdminRegistrySetPool encodes parameters for the TokenAdminRegistrySetPool choice.

@@ -1,0 +1,72 @@
+-- | Test executor implementation for Daml script tests.
+-- Minimal executor that validates chain enablement, block depth, CCV limits,
+-- and charges a flat per-destination fee in USD cents.
+module TestExecutor where
+
+import DA.Foldable qualified as Foldable
+import DA.List (dedup)
+import qualified DA.Map as Map
+import DA.Optional (fromOptional)
+
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.Interfaces.Executor
+import qualified CCIP.SendingMessageV1
+
+template TestExecutor
+    with
+        instanceId : Text
+        owner : Party
+        minBlockConfirmations : Int
+        maxCCVsPerMsg : Int
+        ccvAllowlistEnabled : Bool
+        allowedCCVs : [RawInstanceAddress]
+        remoteChainFeeUSDCents : Map.Map (Numeric 0) Decimal
+    where
+        signatory owner
+
+        interface instance CCIP.Interfaces.Executor.IExecutor for TestExecutor where
+            view = CCIP.Interfaces.Executor.ExecutorView with
+                owner = owner
+
+            executor_calculateFeeImpl _self arg = do
+                exercise (fromInterfaceContractId @TestExecutor _self) TestExecutor_CalculateFee
+                    with
+                        sendingMessageCid = arg.sendingMessageCid
+                        destChainSelector = arg.destChainSelector
+                        requestedBlockDepth = arg.requestedBlockDepth
+                        caller = arg.caller
+
+        nonconsuming choice TestExecutor_CalculateFee
+                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                destChainSelector : Numeric 0
+                requestedBlockDepth : Int
+                caller : Party
+            controller caller
+            do
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
+                sm <- fetch sendingMessageCid
+
+                let canonicalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+
+                assertMsg "executor: dest chain mismatch"
+                    (sm.destChainSelector == destChainSelector)
+                assertMsg "executor: requestedBlockDepth too low"
+                    (requestedBlockDepth == 0 || requestedBlockDepth >= minBlockConfirmations)
+                assertMsg "executor: too many CCVs"
+                    (length canonicalCCVs <= maxCCVsPerMsg)
+                if ccvAllowlistEnabled
+                    then Foldable.forA_ canonicalCCVs (\ccv -> assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVs))
+                    else pure ()
+
+                fee <- case Map.lookup destChainSelector remoteChainFeeUSDCents of
+                    None -> abort "executor: unsupported destination chain"
+                    Some f -> pure f
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddExecutorFee with
+                    executorInstanceId = instanceId
+                    feeUSDCents = fee
+                    destGasLimit = 0
+                    destBytesOverhead = 0
+                    caller = owner

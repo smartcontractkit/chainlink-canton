@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "dff4df9423f42e69bdc23345df02fe99b6916ac3d732f487d6b43e1385220145"
+	PackageID   = "d99506fe1bb5785bd5e2b0bf408e9b198d32ae5d1978d6310d331e425c95a0cb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -45,6 +45,9 @@ type IITokenPool interface {
 
 	// TokenPoolVerifyInboundCCVs executes the TokenPool_VerifyInboundCCVs choice
 	TokenPoolVerifyInboundCCVs(contractID string, args TokenPoolVerifyInboundCCVs) *model.ExerciseCommand
+
+	// TokenPoolVerifyOutboundCCVs executes the TokenPool_VerifyOutboundCCVs choice
+	TokenPoolVerifyOutboundCCVs(contractID string, args TokenPoolVerifyOutboundCCVs) *model.ExerciseCommand
 
 	// TokenPoolReleaseFromTicket executes the TokenPool_ReleaseFromTicket choice
 	TokenPoolReleaseFromTicket(contractID string, args TokenPoolReleaseFromTicket) *model.ExerciseCommand
@@ -728,6 +731,69 @@ func (t TokenPoolVerifyInboundCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes TokenPoolVerifyInboundCCVs from hex string (Canton MCMS format)
 func (t *TokenPoolVerifyInboundCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenPoolVerifyOutboundCCVs is a Record type
+type TokenPoolVerifyOutboundCCVs struct {
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Amount            types.NUMERIC                              `json:"amount"`
+	Finality          types.INT64                                `json:"finality"`
+	ExtraData         types.TEXT                                 `json:"extraData"`
+	Caller            types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenPoolVerifyOutboundCCVs to a map for DAML arguments
+func (t TokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	m["amount"] = t.Amount
+
+	m["finality"] = int64(t.Finality)
+
+	m["extraData"] = string(t.ExtraData)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenPoolVerifyOutboundCCVs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenPoolVerifyOutboundCCVs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenPoolVerifyOutboundCCVs to hex string (Canton MCMS format)
+func (t TokenPoolVerifyOutboundCCVs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenPoolVerifyOutboundCCVs from hex string (Canton MCMS format)
+func (t *TokenPoolVerifyOutboundCCVs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

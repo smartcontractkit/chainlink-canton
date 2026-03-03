@@ -8,7 +8,7 @@ module CCIP.SendingMessageV1 where
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (isNone)
+import DA.Optional (isNone, fromOptional)
 
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
@@ -52,6 +52,15 @@ data TokenSendData = TokenSendData
         extraData : BytesHex
     deriving (Eq, Show)
 
+data ExecutorFee = ExecutorFee
+    with
+        executorInstanceId : Text
+        executorOwner : Party
+        feeUSDCents : Decimal
+        destGasLimit : Int
+        destBytesOverhead : Int
+    deriving (Eq, Show)
+
 template SendingMessageV1
     with
         routerInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
@@ -78,6 +87,15 @@ template SendingMessageV1
         tokenReceiver : BytesHex
         feeToken : Splice.Api.Token.HoldingV1.InstrumentId
         networkFeeUSDCents : Decimal
+        -- Expected token instrument for outbound TAR validation
+        expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
+        -- Pool-required outbound CCVs, set via TAR authorization
+        outboundPoolCCVs : Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
+        -- Executor arguments from extra args
+        executorArgs : BytesHex
+        -- Executor fee, set by AddExecutorFee
+        executorFee : Optional ExecutorFee
+        executorFeeTokenAmount : Numeric 0
         -- Appended to by AddVerifierData
         -- TODO: also allow AddTokenSend to add their own observers
         observingParties : [Party]
@@ -145,6 +163,61 @@ template SendingMessageV1
                         feeUSDCents, destGasOverhead, destBytesOverhead
                 create this with tokenSendFee = Some fee
 
+        -- TAR-authorized outbound pool CCV requirements.
+        choice SetOutboundPoolCCVs : ContractId SendingMessageV1
+            with
+                poolCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+            controller ccipOwner
+            do
+                assertMsg "setOutboundPoolCCVs: already set" (outboundPoolCCVs == None)
+                create this with outboundPoolCCVs = Some poolCCVs
+
+        -- Executor fee and final CCV/executor hash computation.
+        -- Merges outbound pool CCVs into requiredCCVs, computes ccvAndExecutorHash.
+        -- For message-only sends (message already constructed at PrepareSend), also
+        -- rebuilds the message and recomputes encodedMessage/messageId with the final hash.
+        choice AddExecutorFee : ContractId SendingMessageV1
+            with
+                executorInstanceId : Text
+                feeUSDCents : Decimal
+                destGasLimit : Int
+                destBytesOverhead : Int
+                caller : Party
+            controller caller
+            do
+                assertMsg "addExecutorFee: fees already finalized" (not feesFinalized)
+                assertMsg "addExecutorFee: already set" (executorFee == None)
+
+                let poolCCVs = fromOptional [] outboundPoolCCVs
+                let finalCCVs = dedup (requiredCCVs ++ poolCCVs)
+                let ccvAddrs = map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
+                let execAddr = CCIP.RawInstanceAddress.toInstanceAddress executorAddress
+                let finalHash = CCIP.MessageCodecV1.computeCCVAndExecutorHash ccvAddrs execAddr
+
+                let ef = ExecutorFee with
+                        executorInstanceId = executorInstanceId
+                        executorOwner = caller
+                        feeUSDCents = feeUSDCents
+                        destGasLimit = destGasLimit
+                        destBytesOverhead = destBytesOverhead
+
+                -- For message-only sends, update the already-constructed message
+                -- with the finalized hash and recompute encoded/messageId.
+                let (updatedMsg, updatedEncoded, updatedMsgId) = case message of
+                        Some msg ->
+                            let newMsg = msg with ccvAndExecutorHash = finalHash
+                                enc = CCIP.MessageCodecV1.encodeMessageV1 newMsg
+                            in (Some newMsg, enc, keccak256 enc)
+                        None -> (None, encodedMessage, messageId)
+
+                create this with
+                    requiredCCVs = finalCCVs
+                    ccvAndExecutorHash = finalHash
+                    executorFee = Some ef
+                    message = updatedMsg
+                    encodedMessage = updatedEncoded
+                    messageId = updatedMsgId
+
         choice AddVerifierData : ContractId SendingMessageV1
             with
                 ccvInstanceId : Text
@@ -166,9 +239,8 @@ template SendingMessageV1
                         dedup (observingParties ++ messageSentObservers)
 
         -- Constructs MessageV1 from SendingMessageV1 fields with pool-provided
-        -- destTokenAddress and extraData (destPoolData). Merges pool's CCV
-        -- requirements into requiredCCVs and computes ccvAndExecutorHash
-        -- from the unified list. Only valid when message is not yet constructed.
+        -- destTokenAddress and extraData (destPoolData). Requires ccvAndExecutorHash
+        -- to be finalized by AddExecutorFee before this step.
         choice AddTokenSend : ContractId SendingMessageV1
             with
                 poolInstanceId : Text
@@ -177,25 +249,16 @@ template SendingMessageV1
                 amount : Numeric 0
                 destTokenAddress : BytesHex
                 extraData : BytesHex
-                poolRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 caller : Party
             controller caller
             do
                 assertMsg "token send already set" (isNone tokenSendData)
                 assertMsg "message already constructed" (isNone message)
+                assertMsg "addTokenSend: ccvAndExecutorHash not finalized" (ccvAndExecutorHash /= "")
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
                         destTokenAddress, extraData
-
-                -- Merge pool CCVs with existing required CCVs
-                let finalCCVs = dedup (requiredCCVs ++ poolRequiredCCVs)
-                let ccvHashedAddresses =
-                        map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
-                let executorAddr =
-                        CCIP.RawInstanceAddress.toInstanceAddress executorAddress
-                let finalHash = CCIP.MessageCodecV1.computeCCVAndExecutorHash
-                        ccvHashedAddresses executorAddr
 
                 let sourcePoolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
                         poolInstanceId poolOwner
@@ -209,7 +272,7 @@ template SendingMessageV1
                         sourceChainSelector, destChainSelector, sequenceNumber
                         executionGasLimit, ccipReceiveGasLimit
                         finality
-                        ccvAndExecutorHash = finalHash
+                        ccvAndExecutorHash
                         onRampAddress, offRampAddress
                         sender = senderAddress
                         receiver
@@ -221,8 +284,6 @@ template SendingMessageV1
                 let msgId = keccak256 encoded
 
                 create this with
-                    requiredCCVs = finalCCVs
-                    ccvAndExecutorHash = finalHash
                     tokenSendData = Some tsd
                     message = Some messageV1
                     encodedMessage = encoded
@@ -253,12 +314,16 @@ template SendingMessageV1
                 let poolAmount = case tokenSendFee of
                         None -> 0.0
                         Some fee -> convertUSD fee.feeUSDCents
+                let executorAmount = case executorFee of
+                        None -> 0.0
+                        Some fee -> convertUSD fee.feeUSDCents
                 let networkAmount = convertUSD networkFeeUSDCents
 
                 create this with
                     feesFinalized = True
                     ccvFeeTokenAmounts = ccvAmounts
                     tokenSendFeeTokenAmount = poolAmount
+                    executorFeeTokenAmount = executorAmount
                     networkFeeTokenAmount = networkAmount
 
         -- Total fee in fee token units. Matches EVM where
@@ -272,4 +337,5 @@ template SendingMessageV1
                 assertMsg "fees not finalized" feesFinalized
                 pure (Foldable.sum ccvFeeTokenAmounts
                     + tokenSendFeeTokenAmount
+                    + executorFeeTokenAmount
                     + networkFeeTokenAmount)

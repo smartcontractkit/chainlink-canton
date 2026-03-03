@@ -10,6 +10,7 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 
 template TokenAdminRegistry
@@ -195,6 +196,41 @@ template TokenAdminRegistry
                                     assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: owner mismatch"
                                         (ticket.ccipOwner == owner)
                                     archive ticketCid
+
+        -- | Record pool's outbound CCV requirements on a SendingMessageV1.
+        -- Validates the caller is the registered pool for the expected token instrument,
+        -- then exercises SetOutboundPoolCCVs (authorized via TAR's signatory = ccipOwner).
+        nonconsuming choice TokenAdminRegistry_SetOutboundPoolCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                poolInstanceId : Text
+                poolCCVs : [RawInstanceAddress]
+                caller : Party
+            controller caller
+            do
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
+                sm <- fetch sendingMessageCid
+                assertMsg "TAR outbound: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
+                CCIP.RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
+                    instanceId owner sm.tokenAdminRegistryInstanceAddress
+
+                instrumentId <- case sm.expectedTokenInstrumentId of
+                    None -> abort "TAR outbound: missing expected token instrument"
+                    Some iid -> pure iid
+
+                config <- case Map.lookup instrumentId tokenConfigs of
+                    None -> abort "TAR outbound: no config for instrument"
+                    Some c -> pure c
+
+                pool <- case config.tokenPool of
+                    None -> abort "TAR outbound: no pool registered for instrument"
+                    Some p -> pure p
+
+                assertMsg "TAR outbound: caller is not registered pool"
+                    (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.SetOutboundPoolCCVs with
+                    poolCCVs
 
         -- | Record pool's inbound CCV requirements on an ExecutingMessageV1.
         -- Validates the caller is the registered pool for the token in the message,

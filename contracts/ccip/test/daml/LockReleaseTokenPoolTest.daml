@@ -133,7 +133,7 @@ testLockOrBurn = script do
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
             finality = 2000
-            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
             tokenReceiver = "0000000000000000000000000000000000000001"
@@ -142,6 +142,11 @@ testLockOrBurn = script do
             messageId = ""
             feeToken = testInstrumentId
             networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = Some testInstrumentId
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
             ccvFees = []
             tokenSendFee = None
             feesFinalized = False
@@ -151,6 +156,15 @@ testLockOrBurn = script do
             verifierData = []
             tokenSendData = None
             observingParties = [sender]
+
+    -- Finalize ccvAndExecutorHash before LockOrBurn (AddTokenSend requires it)
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+            executorInstanceId = "default-executor"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            caller = ccipOwner
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory

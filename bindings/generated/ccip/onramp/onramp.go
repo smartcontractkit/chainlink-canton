@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "29c33435f1f42d7d7573c7ce46ae2639cae9228faa9565df5144a1f0fc952727"
+	PackageID   = "09fe6d2da344ed59719e0e0a379a8d1de1101479a7fbeac92f2793e4031a8027"
 	SDKVersion  = "3.4.10"
 )
 
@@ -553,21 +553,21 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	RouterPartyOwner      types.PARTY                              `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT                               `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID                        `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID                        `json:"rmnRemoteCid"`
-	DestChainSelector     types.NUMERIC                            `json:"destChainSelector"`
-	Receiver              types.TEXT                               `json:"receiver"`
-	Payload               types.TEXT                               `json:"payload"`
-	CcipReceiveGasLimit   types.INT64                              `json:"ccipReceiveGasLimit"`
-	CurrentSequenceNumber types.NUMERIC                            `json:"currentSequenceNumber"`
-	SenderRequiredCCVs    []common.RawInstanceAddress              `json:"senderRequiredCCVs"`
-	WithTokenTransfer     types.BOOL                               `json:"withTokenTransfer"`
-	TokenReceiver         *types.TEXT                              `json:"tokenReceiver"`
-	FeeToken              splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	RouterPartyOwner      types.PARTY                               `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT                                `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID                         `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID                         `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID                         `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID                         `json:"rmnRemoteCid"`
+	DestChainSelector     types.NUMERIC                             `json:"destChainSelector"`
+	Receiver              types.TEXT                                `json:"receiver"`
+	Payload               types.TEXT                                `json:"payload"`
+	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
+	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
+	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
+	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	TokenReceiver         *types.TEXT                               `json:"tokenReceiver"`
+	FeeToken              splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments
@@ -633,7 +633,16 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 		return res
 	}()
 
-	m["withTokenTransfer"] = bool(t.WithTokenTransfer)
+	if t.TokenInstrumentId != nil {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenInstrumentId,
+		}
+	} else {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	if t.TokenReceiver != nil {
 		m["tokenReceiver"] = map[string]any{

@@ -22,11 +22,13 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
+import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
+import qualified TestExecutor
 import qualified TestToken
 
 
@@ -113,6 +115,17 @@ testCCIPSend = script do
             tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
             ccvRegistryInstanceAddress = ccvRegistryInstanceAddress
 
+    -- Deploy TestExecutor
+    executor <- submit ccipOwner do
+        createCmd TestExecutor.TestExecutor with
+            instanceId = "test-executor"
+            owner = ccipOwner
+            minBlockConfirmations = 0
+            maxCCVsPerMsg = 10
+            ccvAllowlistEnabled = False
+            allowedCCVs = []
+            remoteChainFeeUSDCents = Map.fromList [(destChainSelector, 0.0)]
+
     -- Deploy PerPartyRouter factory
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
@@ -153,9 +166,21 @@ testCCIPSend = script do
             payload = "48656c6c6f20576f726c64"
             ccipReceiveGasLimit = 100000
             senderRequiredCCVs = []
-            withTokenTransfer = False
+            tokenInstrumentId = None
             tokenReceiver = None
             feeToken = testFeeTokenId
+
+    -- Executor fee and hash finalization
+    disclosedExecutor <- fromSome <$> queryDisclosure ccipOwner executor
+    sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedExecutor) do
+        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                sendingMessageCid = sendingMessageCid
+                destChainSelector = destChainSelector
+                requestedBlockDepth = 0
+                executorArgs = ""
+                feeToken = testFeeTokenId
+                caller = ccipOwner
 
     -- FinalizeFee (no CCV/pool fees, just network fee = 0)
     sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedFeeQuoter) do
@@ -213,9 +238,20 @@ testCCIPSend = script do
             payload = "48656c6c6f20576f726c6432"
             ccipReceiveGasLimit = 100000
             senderRequiredCCVs = []
-            withTokenTransfer = False
+            tokenInstrumentId = None
             tokenReceiver = None
             feeToken = testFeeTokenId
+
+    -- Executor fee and hash finalization for second message
+    sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedExecutor) do
+        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                sendingMessageCid = sendingMessageCid2
+                destChainSelector = destChainSelector
+                requestedBlockDepth = 0
+                executorArgs = ""
+                feeToken = testFeeTokenId
+                caller = ccipOwner
 
     sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedFeeQuoter) do
         exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with

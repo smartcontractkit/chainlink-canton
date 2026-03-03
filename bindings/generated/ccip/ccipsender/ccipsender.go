@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "693463ee39bfe5ef5a1f983fde81868473cf0da6cc7a0c4e4a65b0e36d2e05b1"
+	PackageID   = "d820a08c1564c3b50831e665f3a7518d6dd0f926bca645152e95db5c622c244c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -227,6 +227,7 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 type Send struct {
 	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid           types.CONTRACT_ID                          `json:"routerCid"`
+	ExecutorCid         types.CONTRACT_ID                          `json:"executorCid"`
 	DestChainSelector   types.NUMERIC                              `json:"destChainSelector"`
 	Receiver            types.TEXT                                 `json:"receiver"`
 	Payload             types.TEXT                                 `json:"payload"`
@@ -257,6 +258,14 @@ func (t Send) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.RouterCid
+	}()
+
+	m["executorCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutorCid
 	}()
 
 	m["destChainSelector"] = t.DestChainSelector
@@ -355,11 +364,12 @@ func (t *Send) UnmarshalHex(data string) error {
 
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
-	TokenPoolCid    types.CONTRACT_ID     `json:"tokenPoolCid"`
-	TokenInput      interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount          types.NUMERIC         `json:"amount"`
-	TokenReceiver   *types.TEXT           `json:"tokenReceiver"`
+	TokenPoolCid      types.CONTRACT_ID                        `json:"tokenPoolCid"`
+	TokenInput        interfaces.TokenInput                    `json:"tokenInput"`
+	SenderInputCids   []types.CONTRACT_ID                      `json:"senderInputCids"`
+	Amount            types.NUMERIC                            `json:"amount"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	TokenReceiver     *types.TEXT                              `json:"tokenReceiver"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -391,6 +401,14 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	}()
 
 	m["amount"] = t.Amount
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
+	}()
 
 	if t.TokenReceiver != nil {
 		m["tokenReceiver"] = map[string]any{
