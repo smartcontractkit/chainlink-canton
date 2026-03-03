@@ -57,6 +57,7 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 		blockchainInfo.GRPCLedgerAPIURL,
 		blockchainInfo.JWT,
 		sourcereader.ReaderConfig{
+			NodeOperatorParty:         readerConfig.NodeOperatorParty,
 			CCIPOwnerParty:            readerConfig.CCIPOwnerParty,
 			CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 			Authority:                 readerConfig.Authority,
