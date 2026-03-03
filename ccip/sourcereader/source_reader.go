@@ -45,6 +45,9 @@ const (
 
 // ReaderConfig is the configuration required to create a canton source reader.
 type ReaderConfig struct {
+	// NodeOperatorParty is the observer party that node operators will use to observe CCIPMessageSent events.
+	// This is used to filter out events that are not observed by the node operator.
+	NodeOperatorParty string `toml:"node_operator_party"`
 	// CCIPOwnerParty is the party that we expect to be present in the CCIPMessageSent.ccipOwner field.
 	// This proves that the ccipOwner is a signatory on the CCIPMessageSent contract(event).
 	CCIPOwnerParty string `toml:"ccip_owner_party"`
@@ -144,7 +147,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 				TransactionShape: ledgerv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
 				EventFormat: &ledgerv2.EventFormat{
 					FiltersByParty: map[string]*ledgerv2.Filters{
-						c.config.CCIPOwnerParty: {
+						c.config.NodeOperatorParty: {
 							Cumulative: []*ledgerv2.CumulativeFilter{
 								{
 									IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{

@@ -144,6 +144,7 @@ func TestCantonSourceReader(t *testing.T) {
 		grpcURL,
 		jwt,
 		sourcereader.ReaderConfig{
+			NodeOperatorParty:         party,
 			CCIPOwnerParty:            ccipOwner,
 			CCIPMessageSentTemplateID: fmt.Sprintf("%s:%s:%s", ccipMessageSentTemplateID.PackageId, ccipMessageSentTemplateID.ModuleName, ccipMessageSentTemplateID.EntityName),
 		},

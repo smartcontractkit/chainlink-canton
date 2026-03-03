@@ -145,6 +145,8 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		for _, partyDetail := range resp.PartyDetails {
 			if strings.HasPrefix(partyDetail.GetParty(), readerConfig.CCIPOwnerParty) {
 				cantonConfigs.ReaderConfigs[strSelector] = sourcereader.ReaderConfig{
+					// TODO: ideally node operator party and ccip owner party should be separate parties.
+					NodeOperatorParty:         partyDetail.GetParty(),
 					CCIPOwnerParty:            partyDetail.GetParty(),
 					CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 					Authority:                 authority,
