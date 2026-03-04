@@ -1,0 +1,26 @@
+module CCIP.Interfaces.Executor where
+
+import DA.Crypto.Text (BytesHex)
+import qualified CCIP.SendingMessageV1
+
+interface IExecutor where
+    viewtype ExecutorView
+
+    executor_calculateFeeImpl :
+        ContractId IExecutor ->
+        Executor_CalculateFee ->
+        Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
+
+    nonconsuming choice Executor_CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        with
+            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            executorArgs : BytesHex
+            caller : Party
+        controller caller
+        do executor_calculateFeeImpl this self arg
+
+
+data ExecutorView = ExecutorView
+    with
+        owner : Party
+    deriving (Eq, Show)

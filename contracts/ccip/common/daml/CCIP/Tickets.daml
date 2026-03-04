@@ -10,6 +10,7 @@ import qualified Splice.Api.Token.HoldingV1
 data IssuerType
     = IssuerType_CCV      -- Cross-chain verifier
     | IssuerType_Pool     -- Token pool
+    | IssuerType_Executor -- Executor
     | IssuerType_Network  -- Network/protocol fee
     deriving (Eq, Show)
 
