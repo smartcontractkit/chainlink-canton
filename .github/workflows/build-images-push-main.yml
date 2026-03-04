@@ -1,42 +1,28 @@
-name: Committee Verifier Docker Build and Publish
+name: Build and publish Docker images
 on:
   push:
-    branches: [develop, main]
+    branches: [ main ]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-committeeverifier:
     name: Build and publish committee verifier image
     permissions:
       id-token: write
       contents: read
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-      ECR_REPOSITORY: ${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-      - name: Validate ECR configuration for push
-        run: |
-          if [ -z "$ECR_REGISTRY" ]; then
-            echo "ECR registry secret (ECR_REGISTRY) is not set"
-            exit 1
-          fi
-          if [ -z "$ECR_REPOSITORY" ]; then
-            echo "Repository secret COMMITTEE_VERIFIER_ECR_REPOSITORY is not set"
-            exit 1
-          fi
       - name: Authenticate to AWS ECR
         uses: ./.github/actions/aws-ecr-auth
         with:
           role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: us-west-2
           registry-type: private
       - name: Build and push image to ECR
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
@@ -47,3 +33,30 @@ jobs:
           tags: |
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}:${{ github.sha }}
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}:latest
+
+  build-eds:
+    name: Build and publish EDS image
+    permissions:
+      id-token: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      - name: Authenticate to AWS ECR
+        uses: ./.github/actions/aws-ecr-auth
+        with:
+          role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
+          aws-region: us-west-2
+          registry-type: private
+      - name: Build and push image to ECR
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: eds/eds.Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.EDS_ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.EDS_ECR_REPOSITORY }}:latest

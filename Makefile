@@ -60,7 +60,7 @@ build-committeeverifier:
 
 .PHONY: build-eds
 build-eds:
-	docker build -t canton-eds:latest -f eds/Dockerfile .
+	docker build -t canton-eds:latest -f eds/eds.Dockerfile .
 
 ## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
 .PHONY: build-ccv-images
