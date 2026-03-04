@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -33,7 +34,11 @@ import (
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {
-	chainDetails, err := chainsel.GetChainDetails(cfg.ChainSelector)
+	chainSelector, err := strconv.ParseUint(cfg.ChainSelector, 10, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse chain selector: %w", err)
+	}
+	chainDetails, err := chainsel.GetChainDetails(chainSelector)
 	if err != nil {
 		return fmt.Errorf("failed to get chain details: %w", err)
 	}
@@ -58,13 +63,15 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	chain, err := provider.NewRPCChainProvider(chainDetails.ChainSelector, provider.RPCChainProviderConfig{
 		Participants: []provider.ParticipantConfig{
 			{
-				JSONLedgerAPIURL: "json-ledger-api",
-				GRPCLedgerAPIURL: cfg.Node.URL,    // not used, but currently required
-				AdminAPIURL:      "",              // not used
-				ValidatorAPIURL:  "validator-api", // not used, but currently required
-				UserID:           cfg.Node.AuthConfig.UserID,
-				PartyID:          "party-id", // not used, will be taken from contract config instead
-				AuthProvider:     authProvider,
+				Endpoints: provider.Endpoints{
+					JSONLedgerAPIURL: "", // not used
+					GRPCLedgerAPIURL: cfg.Node.URL,
+					AdminAPIURL:      "", // not used
+					ValidatorAPIURL:  "", // not used
+				},
+				UserID:       cfg.Node.AuthConfig.UserID,
+				PartyID:      "party-id", // not used, will be taken from contract config instead
+				AuthProvider: authProvider,
 			},
 		},
 	}).Initialize(ctx)

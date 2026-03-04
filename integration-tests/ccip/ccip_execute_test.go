@@ -351,7 +351,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	go func() {
 		log.Info().Msg("Running EDS...")
 		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
-			ChainSelector: env.Chain.ChainSelector(),
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
 			Server: config.ServerConfig{
 				Host: "0.0.0.0",
 				Port: uint16(edsPort), //nolint:gosec // this is a port number

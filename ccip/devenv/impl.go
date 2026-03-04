@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
@@ -16,6 +15,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/freeport"
+
+	deployment2 "github.com/smartcontractkit/chainlink-canton/deployment"
+	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
@@ -85,6 +88,10 @@ type Chain struct {
 	chain        canton.Chain
 	logger       zerolog.Logger
 	chainDetails chainsel.ChainDetails
+}
+
+func (c *Chain) ChainSelector() uint64 {
+	return c.chainDetails.ChainSelector
 }
 
 func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
@@ -316,7 +323,41 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		return nil, fmt.Errorf("failed to add executor proxy address ref: %w", err)
 	}
 
-	return runningDS.Seal(), nil
+	env.DataStore = runningDS.Seal()
+
+	// Generate EDS config
+	ports, err := freeport.Take(1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to take free port: %w", err)
+	}
+	out, err = cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[edsConfig.ServerConfig]{
+		ChainSelector: selector,
+		Participant:   0,
+		Config: edsConfig.ServerConfig{
+			Host: "0.0.0.0",
+			Port: uint16(ports[0]), //nolint:gosec // This is a port
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate EDS config for selector %d: %w", selector, err)
+	}
+	err = runningDS.Merge(out.DataStore.Seal())
+	if err != nil {
+		return nil, err
+	}
+
+	// Start EDS container
+	// TODO this should be made part of the generic service API instead
+	ds := runningDS.Seal()
+	edsCfg, err := deployment2.GetEDSConfig(ds)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get EDS config: %w", err)
+	}
+	if _, err := StartEDS(ctx, edsCfg); err != nil {
+		return nil, fmt.Errorf("failed to start EDS: %w", err)
+	}
+
+	return ds, nil
 }
 
 // ConnectContractsWithSelectors implements cciptestinterfaces.CCIP17Configuration.
@@ -562,7 +603,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 }
 
 // SendMessageWithNonce implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *atomic.Uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
+func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
 	return cciptestinterfaces.MessageSentEvent{}, nil // TODO: implement
 }
 
@@ -579,4 +620,14 @@ func (c *Chain) WaitOneExecEventBySeqNo(ctx context.Context, from, seq uint64, t
 // WaitOneSentEventBySeqNo implements cciptestinterfaces.CCIP17.
 func (c *Chain) WaitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
 	return cciptestinterfaces.MessageSentEvent{}, nil // TODO: implement
+}
+
+func (c *Chain) NativeBalance(ctx context.Context, address protocol.UnknownAddress) (*big.Int, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (c *Chain) TransferNative(ctx context.Context, from, to protocol.UnknownAddress, amount *big.Int) error {
+	// TODO implement me
+	panic("implement me")
 }
