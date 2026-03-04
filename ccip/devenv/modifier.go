@@ -13,17 +13,43 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
-	"github.com/smartcontractkit/chainlink-ccv/integration/pkg/sourcereader/canton"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/go-daml/pkg/auth"
 	"github.com/testcontainers/testcontainers-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/smartcontractkit/chainlink-canton/ccip"
+	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 )
 
 const (
 	DefaultCantonCommitteVerifierImage = "committeeverifier-canton:latest"
 )
+
+func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any, error) {
+	ret := make(map[string]any)
+	for _, output := range outputs {
+		if output.Family != chainsel.FamilyCanton {
+			continue
+		}
+
+		chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(output.ChainID, output.Family)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get chain details for chain %s, family %s: %w", output.ChainID, output.Family, err)
+		}
+
+		strSelector := strconv.FormatUint(chainDetails.ChainSelector, 10)
+
+		// Return placeholder values here, the real values will be pulled from the mounted config in the container.
+		ret[strSelector] = ccip.BlockchainInfo{
+			GRPCLedgerAPIURL: "dontuse",
+			JWT:              "dontuse",
+		}
+	}
+
+	return ret, nil
+}
 
 // CommitteeVerifierModifier modifies a testcontainers.ContainerRequest for canton.
 func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInput *committeeverifier.Input, outputs []*blockchain.Output) (testcontainers.ContainerRequest, error) {
@@ -51,7 +77,7 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 	//nolint:staticcheck // we're still using it...
 	req.Mounts = append(req.Mounts, testcontainers.BindMount(
 		cantonConfigFilePath,
-		canton.DefaultCantonConfigPath,
+		ccip.DefaultCantonConfigPath,
 	))
 
 	return req, nil
@@ -59,7 +85,7 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 
 // hydrateAndMarshalCantonConfig hydrates the canton config with the full party ID for the CCIPOwnerParty.
 func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*blockchain.Output) ([]byte, error) {
-	cantonConfigs, err := util.OpaqueToConcreteStrict[canton.Config](in.CantonConfigs)
+	cantonConfigs, err := util.OpaqueToConcreteStrict[ccip.Config](in.CantonConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get canton config from opaque: %w", err)
 	}
@@ -93,6 +119,13 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
 
+		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
+			// TODO: we should get the port number programmatically somehow.
+			// This is the default nginx port for the canton ledger API.
+			GRPCLedgerAPIURL: fmt.Sprintf("%s:8080", output.ContainerName),
+			JWT:              jwt,
+		}
+
 		// find the party that starts with the prefix that is listed in the canton config.
 		conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithPerRPCCredentials(auth.NewBearerToken(jwt)))
 		if err != nil {
@@ -111,7 +144,9 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		var found bool
 		for _, partyDetail := range resp.PartyDetails {
 			if strings.HasPrefix(partyDetail.GetParty(), readerConfig.CCIPOwnerParty) {
-				cantonConfigs.ReaderConfigs[strSelector] = canton.ReaderConfig{
+				cantonConfigs.ReaderConfigs[strSelector] = sourcereader.ReaderConfig{
+					// TODO: ideally node operator party and ccip owner party should be separate parties.
+					NodeOperatorParty:         partyDetail.GetParty(),
 					CCIPOwnerParty:            partyDetail.GetParty(),
 					CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 					Authority:                 authority,
@@ -131,6 +166,13 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal canton config: %w", err)
 	}
+
+	// to reduce confusion, re-set the config in the input to what we generated here
+	// so that env-out.toml has the real values, not the placeholder values.
+	newOpaque := make(util.OpaqueConfig)
+	newOpaque["reader_configs"] = cantonConfigs.ReaderConfigs
+	newOpaque["blockchain_infos"] = cantonConfigs.BlockchainInfos
+	in.CantonConfigs = newOpaque
 
 	return cantonConfigBytes, nil
 }

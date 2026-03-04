@@ -135,6 +135,7 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	t.Parallel()
 	const ccipOwner = "owner-party"
+	const nopParty = "node-operator-party"
 	var (
 		templateID = &ledgerv2.Identifier{
 			PackageId:  "pkg",
@@ -252,6 +253,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
@@ -369,6 +371,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
@@ -397,6 +400,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
@@ -431,6 +435,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
@@ -598,6 +603,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
@@ -751,6 +757,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
@@ -873,6 +880,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			updateServiceClient: updateClient,
 			jwt:                 "token",
 			config: ReaderConfig{
+				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
 				CCIPMessageSentTemplateID: templateIDStr,
 			},
