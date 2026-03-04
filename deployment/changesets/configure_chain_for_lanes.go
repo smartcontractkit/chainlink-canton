@@ -3,11 +3,12 @@ package changesets
 import (
 	"fmt"
 
+	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	deploymentadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 )
 
@@ -34,13 +35,9 @@ func (c ConfigureChainForLanes) VerifyPreconditions(e cldf.Environment, config C
 func (c ConfigureChainForLanes) Apply(e cldf.Environment, config CantonCSDeps[ConfigureChainForLanesConfig]) (cldf.ChangesetOutput, error) {
 	ds := datastore.NewMemoryDataStore()
 
-	chain := e.BlockChains.CantonChains()[config.ChainSelector]
-
-	deps := dependencies.CantonDeps{
-		Chain: chain,
-	}
-
-	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.ConfigureChainForLanes, deps, config.Config.Input)
+	chainFamily := deploymentadapters.NewCantonChainFamilyAdapter()
+	ccipInput := toCCIPConfigureChainForLanesInput(config.Config.Input)
+	out, err := operations.ExecuteSequence(e.OperationsBundle, chainFamily.ConfigureChainForLanes(), e.BlockChains, ccipInput)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to execute DeployChainContracts sequence: %w", err)
 	}
@@ -55,4 +52,61 @@ func (c ConfigureChainForLanes) Apply(e cldf.Environment, config CantonCSDeps[Co
 		DataStore: ds,
 		Reports:   []operations.Report[any, any]{},
 	}, nil
+}
+
+func toCCIPConfigureChainForLanesInput(input sequences.ConfigureChainForLanesInput) ccipadapters.ConfigureChainForLanesInput {
+	out := ccipadapters.ConfigureChainForLanesInput{
+		ChainSelector:      input.ChainSelector,
+		Router:             input.GlobalConfig.Hex(), // Canton-specific: adapter maps this back to GlobalConfig.
+		OnRamp:             input.OnRamp.Hex(),
+		FeeQuoter:          input.FeeQuoter.Hex(),
+		OffRamp:            input.OffRamp.Hex(),
+		CommitteeVerifiers: make([]ccipadapters.CommitteeVerifierConfig[datastore.AddressRef], 0, len(input.CommitteeVerifiers)),
+		RemoteChains:       make(map[uint64]ccipadapters.RemoteChainConfig[[]byte, string], len(input.RemoteChains)),
+	}
+
+	for _, committee := range input.CommitteeVerifiers {
+		cv := ccipadapters.CommitteeVerifierConfig[datastore.AddressRef]{
+			CommitteeVerifier: make([]datastore.AddressRef, 0, len(committee.CommitteeVerifier)),
+			RemoteChains:      committee.RemoteChains,
+		}
+		for _, address := range committee.CommitteeVerifier {
+			cv.CommitteeVerifier = append(cv.CommitteeVerifier, datastore.AddressRef{
+				Address: address.Hex(),
+			})
+		}
+		out.CommitteeVerifiers = append(out.CommitteeVerifiers, cv)
+	}
+
+	for selector, rc := range input.RemoteChains {
+		remote := ccipadapters.RemoteChainConfig[[]byte, string]{
+			AllowTrafficFrom:         rc.AllowTrafficFrom,
+			OnRamps:                  rc.OnRamps,
+			OffRamp:                  rc.OffRamp,
+			DefaultInboundCCVs:       make([]string, 0, len(rc.DefaultInboundCCVs)),
+			LaneMandatedInboundCCVs:  make([]string, 0, len(rc.LaneMandatedInboundCCVs)),
+			DefaultOutboundCCVs:      make([]string, 0, len(rc.DefaultOutboundCCVs)),
+			LaneMandatedOutboundCCVs: make([]string, 0, len(rc.LaneMandatedOutboundCCVs)),
+			DefaultExecutor:          rc.DefaultExecutor.String(),
+			FeeQuoterDestChainConfig: rc.FeeQuoterDestChainConfig,
+			ExecutorDestChainConfig:  rc.ExecutorDestChainConfig,
+			AddressBytesLength:       rc.AddressBytesLength,
+			BaseExecutionGasCost:     rc.BaseExecutionGasCost,
+		}
+		for _, v := range rc.DefaultInboundCCVs {
+			remote.DefaultInboundCCVs = append(remote.DefaultInboundCCVs, v.String())
+		}
+		for _, v := range rc.LaneMandatedInboundCCVs {
+			remote.LaneMandatedInboundCCVs = append(remote.LaneMandatedInboundCCVs, v.String())
+		}
+		for _, v := range rc.DefaultOutboundCCVs {
+			remote.DefaultOutboundCCVs = append(remote.DefaultOutboundCCVs, v.String())
+		}
+		for _, v := range rc.LaneMandatedOutboundCCVs {
+			remote.LaneMandatedOutboundCCVs = append(remote.LaneMandatedOutboundCCVs, v.String())
+		}
+		out.RemoteChains[selector] = remote
+	}
+
+	return out
 }
