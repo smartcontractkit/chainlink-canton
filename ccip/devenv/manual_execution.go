@@ -140,7 +140,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	for i, verifier := range verifiers {
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
-	disclosedContracts, choiceContext, ccvContractIDs, err := c.GetDisclosuresForExecutionFromACS(ctx, ccvs)
+	disclosedContracts, choiceContext, ccvContractIDs, err := c.GetDisclosuresForExecution(ctx, ccvs)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
