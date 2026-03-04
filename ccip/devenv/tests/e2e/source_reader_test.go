@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -142,7 +143,7 @@ func TestCantonSourceReader(t *testing.T) {
 	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Test(t),
 		grpcURL,
-		jwt,
+		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: jwt}),
 		sourcereader.ReaderConfig{
 			NodeOperatorParty:         party,
 			CCIPOwnerParty:            ccipOwner,

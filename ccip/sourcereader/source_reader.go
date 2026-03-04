@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -78,15 +79,16 @@ type sourceReader struct {
 	lggr                logger.Logger
 	stateServiceClient  ledgerv2.StateServiceClient
 	updateServiceClient ledgerv2.UpdateServiceClient
-	jwt                 string
+	tokenSource         oauth2.TokenSource
 
 	config ReaderConfig
 }
 
+// NewSourceReader creates a new canton source reader using an oauth2.TokenSource for auth.
 func NewSourceReader(
 	lggr logger.Logger,
-	grpcEndpoint,
-	jwt string,
+	grpcEndpoint string,
+	tokenSource oauth2.TokenSource,
 	config ReaderConfig,
 	opts ...grpc.DialOption,
 ) (chainaccess.SourceReader, error) {
@@ -105,7 +107,7 @@ func NewSourceReader(
 		lggr:                lggr,
 		stateServiceClient:  ledgerv2.NewStateServiceClient(conn),
 		updateServiceClient: ledgerv2.NewUpdateServiceClient(conn),
-		jwt:                 jwt,
+		tokenSource:         tokenSource,
 		config:              config,
 	}, nil
 }
@@ -483,7 +485,12 @@ func (c *sourceReader) LatestAndFinalizedBlock(ctx context.Context) (latest, fin
 }
 
 func (c *sourceReader) authCtx(ctx context.Context) context.Context {
-	return metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", c.jwt)))
+	token, err := c.tokenSource.Token()
+	if err != nil {
+		c.lggr.Errorw("failed to obtain auth token, proceeding without authorization", "err", err)
+		return ctx
+	}
+	return metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", token.AccessToken)))
 }
 
 func intToBytes32(i uint64) protocol.Bytes32 {
