@@ -6,6 +6,7 @@ import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cli"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/chainconfig"
@@ -22,6 +23,7 @@ var tokenPoolVersions = []string{
 }
 
 func init() {
+	ccv.RegisterLauncher(chain_selectors.FamilyCanton, cantondevenv.NewLauncher())
 	// Register the canton modifier for the canton family.
 	committeeverifier.RegisterModifier(chain_selectors.FamilyCanton, cantondevenv.CommitteeVerifierModifier)
 	// Register the canton chain config loader for the canton family.
