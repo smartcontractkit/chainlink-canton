@@ -10,6 +10,8 @@ import (
 )
 
 func TestToCantonConfigureChainForLanesInput_Valid(t *testing.T) {
+	t.Parallel()
+
 	in := ccipadapters.ConfigureChainForLanesInput{
 		ChainSelector: 1,
 		Router:        "0x01",
@@ -38,6 +40,8 @@ func TestToCantonConfigureChainForLanesInput_Valid(t *testing.T) {
 }
 
 func TestToCantonConfigureChainForLanesInput_RequiresCoreFields(t *testing.T) {
+	t.Parallel()
+
 	_, err := toCantonConfigureChainForLanesInput(ccipadapters.ConfigureChainForLanesInput{
 		ChainSelector: 1,
 		OnRamp:        "0x02",
@@ -47,4 +51,3 @@ func TestToCantonConfigureChainForLanesInput_RequiresCoreFields(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "Router")
 }
-

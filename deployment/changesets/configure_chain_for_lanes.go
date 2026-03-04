@@ -3,8 +3,8 @@ package changesets
 import (
 	"fmt"
 
-	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	deploymentadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"

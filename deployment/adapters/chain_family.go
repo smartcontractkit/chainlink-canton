@@ -28,4 +28,3 @@ func (c *CantonChainFamilyAdapter) ConfigureChainForLanes() *operations.Sequence
 func (c *CantonChainFamilyAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
 	return contracts.HexToInstanceAddress(ref.Address).Bytes(), nil
 }
-
