@@ -3,31 +3,23 @@
 The `devenv` package contains the needed implementations needed to properly spin up a CCIP
 environment that includes Canton.
 
+## Prerequisites
+
+Make sure to checkout [chainlink-ccv](https://github.com/smartcontractkit/chainlink-ccv/) in a parallel directory,
+i.e. so that chainlink-canton and chainlink-ccv have the same parent directory. This is needed so that we can build
+needed docker images.
+
 ## Spin up an environment
 
-### Build needed Docker images
-
-Check out `smartcontractkit/chainlink-ccv` and run the following:
+The quickest way to run the EVM/Canton environment is from the root of the repo:
 
 ```bash
-# From chainlink-ccv root
-cd build/devenv
-just build-docker
+# From chainlink-canton root
+make start-devenv
 ```
 
-From `chainlink-canton` run the following to build the Canton committee verifier:
-
-```bash
-make build-committeeverifier
-```
-
-### Spin up the env
-
-```bash
-# From repo root
-cd ccip/devenv
-go run cmd/ccv/main.go up env-canton-evm.toml
-```
+This will build all the necessary docker images from chainlink-ccv and chainlink-canton, and spin up an environment with
+both EVM and Canton chains.
 
 ## Run a test
 
@@ -35,6 +27,14 @@ After the environment is spun up, you can run a test like:
 
 ```bash
 # From repo root
-cd ccip/devenv/tests/e2e
-go test -v -run "TestEVM2Canton_Basic" .
+make run-e2e-tests
+```
+
+## Shortcut
+
+If you want to build docker images, spin up a new env, and run the test in a single command, the following is useful:
+
+```bash
+# From repo root
+make build-run-e2e-tests
 ```

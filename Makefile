@@ -57,3 +57,19 @@ fix-all: contracts go-generate gomodtidy golangci-lint-fix-all
 .PHONY: build-committeeverifier
 build-committeeverifier:
 	docker build -t committeeverifier-canton:latest -f ccip/committee_verifier.Dockerfile .
+
+## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
+.PHONY: build-ccv-images
+build-ccv-images:
+	cd ../chainlink-ccv/build/devenv && just build-docker
+
+.PHONY: start-devenv
+start-devenv: build-ccv-images build-committeeverifier
+	cd ccip/devenv && go run cmd/ccv/main.go down && go run cmd/ccv/main.go up env-canton-evm.toml
+
+.PHONY: run-e2e-tests
+run-e2e-tests:
+	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCantonSourceReader
+
+.PHONY: build-run-e2e-tests
+build-run-e2e-tests: start-devenv run-e2e-tests

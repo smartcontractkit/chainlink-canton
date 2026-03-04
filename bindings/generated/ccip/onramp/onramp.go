@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "29c33435f1f42d7d7573c7ce46ae2639cae9228faa9565df5144a1f0fc952727"
+	PackageID   = "a32d762522a4ec99ab7f689f7a1469c1e776fc42772fbaba2ee37bb5b6ca6e21"
 	SDKVersion  = "3.4.10"
 )
 
@@ -467,6 +467,27 @@ func (t OnRamp) CCIPSendFromRouterWithPackageID(contractID string, packageID str
 	}
 }
 
+// PrepareSendFromRouter exercises the PrepareSendFromRouter choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) PrepareSendFromRouter(contractID string, args PrepareSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "PrepareSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// PrepareSendFromRouterWithPackageID exercises the PrepareSendFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) PrepareSendFromRouterWithPackageID(contractID string, packageID string, args PrepareSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "PrepareSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CancelSendFromRouter exercises the CancelSendFromRouter choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) CancelSendFromRouter(contractID string, args CancelSendFromRouter) *model.ExerciseCommand {
@@ -509,27 +530,6 @@ func (t OnRamp) GetRequiredCCVsForSendWithPackageID(contractID string, packageID
 	}
 }
 
-// PrepareSendFromRouter exercises the PrepareSendFromRouter choice on this OnRamp contract
-// This method uses the package name in the template ID
-func (t OnRamp) PrepareSendFromRouter(contractID string, args PrepareSendFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "PrepareSendFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// PrepareSendFromRouterWithPackageID exercises the PrepareSendFromRouter choice using the provided package ID instead of package name
-func (t OnRamp) PrepareSendFromRouterWithPackageID(contractID string, packageID string, args PrepareSendFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "PrepareSendFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // Archive exercises the Archive choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) Archive(contractID string) *model.ExerciseCommand {
@@ -553,21 +553,22 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	RouterPartyOwner      types.PARTY                              `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT                               `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID                        `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID                        `json:"rmnRemoteCid"`
-	DestChainSelector     types.NUMERIC                            `json:"destChainSelector"`
-	Receiver              types.TEXT                               `json:"receiver"`
-	Payload               types.TEXT                               `json:"payload"`
-	CcipReceiveGasLimit   types.INT64                              `json:"ccipReceiveGasLimit"`
-	CurrentSequenceNumber types.NUMERIC                            `json:"currentSequenceNumber"`
-	SenderRequiredCCVs    []common.RawInstanceAddress              `json:"senderRequiredCCVs"`
-	WithTokenTransfer     types.BOOL                               `json:"withTokenTransfer"`
-	TokenReceiver         *types.TEXT                              `json:"tokenReceiver"`
-	FeeToken              splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	RouterPartyOwner      types.PARTY                               `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT                                `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID                         `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID                         `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID                         `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID                         `json:"rmnRemoteCid"`
+	DestChainSelector     types.NUMERIC                             `json:"destChainSelector"`
+	Receiver              types.TEXT                                `json:"receiver"`
+	Payload               types.TEXT                                `json:"payload"`
+	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
+	BlockConfirmations    *types.INT64                              `json:"blockConfirmations"`
+	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
+	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
+	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	TokenReceiver         *types.TEXT                               `json:"tokenReceiver"`
+	FeeToken              splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments
@@ -618,6 +619,17 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
 
+	if t.BlockConfirmations != nil {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.BlockConfirmations),
+		}
+	} else {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
 	m["currentSequenceNumber"] = t.CurrentSequenceNumber
 
 	m["senderRequiredCCVs"] = func() []any {
@@ -633,7 +645,16 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 		return res
 	}()
 
-	m["withTokenTransfer"] = bool(t.WithTokenTransfer)
+	if t.TokenInstrumentId != nil {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenInstrumentId,
+		}
+	} else {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	if t.TokenReceiver != nil {
 		m["tokenReceiver"] = map[string]any{

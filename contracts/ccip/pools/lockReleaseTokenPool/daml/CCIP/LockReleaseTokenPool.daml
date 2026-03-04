@@ -109,6 +109,15 @@ template LockReleaseTokenPool
                         executingMessageCid = arg.executingMessageCid
                         caller = arg.caller
 
+            tokenPool_verifyOutboundCCVsImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyOutboundCCVs
+                    with
+                        context = arg.context
+                        sendingMessageCid = arg.sendingMessageCid
+                        amount = arg.amount
+                        tokenArgs = arg.tokenArgs
+                        caller = arg.caller
+
             tokenPool_releaseFromTicketImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_ReleaseFromTicket
                     with
@@ -184,6 +193,33 @@ template LockReleaseTokenPool
                         executingMessageCid
                         poolInstanceId = instanceId
                         poolCCVs = requiredAddrs
+                        caller = poolOwner
+
+        -- Declare outbound CCV requirements on SendingMessageV1 via TAR.
+        -- Looks up per-chain CCV requirements and records them on the sending message.
+        nonconsuming choice LockReleaseTokenPool_VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                amount : Numeric 0
+                tokenArgs : BytesHex
+                caller : Party
+            controller caller
+            do
+                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
+
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
+                sm <- fetch sendingMessageCid
+
+                let poolCCVs = case Map.lookup sm.destChainSelector chainCCVRequirements of
+                        None -> []
+                        Some cfg -> cfg.outboundCCVs
+
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_SetOutboundPoolCCVs with
+                        sendingMessageCid = sendingMessageCid
+                        poolInstanceId = instanceId
+                        poolCCVs = poolCCVs
                         caller = poolOwner
 
         -- Release tokens by consuming a TokenReceiveTicket via TokenAdminRegistry.
@@ -279,6 +315,7 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
                 let feeConfig = fromSomeNote "no pool fee config for dest chain"
                         (Map.lookup sendingMsg.destChainSelector chainFeeConfigs)
@@ -294,8 +331,7 @@ template LockReleaseTokenPool
 
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.
-        -- Passes pool's outbound CCV requirements to AddTokenSend for
-        -- merging into the unified requiredCCVs list.
+        -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
         nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
@@ -306,20 +342,15 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller, poolOwner
             do
-                -- Get Cids from context
                 rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
 
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
 
-                -- Best-effort RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner
                     chainSelector = sendingMsg.destChainSelector
                 assertMsg "LockOrBurn: dest chain is cursed" (not isCursed)
-
-                let poolRequiredCCVs = case Map.lookup sendingMsg.destChainSelector chainCCVRequirements of
-                        None -> []
-                        Some config -> config.outboundCCVs
 
                 let destTokenAddr = fromSomeNote
                         "LockOrBurn: no remote token for dest chain"
@@ -351,9 +382,6 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
-                -- AddTokenSend merges poolRequiredCCVs into the unified CCV list
-                -- and constructs MessageV1 from SendingMessageV1 fields.
-                -- OnRamp cross-validates pool identity against TAR at CCIPSend.
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.AddTokenSend with
@@ -363,7 +391,6 @@ template LockReleaseTokenPool
                         amount = amount
                         destTokenAddress = destTokenAddr
                         extraData = extraData
-                        poolRequiredCCVs = poolRequiredCCVs
                         caller = poolOwner
 
                 case transferResult.output of
