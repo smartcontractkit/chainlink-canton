@@ -38,7 +38,7 @@ var ConfigureChainForLanesAdapter = operations.NewSequence(
 		out, err := operations.ExecuteSequence(
 			b,
 			ConfigureChainForLanes,
-			dependencies.CantonDeps{Chain: chain, Participant: 0},
+			dependencies.CantonDeps{Chain: chain},
 			localInput,
 		)
 		if err != nil {
