@@ -31,7 +31,7 @@ func init() {
 	// Register the canton chain family adapter for the canton family.
 	registry.RegisterChainFamilyAdapter(chain_selectors.FamilyCanton, cantonadapters.NewChainFamilyAdapter(&evmadapters.ChainFamilyAdapter{}))
 	// Register the canton impl factory for the canton family.
-	registry.RegisterImplFactory(chain_selectors.FamilyCanton, cantondevenv.NewImplFactory())
+	ccv.RegisterImplFactory(chain_selectors.FamilyCanton, cantondevenv.NewImplFactory())
 	// Register the canton token adapter for the canton family.
 	for _, version := range tokenPoolVersions {
 		tokenscore.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyCanton, semver.MustParse(version), cantonadapters.NewTokenAdapter(&evmadapters.TokenAdapter{}))

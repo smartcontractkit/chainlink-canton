@@ -32,13 +32,12 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260219214941-b6d2149fb063
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260219214941-b6d2149fb063
-	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260304134302-24112cae3517
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260304134302-24112cae3517
+	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260304161401-11adb3576184
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260304161401-11adb3576184
 	github.com/smartcontractkit/chainlink-ccv/deployments v0.0.0-20260303211149-b95ddd059c72
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217084735-307a5770c4f6
 	github.com/smartcontractkit/chainlink-deployments-framework v0.85.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.0
-	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260219003852-a14a57e6863b
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
@@ -399,6 +398,7 @@ require (
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
 	github.com/smartcontractkit/chainlink/deployment v0.0.0-20260126202327-6be9a05f0caf // indirect
 	github.com/smartcontractkit/chainlink/v2 v2.29.0 // indirect
+	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20251212213002-0a5e2f907dda // indirect
 	github.com/smartcontractkit/mcms v0.36.3 // indirect
