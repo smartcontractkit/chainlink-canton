@@ -13,9 +13,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/committee_verifier"
@@ -140,16 +140,17 @@ func TestCantonSourceReader(t *testing.T) {
 	createResp := ts.createTestRouter(t, ccipOwner, partyOwner)
 	require.NotNil(t, createResp)
 
+	authProvider := authentication.NewInsecureStaticProvider(jwt)
 	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Test(t),
 		grpcURL,
-		oauth2.StaticTokenSource(&oauth2.Token{AccessToken: jwt}),
 		sourcereader.ReaderConfig{
 			NodeOperatorParty:         party,
 			CCIPOwnerParty:            ccipOwner,
 			CCIPMessageSentTemplateID: fmt.Sprintf("%s:%s:%s", ccipMessageSentTemplateID.PackageId, ccipMessageSentTemplateID.ModuleName, ccipMessageSentTemplateID.EntityName),
 		},
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
+		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
 	)
 	require.NoError(t, err)
 

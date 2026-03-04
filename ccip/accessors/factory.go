@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"strconv"
 
-	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
@@ -55,22 +54,22 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 		return nil, fmt.Errorf("canton reader config not found for chain %d", chainSelector)
 	}
 
-	tokenSource, err := newTokenSource(ctx, blockchainInfo)
+	authProvider, err := newAuthProvider(ctx, blockchainInfo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create auth token source for chain %d: %w", chainSelector, err)
+		return nil, fmt.Errorf("failed to create auth provider for chain %d: %w", chainSelector, err)
 	}
 
 	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Named(f.lggr, fmt.Sprintf("CantonSourceReader.%d", chainSelector)),
 		blockchainInfo.GRPCLedgerAPIURL,
-		tokenSource,
 		sourcereader.ReaderConfig{
 			NodeOperatorParty:         readerConfig.NodeOperatorParty,
 			CCIPOwnerParty:            readerConfig.CCIPOwnerParty,
 			CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 			Authority:                 readerConfig.Authority,
 		},
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // TODO: make this configurable
+		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
+		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source reader: %w", err)
@@ -79,9 +78,10 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 	return newAccessor(sourceReader), nil
 }
 
-// newTokenSource builds an oauth2.TokenSource from the BlockchainInfo auth configuration.
+// newAuthProvider builds an authentication.Provider from the BlockchainInfo auth configuration.
+// The returned Provider supplies TransportCredentials (TLS), PerRPCCredentials (Bearer token), and TokenSource.
 // When Auth.Type is empty or "static", it falls back to the top-level JWT field for backward compatibility.
-func newTokenSource(ctx context.Context, info ccip.BlockchainInfo) (oauth2.TokenSource, error) {
+func newAuthProvider(ctx context.Context, info ccip.BlockchainInfo) (authentication.Provider, error) {
 	authType := info.Auth.Type
 	if authType == "" {
 		authType = ccip.AuthTypeStatic
@@ -96,27 +96,19 @@ func newTokenSource(ctx context.Context, info ccip.BlockchainInfo) (oauth2.Token
 		if jwt == "" {
 			return nil, fmt.Errorf("static auth requires a JWT token (set auth.jwt or top-level jwt)")
 		}
-		return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: jwt}), nil
+		return authentication.NewStaticProvider(jwt), nil
 
 	case ccip.AuthTypeClientCredentials:
 		if info.Auth.AuthURL == "" || info.Auth.ClientID == "" || info.Auth.ClientSecret == "" {
 			return nil, fmt.Errorf("clientCredentials auth requires auth_url, client_id, and client_secret")
 		}
-		provider, err := clientcredentials.NewDiscoveryProvider(ctx, info.Auth.AuthURL, info.Auth.ClientID, info.Auth.ClientSecret)
-		if err != nil {
-			return nil, fmt.Errorf("clientCredentials provider: %w", err)
-		}
-		return provider.TokenSource(), nil
+		return clientcredentials.NewDiscoveryProvider(ctx, info.Auth.AuthURL, info.Auth.ClientID, info.Auth.ClientSecret)
 
 	case ccip.AuthTypeAuthorizationCode:
 		if info.Auth.AuthURL == "" || info.Auth.ClientID == "" {
 			return nil, fmt.Errorf("authorizationCode auth requires auth_url and client_id")
 		}
-		provider, err := authorizationcode.NewDiscoveryProvider(ctx, info.Auth.AuthURL, info.Auth.ClientID)
-		if err != nil {
-			return nil, fmt.Errorf("authorizationCode provider: %w", err)
-		}
-		return provider.TokenSource(), nil
+		return authorizationcode.NewDiscoveryProvider(ctx, info.Auth.AuthURL, info.Auth.ClientID)
 
 	default:
 		return nil, fmt.Errorf("unsupported auth type: %q (expected static, clientCredentials, or authorizationCode)", authType)
