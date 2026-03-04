@@ -24,11 +24,11 @@ make2of3Config = MultisigConfig
 
 -- | Create test operation
 makeTestOp : Int -> Text -> Int -> Text -> Text -> Op
-makeTestOp chainId mcmsId nonce functionName targetInstanceId = Op
+makeTestOp chainId mcmsId nonce functionName targetInstanceAddress = Op
   { chainId
   , multisigId = mcmsId
   , nonce
-  , targetInstanceId
+  , targetInstanceAddress
   , functionName
   , operationData = ""
   }

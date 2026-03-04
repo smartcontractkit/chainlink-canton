@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -399,7 +400,7 @@ func TestMCMSCrypto_ProposalBuilder(t *testing.T) {
 		fmt.Printf("  chainId = %d\n", op.ChainId)
 		fmt.Printf("  multisigId = \"%s\"\n", op.MultisigId)
 		fmt.Printf("  nonce = %d\n", op.Nonce)
-		fmt.Printf("  targetInstanceId = \"%s\"\n", op.TargetInstanceId)
+		fmt.Printf("  targetInstanceAddress = \"%s\"\n", op.TargetInstanceAddress)
 		fmt.Printf("  functionName = \"%s\"\n", op.FunctionName)
 		fmt.Printf("  operationData = \"%s\"\n", op.OperationData)
 		fmt.Printf("}\n")
@@ -540,7 +541,7 @@ func TestMCMSCrypto_FullSigningFlow(t *testing.T) {
 	fmt.Printf("  chainId = %d\n", proposal.Operations[0].ChainId)
 	fmt.Printf("  multisigId = \"%s\"\n", proposal.Operations[0].MultisigId)
 	fmt.Printf("  nonce = %d\n", proposal.Operations[0].Nonce)
-	fmt.Printf("  targetInstanceId = \"%s\"\n", proposal.Operations[0].TargetInstanceId)
+	fmt.Printf("  targetInstanceAddress = \"%s\"\n", proposal.Operations[0].TargetInstanceAddress)
 	fmt.Printf("  functionName = \"%s\"\n", proposal.Operations[0].FunctionName)
 	fmt.Printf("  operationData = \"%s\"\n", proposal.Operations[0].OperationData)
 	fmt.Println("}")
@@ -651,7 +652,7 @@ func createMCMS(ctx context.Context, participant canton.Participant, owner strin
 							},
 							CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
-								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: fmt.Sprintf("%s@%s", baseMcmsId, owner)}}},
+								{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: baseMcmsId}}},
 								{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(chainId)}}},
 								{Label: "proposer", Value: roleStateValue},
 								{Label: "canceller", Value: roleStateValue},

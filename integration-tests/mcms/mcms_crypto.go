@@ -64,25 +64,25 @@ type MCMSConfig struct {
 
 // MCMSOp matches Canton Op
 type MCMSOp struct {
-	ChainId          int
-	MultisigId       string
-	Nonce            int
-	TargetInstanceId string
-	FunctionName     string
-	OperationData    string // hex encoded
+	ChainId               int
+	MultisigId            string
+	Nonce                 int
+	TargetInstanceAddress string
+	FunctionName          string
+	OperationData         string // hex encoded
 }
 
 // TimelockCall matches Canton TimelockCall
 type TimelockCall struct {
-	TargetInstanceId string
-	FunctionName     string
-	OperationData    string // hex encoded
+	TargetInstanceAddress string
+	FunctionName          string
+	OperationData         string // hex encoded
 }
 
 // BlockedFunction matches Canton BlockedFunction (per-target blocked function)
 type BlockedFunction struct {
-	TargetInstanceId string
-	FunctionName     string
+	TargetInstanceAddress string
+	FunctionName          string
 }
 
 // ZeroHash represents "no predecessor" in timelock operations
@@ -95,9 +95,9 @@ const ZeroHash = "00000000000000000000000000000000000000000000000000000000000000
 // ToMCMSTimelockCall converts local TimelockCall to generated mcms.TimelockCall
 func ToMCMSTimelockCall(call TimelockCall) mcms.TimelockCall {
 	return mcms.TimelockCall{
-		TargetInstanceId: types.TEXT(call.TargetInstanceId),
-		FunctionName:     types.TEXT(call.FunctionName),
-		OperationData:    types.TEXT(call.OperationData),
+		TargetInstanceAddress: types.TEXT(call.TargetInstanceAddress),
+		FunctionName:          types.TEXT(call.FunctionName),
+		OperationData:         types.TEXT(call.OperationData),
 	}
 }
 
@@ -114,9 +114,9 @@ func ToMCMSTimelockCalls(calls []TimelockCall) []mcms.TimelockCall {
 // FromMCMSTimelockCall converts mcms.TimelockCall to local TimelockCall
 func FromMCMSTimelockCall(call mcms.TimelockCall) TimelockCall {
 	return TimelockCall{
-		TargetInstanceId: string(call.TargetInstanceId),
-		FunctionName:     string(call.FunctionName),
-		OperationData:    string(call.OperationData),
+		TargetInstanceAddress: string(call.TargetInstanceAddress),
+		FunctionName:          string(call.FunctionName),
+		OperationData:         string(call.OperationData),
 	}
 }
 
@@ -134,7 +134,7 @@ func FromMCMSTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
 // Usage: encoder := NewMCMSEncoder(mcmsPkgID)
 //
 //	choice, _ := encoder.ScheduleBatch(params)
-//	proposal.AddOperation(instanceID, choice.Choice, choice.OperationData)
+//	proposal.AddOperation(instanceAddress, choice.Choice, choice.OperationData)
 func NewMCMSEncoder(pkgID string) mcms.MCMSEncoder {
 	return mcms.NewContract(pkgID, "MCMS.Main", "MCMS").Encoder()
 }
@@ -185,9 +185,9 @@ type RawSignature struct {
 	S         string // Signature s component (64 hex chars)
 }
 
-// MakeMcmsId creates multisigId from MCMS instanceId and role (e.g., "mcms-001@partyId-proposer")
-func MakeMcmsId(instanceId string, role MCMSRole) string {
-	return instanceId + "-" + role.String()
+// MakeMcmsId creates multisigId from MCMS instanceAddress and role (e.g., "mcms-001@partyId-proposer")
+func MakeMcmsId(instanceAddress string, role MCMSRole) string {
+	return instanceAddress + "-" + role.String()
 }
 
 // MCMSSigner wraps a private key with MCMS-specific functionality
@@ -311,7 +311,7 @@ func HashOpLeaf(op MCMSOp) string {
 	encoded := PadLeft32(IntToHex(op.ChainId)) +
 		AsciiToHex(op.MultisigId) +
 		PadLeft32(IntToHex(op.Nonce)) +
-		AsciiToHex(op.TargetInstanceId) +
+		AsciiToHex(op.TargetInstanceAddress) +
 		AsciiToHex(op.FunctionName) +
 		op.OperationData
 
@@ -345,7 +345,7 @@ func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 	// Encode calls
 	var sb strings.Builder
 	for _, call := range calls {
-		sb.WriteString(AsciiToHex(call.TargetInstanceId))
+		sb.WriteString(AsciiToHex(call.TargetInstanceAddress))
 		sb.WriteString(AsciiToHex(call.FunctionName))
 		sb.WriteString(EncodeOperationDataForHash(call.OperationData))
 	}
@@ -634,12 +634,12 @@ func BuildRawSignatureValue(sig RawSignature) map[string]any {
 // BuildOpValue creates Canton Value for Op
 func BuildOpValue(op MCMSOp) map[string]any {
 	return map[string]any{
-		"chainId":          op.ChainId,
-		"multisigId":       op.MultisigId,
-		"nonce":            op.Nonce,
-		"targetInstanceId": op.TargetInstanceId,
-		"functionName":     op.FunctionName,
-		"operationData":    op.OperationData,
+		"chainId":               op.ChainId,
+		"multisigId":            op.MultisigId,
+		"nonce":                 op.Nonce,
+		"targetInstanceAddress": op.TargetInstanceAddress,
+		"functionName":          op.FunctionName,
+		"operationData":         op.OperationData,
 	}
 }
 
@@ -684,14 +684,14 @@ func NewMCMSProposal(chainId int, multisigId string, preOpCount int, overridePre
 }
 
 // AddOperation adds an operation to the proposal
-func (p *MCMSProposal) AddOperation(targetInstanceId, functionName, operationData string) *MCMSProposal {
+func (p *MCMSProposal) AddOperation(targetInstanceAddress, functionName, operationData string) *MCMSProposal {
 	op := MCMSOp{
-		ChainId:          p.ChainId,
-		MultisigId:       p.MultisigId,
-		Nonce:            p.Metadata.PostOpCount,
-		TargetInstanceId: targetInstanceId,
-		FunctionName:     functionName,
-		OperationData:    operationData,
+		ChainId:               p.ChainId,
+		MultisigId:            p.MultisigId,
+		Nonce:                 p.Metadata.PostOpCount,
+		TargetInstanceAddress: targetInstanceAddress,
+		FunctionName:          functionName,
+		OperationData:         operationData,
 	}
 	p.Operations = append(p.Operations, op)
 	p.Metadata.PostOpCount++
@@ -983,14 +983,14 @@ func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
 // EncodeBlockedFunction encodes a BlockedFunction to hex bytes
 // Format matches Canton MCMS.Codec.encodeBlockedFunction:
 //
-//	encodeText(targetInstanceId) <> encodeText(functionName)
+//	encodeText(targetInstanceAddress) <> encodeText(functionName)
 //
 // where encodeText = uint8(len) <> asciiBytes
 func EncodeBlockedFunction(bf BlockedFunction) string {
-	targetBytes := []byte(bf.TargetInstanceId)
+	targetBytes := []byte(bf.TargetInstanceAddress)
 	fnBytes := []byte(bf.FunctionName)
 	buf := make([]byte, 0, 1+len(targetBytes)+1+len(fnBytes))
-	// targetInstanceId
+	// targetInstanceAddress
 	buf = append(buf, byte(len(targetBytes)))
 	buf = append(buf, targetBytes...)
 	// functionName
@@ -1044,13 +1044,13 @@ func encodeText(s string) []byte {
 }
 
 // encodeTimelockCall encodes a TimelockCall
-// Format: encodeText(targetInstanceId) + encodeText(functionName) + encodeText(operationData)
+// Format: encodeText(targetInstanceAddress) + encodeText(functionName) + encodeText(operationData)
 // Matches Canton MCMS.Codec.encodeTimelockCall
 func encodeTimelockCall(call TimelockCall) []byte {
 	// Calculate size: 3 length bytes + string contents
-	size := 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
+	size := 3 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
 	buf := make([]byte, 0, size)
-	buf = append(buf, encodeText(call.TargetInstanceId)...)
+	buf = append(buf, encodeText(call.TargetInstanceAddress)...)
 	buf = append(buf, encodeText(call.FunctionName)...)
 	buf = append(buf, encodeText(call.OperationData)...)
 
@@ -1064,7 +1064,7 @@ func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
 	// Estimate size: 1 (numCalls) + calls + predecessor + salt + 8 (delay as int64)
 	estimatedSize := 1 + len(params.Predecessor) + 1 + len(params.Salt) + 1 + 8
 	for _, call := range params.Calls {
-		estimatedSize += 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
+		estimatedSize += 3 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
 	}
 	buf := make([]byte, 0, estimatedSize)
 
@@ -1095,7 +1095,7 @@ func EncodeBypasserExecuteBatchParams(params BypasserExecuteBatchParams) string 
 	// Estimate size: 1 (numCalls) + calls
 	estimatedSize := 1
 	for _, call := range params.Calls {
-		estimatedSize += 3 + len(call.TargetInstanceId) + len(call.FunctionName) + len(call.OperationData)
+		estimatedSize += 3 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
 	}
 	buf := make([]byte, 0, estimatedSize)
 

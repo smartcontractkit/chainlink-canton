@@ -12,13 +12,14 @@ import MCMS.MCMSReceiver
 -- Demonstrates the MCMSReceiver interface for direct MCMS calls
 --
 -- Key fields:
---   - instanceId: Stable identifier in the format "baseId@partyId"
---     This doesn't change when contract state updates (unlike ContractId)
---   - MCMS validates: op.targetInstanceId == instanceId
+--   - instanceId: Stable identifier (without @partyId suffix)
+--     This NEVER changes, even when contract state updates or signatory changes.
+--   - instanceAddress: CALCULATED as instanceId <> "@" <> partyToText owner
+--   - MCMS validates: call.targetInstanceAddress == calculated instanceAddress
 template Counter
   with
     owner : Party                              -- Same ccip_owner party as MCMS
-    instanceId : Text                          -- Stable identifier for MCMS targeting (baseId@partyId)
+    instanceId : Text                          -- Stable identifier for MCMS targeting (no @partyId)
     value : Int                                -- Current counter value
   where
     signatory owner
@@ -29,23 +30,30 @@ template Counter
         owner
         instanceId = instanceId
 
-      mcmsEntrypoint selfCid functionName operationData contractIds = do
-        let selfCounterCid : ContractId Counter = coerceContractId selfCid
+      mcmsEntrypoint functionName operationData contractIds = do
+        -- Calculate full instanceAddress for map lookup
+        let instanceAddress = makeInstanceAddress instanceId owner
+
+        -- Look up self CID from map using full address
+        selfCid <- case Map.lookup instanceAddress contractIds of
+          None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instanceAddress
+          Some cid -> pure (coerceContractId cid : ContractId Counter)
+
         case functionName of
           "Increment" -> do
-            newCid <- exercise selfCounterCid Increment
-            pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+            newCid <- exercise selfCid Increment
+            pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
           "SetValue" -> do
             case T.parseInt operationData of
               Some newValue -> do
-                newCid <- exercise selfCounterCid (SetValue newValue)
-                pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+                newCid <- exercise selfCid (SetValue newValue)
+                pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
               None -> abort $ "E_INVALID_INT: " <> operationData
 
           "Reset" -> do
-            newCid <- exercise selfCounterCid Reset
-            pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+            newCid <- exercise selfCid Reset
+            pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
@@ -82,4 +90,10 @@ template Counter
         viewer : Party
       controller viewer
       do pure instanceId
+
+    nonconsuming choice GetInstanceAddressChoice : Text
+      with
+        viewer : Party
+      controller viewer
+      do pure (makeInstanceAddress instanceId owner)
 
