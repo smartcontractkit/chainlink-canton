@@ -100,8 +100,9 @@ template PerPartyRouter
                 receiver : BytesHex
                 payload : BytesHex
                 ccipReceiveGasLimit : Int
+                blockConfirmations : Optional Int
                 senderRequiredCCVs : [RawInstanceAddress]
-                withTokenTransfer : Bool
+                tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
                 tokenReceiver : Optional BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
@@ -131,9 +132,10 @@ template PerPartyRouter
                     receiver
                     payload
                     ccipReceiveGasLimit
+                    blockConfirmations
                     currentSequenceNumber = currentSeqNum
                     senderRequiredCCVs
-                    withTokenTransfer
+                    tokenInstrumentId
                     tokenReceiver
                     feeToken
 

@@ -23,6 +23,7 @@ interface ITokenPool where
 
     tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [RawInstanceAddress]
     tokenPool_verifyInboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyInboundCCVs -> Update (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
+    tokenPool_verifyOutboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyOutboundCCVs -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
     tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
@@ -47,6 +48,17 @@ interface ITokenPool where
             caller : Party
         controller caller
         do tokenPool_verifyInboundCCVsImpl this self arg
+
+    -- Verify outbound CCVs and record pool-required CCVs on SendingMessageV1 via TAR.
+    nonconsuming choice TokenPool_VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            amount : Numeric 0
+            tokenArgs : BytesHex
+            caller : Party
+        controller caller
+        do tokenPool_verifyOutboundCCVsImpl this self arg
 
     -- Release tokens by consuming a TokenReceiveTicket issued by OffRamp.
     -- The pool should consume the ticket via TokenAdminRegistry_ConsumeReceiveTicket.

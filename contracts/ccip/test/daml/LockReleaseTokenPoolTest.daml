@@ -132,8 +132,8 @@ testLockOrBurn = script do
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 2000
-            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
             tokenReceiver = "0000000000000000000000000000000000000001"
@@ -142,6 +142,11 @@ testLockOrBurn = script do
             messageId = ""
             feeToken = testInstrumentId
             networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = Some testInstrumentId
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
             ccvFees = []
             tokenSendFee = None
             feesFinalized = False
@@ -166,7 +171,7 @@ testLockOrBurn = script do
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Call LockOrBurn
+    -- LockOrBurn stores token data via AddTokenSend
     result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval

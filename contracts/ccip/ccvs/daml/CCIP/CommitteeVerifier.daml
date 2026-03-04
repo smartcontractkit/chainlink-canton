@@ -168,6 +168,7 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
                 let feeConfig = fromSomeNote "no fee config for dest chain"
                         (Map.lookup sendingMsg.destChainSelector remoteChainFeeConfigs)
@@ -193,9 +194,11 @@ template CommitteeVerifier
                 -- Get Cids from context
                 rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
 
+                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse
+                -- TODO: Replace fetch with nonconsuming getter choice for RMNRemote
                 rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress

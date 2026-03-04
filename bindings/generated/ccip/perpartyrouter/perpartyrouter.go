@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "cdda6643a24f923a20647396ebaad757d9fe79261ca4ec180602886c643af591"
+	PackageID   = "d585dcc60094cc0f0ed3455d84a6b877ac8ac9be05b79febb34a2f7c4a0e45ea"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1593,8 +1593,9 @@ type PrepareSend struct {
 	Receiver            types.TEXT                                 `json:"receiver"`
 	Payload             types.TEXT                                 `json:"payload"`
 	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
+	BlockConfirmations  *types.INT64                               `json:"blockConfirmations"`
 	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
-	WithTokenTransfer   types.BOOL                                 `json:"withTokenTransfer"`
+	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId  `json:"tokenInstrumentId"`
 	TokenReceiver       *types.TEXT                                `json:"tokenReceiver"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
 }
@@ -1619,6 +1620,17 @@ func (t PrepareSend) ToMap() map[string]any {
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
 
+	if t.BlockConfirmations != nil {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.BlockConfirmations),
+		}
+	} else {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
 	m["senderRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.SenderRequiredCCVs))
 		for _, e := range t.SenderRequiredCCVs {
@@ -1632,7 +1644,16 @@ func (t PrepareSend) ToMap() map[string]any {
 		return res
 	}()
 
-	m["withTokenTransfer"] = bool(t.WithTokenTransfer)
+	if t.TokenInstrumentId != nil {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenInstrumentId,
+		}
+	} else {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	if t.TokenReceiver != nil {
 		m["tokenReceiver"] = map[string]any{
