@@ -10,6 +10,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -298,7 +300,7 @@ const (
 	DefaultEDSImage = "canton-eds:latest"
 )
 
-func StartEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Container, error) {
+func startEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Container, error) {
 	configToml, err := toml.Marshal(*cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal EDS config: %w", err)
@@ -311,7 +313,16 @@ func StartEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 		NetworkAliases: map[string][]string{
 			framework.DefaultNetworkName: {DefaultEDSName},
 		},
-		ExposedPorts: []string{fmt.Sprintf("%d:%d", cfg.Server.Port, cfg.Server.Port)},
+		ExposedPorts: []string{
+			fmt.Sprintf("%d/tcp", cfg.Server.Port),
+		},
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.PortBindings = nat.PortMap{
+				nat.Port(fmt.Sprintf("%d/tcp", cfg.Server.Port)): []nat.PortBinding{
+					{HostPort: ""}, // Docker assigns a random free host port.
+				},
+			}
+		},
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            bytes.NewReader(configToml),
@@ -388,7 +399,7 @@ func (l *launcher) Launch(
 	}
 
 	// start the EDS
-	_, err = StartEDS(ctx, edsCfg)
+	_, err = startEDS(ctx, edsCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start EDS: %w", err)
 	}
