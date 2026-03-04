@@ -37,7 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
-	devenvutils "github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 )
 
 func convertToDisclosedContract(contract *apiv2.ActiveContract) *apiv2.DisclosedContract {
@@ -377,7 +376,7 @@ func (l *launcher) Launch(
 	}
 
 	// parse input from definition
-	in, err := devenvutils.OpaqueToConcreteStrict[input](definition.Input)
+	in, err := util.OpaqueToConcreteStrict[input](definition.Input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse input: %w", err)
 	}
@@ -405,7 +404,7 @@ func (l *launcher) Launch(
 	}
 
 	// return the EDS config
-	return devenvutils.OpaqueConfig{
+	return util.OpaqueConfig{
 		"eds_config": edsCfg,
 	}, nil
 }

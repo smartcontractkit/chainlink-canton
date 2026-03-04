@@ -17,6 +17,8 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/aws/smithy-go v1.24.1
 	github.com/digital-asset/dazl-client/v8 v8.9.0
+	github.com/docker/docker v28.5.2+incompatible
+	github.com/docker/go-connections v0.6.0
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/gin-gonic/gin v1.10.1
@@ -143,8 +145,6 @@ require (
 	github.com/dennwc/varint v1.0.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/docker v28.5.2+incompatible // indirect
-	github.com/docker/go-connections v0.6.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
