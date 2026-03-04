@@ -14,9 +14,9 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: us-west-2
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-      ECR_REPOSITORY: ${{ vars.COMMITTEE_VERIFIER_ECR_REPOSITORY }}
+      ECR_REPOSITORY: ${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -29,14 +29,14 @@ jobs:
             exit 1
           fi
           if [ -z "$ECR_REPOSITORY" ]; then
-            echo "Repository var COMMITTEE_VERIFIER_ECR_REPOSITORY is not set"
+            echo "Repository secret COMMITTEE_VERIFIER_ECR_REPOSITORY is not set"
             exit 1
           fi
       - name: Authenticate to AWS ECR
         uses: ./.github/actions/aws-ecr-auth
         with:
           role-to-assume: ${{ secrets.CCV_IAM_ROLE }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
           registry-type: private
       - name: Build and push image to ECR
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
@@ -45,5 +45,5 @@ jobs:
           file: ccip/committee_verifier.Dockerfile
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ secrets.ECR_REGISTRY }}/${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}:latest
