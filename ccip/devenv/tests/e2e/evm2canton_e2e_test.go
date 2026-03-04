@@ -16,7 +16,6 @@ import (
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -35,7 +34,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	}
 
 	// Register the canton impl factory for the canton family.
-	registry.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
+	ccv.RegisterImplFactory(chainsel.FamilyCanton, cantondevenv.NewImplFactory())
 
 	ctx := ccv.Plog.WithContext(t.Context())
 	l := zerolog.Ctx(ctx)

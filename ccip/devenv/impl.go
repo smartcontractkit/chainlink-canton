@@ -15,10 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/freeport"
-
-	deployment2 "github.com/smartcontractkit/chainlink-canton/deployment"
-	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
@@ -45,9 +41,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/deployments"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
@@ -57,7 +53,7 @@ import (
 var (
 	_ cciptestinterfaces.CCIP17              = &Chain{}
 	_ cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_ registry.ImplFactory                   = &ImplFactory{}
+	_ ccv.ImplFactory                        = &ImplFactory{}
 )
 
 type ImplFactory struct{}
@@ -67,8 +63,8 @@ func NewImplFactory() *ImplFactory {
 }
 
 // New implements [registry.ImplFactory].
-func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
-	return New(ctx, lggr, env, bc.ChainID)
+func (i *ImplFactory) New(ctx context.Context, cfg *ccv.Cfg, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, cfg, lggr, env, bc.ChainID)
 }
 
 // NewEmpty implements [registry.ImplFactory].
@@ -88,13 +84,14 @@ type Chain struct {
 	chain        canton.Chain
 	logger       zerolog.Logger
 	chainDetails chainsel.ChainDetails
+	cfg          *ccv.Cfg
 }
 
 func (c *Chain) ChainSelector() uint64 {
 	return c.chainDetails.ChainSelector
 }
 
-func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
+func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
 	if err != nil {
 		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
@@ -106,6 +103,7 @@ func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, 
 		chain:        chain,
 		chainDetails: chainDetails,
 		logger:       logger,
+		cfg:          cfg,
 	}, nil
 }
 
@@ -325,39 +323,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 
 	env.DataStore = runningDS.Seal()
 
-	// Generate EDS config
-	ports, err := freeport.Take(1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to take free port: %w", err)
-	}
-	out, err = cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[edsConfig.ServerConfig]{
-		ChainSelector: selector,
-		Participant:   0,
-		Config: edsConfig.ServerConfig{
-			Host: "0.0.0.0",
-			Port: uint16(ports[0]), //nolint:gosec // This is a port
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate EDS config for selector %d: %w", selector, err)
-	}
-	err = runningDS.Merge(out.DataStore.Seal())
-	if err != nil {
-		return nil, err
-	}
-
-	// Start EDS container
-	// TODO this should be made part of the generic service API instead
-	ds := runningDS.Seal()
-	edsCfg, err := deployment2.GetEDSConfig(ds)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get EDS config: %w", err)
-	}
-	if _, err := StartEDS(ctx, edsCfg); err != nil {
-		return nil, fmt.Errorf("failed to start EDS: %w", err)
-	}
-
-	return ds, nil
+	return runningDS.Seal(), nil
 }
 
 // ConnectContractsWithSelectors implements cciptestinterfaces.CCIP17Configuration.

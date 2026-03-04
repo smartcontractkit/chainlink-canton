@@ -10,10 +10,17 @@ import (
 
 	"github.com/BurntSushi/toml"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	cldfdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
+	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -22,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment"
+	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
@@ -291,7 +299,7 @@ const (
 	DefaultEDSImage = "canton-eds:latest"
 )
 
-func StartEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Container, error) {
+func startEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Container, error) {
 	configToml, err := toml.Marshal(*cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal EDS config: %w", err)
@@ -304,7 +312,16 @@ func StartEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 		NetworkAliases: map[string][]string{
 			framework.DefaultNetworkName: {DefaultEDSName},
 		},
-		ExposedPorts: []string{fmt.Sprintf("%d:%d", cfg.Server.Port, cfg.Server.Port)},
+		ExposedPorts: []string{
+			fmt.Sprintf("%d/tcp", cfg.Server.Port),
+		},
+		HostConfigModifier: func(hc *container.HostConfig) {
+			hc.PortBindings = nat.PortMap{
+				nat.Port(fmt.Sprintf("%d/tcp", cfg.Server.Port)): []nat.PortBinding{
+					{HostPort: ""}, // Docker assigns a random free host port.
+				},
+			}
+		},
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            bytes.NewReader(configToml),
@@ -323,4 +340,71 @@ func StartEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 	}
 
 	return c, nil
+}
+
+type launcher struct{}
+
+var _ ccv.Launcher = &launcher{}
+
+func NewLauncher() *launcher {
+	return &launcher{}
+}
+
+type input struct {
+	EDSServerConfig edsConfig.ServerConfig `toml:"eds_server_config"`
+}
+
+func (l *launcher) Launch(
+	ctx context.Context,
+	env *cldfdeployment.Environment,
+	chains []*blockchain.Output,
+	definition *ccv.GenericServiceDefinition,
+) (output util.OpaqueConfig, err error) {
+	var cantonOutput *blockchain.Output
+	for _, chain := range chains {
+		if chain.Type == chain_selectors.FamilyCanton {
+			cantonOutput = chain
+			break
+		}
+	}
+	if cantonOutput == nil {
+		return nil, fmt.Errorf("canton chain not found")
+	}
+	chainDetails, err := chain_selectors.GetChainDetailsByChainIDAndFamily(cantonOutput.ChainID, chain_selectors.FamilyCanton)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chain details for canton chain: %w", err)
+	}
+
+	// parse input from definition
+	in, err := util.OpaqueToConcreteStrict[input](definition.Input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse input: %w", err)
+	}
+	out, err := cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[edsConfig.ServerConfig]{
+		ChainSelector: chainDetails.ChainSelector,
+		Participant:   0,
+		Config: edsConfig.ServerConfig{
+			Host: in.EDSServerConfig.Host,
+			Port: in.EDSServerConfig.Port,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate EDS config for selector %d: %w", chainDetails.ChainSelector, err)
+	}
+
+	edsCfg, err := deployment.GetEDSConfig(out.DataStore.Seal())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get EDS config: %w", err)
+	}
+
+	// start the EDS
+	_, err = startEDS(ctx, edsCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start EDS: %w", err)
+	}
+
+	// return the EDS config
+	return util.OpaqueConfig{
+		"eds_config": edsCfg,
+	}, nil
 }
