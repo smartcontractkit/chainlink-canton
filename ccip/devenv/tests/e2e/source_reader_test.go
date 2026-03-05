@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -68,6 +69,10 @@ func TestCantonSourceReader(t *testing.T) {
 		t.Skip("skipping CantonSourceReader test in short mode")
 	}
 
+	// Register the Canton impl factory so e2e test helpers can build full source->dest chain context
+	// when this test runs in isolation.
+	ccv.RegisterImplFactory(chain_selectors.FamilyCanton, cantondevenv.NewImplFactory())
+
 	ctx := ccv.Plog.WithContext(t.Context())
 	l := zerolog.Ctx(ctx)
 
@@ -104,7 +109,7 @@ func TestCantonSourceReader(t *testing.T) {
 	b := ccv.NewDefaultCLDFBundle(e)
 	e.OperationsBundle = b
 
-	lib, err := ccv.NewLib(l, configPath, chain_selectors.FamilyEVM)
+	lib, err := ccv.NewLib(l, configPath, chain_selectors.FamilyEVM, chain_selectors.FamilyCanton)
 	require.NoError(t, err)
 	chains, err := lib.ChainsMap(ctx)
 	require.NoError(t, err)
