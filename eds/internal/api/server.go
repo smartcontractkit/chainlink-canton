@@ -161,6 +161,10 @@ func (s Server) CcipSend(c *gin.Context) {
 				Tag:   "AV_ContractId",
 				Value: disclosures.RMNRemote.GetContractId(),
 			},
+			"fee-quoter": {
+				Tag:   "AV_ContractId",
+				Value: disclosures.FeeQuoter.GetContractId(),
+			},
 		},
 	}
 	disclosedContracts := []edsv1.DisclosedContract{
@@ -168,6 +172,7 @@ func (s Server) CcipSend(c *gin.Context) {
 		convertDisclosedContract(disclosures.GlobalConfig),
 		convertDisclosedContract(disclosures.TokenAdminRegistry),
 		convertDisclosedContract(disclosures.RMNRemote),
+		convertDisclosedContract(disclosures.FeeQuoter),
 	}
 
 	resp := edsv1.CCIPSendResponse{

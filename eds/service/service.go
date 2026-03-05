@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
@@ -105,6 +106,10 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 			TemplateID: store.TemplateIDFromBinding(rmn.RMNRemote{}),
 			PartyID:    cfg.Contracts.RMNRemote.PartyID,
 		},
+		store.RegisteredTemplate{
+			TemplateID: store.TemplateIDFromBinding(feequoter.FeeQuoter{}),
+			PartyID:    cfg.Contracts.FeeQuoter.PartyID,
+		},
 	}
 	ccvCids := make([]contracts.InstanceAddress, len(cfg.Contracts.CCVs))
 	for i, ccv := range cfg.Contracts.CCVs {
@@ -145,6 +150,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		GlobalConfig:          cfg.Contracts.GlobalConfig.InstanceAddress,
 		TokenAdminRegistry:    cfg.Contracts.TokenAdminRegistry.InstanceAddress,
 		RMNRemote:             cfg.Contracts.RMNRemote.InstanceAddress,
+		FeeQuoter:             cfg.Contracts.FeeQuoter.InstanceAddress,
 		CCVs:                  ccvCids,
 	})
 

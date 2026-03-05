@@ -44,6 +44,7 @@ type Contracts struct {
 	GlobalConfig          ContractIdentifier   `toml:"global_config" validate:"required"`
 	TokenAdminRegistry    ContractIdentifier   `toml:"token_admin_registry" validate:"required"`
 	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
+	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
 	CCVs                  []ContractIdentifier `toml:"ccvs"`
 }
 
