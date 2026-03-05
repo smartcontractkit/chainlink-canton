@@ -53,6 +53,15 @@ type ContractIdentifier struct {
 	InstanceAddress contracts.InstanceAddress `toml:"instance_address" validate:"required"`
 }
 
+func (cfg *Config) Validate() error {
+	validate := validator.New(validator.WithRequiredStructEnabled())
+	if err := validate.Struct(cfg); err != nil {
+		return fmt.Errorf("failed to validate config: %w", err)
+	}
+
+	return nil
+}
+
 func Read(configData io.Reader) (*Config, error) {
 	var config Config
 	decoder := toml.NewDecoder(configData)
@@ -60,9 +69,8 @@ func Read(configData io.Reader) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
 
-	validate := validator.New(validator.WithRequiredStructEnabled())
-	if err := validate.Struct(config); err != nil {
-		return nil, fmt.Errorf("failed to validate config: %w", err)
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	return &config, nil
