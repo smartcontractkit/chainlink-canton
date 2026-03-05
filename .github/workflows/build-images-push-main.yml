@@ -32,7 +32,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}:${{ github.sha }}
-            ${{ secrets.ECR_REGISTRY }}/${{ secrets.COMMITTEE_VERIFIER_ECR_REPOSITORY }}:latest
 
   build-eds:
     name: Build and publish EDS image
@@ -59,4 +58,3 @@ jobs:
           push: true
           tags: |
             ${{ secrets.ECR_REGISTRY }}/${{ secrets.EDS_ECR_REPOSITORY }}:${{ github.sha }}
-            ${{ secrets.ECR_REGISTRY }}/${{ secrets.EDS_ECR_REPOSITORY }}:latest
