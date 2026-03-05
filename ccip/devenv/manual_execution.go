@@ -134,8 +134,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	c.logger.Debug().Str("ReceiverAddress", receiverAddress.String()).Msg("Deployed CCIPReceiver")
 
-	// TODO replace with EDS - once we're able to get the API URL here
-	// Get disclosures for execution
+	// Get disclosures for execution using EDS
 	ccvs := make([]contracts.InstanceAddress, len(verifiers))
 	for i, verifier := range verifiers {
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())

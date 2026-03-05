@@ -40,6 +40,7 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 	[]*apiv2.Value_ContractId,
 	error,
 ) {
+	// Get the EDS output from generic services output, will contain the EDS API URL
 	edsOut, err := util.OpaqueToConcreteStrict[output](c.cfg.GenericServices[c.ChainSelector()].Output)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to get generic services output for chain %d: %w", c.ChainSelector(), err)
@@ -49,6 +50,7 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		return nil, nil, nil, fmt.Errorf("failed to create eds client: %w", err)
 	}
 
+	// Add the verifier addresses to the request - required for EDS to return explicit disclosures for them
 	request := edsv1.CCIPExecuteRequest{
 		Ccvs:      make([]string, len(verifiers)),
 		MessageID: "", // not used (yet)
@@ -79,13 +81,13 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		return nil, nil, nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
 
-	// Handle CCVs
+	// Handle Verifiers
 	ccvContractIDs := make([]*apiv2.Value_ContractId, len(verifiers))
-	for i, ccv := range verifiers {
-		// Check if the API returned an explicit disclosure for the requested CCV
-		disclosure, ok := resp.JSON200.Ccvs[ccv.String()]
+	for i, verifier := range verifiers {
+		// Check if the API returned an explicit disclosure for the requested verifier
+		disclosure, ok := resp.JSON200.Ccvs[verifier.String()]
 		if !ok || disclosure.DisclosedContract == nil {
-			return nil, nil, nil, fmt.Errorf("failed to get disclosure for ccv: %s", ccv.String())
+			return nil, nil, nil, fmt.Errorf("failed to get disclosure for verifier: %s", verifier.String())
 		}
 		ccvContractIDs[i] = &apiv2.Value_ContractId{
 			ContractId: disclosure.DisclosedContract.ContractId,
@@ -93,7 +95,7 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		// Add the CCV's explicit disclosure to disclosedContracts
 		disclosedContract, err := disclosedContractToProto(*disclosure.DisclosedContract)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to convert disclosed contract for ccv %s: %w", ccv.String(), err)
+			return nil, nil, nil, fmt.Errorf("failed to convert disclosed contract for verifier %s: %w", verifier.String(), err)
 		}
 		disclosedContracts = append(disclosedContracts, disclosedContract)
 	}
@@ -257,6 +259,7 @@ func (l *launcher) Launch(
 	}
 
 	// return the EDS config
+	// Add the config and container URL to the output
 	opaqueConfig, err := util.ConcreteToOpaque(output{
 		EDSConfig: *edsCfg,
 		EDSURL:    fmt.Sprintf("http://%s:%s", host, edsMappedPort.Port()),
