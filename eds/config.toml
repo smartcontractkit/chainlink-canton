@@ -1,4 +1,4 @@
-chain_selector = 8706591216959472610
+chain_selector = "8706591216959472610"
 
 [server]
 host = "0.0.0.0"

@@ -1,0 +1,14 @@
+.idea
+.vscode
+.DS_Store
+
+*/.daml
+.daml
+*/log
+navigator.log
+
+go.work
+go.work.sum
+
+**/eds.Dockerfile
+**/eds.Dockerfile.dockerignore

@@ -83,13 +83,15 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 
 		authProvider := authentication.NewInsecureStaticProvider(config.JWT)
 		providerConfig.Participants[i] = cantonProvider.ParticipantConfig{
-			JSONLedgerAPIURL: config.JSONLedgerAPIURL,
-			GRPCLedgerAPIURL: config.GRPCLedgerAPIURL,
-			AdminAPIURL:      config.AdminAPIURL,
-			ValidatorAPIURL:  config.ValidatorAPIURL,
-			UserID:           config.UserName,
-			PartyID:          party,
-			AuthProvider:     authProvider,
+			Endpoints: cantonProvider.Endpoints{
+				JSONLedgerAPIURL: config.JSONLedgerAPIURL,
+				GRPCLedgerAPIURL: config.GRPCLedgerAPIURL,
+				AdminAPIURL:      config.AdminAPIURL,
+				ValidatorAPIURL:  config.ValidatorAPIURL,
+			},
+			UserID:       config.UserName,
+			PartyID:      party,
+			AuthProvider: authProvider,
 		}
 	}
 

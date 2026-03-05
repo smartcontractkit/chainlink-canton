@@ -20,6 +20,7 @@ type DisclosureServiceConfig struct {
 	GlobalConfig          contracts.InstanceAddress
 	TokenAdminRegistry    contracts.InstanceAddress
 	RMNRemote             contracts.InstanceAddress
+	FeeQuoter             contracts.InstanceAddress
 	CCVs                  []contracts.InstanceAddress
 }
 
@@ -35,6 +36,7 @@ type DisclosureService struct {
 	globalConfig          contracts.InstanceAddress
 	tokenAdminRegistry    contracts.InstanceAddress
 	rmnRemote             contracts.InstanceAddress
+	feeQuoter             contracts.InstanceAddress
 	ccvs                  []contracts.InstanceAddress
 
 	// Contains all configured instance addresses, to allow looking up if a requested disclosure should be returned.
@@ -43,13 +45,14 @@ type DisclosureService struct {
 
 func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *DisclosureService {
 	// Create a map of all instance addresses
-	allContracts := make(map[contracts.InstanceAddress]struct{}, 6+len(config.CCVs))
+	allContracts := make(map[contracts.InstanceAddress]struct{}, 7+len(config.CCVs))
 	allContracts[config.PerPartyRouterFactory] = struct{}{}
 	allContracts[config.OnRamp] = struct{}{}
 	allContracts[config.OffRamp] = struct{}{}
 	allContracts[config.GlobalConfig] = struct{}{}
 	allContracts[config.TokenAdminRegistry] = struct{}{}
 	allContracts[config.RMNRemote] = struct{}{}
+	allContracts[config.FeeQuoter] = struct{}{}
 	for _, ccv := range config.CCVs {
 		allContracts[ccv] = struct{}{}
 	}
@@ -63,6 +66,7 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 		globalConfig:          config.GlobalConfig,
 		tokenAdminRegistry:    config.TokenAdminRegistry,
 		rmnRemote:             config.RMNRemote,
+		feeQuoter:             config.FeeQuoter,
 		ccvs:                  config.CCVs,
 
 		allContracts: allContracts,
@@ -78,6 +82,7 @@ type CCIPSendDisclosures struct {
 	GlobalConfig       *apiv2.DisclosedContract
 	TokenAdminRegistry *apiv2.DisclosedContract
 	RMNRemote          *apiv2.DisclosedContract
+	FeeQuoter          *apiv2.DisclosedContract
 	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
 }
 
@@ -133,11 +138,17 @@ func (s *DisclosureService) GetCCIPSendDisclosures(ctx context.Context, request 
 		ccvs[requestedCCV] = ccv
 	}
 
+	feeQuoter, err := s.GetDisclosure(ctx, s.feeQuoter)
+	if err != nil {
+		return CCIPSendDisclosures{}, fmt.Errorf("feeQuoter: %w", err)
+	}
+
 	return CCIPSendDisclosures{
 		OnRamp:             onRamp,
 		GlobalConfig:       globalConfig,
 		TokenAdminRegistry: tokenAdminRegistry,
 		RMNRemote:          rmnRemote,
+		FeeQuoter:          feeQuoter,
 		CCVs:               ccvs,
 	}, nil
 }

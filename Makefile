@@ -58,6 +58,10 @@ fix-all: contracts go-generate gomodtidy golangci-lint-fix-all
 build-committeeverifier:
 	docker build -t committeeverifier-canton:latest -f ccip/committee_verifier.Dockerfile .
 
+.PHONY: build-eds
+build-eds:
+	docker build -t canton-eds:latest -f eds/eds.Dockerfile .
+
 ## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
 .PHONY: build-ccv-images
 build-ccv-images:
