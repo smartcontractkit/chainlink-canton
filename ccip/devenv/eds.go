@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
+	"golang.org/x/exp/maps"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
@@ -249,7 +250,8 @@ func (l *launcher) Launch(
 	}
 	edsMappedPort, err := edsContainer.MappedPort(ctx, nat.Port(fmt.Sprintf("%d/tcp", in.EDSServerConfig.Port)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get EDS container mapped port: %w", err)
+		pm, _ := edsContainer.Ports(ctx) // Add all existing ports to error
+		return nil, fmt.Errorf("failed to get EDS container mapped port (ports: %v): %w", maps.Keys(pm), err)
 	}
 
 	// return the EDS config
