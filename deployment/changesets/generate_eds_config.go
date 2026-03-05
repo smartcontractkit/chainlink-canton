@@ -51,22 +51,9 @@ func (c GenerateEDSConfig) Apply(e cldf.Environment, config CantonCSDeps[edsConf
 	}
 
 	edsCfg := out.Output.Config
-	fmt.Println("Got config: ", *edsCfg)
 	if err := deployment.SaveEDSConfig(ds, edsCfg); err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save EDS config: %w", err)
 	}
-	fmt.Println("Saved config to datastore")
-	fmt.Println("Trying to get the config...")
-	m, err := ds.EnvMetadata().Get()
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get metadata: %w", err)
-	}
-	fmt.Println("Got metadata: ", m)
-	cfg, err := deployment.GetEDSConfig(ds.Seal())
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to get EDS config: %w", err)
-	}
-	fmt.Println("Got config: ", *cfg)
 
 	return cldf.ChangesetOutput{
 		DataStore: ds,
