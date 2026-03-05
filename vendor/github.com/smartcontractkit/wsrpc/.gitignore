@@ -1,0 +1,13 @@
+# OS
+.DS_Store
+
+# Editors
+.vscode
+
+# Test & linter reports
+*report.xml
+*report.json
+*.out
+
+# Node Modules
+node_modules

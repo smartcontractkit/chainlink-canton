@@ -1,0 +1,27 @@
+[package]
+name = "LockReleaseTokenPool"
+version = "1.0.0"
+authors = []
+
+[addresses]
+ccip = "_"
+ccip_token_pool = "_"
+lock_release_token_pool = "_"
+mcms = "_"
+mcms_register_entrypoints = "_"
+lock_release_local_token = "_"
+
+[dev-addresses]
+ccip = "0x85d5520ea6a8b1501502651040c6f61238b281142ccbafdc205d40258f0bec10"
+ccip_token_pool = "0x5e3f60cdec3a844938a0afb320fb644a96450070fea4280231b5062fc2aa16d2"
+lock_release_token_pool = "0x2e1f4cc8fbc2c7ccd2c67ff453e00526919098304d70708ef504af944d6fede8"
+mcms = "0x4000"
+mcms_register_entrypoints = "0x4001"
+lock_release_local_token = "0x6d1c246126d36fea774b12486de0a3737997f1b9b23806c67ca5ce72859ff5fa"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", rev = "16beac69835f3a71564c96164a606a23f259099a", subdir = "aptos-move/framework/aptos-framework" }
+ChainlinkCCIP = { local = "../../ccip" }
+CCIPTokenPool = { local = "../token_pool" }
+
+[dev-dependencies]

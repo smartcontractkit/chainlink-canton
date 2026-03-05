@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package chainlink_ccv.message_discovery.v1;
+
+import "verifier/v1/verifier.proto";
+
+option go_package = "github.com/smartcontractkit/chainlink-protos/chainlink-ccv/message-discovery/v1";
+
+service MessageDiscovery {
+  rpc GetMessagesSince(GetMessagesSinceRequest) returns (GetMessagesSinceResponse);
+}
+
+message VerifierResultWithSequence {  
+  // Verifier result contains the message data and required verification data from the committee verifier  
+  chainlink_ccv.verifier.v1.VerifierResult verifierResult = 1;
+  // Monotonic sequence number assigned by the verifier result API. Can be used to query for new messages since a given sequence.  
+  int64 sequence = 2;  
+}
+
+message GetMessagesSinceRequest {
+    int64 sinceSequence = 1;
+}
+
+message GetMessagesSinceResponse {
+    repeated VerifierResultWithSequence results = 1;
+}
+

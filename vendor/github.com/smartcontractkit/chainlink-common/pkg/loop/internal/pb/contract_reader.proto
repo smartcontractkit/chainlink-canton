@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+option go_package = "github.com/smartcontractkit/chainlink-common/pkg/loop/internal/pb";
+
+package loop;
+
+import "internal/codec/codec.proto";
+import "loop/chain-common/query.proto";
+import "google/protobuf/empty.proto";
+
+service ContractReader {
+  rpc GetLatestValue (GetLatestValueRequest) returns (GetLatestValueReply) {}
+  rpc GetLatestValueWithHeadData (GetLatestValueRequest) returns (GetLatestValueWithHeadDataReply) {}
+  rpc BatchGetLatestValues (BatchGetLatestValuesRequest) returns (BatchGetLatestValuesReply) {}
+  rpc QueryKey(QueryKeyRequest) returns (QueryKeyReply) {}
+  rpc QueryKeys(QueryKeysRequest) returns (QueryKeysReply) {}
+  rpc Bind(BindRequest) returns (google.protobuf.Empty) {}
+  rpc Unbind(UnbindRequest) returns (google.protobuf.Empty) {}
+}
+
+// GetLatestValueRequest has arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.GetLatestValue].
+message GetLatestValueRequest {
+  string read_identifier = 1;
+  loop.chain.common.Confidence confidence = 2;
+  codec.VersionedBytes params = 3;
+  bool as_value_type = 4;
+}
+
+// BatchGetLatestValuesRequest has arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.BatchGetLatestValues].
+message BatchGetLatestValuesRequest {
+  repeated ContractBatch requests = 1;
+}
+
+// QueryKeyRequest has arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.QueryKey].
+message QueryKeyRequest {
+  BoundContract contract = 1;
+  QueryKeyFilter filter = 2;
+  loop.chain.common.LimitAndSort limit_and_sort = 3;
+  bool as_value_type = 4;
+}
+
+// QueryKeysRequest has arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.QueryKeys].
+message QueryKeysRequest {
+  repeated ContractKeyFilter filters = 1;
+  loop.chain.common.LimitAndSort limit_and_sort = 2;
+}
+
+message ContractKeyFilter {
+  BoundContract contract = 1;
+  QueryKeyFilter filter = 2;
+  bool as_value_type = 4;
+}
+
+// BindRequest has arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.Bind].
+message BindRequest {
+  repeated BoundContract bindings = 1;
+}
+
+// UnbindRequest has arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.Unbind].
+message UnbindRequest {
+  repeated BoundContract bindings = 1;
+}
+
+// GetLatestValueReply has return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.GetLatestValue].
+message GetLatestValueReply {
+  codec.VersionedBytes ret_val = 1;
+}
+
+// GetLatestValueWithHeadDataReply has return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.GetLatestValueWithHeadData].
+message GetLatestValueWithHeadDataReply {
+  codec.VersionedBytes ret_val = 1;
+  Head head_data = 2;
+}
+
+// BatchGetLatestValuesReply has return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.BatchGetLatestValues].
+message BatchGetLatestValuesReply {
+  repeated ContractBatchResult results = 1;
+}
+
+// QueryKeyReply has return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.QueryKey].
+message QueryKeyReply {
+  repeated Sequence sequences = 1;
+}
+
+// QueryKeysReply has return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.QueryKeys].
+message QueryKeysReply {
+  repeated SequenceWithKey sequences = 1;
+}
+
+// ContractBatch is gRPC adapter for the BatchGetLatestValuesRequest struct map value [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.BatchGetLatestValuesRequest].
+message ContractBatch {
+  BoundContract contract = 1;
+  repeated BatchRead reads = 2;
+}
+
+// BatchCall is gRPC adapter for the GetLatestValueRequest struct [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.BatchCall].
+message BatchRead  {
+  string read_name = 1;
+  codec.VersionedBytes params = 2;
+  codec. VersionedBytes return_val = 3;
+}
+
+// ContractBatchResult is part of return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.BatchGetLatestValues].
+message ContractBatchResult {
+  BoundContract contract = 1;
+  repeated BatchReadResult results = 2;
+}
+
+// BatchCallResult is part of return arguments for [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.BatchGetLatestValues].
+message BatchReadResult {
+  string read_name = 1;
+  codec.VersionedBytes return_val = 2;
+  string error = 3;
+}
+
+// Head is gRPC adapter for the Head struct [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.Head].
+message Head {
+  string height = 1;
+  bytes hash = 2;
+  uint64 timestamp = 3;
+}
+
+// Head is gRPC adapter for the Head struct [github.com/smartcontractkit/chainlink-common/pkg/types.ContractReader.Sequence].
+message Sequence {
+  string sequence_cursor = 1;
+  Head head = 2;
+  codec.VersionedBytes data = 3;
+  bytes tx_hash = 4;
+}
+
+message SequenceWithKey {
+  string sequence_cursor = 1;
+  Head head = 2;
+  codec.VersionedBytes data = 3;
+  string key = 4;
+  bytes tx_hash = 5;
+}
+
+// BoundContract represents a [github.com/smartcontractkit/chainlink-common/pkg/types.BoundContract].
+message BoundContract {
+  string address = 1;
+  string name = 2;
+}
+
+message QueryKeyFilter {
+  string key = 1;
+  // Expressions are lightweight orm like DSL defined for filtering over common blockchain primitives.
+  repeated loop.chain.common.Expression expression = 2;
+}

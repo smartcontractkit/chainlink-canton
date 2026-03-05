@@ -1,0 +1,24 @@
+# https://taskfile.dev
+
+version: "3"
+
+includes:
+  changeset:
+    taskfile: ./taskfiles/changesets/Taskfile.yml
+
+  docs:
+    taskfile: ./taskfiles/docs/Taskfile.yml
+
+  install:
+    taskfile: ./taskfiles/install/Taskfile.yml
+
+  lint:
+    taskfile: ./taskfiles/lint/Taskfile.yml
+
+  test:
+    taskfile: ./taskfiles/test/Taskfile.yml
+
+  generate:
+    taskfile: ./taskfiles/generate/Taskfile.yml
+    aliases: [gen]
+

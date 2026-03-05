@@ -1,0 +1,160 @@
+set fallback
+
+import '../../tools/lib/utils.justfile'
+
+# Default: show available recipes
+default:
+    just --list
+
+clean:
+    rm -rf compose/ blockscout/
+
+# Remove all the chaos experiments
+rm-chaos:
+    kubectl delete networkchaos --all -A
+    kubectl delete podchaos --all -A
+    kubectl delete iochaos --all -A
+    kubectl delete timechaos --all -A
+    kubectl delete stresschaos --all -A
+    kubectl delete dnschaos --all -A
+    kubectl delete kernelchaos --all -A
+
+# Install pre-commit hooks
+pre-commit:
+    pre-commit install
+
+# Remove all the dev images
+clean-docker-dev:
+    just ../../build/devenv/fakes/clean-dev >/dev/null 2>&1 || true
+    just ../../pricer/clean-dev >/dev/null 2>&1 || true
+    just ../../verifier/clean-dev >/dev/null 2>&1 || true
+    just ../../executor/clean-dev >/dev/null 2>&1 || true
+    just ../../indexer/clean-dev >/dev/null 2>&1 || true
+    just ../../aggregator/clean-dev >/dev/null 2>&1 || true
+    rm -rf job-distributor/ >/dev/null 2>&1 || true
+
+# Build all the services (hot-reload dev mode)
+build-docker-dev:
+    @just ../../build/devenv/fakes/build-dev
+    @just ../../pricer/build-dev
+    @just ../../verifier/build-dev
+    @just ../../executor/build-dev
+    @just ../../indexer/build-dev
+    @just ../../aggregator/build-dev
+
+build-docker:
+    @just ../../build/devenv/fakes/build
+    @just ../../pricer/build
+    @just ../../verifier/build
+    @just ../../executor/build
+    @just ../../indexer/build
+    @just ../../aggregator/build
+
+# Build all the services (hot-reload dev mode but with default JD image)
+build-docker-dev-ci:
+    @just ../../build/devenv/fakes/build-dev
+    @just ../../pricer/build-dev
+    @just ../../verifier/build-dev
+    @just ../../executor/build-dev
+    @just ../../indexer/build-dev
+    @just ../../aggregator/build-dev
+
+# Build all the services for production
+build-docker-rc:
+    @just fakes/build
+    @just ../../services/pricer/build-rc
+    @just ../../services/verifier/build-rc
+    @just ../../services/executor/build-rc
+    @just ../../services/indexer/build-rc
+    @just ../../services/aggregator/build-rc
+
+# Rebuild CLI
+cli:
+    cd cmd/ccv && go install -ldflags="-X main.Version=1.0.0" . && cd ../..
+
+# Rebuild all (optionally pass config, defaults to env.toml)
+rebuild-all config="env.toml":
+    echo "Building CLI and all services"
+    @just cli
+    ccv down
+    echo "Cleaning up old images..."
+    @just clean-docker-dev
+    @just build-docker-dev
+    @just build-jd-docker
+    ccv up {{ config }}
+
+# Clone and build job-distributor Docker image
+build-jd-docker:
+    #!/usr/bin/env bash
+    set -e
+    REPO_URL="git@github.com:smartcontractkit/job-distributor.git"
+    REPO_DIR="job-distributor/"
+    IMAGE_NAME="job-distributor:local"
+    DOCKERFILE="e2e/Dockerfile.e2e"
+    if docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        echo "Docker image $IMAGE_NAME already exists, skipping build..."
+    else
+        echo "Cloning repository... check for 2-factor authentication"
+        git clone "$REPO_URL" "$REPO_DIR"
+        echo "Building Docker image..."
+        cd "$REPO_DIR" && docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" .
+        cd ..
+        rm -rf job-distributor/
+    fi
+    echo "Done!"
+smoke-test:
+    cd tests/e2e && go test -v -run TestE2ESmoke
+
+# Install and authenticate with GH CLI
+setup-gh:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    required="2.50.0"
+
+    # Convert semver to a zero-padded comparable number, e.g. 2.50.0 -> 002050000
+    ver() {
+      local v="${1#v}"
+      # Ensure we always have 3 fields by appending ".0.0"
+      echo "${v}.0.0" \
+        | awk -F. '{printf "%03d%03d%03d\n", ($1+0), ($2+0), ($3+0)}'
+    }
+
+    # 1) Ensure gh is installed (prefer Homebrew if available)
+    if ! command -v gh >/dev/null 2>&1; then
+      echo "GitHub CLI not found."
+      if command -v brew >/dev/null 2>&1; then
+        echo "Installing gh via Homebrew..."
+        brew install gh
+      else
+        echo "Homebrew not found. Please install gh manually (>= v${required})." >&2
+        exit 1
+      fi
+    fi
+
+    # 2) Check version
+    have_raw="$(gh --version | head -n1 | awk '{print $3}')"
+    have="${have_raw#v}"
+
+    if [[ "$(ver "$have")" -lt "$(ver "$required")" ]]; then
+      echo "Found gh v${have}, which is older than required v${required}."
+
+      # 3) If installed by Homebrew, upgrade; else error out
+      if command -v brew >/dev/null 2>&1 && brew list gh >/dev/null 2>&1; then
+        echo "gh appears to be managed by Homebrew. Upgrading..."
+        brew upgrade gh
+      else
+        echo "gh is not managed by Homebrew. Please upgrade manually to at least v${required}." >&2
+        exit 1
+      fi
+    else
+      echo "gh v${have} meets requirement (>= v${required})."
+    fi
+
+    # 4) Ensure authentication
+    if ! gh auth status >/dev/null 2>&1; then
+      echo "GitHub CLI not authenticated. Running gh auth login..."
+      gh auth login
+    else
+      echo "GitHub CLI is already authenticated."
+    fi

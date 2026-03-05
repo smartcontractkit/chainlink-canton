@@ -1,0 +1,10 @@
+bin/
+.vscode/
+.idea/
+.direnv/
+performance_reports/
+k3dvolume/
+.private.env
+.envrc.ci
+.envrc.local
+gen_*

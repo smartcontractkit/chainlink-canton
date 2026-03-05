@@ -1,0 +1,24 @@
+dir: "{{ .InterfaceDir }}/mocks"
+mockname: "{{ .InterfaceName }}"
+outpkg: mocks
+filename: "{{ .InterfaceName | snakecase }}.go"
+packages:
+  github.com/smartcontractkit/chainlink-framework/multinode:
+    config:
+      dir: "{{ .InterfaceDir }}"
+      filename: "mock_{{ .InterfaceName | snakecase }}_test.go"
+      inpackage: true
+      mockname: "mock{{ .InterfaceName | camelcase }}"
+    interfaces:
+      Node:
+      NodeSelector:
+      sendOnlyClient:
+      SendOnlyNode:
+      RPCClient:
+      Head:
+      PoolChainInfoProvider:
+      Subscription:
+      multiNodeMetrics:
+      nodeMetrics:
+      sendOnlyNodeMetrics:
+      transactionSenderMetrics:

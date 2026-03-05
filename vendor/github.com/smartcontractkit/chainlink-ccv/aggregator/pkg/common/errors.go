@@ -1,0 +1,10 @@
+package common
+
+import "errors"
+
+// ErrAggregationChannelFull is returned when the aggregation channel is full.
+var ErrAggregationChannelFull = errors.New("aggregation channel is full")
+
+var ErrNotFound = errors.New("not found")
+
+var ErrShuttingDown = errors.New("channel manager is shutting down")

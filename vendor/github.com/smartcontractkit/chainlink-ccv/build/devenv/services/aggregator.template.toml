@@ -1,0 +1,90 @@
+pyroscope_url = "http://pyroscope:4040"
+
+[server]
+address = ":50051"
+requestTimeout = "5s"
+maxRecvMsgSizeBytes =  65536 # 64KB
+
+[healthCheck]
+enabled = true
+
+[storage]
+type = "postgres"
+
+# Anonymous Auth Configuration
+# In devenv, all containers connect directly via Docker network.
+# These CIDRs cover standard Docker network ranges so that forwarded
+# headers from containers within the network are trusted.
+[anonymousAuth]
+trustedProxies = [
+    "172.16.0.0/12",
+    "10.0.0.0/8",
+    "192.168.0.0/16",
+]
+
+[orphanRecovery]
+enabled = false
+interval = "5m"
+maxAge = "24h"
+
+# Rate Limiting Configuration
+[rateLimiting]
+enabled = true
+
+# Storage backend: "memory" (single instance) or "redis" (distributed)
+[rateLimiting.storage]
+type = "redis"
+
+[rateLimiting.storage.redis]
+key_prefix = "ratelimit"
+
+# Default rate limits (applied to all callers unless overridden)
+[rateLimiting.defaultLimits]
+"/chainlink_ccv.message_discovery.v1.MessageDiscovery/GetMessagesSince" = { limit_per_minute = 1200 }
+"/chainlink_ccv.verifier.v1.Verifier/GetVerifierResultsForMessage" = { limit_per_minute = 6000 }
+"/chainlink_ccv.heartbeat.v1.HeartbeatService/SendHeartbeat" = { limit_per_minute = 6000 }
+
+# Limit shared across all anonymous callers
+[rateLimiting.globalAnonymousLimits]
+"/chainlink_ccv.verifier.v1.Verifier/GetVerifierResultsForMessage" = { limit_per_minute = 6000 }
+
+# Group-based rate limits (more restrictive than defaults for specific groups)
+# WriteCommitteeVerifierNodeResult is not needed for verifiers as they use BatchWriteCommitteeVerifierNodeResult instead.
+[rateLimiting.groupLimits.verifiers]
+"/chainlink_ccv.committee_verifier.v1.CommitteeVerifier/BatchWriteCommitteeVerifierNodeResult" = { limit_per_minute = 150 }
+"/chainlink_ccv.heartbeat.v1.HeartbeatService/SendHeartbeat" = { limit_per_minute = 6000 }
+
+# Higher rate limit group for service tests-1
+[rateLimiting.groupLimits.service-tests-1]
+"/chainlink_ccv.committee_verifier.v1.CommitteeVerifier/WriteCommitteeVerifierNodeResult" = { limit_per_minute = 150 }
+"/chainlink_ccv.committee_verifier.v1.CommitteeVerifier/BatchWriteCommitteeVerifierNodeResult" = { limit_per_minute = 150 }
+"/chainlink_ccv.heartbeat.v1.HeartbeatService/SendHeartbeat" = { limit_per_minute = 6000 }
+
+# Low rate limit group for service tests-2
+[rateLimiting.groupLimits.service-tests-2]
+"/chainlink_ccv.committee_verifier.v1.CommitteeVerifier/WriteCommitteeVerifierNodeResult" = { limit_per_minute = 50 }
+"/chainlink_ccv.committee_verifier.v1.CommitteeVerifier/BatchWriteCommitteeVerifierNodeResult" = { limit_per_minute = 10 }
+
+[rateLimiting.groupLimits.monitoring]
+"/chainlink_ccv.message_discovery.v1.MessageDiscovery/GetMessagesSince" = { limit_per_minute = 200 }
+
+[rateLimiting.groupLimits.indexer]
+"/chainlink_ccv.verifier.v1.Verifier/GetVerifierResultsForMessage" = { limit_per_minute = 6000 }
+"/chainlink_ccv.message_discovery.v1.MessageDiscovery/GetMessagesSince" = { limit_per_minute = 1200 }
+
+
+[Monitoring]
+Enabled = true
+Type = "beholder"
+[Monitoring.Beholder]
+InsecureConnection = true
+CACertFile = ""
+OtelExporterGRPCEndpoint = ""
+OtelExporterHTTPEndpoint = "otel-collector:4318"
+LogStreamingEnabled = true
+MetricReaderInterval = 5
+TraceSampleRatio = 1.0
+TraceBatchTimeout = 10
+
+# Committee config is loaded from the generated config file.
+# generatedConfigPath is set dynamically during config generation.

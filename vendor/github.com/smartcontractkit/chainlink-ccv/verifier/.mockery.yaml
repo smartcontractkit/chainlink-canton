@@ -1,0 +1,24 @@
+with-expecter: true
+
+dir: ./internal/mocks
+outpkg: mocks
+
+packages:
+  github.com/smartcontractkit/chainlink-ccv/verifier/token/cctp:
+    interfaces:
+      AttestationService:
+        config:
+          filename: "mock_cctpAttestationService.go"
+          mockname: "CCTPAttestationService"
+  github.com/smartcontractkit/chainlink-ccv/verifier/token/lombard:
+    interfaces:
+      AttestationService:
+        config:
+          filename: "mock_lombardAttestationService.go"
+          mockname: "LombardAttestationService"
+  github.com/smartcontractkit/chainlink-ccv/verifier:
+    interfaces:
+      MetricLabeler:
+        config:
+          filename: "mock_MetricLabeler.go"
+

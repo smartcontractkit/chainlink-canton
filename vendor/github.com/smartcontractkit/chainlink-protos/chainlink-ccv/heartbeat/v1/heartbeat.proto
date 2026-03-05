@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package chainlink_ccv.heartbeat.v1;
+
+option go_package = "github.com/smartcontractkit/chainlink-protos/chainlink-ccv/heartbeat/v1";
+
+service HeartbeatService {
+  rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+}
+
+message HeartbeatRequest {
+  int64 send_timestamp = 1;
+
+  ChainHealthDetails chain_details = 2;
+}
+
+message ChainHealthDetails {
+  map<uint64, uint64> block_heights_by_chain = 1;
+}
+
+message HeartbeatResponse {
+  string aggregator_id = 1;
+  int64 timestamp = 2;
+
+  map<uint64, ChainBenchmark> chain_benchmarks = 3;
+}
+
+message ChainBenchmark {
+  uint64 block_height = 1;
+  float score = 2;
+}

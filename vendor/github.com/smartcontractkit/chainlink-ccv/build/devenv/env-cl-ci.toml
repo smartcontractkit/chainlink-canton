@@ -1,0 +1,24 @@
+## CI-specific override: use pre-built local images instead of building from Dockerfile
+[[nodesets]]
+  name = "don"
+  nodes = 2
+  override_mode = "each"
+
+  [nodesets.db]
+    image = "postgres:15.0"
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      image = "docker.io/library/local:latest"
+    
+    [nodesets.node_specs.node.env_vars]
+      CL_EVM_CMD=""
+
+  [[nodesets.node_specs]]
+
+    [nodesets.node_specs.node]
+      image = "docker.io/library/local:latest"
+    
+    [nodesets.node_specs.node.env_vars]
+      CL_EVM_CMD=""
