@@ -96,18 +96,21 @@ func newAuthProvider(ctx context.Context, info ccip.BlockchainInfo) (authenticat
 		if jwt == "" {
 			return nil, fmt.Errorf("static auth requires a JWT token (set auth.jwt or top-level jwt)")
 		}
+
 		return authentication.NewStaticProvider(jwt), nil
 
 	case ccip.AuthTypeClientCredentials:
 		if info.Auth.AuthURL == "" || info.Auth.ClientID == "" || info.Auth.ClientSecret == "" {
 			return nil, fmt.Errorf("clientCredentials auth requires auth_url, client_id, and client_secret")
 		}
+
 		return clientcredentials.NewDiscoveryProvider(ctx, info.Auth.AuthURL, info.Auth.ClientID, info.Auth.ClientSecret)
 
 	case ccip.AuthTypeAuthorizationCode:
 		if info.Auth.AuthURL == "" || info.Auth.ClientID == "" {
 			return nil, fmt.Errorf("authorizationCode auth requires auth_url and client_id")
 		}
+
 		return authorizationcode.NewDiscoveryProvider(ctx, info.Auth.AuthURL, info.Auth.ClientID)
 
 	default:
