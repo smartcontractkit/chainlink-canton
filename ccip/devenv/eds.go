@@ -203,7 +203,7 @@ func (l *launcher) Launch(
 	env *cldfdeployment.Environment,
 	chains []*blockchain.Output,
 	definition *ccv.GenericServiceDefinition,
-) (output util.OpaqueConfig, err error) {
+) (util.OpaqueConfig, error) {
 	var cantonOutput *blockchain.Output
 	for _, chain := range chains {
 		if chain.Type == chain_selectors.FamilyCanton {
@@ -257,9 +257,13 @@ func (l *launcher) Launch(
 	}
 
 	// return the EDS config
-	// TODO, should we use the output struct here somehow?
-	return util.OpaqueConfig{
-		"eds_config": edsCfg,
-		"eds_url":    fmt.Sprintf("http://%s:%s", host, edsMappedPort.Port()),
-	}, nil
+	opaqueConfig, err := util.ConcreteToOpaque(output{
+		EDSConfig: *edsCfg,
+		EDSURL:    fmt.Sprintf("http://%s:%s", host, edsMappedPort.Port()),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert output to opaque config: %w", err)
+	}
+
+	return opaqueConfig, nil
 }
