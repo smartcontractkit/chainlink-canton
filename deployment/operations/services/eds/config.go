@@ -78,6 +78,7 @@ var BuildConfig = operations.NewOperation(
 
 		// CCVs
 		refs := env.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(input.ChainSelector),
 			datastore.AddressRefByType(datastore.ContractType(committee_verifier.ContractType)),
 		)
 		if len(refs) == 0 {
