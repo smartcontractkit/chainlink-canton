@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
@@ -74,6 +75,10 @@ var BuildConfig = operations.NewOperation(
 		perPartyRouterFactory, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(input.ChainSelector, datastore.ContractType(per_party_router_factory.ContractType), per_party_router_factory.Version, ""))
 		if err != nil {
 			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get PerPartyRouterFactory address: %w", err)
+		}
+		feeQuoter, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(input.ChainSelector, datastore.ContractType(fee_quoter.ContractType), fee_quoter.Version, ""))
+		if err != nil {
+			return GenerateEDSConfigOutput{}, fmt.Errorf("failed to get FeeQuoter address: %w", err)
 		}
 
 		// CCVs
@@ -145,6 +150,10 @@ var BuildConfig = operations.NewOperation(
 					RMNRemote: edsConfig.ContractIdentifier{
 						PartyID:         participant.PartyID,
 						InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+					},
+					FeeQuoter: edsConfig.ContractIdentifier{
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 					},
 					CCVs: ccvs,
 				},
