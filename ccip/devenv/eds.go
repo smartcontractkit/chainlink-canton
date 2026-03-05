@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/exp/maps"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
@@ -159,6 +160,7 @@ func startEDS(ctx context.Context, cfg *edsConfig.Config) (testcontainers.Contai
 				},
 			}
 		},
+		WaitingFor: wait.ForLog("Backfill complete"), // TODO: properly implement readiness endpoint
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            bytes.NewReader(configToml),

@@ -20,4 +20,4 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /disclosure-server /app/disclosure-server
 
 ENV CONFIG_FILE=/app/config.toml
-CMD ["sh", "-c", "./disclosure-server", "-config", "$CONFIG_FILE"]
+CMD ["/app/disclosure-server"]

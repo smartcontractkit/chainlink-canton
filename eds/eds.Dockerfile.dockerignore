@@ -10,4 +10,5 @@ navigator.log
 go.work
 go.work.sum
 
+**/eds.Dockerfile
 **/eds.Dockerfile.dockerignore
