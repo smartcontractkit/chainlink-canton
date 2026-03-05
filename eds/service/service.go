@@ -35,6 +35,11 @@ import (
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {
+	// Validate config
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+
 	chainSelector, err := strconv.ParseUint(cfg.ChainSelector, 10, 64)
 	if err != nil {
 		return fmt.Errorf("failed to parse chain selector: %w", err)

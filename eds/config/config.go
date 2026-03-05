@@ -69,9 +69,5 @@ func Read(configData io.Reader) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
 
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
 	return &config, nil
 }
