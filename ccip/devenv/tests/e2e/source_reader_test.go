@@ -119,9 +119,9 @@ func TestCantonSourceReader(t *testing.T) {
 	participant := chain.Participants[0]
 	party := participant.PartyID
 
-	grpcURL := cantonChain.Out.NetworkSpecificData.CantonEndpoints.Participants[0].GRPCLedgerAPIURL
+	grpcURL := cantonChain.Out.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].GRPCLedgerAPIURL
 	require.NotEmpty(t, grpcURL)
-	jwt := cantonChain.Out.NetworkSpecificData.CantonEndpoints.Participants[0].JWT
+	jwt := cantonChain.Out.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].JWT
 	require.NotEmpty(t, jwt)
 
 	ts := newTestSetup(participant)

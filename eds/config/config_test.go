@@ -20,7 +20,7 @@ func TestRead(t *testing.T) {
 		{
 			name: "valid config",
 			config: `
-chain_selector = 8706591216959472610
+chain_selector = "8706591216959472610"
 
 [server]
 host = "0.0.0.0"
@@ -62,7 +62,7 @@ user_id = "local-user"
 jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
 	`,
 			want: &Config{
-				ChainSelector: 8706591216959472610,
+				ChainSelector: "8706591216959472610",
 				Server: ServerConfig{
 					Host: "0.0.0.0",
 					Port: 8088,

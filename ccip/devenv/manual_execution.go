@@ -134,12 +134,12 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	c.logger.Debug().Str("ReceiverAddress", receiverAddress.String()).Msg("Deployed CCIPReceiver")
 
-	// Get disclosures for execution // TODO replace with EDS
+	// Get disclosures for execution using EDS
 	ccvs := make([]contracts.InstanceAddress, len(verifiers))
 	for i, verifier := range verifiers {
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
-	disclosures, err := c.GetDisclosuresForExecution(ctx, ccvs)
+	disclosedContracts, choiceContext, ccvContractIDs, err := c.GetDisclosuresForExecution(ctx, ccvs)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
@@ -168,48 +168,14 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		Str("Receiver", hex.EncodeToString(message.Receiver)).
 		Msg("Executing message...")
 
-	disclosedContracts := []*apiv2.DisclosedContract{
-		disclosures.OffRamp,
-		disclosures.GlobalConfig,
-		disclosures.TokenAdminRegistry,
-		disclosures.RMNRemote,
-	}
-
 	ccvElements := make([]*apiv2.Value, len(verifiers))
-	for i, verifier := range disclosures.Verifiers {
+	for i, ccvCid := range ccvContractIDs {
 		ccvElements[i] = &apiv2.Value{
 			Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: verifier.GetContractId()}}},
+				{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvCid}},
 				{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(verifierResults[i])}}},
 			}}},
 		}
-		disclosedContracts = append(disclosedContracts, verifier)
-	}
-
-	// Create context - replace with EDS
-	choiceContext := map[string]any{
-		"values": map[string]any{
-			"off-ramp": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.OffRamp.ContractId,
-			},
-			"global-config": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.GlobalConfig.ContractId,
-			},
-			"token-admin-registry": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.TokenAdminRegistry.ContractId,
-			},
-			"rmn-remote": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.RMNRemote.ContractId,
-			},
-		},
-	}
-	choiceContextValue, err := ChoiceContextFromData(choiceContext)
-	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to create choice context: %w", err)
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
@@ -221,7 +187,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					ContractId: receiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContextValue},
+						{Label: "context", Value: choiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(encodedMessage)}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},

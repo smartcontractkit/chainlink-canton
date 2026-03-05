@@ -161,13 +161,14 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 
 	// Subscribe to updates
 	for {
-		s.logger.Debug().Int64("offset", offset).Msg("Subscribing to update stream")
-		stream, err := s.getUpdateStream(ctx, offset)
+		// Start streaming from s.ledgerEnd (exclusive)
+		s.logger.Debug().Int64("offset", s.ledgerEnd).Msg("Subscribing to update stream")
+		stream, err := s.getUpdateStream(ctx, s.ledgerEnd)
 		if err != nil {
 			return fmt.Errorf("failed to create update stream: %w", err)
 		}
 
-		s.logger.Debug().Int64("offset", offset).Msg("Update stream created, listening for updates")
+		s.logger.Debug().Int64("offset", s.ledgerEnd).Msg("Update stream created, listening for updates")
 		for {
 			resp, err := stream.Recv()
 			if errors.Is(err, io.EOF) {
@@ -202,6 +203,7 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 								SynchronizerId:      transaction.Transaction.GetSynchronizerId(),
 								ReassignmentCounter: 0,
 							}
+							// Increment ledgerEnd
 							s.ledgerEnd = transaction.Transaction.GetOffset()
 							s.mux.Unlock()
 						}

@@ -11,7 +11,7 @@ import (
 )
 
 type Config struct {
-	ChainSelector uint64       `toml:"chain_selector" validate:"required"`
+	ChainSelector string       `toml:"chain_selector" validate:"required"`
 	Server        ServerConfig `toml:"server" validate:"required"`
 	Node          NodeConfig   `toml:"node" validate:"required"`
 	Contracts     Contracts    `toml:"contracts" validate:"required"`

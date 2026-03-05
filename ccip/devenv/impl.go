@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"sync/atomic"
 	"time"
 
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
@@ -42,9 +41,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/deployments"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
@@ -54,7 +53,7 @@ import (
 var (
 	_ cciptestinterfaces.CCIP17              = &Chain{}
 	_ cciptestinterfaces.CCIP17Configuration = &Chain{}
-	_ registry.ImplFactory                   = &ImplFactory{}
+	_ ccv.ImplFactory                        = &ImplFactory{}
 )
 
 type ImplFactory struct{}
@@ -64,8 +63,8 @@ func NewImplFactory() *ImplFactory {
 }
 
 // New implements [registry.ImplFactory].
-func (i *ImplFactory) New(ctx context.Context, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
-	return New(ctx, lggr, env, bc.ChainID)
+func (i *ImplFactory) New(ctx context.Context, cfg *ccv.Cfg, lggr zerolog.Logger, env *deployment.Environment, bc *blockchain.Input) (cciptestinterfaces.CCIP17, error) {
+	return New(ctx, cfg, lggr, env, bc.ChainID)
 }
 
 // NewEmpty implements [registry.ImplFactory].
@@ -85,9 +84,14 @@ type Chain struct {
 	chain        canton.Chain
 	logger       zerolog.Logger
 	chainDetails chainsel.ChainDetails
+	cfg          *ccv.Cfg
 }
 
-func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
+func (c *Chain) ChainSelector() uint64 {
+	return c.chainDetails.ChainSelector
+}
+
+func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
 	if err != nil {
 		return nil, fmt.Errorf("get chain details for chain %s: %w", chainID, err)
@@ -99,6 +103,7 @@ func New(ctx context.Context, logger zerolog.Logger, e *deployment.Environment, 
 		chain:        chain,
 		chainDetails: chainDetails,
 		logger:       logger,
+		cfg:          cfg,
 	}, nil
 }
 
@@ -315,6 +320,8 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	if err != nil {
 		return nil, fmt.Errorf("failed to add executor proxy address ref: %w", err)
 	}
+
+	env.DataStore = runningDS.Seal()
 
 	return runningDS.Seal(), nil
 }
@@ -562,7 +569,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 }
 
 // SendMessageWithNonce implements cciptestinterfaces.CCIP17.
-func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *atomic.Uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
+func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
 	return cciptestinterfaces.MessageSentEvent{}, nil // TODO: implement
 }
 
@@ -579,4 +586,14 @@ func (c *Chain) WaitOneExecEventBySeqNo(ctx context.Context, from, seq uint64, t
 // WaitOneSentEventBySeqNo implements cciptestinterfaces.CCIP17.
 func (c *Chain) WaitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
 	return cciptestinterfaces.MessageSentEvent{}, nil // TODO: implement
+}
+
+func (c *Chain) NativeBalance(ctx context.Context, address protocol.UnknownAddress) (*big.Int, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (c *Chain) TransferNative(ctx context.Context, from, to protocol.UnknownAddress, amount *big.Int) error {
+	// TODO implement me
+	panic("implement me")
 }
