@@ -11,9 +11,9 @@ import (
 )
 
 type UnvetAndReuploadDARsConfig struct {
-	// DAR payloads to upload after unvetting.
+	// DAR payloads to upload and vet.
 	DARs [][]byte
-	// Optional explicit list of main package IDs to unvet first.
+	// Optional explicit list of main package IDs to unvet.
 	// If empty, all currently listed DARs on the participant are unvetted.
 	MainPackageIDsToUnvet []string
 	// Whether to wait for package vetting changes to synchronize.
@@ -52,6 +52,32 @@ func (u UnvetAndReuploadDARs) Apply(e cldf.Environment, config CantonCSDeps[Unve
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 	participant := chain.Participants[config.Participant]
 
+	// Step 1: Upload and vet the new DARs first.
+	// This ensures both old and new packages are available, allowing callers
+	// to archive old contract instances before the old packages are unvetted.
+	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(config.Config.DARs))
+	for i, dar := range config.Config.DARs {
+		if len(dar) == 0 {
+			return cldf.ChangesetOutput{}, fmt.Errorf("DAR at index %d is empty", i)
+		}
+		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{
+			Bytes: dar,
+		})
+	}
+
+	_, err := participant.AdminServices.Package.UploadDar(e.GetContext(), &participantv30.UploadDarRequest{
+		Dars:               darData,
+		VetAllPackages:     true,
+		SynchronizeVetting: config.Config.SynchronizeVetting,
+		SynchronizerId:     config.Config.SynchronizerID,
+	})
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to upload new DARs: %w", err)
+	}
+
+	// Step 2: Unvet the old DARs.
+	// Old contracts must be archived by the caller before this changeset runs,
+	// or between the upload (step 1) and a separate unvet call.
 	mainPackageIDs, err := mainPackageIDsToUnvet(e, participant, config.Config)
 	if err != nil {
 		return cldf.ChangesetOutput{}, err
@@ -65,26 +91,6 @@ func (u UnvetAndReuploadDARs) Apply(e cldf.Environment, config CantonCSDeps[Unve
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("failed to unvet DAR %q: %w", mainPackageID, err)
 		}
-	}
-
-	darData := make([]*participantv30.UploadDarRequest_UploadDarData, 0, len(config.Config.DARs))
-	for i, dar := range config.Config.DARs {
-		if len(dar) == 0 {
-			return cldf.ChangesetOutput{}, fmt.Errorf("DAR at index %d is empty", i)
-		}
-		darData = append(darData, &participantv30.UploadDarRequest_UploadDarData{
-			Bytes: dar,
-		})
-	}
-
-	_, err = participant.AdminServices.Package.UploadDar(e.GetContext(), &participantv30.UploadDarRequest{
-		Dars:               darData,
-		VetAllPackages:     true,
-		SynchronizeVetting: config.Config.SynchronizeVetting,
-		SynchronizerId:     config.Config.SynchronizerID,
-	})
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to reupload DARs: %w", err)
 	}
 
 	return cldf.ChangesetOutput{
