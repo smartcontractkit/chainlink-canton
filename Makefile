@@ -27,7 +27,7 @@ gomodtidy: ## Run go mod tidy on all modules.
 .PHONY: test-daml-contracts
 test-daml-contracts:
 	cd contracts && dpm build --all
-	go run ./contracts/cmd/test --root ./contracts --color
+	go run ./contracts/cmd/test --root ./contracts
 
 # GolangCI-Lint targets
 
