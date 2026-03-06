@@ -87,7 +87,7 @@ jobs:
       - name: Install DPM
         uses: ./.github/actions/install-dpm
       - name: Test Daml Contracts
-        run: go run ./contracts/cmd/test --root . --plain --output ./summary.md
+        run: go run ./contracts/cmd/test --root ./contracts --plain --output ./summary.md
       - name: Output test summary
         if: always()
         run: cat summary.md >$GITHUB_STEP_SUMMARY
