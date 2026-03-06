@@ -15,6 +15,7 @@ import (
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -152,7 +153,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		result, err := testCtx.AssertMessage(sentEvent.MessageID, tcapi.AssertMessageOptions{
 			TickInterval:            1 * time.Second,
 			ExpectedVerifierResults: 1,
-			Timeout:                 tcapi.DefaultExecTimeout,
+			Timeout:                 tests.WaitTimeout(t),
 			AssertVerifierLogs:      false,
 			AssertExecutorLogs:      false,
 		})
@@ -160,7 +161,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NotNil(t, result.AggregatedResult)
 		require.Len(t, result.IndexedVerifications.Results, 1)
 
-		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tcapi.DefaultExecTimeout)
+		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 		t.Logf("Execution event: %+v", ev)
