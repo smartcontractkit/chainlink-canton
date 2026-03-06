@@ -71,3 +71,45 @@ var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.Co
 	Template: ccvs.CommitteeVerifier{},
 	Method:   ccvs.CommitteeVerifier{}.CommitteeVerifierApplySignatureConfigs,
 })
+
+var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierUpdateStorageLocations]{
+	Name:         "canton/ccip/committee_verifier/update_storage_locations",
+	Version:      Version,
+	Description:  "Updates the storage locations of a CommitteeVerifier instance",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.CommitteeVerifierUpdateStorageLocations,
+})
+
+var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierTransferStorageLocationsAdmin]{
+	Name:         "canton/ccip/committee_verifier/transfer_storage_locations_admin",
+	Version:      Version,
+	Description:  "Initiates the two-step transfer of the storage locations admin role",
+	ContractType: ContractType,
+	Validate: func(input ccvs.CommitteeVerifierTransferStorageLocationsAdmin) error {
+		if input.NewAdmin == "" {
+			return errors.New("newAdmin cannot be empty")
+		}
+
+		return nil
+	},
+	Template: ccvs.CommitteeVerifier{},
+	Method:   ccvs.CommitteeVerifier{}.CommitteeVerifierTransferStorageLocationsAdmin,
+})
+
+var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierAcceptStorageLocationsAdmin]{
+	Name:         "canton/ccip/committee_verifier/accept_storage_locations_admin",
+	Version:      Version,
+	Description:  "Accepts a pending transfer of the storage locations admin role",
+	ContractType: ContractType,
+	Validate: func(input ccvs.CommitteeVerifierAcceptStorageLocationsAdmin) error {
+		if input.Caller == "" {
+			return errors.New("caller cannot be empty")
+		}
+
+		return nil
+	},
+	Template: ccvs.CommitteeVerifier{},
+	Method:   ccvs.CommitteeVerifier{}.CommitteeVerifierAcceptStorageLocationsAdmin,
+})

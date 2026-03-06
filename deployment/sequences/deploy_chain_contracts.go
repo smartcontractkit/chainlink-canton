@@ -203,7 +203,7 @@ var DeployChainContracts = operations.NewSequence(
 					CcipOwner:                types.PARTY(input.CCIPOwnerParty),
 					VersionTag:               committeeVerifier.Template.VersionTag,
 					MessageSentObserver:      committeeVerifier.Template.MessageSentObserver,
-					StorageLocation:          committeeVerifier.Template.StorageLocation,
+					StorageLocations:         committeeVerifier.Template.StorageLocations,
 					SignerConfigs:            committeeVerifier.Template.SignerConfigs,
 					RmnRemoteInstanceAddress: rmnRemoteRawInstanceAddress.Binding(),
 					RemoteChainFeeConfigs:    committeeVerifier.Template.RemoteChainFeeConfigs,

@@ -46,20 +46,26 @@ template CommitteeVerifier
         ccipOwner : Party
         versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")
         messageSentObserver : Party
-        storageLocation : Text
+
+        -- | Storage locations for off-chain components to read from.
+        storageLocations : [Text]
+        storageLocationsAdmin : Party
+        pendingStorageLocationsAdmin : Optional Party
 
         signerConfigs : Map.Map (Numeric 0) SignatureConfig
         rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         remoteChainFeeConfigs : Map.Map (Numeric 0) CCVFeeConfig
     where
         signatory owner
+        observer storageLocationsAdmin :: optional [] pure pendingStorageLocationsAdmin
+        
         -- Ensure that for each signerConfig the number of signer keys is >= threshold and that threshold > 0
-        ensure storageLocation /= "" && versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
+        ensure versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
                 ccipOwner = ccipOwner
-                storageLocation = storageLocation
+                storageLocations = storageLocations
 
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_VerifyMessage
@@ -96,6 +102,37 @@ template CommitteeVerifier
                     (all (\config -> (config.threshold > 0) && (length config.signerKeys >= config.threshold)) signatureConfigs)
                 let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
                 create this with signerConfigs = newSignerConfigs
+
+        -- | Initiates the two-step transfer for the storage locations admin role.
+        -- Caller must be the current storage locations admin.
+        -- @param newAdmin The proposed new storage locations admin party
+        choice CommitteeVerifier_TransferStorageLocationsAdmin : ContractId CommitteeVerifier
+            with
+                newAdmin : Party
+            controller storageLocationsAdmin
+            do
+                create this with pendingStorageLocationsAdmin = Some newAdmin
+
+        -- | Completes the transfer of the storage locations admin role.
+        -- Caller must be the proposed new storage locations admin.
+        choice CommitteeVerifier_AcceptStorageLocationsAdmin : ContractId CommitteeVerifier
+            with
+                caller : Party
+            controller caller
+            do
+                let proposedAdmin = fromSomeNote "No pending storage locations admin" pendingStorageLocationsAdmin
+                assertMsg "Only the pending storage locations admin can accept the role" (proposedAdmin == caller)
+                create this with storageLocationsAdmin = proposedAdmin, pendingStorageLocationsAdmin = None
+
+        -- | Updates the storage locations identifiers.
+        -- Caller must be the storage locations admin.
+        -- @param newLocations The new storage location identifiers
+        choice CommitteeVerifier_UpdateStorageLocations : ContractId CommitteeVerifier
+            with
+                newLocations : [Text]
+            controller storageLocationsAdmin
+            do
+                create this with storageLocations = newLocations
 
         -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
         -- Fetches ExecutingMessageV1 for decoded message content and re-encodes

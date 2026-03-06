@@ -106,11 +106,12 @@ func TestDeployChainContracts(t *testing.T) {
 				CommitteeVerifiers: []sequences.CommitteeVerifierParams{
 					{
 						Template: ccvs.CommitteeVerifier{
-							Owner:               types.PARTY(ccipOwnerParty),
-							CcipOwner:           types.PARTY(ccipOwnerParty),
-							VersionTag:          types.TEXT(versionTag),
-							MessageSentObserver: types.PARTY(ccipOwnerParty),
-							StorageLocation:     "ipfs://test-receive",
+							Owner:                 types.PARTY(ccipOwnerParty),
+							CcipOwner:             types.PARTY(ccipOwnerParty),
+							VersionTag:            types.TEXT(versionTag),
+							MessageSentObserver:   types.PARTY(ccipOwnerParty),
+							StorageLocations:      []types.TEXT{"ipfs://test-receive"},
+							StorageLocationsAdmin: types.PARTY(ccipOwnerParty),
 						},
 					},
 				},

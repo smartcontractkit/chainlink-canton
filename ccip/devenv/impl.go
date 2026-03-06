@@ -256,11 +256,9 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 
 	// Get committees
 	for qualifier, committeeConfig := range topology.NOPTopology.Committees {
-		var storageLocation types.TEXT // TODO, multiple storage locations
-		if len(committeeConfig.StorageLocations) > 0 {
-			storageLocation = types.TEXT(committeeConfig.StorageLocations[0])
-		} else {
-			storageLocation = types.TEXT("dummy-location") // TODO contracts don't allow an empty location for now
+		storageLocations := make([]types.TEXT, len(committeeConfig.StorageLocations))
+		for i, location := range committeeConfig.StorageLocations {
+			storageLocations[i] = types.TEXT(location)
 		}
 		cv := sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
@@ -269,7 +267,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				CcipOwner:           types.PARTY(participant.PartyID),
 				VersionTag:          types.TEXT("49ff34ed"),
 				MessageSentObserver: types.PARTY(participant.PartyID),
-				StorageLocation:     storageLocation,
+				StorageLocations:    storageLocations,
 			},
 		}
 		config.Config.Params.CommitteeVerifiers = append(config.Config.Params.CommitteeVerifiers, cv)

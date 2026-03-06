@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "47eb56828ca066b32389d3ff8aa3b2f3cf884e39763abd13afce2caaddd62c19"
+	PackageID   = "cc99e935a98ab7d98882855e2e0fd1951d8c62f1ca1de735001891abb782c84c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -97,15 +97,17 @@ func (t *CCVFeeConfig) UnmarshalHex(data string) error {
 
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
-	InstanceId               types.TEXT                `json:"instanceId"`
-	Owner                    types.PARTY               `json:"owner"`
-	CcipOwner                types.PARTY               `json:"ccipOwner"`
-	VersionTag               types.TEXT                `json:"versionTag"`
-	MessageSentObserver      types.PARTY               `json:"messageSentObserver"`
-	StorageLocation          types.TEXT                `json:"storageLocation"`
-	SignerConfigs            types.GENMAP              `json:"signerConfigs"`
-	RmnRemoteInstanceAddress common.RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
-	RemoteChainFeeConfigs    types.GENMAP              `json:"remoteChainFeeConfigs"`
+	InstanceId                   types.TEXT                `json:"instanceId"`
+	Owner                        types.PARTY               `json:"owner"`
+	CcipOwner                    types.PARTY               `json:"ccipOwner"`
+	VersionTag                   types.TEXT                `json:"versionTag"`
+	MessageSentObserver          types.PARTY               `json:"messageSentObserver"`
+	StorageLocations             []types.TEXT              `json:"storageLocations"`
+	StorageLocationsAdmin        types.PARTY               `json:"storageLocationsAdmin"`
+	PendingStorageLocationsAdmin *types.PARTY              `json:"pendingStorageLocationsAdmin"`
+	SignerConfigs                types.GENMAP              `json:"signerConfigs"`
+	RmnRemoteInstanceAddress     common.RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
+	RemoteChainFeeConfigs        types.GENMAP              `json:"remoteChainFeeConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -138,7 +140,27 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	args["messageSentObserver"] = t.MessageSentObserver.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["storageLocation"] = string(t.StorageLocation)
+	args["storageLocations"] = func() []any {
+		res := make([]any, 0, len(t.StorageLocations))
+		for _, e := range t.StorageLocations {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["storageLocationsAdmin"] = t.StorageLocationsAdmin.ToMap()
+
+	if t.PendingStorageLocationsAdmin != nil {
+		args["pendingStorageLocationsAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.PendingStorageLocationsAdmin).ToMap(),
+		}
+	} else {
+		args["pendingStorageLocationsAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["signerConfigs"] = func() any {
@@ -191,7 +213,27 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	args["messageSentObserver"] = t.MessageSentObserver.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["storageLocation"] = string(t.StorageLocation)
+	args["storageLocations"] = func() []any {
+		res := make([]any, 0, len(t.StorageLocations))
+		for _, e := range t.StorageLocations {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["storageLocationsAdmin"] = t.StorageLocationsAdmin.ToMap()
+
+	if t.PendingStorageLocationsAdmin != nil {
+		args["pendingStorageLocationsAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.PendingStorageLocationsAdmin).ToMap(),
+		}
+	} else {
+		args["pendingStorageLocationsAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["signerConfigs"] = func() any {
@@ -286,6 +328,69 @@ func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigsWithPackageID(c
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierTransferStorageLocationsAdmin exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdmin(contractID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierTransferStorageLocationsAdminWithPackageID exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdminWithPackageID(contractID string, packageID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierAcceptStorageLocationsAdmin exercises the CommitteeVerifier_AcceptStorageLocationsAdmin choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierAcceptStorageLocationsAdmin(contractID string, args CommitteeVerifierAcceptStorageLocationsAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_AcceptStorageLocationsAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierAcceptStorageLocationsAdminWithPackageID exercises the CommitteeVerifier_AcceptStorageLocationsAdmin choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierAcceptStorageLocationsAdminWithPackageID(contractID string, packageID string, args CommitteeVerifierAcceptStorageLocationsAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_AcceptStorageLocationsAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierUpdateStorageLocations exercises the CommitteeVerifier_UpdateStorageLocations choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocations(contractID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_UpdateStorageLocations",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierUpdateStorageLocationsWithPackageID exercises the CommitteeVerifier_UpdateStorageLocations choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocationsWithPackageID(contractID string, packageID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_UpdateStorageLocations",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -419,6 +524,42 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(cont
 // Verify interface implementations for CommitteeVerifier
 
 var _ common.IICrossChainVerifier = (*CommitteeVerifier)(nil)
+
+// CommitteeVerifierAcceptStorageLocationsAdmin is a Record type
+type CommitteeVerifierAcceptStorageLocationsAdmin struct {
+	Caller types.PARTY `json:"caller"`
+}
+
+// ToMap converts CommitteeVerifierAcceptStorageLocationsAdmin to a map for DAML arguments
+func (t CommitteeVerifierAcceptStorageLocationsAdmin) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t CommitteeVerifierAcceptStorageLocationsAdmin) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CommitteeVerifierAcceptStorageLocationsAdmin) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierAcceptStorageLocationsAdmin to hex string (Canton MCMS format)
+func (t CommitteeVerifierAcceptStorageLocationsAdmin) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierAcceptStorageLocationsAdmin from hex string (Canton MCMS format)
+func (t *CommitteeVerifierAcceptStorageLocationsAdmin) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // CommitteeVerifierApplySignatureConfigs is a Record type
 type CommitteeVerifierApplySignatureConfigs struct {
@@ -578,6 +719,84 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CommitteeVerifierTransferStorageLocationsAdmin is a Record type
+type CommitteeVerifierTransferStorageLocationsAdmin struct {
+	NewAdmin types.PARTY `json:"newAdmin"`
+}
+
+// ToMap converts CommitteeVerifierTransferStorageLocationsAdmin to a map for DAML arguments
+func (t CommitteeVerifierTransferStorageLocationsAdmin) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	return m
+}
+
+func (t CommitteeVerifierTransferStorageLocationsAdmin) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CommitteeVerifierTransferStorageLocationsAdmin) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierTransferStorageLocationsAdmin to hex string (Canton MCMS format)
+func (t CommitteeVerifierTransferStorageLocationsAdmin) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierTransferStorageLocationsAdmin from hex string (Canton MCMS format)
+func (t *CommitteeVerifierTransferStorageLocationsAdmin) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CommitteeVerifierUpdateStorageLocations is a Record type
+type CommitteeVerifierUpdateStorageLocations struct {
+	NewLocations []types.TEXT `json:"newLocations"`
+}
+
+// ToMap converts CommitteeVerifierUpdateStorageLocations to a map for DAML arguments
+func (t CommitteeVerifierUpdateStorageLocations) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newLocations"] = func() []any {
+		res := make([]any, 0, len(t.NewLocations))
+		for _, e := range t.NewLocations {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t CommitteeVerifierUpdateStorageLocations) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CommitteeVerifierUpdateStorageLocations) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierUpdateStorageLocations to hex string (Canton MCMS format)
+func (t CommitteeVerifierUpdateStorageLocations) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierUpdateStorageLocations from hex string (Canton MCMS format)
+func (t *CommitteeVerifierUpdateStorageLocations) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
 	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
@@ -686,9 +905,12 @@ func (t *SignatureConfig) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	CommitteeVerifierAcceptStorageLocationsAdmin(args CommitteeVerifierAcceptStorageLocationsAdmin) (*bind.EncodedChoice, error)
 	CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
+	CommitteeVerifierTransferStorageLocationsAdmin(args CommitteeVerifierTransferStorageLocationsAdmin) (*bind.EncodedChoice, error)
+	CommitteeVerifierUpdateStorageLocations(args CommitteeVerifierUpdateStorageLocations) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
 }
 
@@ -719,6 +941,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
+// CommitteeVerifierAcceptStorageLocationsAdmin encodes parameters for the CommitteeVerifierAcceptStorageLocationsAdmin choice.
+func (e *encoder) CommitteeVerifierAcceptStorageLocationsAdmin(args CommitteeVerifierAcceptStorageLocationsAdmin) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierAcceptStorageLocationsAdmin", args)
+}
+
 // CommitteeVerifierApplySignatureConfigs encodes parameters for the CommitteeVerifierApplySignatureConfigs choice.
 func (e *encoder) CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierApplySignatureConfigs", args)
@@ -732,6 +959,16 @@ func (e *encoder) CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateF
 // CommitteeVerifierForwardToVerifier encodes parameters for the CommitteeVerifierForwardToVerifier choice.
 func (e *encoder) CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
+}
+
+// CommitteeVerifierTransferStorageLocationsAdmin encodes parameters for the CommitteeVerifierTransferStorageLocationsAdmin choice.
+func (e *encoder) CommitteeVerifierTransferStorageLocationsAdmin(args CommitteeVerifierTransferStorageLocationsAdmin) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierTransferStorageLocationsAdmin", args)
+}
+
+// CommitteeVerifierUpdateStorageLocations encodes parameters for the CommitteeVerifierUpdateStorageLocations choice.
+func (e *encoder) CommitteeVerifierUpdateStorageLocations(args CommitteeVerifierUpdateStorageLocations) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierUpdateStorageLocations", args)
 }
 
 // CommitteeVerifierVerifyMessage encodes parameters for the CommitteeVerifierVerifyMessage choice.

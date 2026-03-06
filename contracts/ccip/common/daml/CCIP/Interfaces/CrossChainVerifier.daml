@@ -52,5 +52,5 @@ interface ICrossChainVerifier where
 data CrossChainVerifierView = CrossChainVerifierView
     with
         ccipOwner : Party
-        storageLocation : Text
+        storageLocations : [Text]
     deriving (Eq, Show)

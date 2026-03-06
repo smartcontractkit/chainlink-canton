@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "952ea6d8783d8edc063b80b817cd8d0d778b5b8bf32abbe90f27f59f8dc5716d"
+	PackageID   = "9eebc7c6fec931476b733635feece2ece7d942e12d9f617d8a1a8af4c26df1ba"
 	SDKVersion  = "3.4.10"
 )
 
@@ -480,8 +480,8 @@ func (t *CCVVerification) UnmarshalHex(data string) error {
 
 // CrossChainVerifierView is a Record type
 type CrossChainVerifierView struct {
-	CcipOwner       types.PARTY `json:"ccipOwner"`
-	StorageLocation types.TEXT  `json:"storageLocation"`
+	CcipOwner        types.PARTY  `json:"ccipOwner"`
+	StorageLocations []types.TEXT `json:"storageLocations"`
 }
 
 // ToMap converts CrossChainVerifierView to a map for DAML arguments
@@ -490,7 +490,13 @@ func (t CrossChainVerifierView) ToMap() map[string]any {
 
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
-	m["storageLocation"] = string(t.StorageLocation)
+	m["storageLocations"] = func() []any {
+		res := make([]any, 0, len(t.StorageLocations))
+		for _, e := range t.StorageLocations {
+			res = append(res, string(e))
+		}
+		return res
+	}()
 
 	return m
 }
