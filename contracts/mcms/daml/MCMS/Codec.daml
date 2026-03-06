@@ -288,13 +288,13 @@ padHelper n padStr =
   else padStr <> padHelper (n - 1) padStr
 
 encodeBlockedFunction : BlockedFunction -> BytesHex
-encodeBlockedFunction bf = encodeText bf.targetInstanceId <> encodeText bf.functionName
+encodeBlockedFunction bf = encodeText bf.targetInstanceAddress <> encodeText bf.functionName
 
 decodeBlockedFunction : BytesHex -> Optional BlockedFunction
 decodeBlockedFunction encoded = do
-  (targetInstanceId, offset1) <- decodeText encoded 0
+  (targetInstanceAddress, offset1) <- decodeText encoded 0
   (functionName, _) <- decodeText encoded offset1
-  Some $ BlockedFunction targetInstanceId functionName
+  Some $ BlockedFunction targetInstanceAddress functionName
 
 -- ===========================================================================
 -- SELF-DISPATCH SET CONFIG ENCODING
@@ -324,14 +324,14 @@ decodeSelfDispatchSetConfig encoded = do
 
 encodeTimelockCall : TimelockCall -> BytesHex
 encodeTimelockCall tc =
-  encodeText tc.targetInstanceId <> encodeText tc.functionName <> encodeText tc.operationData
+  encodeText tc.targetInstanceAddress <> encodeText tc.functionName <> encodeText tc.operationData
 
 decodeTimelockCall : BytesHex -> Int -> Optional (TimelockCall, Int)
 decodeTimelockCall encoded offset = do
-  (targetInstanceId, offset1) <- decodeText encoded offset
+  (targetInstanceAddress, offset1) <- decodeText encoded offset
   (functionName, offset2) <- decodeText encoded offset1
   (operationData, offset3) <- decodeText encoded offset2
-  Some (TimelockCall targetInstanceId functionName operationData, offset3)
+  Some (TimelockCall targetInstanceAddress functionName operationData, offset3)
 
 -- ===========================================================================
 -- SCHEDULE BATCH PARAMS (for schedule_batch self-dispatch)

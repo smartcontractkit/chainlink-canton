@@ -35,7 +35,9 @@ const (
 	ccipMessageSentEventReceiptsLabel          = "receipts"
 
 	// labels for the Receipt template.
-	ccipMessageSentEventReceiptIssuerLabel            = "issuer"
+	ccipMessageSentEventReceiptIssuerTypeLabel        = "issuerType"
+	ccipMessageSentEventReceiptIssuerAddressLabel     = "issuerAddress"
+	ccipMessageSentEventReceiptVersionTagLabel        = "versionTag"
 	ccipMessageSentEventReceiptDestGasLimitLabel      = "destGasLimit"
 	ccipMessageSentEventReceiptDestBytesOverheadLabel = "destBytesOverhead"
 	ccipMessageSentEventReceiptFeeTokenAmountLabel    = "feeTokenAmount"
@@ -56,6 +58,10 @@ type ReaderConfig struct {
 	// Authority is the authority to use for the gRPC connection.
 	// Connecting to the gRPC API via nginx usually requires this to be set.
 	Authority string `toml:"authority"`
+	// DefaultExecutorAddress is the default executor address for the source chain.
+	// This is optional for source reader operation itself, but included so verifier
+	// config hydration can preserve executor-aware settings end-to-end.
+	DefaultExecutorAddress string `toml:"default_executor_address"`
 }
 
 // GetTemplateID returns a ledgerv2.Identifier from the CCIPMessageSentTemplateID.
@@ -367,16 +373,16 @@ func processReceipts(receiptsField *ledgerv2.RecordField) ([]protocol.ReceiptWit
 		var protoReceipt protocol.ReceiptWithBlob
 		for _, field := range receipt.GetRecord().GetFields() {
 			switch field.GetLabel() {
-			case ccipMessageSentEventReceiptIssuerLabel:
-				// issuer is emitted as Text, and its not a hex string.
-				// however, in order to make it fit into a protocol.UnknownAddress,
-				// we will interpret the string itself as bytes.
-				// Note: assume the Text is valid UTF-8.
+			case ccipMessageSentEventReceiptIssuerTypeLabel:
+				// Not required by protocol.ReceiptWithBlob; parsed to ensure schema compatibility.
+			case ccipMessageSentEventReceiptIssuerAddressLabel:
 				decoded, err := protocol.NewUnknownAddressFromHex(field.GetValue().GetText())
 				if err != nil {
-					return nil, fmt.Errorf("failed to decode issuer: %w, input: %s", err, field.GetValue().GetText())
+					return nil, fmt.Errorf("failed to decode issuerAddress: %w, input: %s", err, field.GetValue().GetText())
 				}
 				protoReceipt.Issuer = decoded
+			case ccipMessageSentEventReceiptVersionTagLabel:
+				// Optional metadata not needed by protocol.ReceiptWithBlob.
 			case ccipMessageSentEventReceiptDestGasLimitLabel:
 				protoReceipt.DestGasLimit = uint64(field.GetValue().GetInt64()) //nolint:gosec // int64 is always non-negative
 			case ccipMessageSentEventReceiptDestBytesOverheadLabel:

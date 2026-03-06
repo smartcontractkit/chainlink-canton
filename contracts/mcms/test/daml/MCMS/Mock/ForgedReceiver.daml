@@ -3,21 +3,26 @@ module MCMS.Mock.ForgedReceiver where
 
 import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..))
 
--- | A malicious receiver that can "lie" in its view.instanceId by embedding
--- an arbitrary party id text. This is used to test that MCMS rejects targets
--- whose parsed partyId is NOT actually a signatory of the target contract.
+-- | A malicious receiver that can "lie" about its identity by using a different
+-- instanceId than expected. This is used to test that MCMS validates:
+--   1. The instanceId in the view matches the parsed instanceId from targetInstanceAddress
+--   2. The actual signatory matches the parsed partyId from targetInstanceAddress
+--
+-- Note: With the new design, MCMSReceiverView exposes just instanceId (not full address).
+-- MCMS parses both instanceId and partyId from call.targetInstanceAddress (merkle leaf)
+-- and validates them separately against the fetched contract's view and signatory.
 template ForgedReceiver
   with
     owner : Party
-    baseId : Text
-    forgedPartyIdText : Text
+    instanceId : Text           -- The instanceId to report in view
+    forgedPartyIdText : Text    -- Not used in view, but indicates the intended forged party
   where
     signatory owner
 
     interface instance MCMSReceiver for ForgedReceiver where
       view = MCMSReceiverView with
         owner
-        instanceId = baseId <> "@" <> forgedPartyIdText
+        instanceId
 
-      mcmsEntrypoint _selfCid _functionName _operationData _contractIds =
+      mcmsEntrypoint _functionName _operationData _contractIds =
         abort "ForgedReceiver: entrypoint should not be called in this test"

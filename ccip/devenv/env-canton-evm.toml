@@ -165,7 +165,7 @@ execution_interval = 15_000_000_000
   [verifier.canton_configs]
     [verifier.canton_configs.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
-      ccip_message_sent_template_id = "#json-tests:Main:CCIPMessageSent"
+      ccip_message_sent_template_id = "#ccip-perpartyrouter:CCIP.PerPartyRouter:CCIPMessageSent"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
@@ -189,7 +189,7 @@ execution_interval = 15_000_000_000
   [verifier.canton_configs]
     [verifier.canton_configs.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
-      ccip_message_sent_template_id = "#json-tests:Main:CCIPMessageSent"
+      ccip_message_sent_template_id = "#ccip-perpartyrouter:CCIP.PerPartyRouter:CCIPMessageSent"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.

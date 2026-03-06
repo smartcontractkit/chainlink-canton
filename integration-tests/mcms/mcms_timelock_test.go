@@ -45,24 +45,25 @@ func TestMCMS_Timelock(t *testing.T) {
 
 	chainID := int64(1)
 	baseMcmsID := "mcms-timelock-" + uuid.New().String()[:8]
-	mcmsInstanceID := fmt.Sprintf("%s@%s", baseMcmsID, ccipOwner)
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsID, ccipOwner)
 
 	// Deploy MCMS with minDelay=0 for testing (self-dispatch tests will update it)
 	mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, baseMcmsID, cfg, 0, nil)
 
 	// Deploy Counter
-	counterInstanceID := fmt.Sprintf("counter-timelock-%s@%s", uuid.New().String()[:8], ccipOwner)
-	counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterInstanceID)
-	counterTargetInstanceID := counterInstanceID
+	counterBaseID := "counter-timelock-" + uuid.New().String()[:8]
+	counterInstanceAddr := fmt.Sprintf("%s@%s", counterBaseID, ccipOwner)
+	counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterBaseID)
+	counterTargetInstanceAddr := counterInstanceAddr
 
 	t.Run("ScheduleAndExecute", func(t *testing.T) {
 		t.Parallel()
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
-			TargetInstanceId: types.TEXT(counterTargetInstanceID),
-			FunctionName:     types.TEXT("Increment"),
-			OperationData:    types.TEXT(""),
+			TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr),
+			FunctionName:          types.TEXT("Increment"),
+			OperationData:         types.TEXT(""),
 		}}
 		salt := uuid.New().String()[:8]
 		delaySecs := 0
@@ -77,9 +78,9 @@ func TestMCMS_Timelock(t *testing.T) {
 		scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
 		// 1) Set proposer root authorizing schedule_batch with encoded operationData
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, scheduleChoice.Choice, scheduleChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 			Build()
 
 		validUntil := time.Now().Add(1 * time.Hour)
@@ -97,10 +98,10 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
 		// 3) Execute immediately (delay is 0, so it's ready right away)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceID: counterCid})
+		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 
 		// 4) Verify counter incremented
-		val := queryCounterValue(t, participant, mcmsPkgID, counterInstanceID)
+		val := queryCounterValue(t, participant, mcmsPkgID, counterBaseID)
 		require.Equal(t, int64(1), val)
 	})
 
@@ -109,14 +110,14 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		// Fresh MCMS for this subtest (avoid cross-subtest opCount coupling)
 		base := "mcms-timelock-cancel-" + uuid.New().String()[:8]
-		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid2 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
-			TargetInstanceId: types.TEXT(counterTargetInstanceID),
-			FunctionName:     types.TEXT("Increment"),
-			OperationData:    types.TEXT(""),
+			TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr),
+			FunctionName:          types.TEXT("Increment"),
+			OperationData:         types.TEXT(""),
 		}}
 		salt := uuid.New().String()[:8]
 		opID := HashTimelockOpId(FromMCMSTimelockCalls(calls), ZeroHash, salt)
@@ -131,9 +132,9 @@ func TestMCMS_Timelock(t *testing.T) {
 		scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
 		// Counter is shared; ok.
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 		scheduleProposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, scheduleChoice.Choice, scheduleChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := scheduleProposal.Sign(validUntil, sortedSigners[:2])
@@ -149,9 +150,9 @@ func TestMCMS_Timelock(t *testing.T) {
 		cancelChoice := MustEncodeCancelBatch(t, mcmsEncoder, cancelParams)
 
 		// Set canceller root authorizing cancel
-		cancellerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleCanceller)
+		cancellerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleCanceller)
 		cancelProposal := NewMCMSProposal(int(chainID), cancellerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, cancelChoice.Choice, cancelChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, cancelChoice.Choice, cancelChoice.OperationData).
 			Build()
 		cancelSigs, err := cancelProposal.Sign(validUntil, sortedSigners[:2])
 		require.NoError(t, err)
@@ -162,7 +163,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid2 = cancelBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, cancelProposal.Operations[0], cancelProof)
 
 		// Should now be gone; ExecuteScheduledBatch should fail with not found.
-		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceID: counterCid})
+		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "E_OPERATION_NOT_FOUND", "expected E_OPERATION_NOT_FOUND, got: %v", err)
 	})
@@ -171,16 +172,16 @@ func TestMCMS_Timelock(t *testing.T) {
 		t.Parallel()
 
 		base := "mcms-timelock-blocked-" + uuid.New().String()[:8]
-		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid3 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, []BlockedFunction{
-			{TargetInstanceId: counterTargetInstanceID, FunctionName: "dangerous_function"},
+			{TargetInstanceAddress: counterTargetInstanceAddr, FunctionName: "dangerous_function"},
 		})
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
-			TargetInstanceId: types.TEXT(counterTargetInstanceID),
-			FunctionName:     types.TEXT("dangerous_function"),
-			OperationData:    types.TEXT(""),
+			TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr),
+			FunctionName:          types.TEXT("dangerous_function"),
+			OperationData:         types.TEXT(""),
 		}}
 		salt := uuid.New().String()[:8]
 		delaySecs := 1
@@ -194,9 +195,9 @@ func TestMCMS_Timelock(t *testing.T) {
 		}
 		scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, scheduleChoice.Choice, scheduleChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -269,8 +270,6 @@ func createMCMSMultiRole(
 	blockedFunctions []BlockedFunction,
 ) string {
 	t.Helper()
-	instanceID := fmt.Sprintf("%s@%s", baseMcmsID, owner)
-
 	// Use bindings to create MCMS - provides type safety and tests bindings work correctly
 
 	// Convert local SignerInfo to binding SignerInfo
@@ -320,15 +319,15 @@ func createMCMSMultiRole(
 	blockedFuncs := make([]mcms.BlockedFunction, len(blockedFunctions))
 	for i, bf := range blockedFunctions {
 		blockedFuncs[i] = mcms.BlockedFunction{
-			TargetInstanceId: types.TEXT(bf.TargetInstanceId),
-			FunctionName:     types.TEXT(bf.FunctionName),
+			TargetInstanceAddress: types.TEXT(bf.TargetInstanceAddress),
+			FunctionName:          types.TEXT(bf.FunctionName),
 		}
 	}
 
 	// Build MCMS contract using bindings
 	mcmsContract := mcms.MCMS{
 		Owner:              types.PARTY(owner),
-		InstanceId:         types.TEXT(instanceID),
+		InstanceId:         types.TEXT(baseMcmsID),
 		ChainId:            types.INT64(chainID),
 		Proposer:           roleState,
 		Canceller:          roleState,
@@ -458,12 +457,12 @@ func scheduleBatch(
 		TargetRole: mcms.RoleProposer,
 		Submitter:  types.PARTY(owner),
 		Op: mcms.Op{
-			ChainId:          types.INT64(op.ChainId),
-			MultisigId:       types.TEXT(op.MultisigId),
-			Nonce:            types.INT64(op.Nonce),
-			TargetInstanceId: types.TEXT(op.TargetInstanceId),
-			FunctionName:     types.TEXT(op.FunctionName),
-			OperationData:    types.TEXT(op.OperationData),
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
 		TargetCids: types.GENMAP{},
@@ -526,12 +525,12 @@ func scheduleBatchExpectError(
 		TargetRole: mcms.RoleProposer,
 		Submitter:  types.PARTY(owner),
 		Op: mcms.Op{
-			ChainId:          types.INT64(op.ChainId),
-			MultisigId:       types.TEXT(op.MultisigId),
-			Nonce:            types.INT64(op.Nonce),
-			TargetInstanceId: types.TEXT(op.TargetInstanceId),
-			FunctionName:     types.TEXT(op.FunctionName),
-			OperationData:    types.TEXT(op.OperationData),
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
 		TargetCids: types.GENMAP{},
@@ -618,7 +617,7 @@ func executeScheduledBatch(
 }
 
 // toContractIDMap converts a map[string]string to types.GENMAP for binding compatibility
-// The key is the instanceId and the value is the contract ID wrapped as CONTRACT_ID type
+// The key is the instanceAddress and the value is the contract ID wrapped as CONTRACT_ID type
 // so it serializes as Value_ContractId rather than Value_Text
 func toContractIDMap(m map[string]string) types.GENMAP {
 	if m == nil {
@@ -694,12 +693,12 @@ func cancelBatch(
 		TargetRole: mcms.RoleCanceller,
 		Submitter:  types.PARTY(owner),
 		Op: mcms.Op{
-			ChainId:          types.INT64(op.ChainId),
-			MultisigId:       types.TEXT(op.MultisigId),
-			Nonce:            types.INT64(op.Nonce),
-			TargetInstanceId: types.TEXT(op.TargetInstanceId),
-			FunctionName:     types.TEXT(op.FunctionName),
-			OperationData:    types.TEXT(op.OperationData),
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
 		TargetCids: types.GENMAP{},
@@ -781,12 +780,12 @@ func bypasserExecuteBatch(
 		TargetRole: mcms.RoleBypasser,
 		Submitter:  types.PARTY(owner),
 		Op: mcms.Op{
-			ChainId:          types.INT64(op.ChainId),
-			MultisigId:       types.TEXT(op.MultisigId),
-			Nonce:            types.INT64(op.Nonce),
-			TargetInstanceId: types.TEXT(op.TargetInstanceId),
-			FunctionName:     types.TEXT(op.FunctionName),
-			OperationData:    types.TEXT(op.OperationData),
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    toTextSlice(opProof),
 		TargetCids: toContractIDMap(targetCids),
@@ -947,14 +946,14 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		t.Parallel()
 
 		base := "mcms-sd-delay-" + uuid.New().String()[:8]
-		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
-			TargetInstanceId: types.TEXT(mcmsInstanceID),
-			FunctionName:     types.TEXT("UpdateMinDelay"),
-			OperationData:    types.TEXT("1"),
+			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
+			FunctionName:          types.TEXT("UpdateMinDelay"),
+			OperationData:         types.TEXT("1"),
 		}}
 		salt := uuid.New().String()[:8]
 		delaySecs := 1
@@ -969,9 +968,9 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
 		// 1) Set proposer root authorizing schedule_batch with encoded operationData
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, scheduleChoice.Choice, scheduleChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -999,15 +998,15 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		t.Parallel()
 
 		base := "mcms-sd-block-" + uuid.New().String()[:8]
-		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
-		bf := BlockedFunction{TargetInstanceId: "some-target@owner", FunctionName: "dangerous_op"}
+		bf := BlockedFunction{TargetInstanceAddress: "some-target@owner", FunctionName: "dangerous_op"}
 		calls := []mcms.TimelockCall{{
-			TargetInstanceId: types.TEXT(mcmsInstanceID),
-			FunctionName:     types.TEXT("BlockFunction"),
-			OperationData:    types.TEXT(EncodeBlockedFunction(bf)),
+			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
+			FunctionName:          types.TEXT("BlockFunction"),
+			OperationData:         types.TEXT(EncodeBlockedFunction(bf)),
 		}}
 		salt := uuid.New().String()[:8]
 		delaySecs := 1
@@ -1021,9 +1020,9 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		}
 		scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, scheduleChoice.Choice, scheduleChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -1046,14 +1045,14 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		t.Parallel()
 
 		base := "mcms-sd-bypass-" + uuid.New().String()[:8]
-		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
 		// Define calls first so we can encode them
 		calls := []mcms.TimelockCall{{
-			TargetInstanceId: types.TEXT(mcmsInstanceID),
-			FunctionName:     types.TEXT("UpdateMinDelay"),
-			OperationData:    types.TEXT("2"),
+			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
+			FunctionName:          types.TEXT("UpdateMinDelay"),
+			OperationData:         types.TEXT("2"),
 		}}
 
 		// Encode bypasser execute params using encoder pattern
@@ -1061,9 +1060,9 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		bypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, bypasserParams)
 
 		// Set bypasser root with encoded operationData
-		bypasserMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleBypasser)
+		bypasserMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser)
 		proposal := NewMCMSProposal(int(chainID), bypasserMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, bypasserChoice.Choice, bypasserChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -1083,17 +1082,17 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		t.Parallel()
 
 		base := "mcms-sd-mixed-" + uuid.New().String()[:8]
-		mcmsInstanceID := fmt.Sprintf("%s@%s", base, ccipOwner)
+		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
-		counterInstanceID := fmt.Sprintf("counter-mixed-%s@%s", uuid.New().String()[:8], ccipOwner)
-		counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterInstanceID)
-		counterTargetInstanceID := counterInstanceID
+		counterBase := "counter-mixed-" + uuid.New().String()[:8]
+		counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterBase)
+		counterTargetInstanceAddr := fmt.Sprintf("%s@%s", counterBase, ccipOwner)
 
 		// Define mixed calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{
-			{TargetInstanceId: types.TEXT(mcmsInstanceID), FunctionName: types.TEXT("UpdateMinDelay"), OperationData: types.TEXT("1")},
-			{TargetInstanceId: types.TEXT(counterTargetInstanceID), FunctionName: types.TEXT("Increment"), OperationData: types.TEXT("")},
+			{TargetInstanceAddress: types.TEXT(mcmsInstanceAddr), FunctionName: types.TEXT("UpdateMinDelay"), OperationData: types.TEXT("1")},
+			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("Increment"), OperationData: types.TEXT("")},
 		}
 		salt := uuid.New().String()[:8]
 		delaySecs := 0
@@ -1107,9 +1106,9 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		}
 		scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
-		proposerMultisigID := MakeMcmsId(mcmsInstanceID, MCMSRoleProposer)
+		proposerMultisigID := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 		proposal := NewMCMSProposal(int(chainID), proposerMultisigID, 0, false).
-			AddOperation(mcmsInstanceID, scheduleChoice.Choice, scheduleChoice.OperationData).
+			AddOperation(mcmsInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 			Build()
 		validUntil := time.Now().Add(1 * time.Hour)
 		sigs, err := proposal.Sign(validUntil, sortedSigners[:2])
@@ -1124,12 +1123,12 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		time.Sleep(1500 * time.Millisecond)
 
 		// targetCids only has 1 entry (for the external counter call)
-		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceID: counterCid})
+		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 
 		delay := queryMinDelay(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
 		require.Equal(t, int64(1_000_000), delay, "minDelay should be 1s after mixed batch")
 
-		val := queryCounterValue(t, participant, mcmsPkgID, counterInstanceID)
+		val := queryCounterValue(t, participant, mcmsPkgID, counterBase)
 		require.Equal(t, int64(1), val, "counter should be incremented")
 	})
 }

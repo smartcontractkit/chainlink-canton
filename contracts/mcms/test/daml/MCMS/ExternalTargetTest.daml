@@ -39,9 +39,9 @@ externalTestValidUntil = datetime 2030 Jan 1 0 0 0
 externalTestBaseMcmsId : Text
 externalTestBaseMcmsId = "mcms-daml-test"
 
--- Helper to create instanceId
-mkInstanceId : Text -> Party -> Text
-mkInstanceId base party = base <> "@" <> partyToText party
+-- Helper to create instanceAddress
+mkInstanceAddress : Text -> Party -> Text
+mkInstanceAddress base party = base <> "@" <> partyToText party
 
 -- ===========================================================================
 -- EXTERNAL CALL TEST VECTORS
@@ -55,7 +55,7 @@ externalBypasserOp = Op
   { chainId = 1
   , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
   , nonce = 0
-  , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+  , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "BypasserExecuteBatch"
   , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e7400"
   }
@@ -105,7 +105,7 @@ externalScheduleOp = Op
   { chainId = 1
   , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-proposer"
   , nonce = 0
-  , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+  , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "ScheduleBatch"
   , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e740040303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030301d746573742d65787465726e616c2d7363686564756c652d73616c742d310000000000000000"
   }
@@ -161,14 +161,14 @@ testBypasserExternalCall : Script ()
 testBypasserExternalCall = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
-  let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
-  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress externalTestBaseMcmsId ccipOwner
+  let counterInstanceAddr = "counter@" <> partyToText ccipOwner
 
   -- Create MCMS with bypasser config
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = externalTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -181,7 +181,7 @@ testBypasserExternalCall = script do
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterInstanceId
+      instanceId = "counter"
       value = 0
 
   -- Verify initial counter value
@@ -210,13 +210,13 @@ testBypasserExternalCall = script do
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = Map.fromList [(counterInstanceId, counterAsMcmsReceiver)]
+      targetCids = Map.fromList [(counterInstanceAddr, counterAsMcmsReceiver)]
 
   -- Verify counter was incremented
   -- Note: Counter is archived after MCMSReceiver_Entrypoint, need to query new one
   -- Actually Counter creates a new contract via archive+create pattern
   counterContracts <- query @Counter ccipOwner
-  let activeCounters = filter (\(_, c) -> c.instanceId == counterInstanceId) counterContracts
+  let activeCounters = filter (\(_, c) -> c.instanceId == "counter") counterContracts
   case activeCounters of
     [(_, counter)] -> do
       assertMsg "Counter should be incremented to 1" $ counter.value == 1
@@ -232,14 +232,14 @@ testScheduledExternalCall : Script ()
 testScheduledExternalCall = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
-  let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
-  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress externalTestBaseMcmsId ccipOwner
+  let counterInstanceAddr = "counter@" <> partyToText ccipOwner
 
   -- Create MCMS with proposer config
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = externalTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState with config = externalTestConfig
       canceller = emptyRoleState
@@ -252,7 +252,7 @@ testScheduledExternalCall = script do
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterInstanceId
+      instanceId = "counter"
       value = 0
 
   -- Verify initial counter value
@@ -281,7 +281,7 @@ testScheduledExternalCall = script do
       targetCids = Map.empty
 
   -- Compute the opId for the scheduled batch
-  let calls = [TimelockCall counterInstanceId "Increment" ""]
+  let calls = [TimelockCall counterInstanceAddr "Increment" ""]
   let opId = hashTimelockOpId calls zeroHash externalScheduleSalt
 
   -- Verify operation was scheduled
@@ -306,11 +306,11 @@ testScheduledExternalCall = script do
       calls
       predecessor = zeroHash
       salt = externalScheduleSalt
-      targetCids = Map.fromList [(counterInstanceId, counterAsMcmsReceiver)]
+      targetCids = Map.fromList [(counterInstanceAddr, counterAsMcmsReceiver)]
 
   -- Verify counter was incremented
   counterContracts <- query @Counter ccipOwner
-  let activeCounters = filter (\(_, c) -> c.instanceId == counterInstanceId) counterContracts
+  let activeCounters = filter (\(_, c) -> c.instanceId == "counter") counterContracts
   case activeCounters of
     [(_, counter)] -> do
       assertMsg "Counter should be incremented to 1" $ counter.value == 1
@@ -318,21 +318,21 @@ testScheduledExternalCall = script do
     _ -> abort "Expected exactly one Counter contract"
   pure ()
 
--- | Test that external call fails if targetInstanceId doesn't match
+-- | Test that external call fails if targetInstanceAddress doesn't match
 -- The op expects "counter@ccip_owner-9cefe94d" but we provide a different counter
 testExternalCallWrongInstanceId : Script ()
 testExternalCallWrongInstanceId = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
-  let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress externalTestBaseMcmsId ccipOwner
   -- Create Counter with WRONG instanceId (doesn't match what's in the signed op)
-  let wrongCounterInstanceId = "different-counter@" <> partyToText ccipOwner
+  let wrongCounterInstanceId = "different-counter"
 
   -- Create MCMS with bypasser config
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = externalTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -345,7 +345,7 @@ testExternalCallWrongInstanceId = script do
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = wrongCounterInstanceId  -- This doesn't match "counter@ccip_owner-9cefe94d" in the op
+      instanceId = wrongCounterInstanceId  -- This doesn't match "counter" in the op
       value = 0
 
   -- SetRoot for bypasser
@@ -365,7 +365,7 @@ testExternalCallWrongInstanceId = script do
   -- The operationData encodes calls to "counter@ccip_owner-9cefe94d" so use that as the key
   let expectedCounterInstanceId = "counter@" <> partyToText ccipOwner
 
-  -- ExecuteOp should fail because the Counter's instanceId doesn't match
+  -- ExecuteOp should fail because the Counter's instanceAddress doesn't match
   -- what's encoded in the operationData ("counter@ccip_owner-9cefe94d")
   submitMustFail ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
@@ -378,22 +378,22 @@ testExternalCallWrongInstanceId = script do
   debug "testExternalCallWrongInstanceId PASSED!"
   pure ()
 
--- | Test that external call fails if partyId in instanceId is not a signatory
--- Counter owned by malicious party but claiming ccipOwner's instanceId
+-- | Test that external call fails if partyId in instanceAddress is not a signatory
+-- Counter owned by malicious party but claiming ccipOwner's instanceAddress
 testExternalCallForgedSignatory : Script ()
 testExternalCallForgedSignatory = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
   maliciousParty <- allocateParty "malicious"
 
-  let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
-  -- Counter owned by malicious party but with forged instanceId claiming to be ccipOwner's
-  let forgedInstanceId = "counter@" <> partyToText ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress externalTestBaseMcmsId ccipOwner
+  -- Counter owned by malicious party but with correct instanceId (the forgery is in ownership)
+  let forgedInstanceAddr = "counter@" <> partyToText ccipOwner
 
   -- Create MCMS owned by ccipOwner
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = externalTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -403,11 +403,11 @@ testExternalCallForgedSignatory = script do
       timelockTimestamps = Map.empty
 
   -- Create Counter owned by malicious party (ccipOwner is NOT a signatory)
-  -- but claiming the forged instanceId
+  -- The instanceId matches, but the owner/signatory is different
   counterCid <- submit maliciousParty do
     createCmd Counter with
       owner = maliciousParty  -- Different owner!
-      instanceId = forgedInstanceId  -- Claims to be ccipOwner's counter
+      instanceId = "counter"  -- Correct instanceId, but wrong owner
       value = 0
 
   -- SetRoot for bypasser
@@ -425,8 +425,8 @@ testExternalCallForgedSignatory = script do
   let counterAsMcmsReceiver = toInterfaceContractId @MCMSReceiver counterCid
 
   -- ExecuteOp should fail because:
-  -- 1. The instanceId in operationData is "counter@ccip_owner-9cefe94d"
-  -- 2. The Counter's instanceId matches that
+  -- 1. The instanceAddress in operationData is "counter@ccip_owner-9cefe94d"
+  -- 2. The Counter's instanceAddress matches that
   -- 3. BUT ccip_owner is NOT a signatory of the Counter contract
   -- This tests E_TARGET_SIGNATORY_MISMATCH
   submitMustFail ccipOwner do
@@ -435,7 +435,7 @@ testExternalCallForgedSignatory = script do
       submitter = ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = Map.fromList [(forgedInstanceId, counterAsMcmsReceiver)]
+      targetCids = Map.fromList [(forgedInstanceAddr, counterAsMcmsReceiver)]
 
   debug "testExternalCallForgedSignatory PASSED!"
   pure ()
@@ -446,15 +446,15 @@ testMultipleExternalTargets : Script ()
 testMultipleExternalTargets = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
-  let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
-  let counter1InstanceId = "counter1@" <> partyToText ccipOwner
-  let counter2InstanceId = "counter2@" <> partyToText ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress externalTestBaseMcmsId ccipOwner
+  let counter1InstanceAddr = "counter1@" <> partyToText ccipOwner
+  let counter2InstanceAddr = "counter2@" <> partyToText ccipOwner
 
   -- Create MCMS
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = externalTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -467,13 +467,13 @@ testMultipleExternalTargets = script do
   counter1Cid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counter1InstanceId
+      instanceId = "counter1"
       value = 0
 
   counter2Cid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counter2InstanceId
+      instanceId = "counter2"
       value = 10
 
   -- Note: This test requires vectors for a batch with 2 external calls.
@@ -489,14 +489,14 @@ testMixedSelfDispatchAndExternal : Script ()
 testMixedSelfDispatchAndExternal = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
 
-  let mcmsInstanceId = mkInstanceId externalTestBaseMcmsId ccipOwner
-  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress externalTestBaseMcmsId ccipOwner
+  let counterInstanceAddr = "counter@" <> partyToText ccipOwner
 
   -- Create MCMS with minDelay = 0
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = externalTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -509,7 +509,7 @@ testMixedSelfDispatchAndExternal = script do
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterInstanceId
+      instanceId = "counter"
       value = 0
 
   -- Note: This test requires vectors for a mixed batch with both self-dispatch
@@ -529,13 +529,13 @@ testCounterMcmsReceiverInterface : Script ()
 testCounterMcmsReceiverInterface = script do
   ccipOwner <- allocateParty "ccip_owner"
 
-  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let counterInstanceAddr = "counter@" <> partyToText ccipOwner
 
   -- Create Counter
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterInstanceId
+      instanceId = "counter"
       value = 0
 
   -- Query counter value
@@ -544,11 +544,11 @@ testCounterMcmsReceiverInterface = script do
 
   assertMsg "Counter value should be 0" $ val == 0
 
-  -- Query instanceId
+  -- Query instanceAddress
   instId <- submit ccipOwner do
-    exerciseCmd counterCid GetInstanceIdChoice with viewer = ccipOwner
+    exerciseCmd counterCid GetInstanceAddressChoice with viewer = ccipOwner
 
-  assertMsg "InstanceId should match" $ instId == counterInstanceId
+  assertMsg "InstanceId should match" $ instId == counterInstanceAddr
 
   debug "testCounterMcmsReceiverInterface PASSED!"
   pure ()
@@ -559,12 +559,12 @@ testCounterIncrementDirect : Script ()
 testCounterIncrementDirect = script do
   ccipOwner <- allocateParty "ccip_owner"
 
-  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let counterInstanceAddr = "counter@" <> partyToText ccipOwner
 
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterInstanceId
+      instanceId = "counter"
       value = 5
 
   -- Verify value via query

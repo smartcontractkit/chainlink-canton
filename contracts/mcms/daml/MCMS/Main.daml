@@ -2,13 +2,13 @@
 --
 -- ARCHITECTURE:
 --   MCMS verifies signatures and merkle proofs, then calls target contracts directly.
---   Target contracts implement MCMSReceiver interface with stable instanceId.
+--   Target contracts implement MCMSReceiver interface with stable instanceAddress.
 --
 -- Direct Invocation Pattern:
---   1. Anyone submits: proofs + signatures + targetCid
+--   1. Anyone submits: proofs + signatures + targetCids (ALL contract CIDs including MCMS)
 --   2. MCMS validates proofs and signatures on-chain
---   3. MCMS verifies target's instanceId matches op.targetInstanceId
---   4. MCMS parses partyId from instanceId (format: baseId@partyId) and verifies signatory
+--   3. MCMS verifies target's instanceAddress matches call.targetInstanceAddress
+--   4. MCMS parses partyId from instanceAddress (format: instanceId@partyId) and verifies signatory
 --   5. MCMS calls target.mcmsEntrypoint(functionName, operationData, contractIds)
 --   6. ccip_owner authority flows through the call chain
 module MCMS.Main where
@@ -39,7 +39,7 @@ import MCMS.Types
   )
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), parsePartyIdText)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), makeInstanceAddress, parseInstanceIdText, parsePartyIdText)
 import MCMS.Codec
   ( decodeSetConfigParams
   , decodeBlockedFunction
@@ -52,14 +52,14 @@ import MCMS.Codec
 template MCMS
   with
     owner : Party                              -- ccip_owner party
-    instanceId : Text                          -- Stable identifier that doesn't change on updates
+    instanceId : Text                          -- Stable identifier (without @partyId suffix)
     chainId : Int                              -- Chain ID for validation
     proposer : RoleState
     canceller : RoleState
     bypasser : RoleState
     -- Timelock configuration
     minDelay : RelTime                         -- Minimum delay for scheduled operations
-    blockedFunctions : [BlockedFunction]         -- Functions that cannot be scheduled (per-target)
+    blockedFunctions : [BlockedFunction]       -- Functions that cannot be scheduled (per-target)
     timelockTimestamps : Map.Map Text Time     -- opId -> readyTime (or doneTimestamp if done)
   where
     signatory owner
@@ -128,7 +128,8 @@ template MCMS
         -- 4. Validate metadata matches this role
         assertMsg ("E_WRONG_CHAIN_ID: expected " <> show chainId) $
           metadata.chainId == chainId
-        let expectedMultisigId = makeMcmsId instanceId targetRole
+        let instanceAddress = makeInstanceAddress instanceId owner
+        let expectedMultisigId = makeMcmsId instanceAddress targetRole
         assertMsg ("E_WRONG_MULTISIG: expected " <> expectedMultisigId) $
           metadata.multisigId == expectedMultisigId
         assertMsg ("E_WRONG_PRE_OP_COUNT: expected " <> show rs.expiringRoot.opCount) $
@@ -195,17 +196,18 @@ template MCMS
         submitter : Party                                         -- Anyone can submit
         op : Op                                                   -- Operation details (params in operationData)
         opProof : [BytesHex]                                      -- Merkle proof
-        targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceId to contract ID
+        targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
         now <- getTime
         let rs = getRoleState targetRole this
 
         -- 1. Validate operation targets this MCMS
+        let instanceAddress = makeInstanceAddress instanceId owner
         assertMsg ("E_WRONG_CHAIN_ID: op targets " <> show op.chainId) $
           op.chainId == chainId
         assertMsg ("E_WRONG_MULTISIG: op targets " <> op.multisigId) $
-          op.multisigId == makeMcmsId instanceId targetRole
+          op.multisigId == makeMcmsId instanceAddress targetRole
 
         -- 2. Check nonce matches current opCount
         assertMsg ("E_WRONG_NONCE: expected " <> show rs.expiringRoot.opCount <> " got " <> show op.nonce) $
@@ -227,8 +229,8 @@ template MCMS
         case op.functionName of
           "ScheduleBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_SCHEDULE: must use Proposer" $ targetRole == Proposer
-            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
-              op.targetInstanceId == instanceId
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceAddress must match instanceAddress" $
+              op.targetInstanceAddress == instanceAddress
             case decodeScheduleBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode ScheduleBatch params"
               Some params ->
@@ -236,8 +238,8 @@ template MCMS
 
           "BypasserExecuteBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_BYPASS: must use Bypasser" $ targetRole == Bypasser
-            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
-              op.targetInstanceId == instanceId
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceAddress must match instanceAddress" $
+              op.targetInstanceAddress == instanceAddress
             case decodeBypasserExecuteBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode BypasserExecuteBatch params"
               Some params ->
@@ -245,8 +247,8 @@ template MCMS
 
           "CancelBatch" -> do
             assertMsg "E_WRONG_ROLE_FOR_CANCEL: must use Canceller" $ targetRole == Canceller
-            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
-              op.targetInstanceId == instanceId
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceAddress must match instanceAddress" $
+              op.targetInstanceAddress == instanceAddress
             case decodeCancelBatchParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode CancelBatch params"
               Some params ->
@@ -254,8 +256,8 @@ template MCMS
 
           -- Self-dispatch: MCMS configuration changes (admin operations)
           "SetConfig" -> do
-            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
-              op.targetInstanceId == instanceId
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceAddress must match instanceAddress" $
+              op.targetInstanceAddress == instanceAddress
             case decodeSetConfigParams op.operationData of
               None -> abort "E_INVALID_OPERATION_DATA: failed to decode SetConfig params"
               Some params -> do
@@ -272,8 +274,8 @@ template MCMS
                 create (setRoleState targetRole newRs this)
 
           "ClearRoot" -> do
-            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceId must match instanceId" $
-              op.targetInstanceId == instanceId
+            assertMsg "E_NOT_SELF_DISPATCH: targetInstanceAddress must match instanceAddress" $
+              op.targetInstanceAddress == instanceAddress
             let newRs = rs with
                   expiringRoot = rs.expiringRoot with root = "", opCount = rs.expiringRoot.opCount + 1
             create (setRoleState targetRole newRs this)
@@ -294,7 +296,7 @@ template MCMS
         calls : [TimelockCall]                                    -- Caller provides (for execution)
         predecessor : Text                                        -- For validation
         salt : Text                                               -- For opId verification
-        targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceId to contract ID
+        targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
         now <- getTime
@@ -342,9 +344,10 @@ template MCMS
       do
         now <- getTime
         let rs = getRoleState targetRole this
+        let instanceAddress = makeInstanceAddress instanceId owner
         pure $
           op.chainId == chainId &&
-          op.multisigId == makeMcmsId instanceId targetRole &&
+          op.multisigId == makeMcmsId instanceAddress targetRole &&
           op.nonce == rs.expiringRoot.opCount &&
           now <= rs.expiringRoot.validUntil &&
           rs.expiringRoot.opCount < rs.rootMetadata.postOpCount
@@ -457,14 +460,14 @@ data MCMSState = MCMSState
 -- HELPER FUNCTIONS
 -- ===========================================================================
 
--- | Create multisigId from base ID and role
+-- | Create multisigId from instanceAddress and role
 -- e.g., makeMcmsId "mcms@mcmsPartyId" Proposer = "mcms@mcmsPartyId-proposer"
 makeMcmsId : Text -> Role -> Text
-makeMcmsId baseId r = baseId <> "-" <> roleToText r
+makeMcmsId instanceAddr r = instanceAddr <> "-" <> roleToText r
 
 -- | Alias emphasizing role-suffixed multisig ids.
 roleMultisigId : Text -> Role -> Text
-roleMultisigId = makeMcmsId
+roleMultisigId instanceAddr = makeMcmsId instanceAddr
 
 getRoleState : Role -> MCMS -> RoleState
 getRoleState Proposer m = m.proposer
@@ -537,8 +540,8 @@ executeSelfDispatch mcms call =
           let delay = seconds params.delaySecs
           assertMsg "E_DELAY_TOO_SHORT" $ delay >= mcms.minDelay
           forA_ params.calls $ \c ->
-            assertMsg ("E_FUNCTION_BLOCKED: " <> c.targetInstanceId <> ":" <> c.functionName) $
-              BlockedFunction c.targetInstanceId c.functionName `notElem` mcms.blockedFunctions
+            assertMsg ("E_FUNCTION_BLOCKED: " <> c.targetInstanceAddress <> ":" <> c.functionName) $
+              BlockedFunction c.targetInstanceAddress c.functionName `notElem` mcms.blockedFunctions
           let opId = hashTimelockOpId params.calls params.predecessor params.salt
           assertMsg "E_ALREADY_SCHEDULED" $
             not $ Map.member opId mcms.timelockTimestamps
@@ -572,8 +575,8 @@ scheduleBatchInternal now mcms rs calls predecessor salt delay = do
 
   -- 2. Validate no blocked functions in calls (per-target, matching Aptos)
   forA_ calls $ \call ->
-    assertMsg ("E_FUNCTION_BLOCKED: " <> call.targetInstanceId <> ":" <> call.functionName) $
-      BlockedFunction call.targetInstanceId call.functionName `notElem` mcms.blockedFunctions
+    assertMsg ("E_FUNCTION_BLOCKED: " <> call.targetInstanceAddress <> ":" <> call.functionName) $
+      BlockedFunction call.targetInstanceAddress call.functionName `notElem` mcms.blockedFunctions
 
   -- 3. Compute opId
   let opId = hashTimelockOpId calls predecessor salt
@@ -619,44 +622,62 @@ cancelBatchInternal mcms rs opIdToCancel = do
   create (updated with timelockTimestamps = Map.delete opIdToCancel mcms.timelockTimestamps)
 
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
--- Uses a map keyed by instanceId to support multiple calls to the same contract.
+-- Uses a map keyed by instanceAddress to support multiple calls to the same contract.
 -- After each external call, the map is updated with the new CID returned from MCMSReceiver_Entrypoint.
 processCallsLoop : Party -> Map.Map Text (ContractId MCMSReceiver) -> MCMS -> [TimelockCall] -> Update (Map.Map Text (ContractId MCMSReceiver), MCMS)
 processCallsLoop _ cidMap mcms [] = pure (cidMap, mcms)
-processCallsLoop ownerParty cidMap mcms (call :: rest)
-  | call.targetInstanceId == mcms.instanceId = do
-      -- Self-dispatch: no CID lookup needed
-      newMcms <- executeSelfDispatch mcms call
-      processCallsLoop ownerParty cidMap newMcms rest
-  | otherwise = do
-      -- External call: look up CID from map by instanceId
-      targetCid <- case Map.lookup call.targetInstanceId cidMap of
-        None -> abort $ "E_NO_CID_FOR_INSTANCE: " <> call.targetInstanceId
-        Some cid -> pure cid
+processCallsLoop ownerParty cidMap mcms (call :: rest) = do
+  -- Calculate MCMS's own instanceAddress for comparison
+  let mcmsInstanceAddress = makeInstanceAddress mcms.instanceId mcms.owner
 
-      -- Validate target
-      target <- fetch targetCid
-      let targetView = view target
-      assertMsg ("E_WRONG_TARGET: expected " <> call.targetInstanceId <> " got " <> targetView.instanceId) $
-        targetView.instanceId == call.targetInstanceId
-      case parsePartyIdText targetView.instanceId of
-        None -> abort "E_INVALID_INSTANCE_ID_FORMAT: expected baseId@partyId"
-        Some partyIdText ->
-          assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
-            any (\s -> partyToText s == partyIdText) (signatory target)
+  if call.targetInstanceAddress == mcmsInstanceAddress then do
+    -- Self-dispatch: execute internal function (no CID lookup needed)
+    newMcms <- executeSelfDispatch mcms call
+    processCallsLoop ownerParty cidMap newMcms rest
+  else do
+    -- External call: lookup CID from map and validate
+    targetCid <- case Map.lookup call.targetInstanceAddress cidMap of
+      None -> abort $ "E_NO_CID_FOR_INSTANCE: " <> call.targetInstanceAddress
+      Some cid -> pure cid
 
-      -- Convert typed map to untyped for interface
-      let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList cidMap]
+    -- Parse instanceId from the call's targetInstanceAddress (from merkle leaf)
+    expectedInstanceId <- case parseInstanceIdText call.targetInstanceAddress of
+      None -> abort "E_INVALID_INSTANCE_ADDRESS_FORMAT: expected instanceId@partyId"
+      Some instId -> pure instId
 
-      -- Execute call and get updated map from entrypoint
-      -- The entrypoint returns a Map with all updated CIDs (including self)
-      returnedCidMap <- exercise targetCid MCMSReceiver_Entrypoint with
-        functionName = call.functionName
-        operationData = call.operationData
-        contractIds = untypedCidMap
+    -- Parse partyId from the call's targetInstanceAddress (from merkle leaf)
+    expectedPartyText <- case parsePartyIdText call.targetInstanceAddress of
+      None -> abort "E_INVALID_INSTANCE_ADDRESS_FORMAT: expected instanceId@partyId"
+      Some partyId -> pure partyId
 
-      -- Convert returned map back to typed for next iteration
-      let updatedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList returnedCidMap]
+    -- Fetch and validate target contract
+    target <- fetch targetCid
+    let targetView = view target
 
-      -- Continue with merged map
-      processCallsLoop ownerParty updatedCidMap mcms rest
+    -- Verify the instanceId matches what was signed
+    -- (targetView.instanceId is just the identifier, NOT the full address)
+    assertMsg ("E_INSTANCE_ID_MISMATCH: expected " <> expectedInstanceId <> " got " <> targetView.instanceId) $
+      targetView.instanceId == expectedInstanceId
+
+    -- Verify fetched contract has exactly one signatory and it matches expected party
+    case signatory target of
+      [singleSig] ->
+        assertMsg "E_TARGET_SIGNATORY_MISMATCH" $
+          partyToText singleSig == expectedPartyText
+      _ -> abort "E_EXPECTED_SINGLE_SIGNATORY: target must have exactly one signatory"
+
+    -- Convert typed map to untyped for interface
+    let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList cidMap]
+
+    -- Execute call and get updated map from entrypoint
+    -- The entrypoint returns a Map with all updated CIDs (including self)
+    returnedCidMap <- exercise targetCid MCMSReceiver_Entrypoint with
+      functionName = call.functionName
+      operationData = call.operationData
+      contractIds = untypedCidMap
+
+    -- Convert returned map back to typed for next iteration
+    let updatedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList returnedCidMap]
+
+    -- Continue with updated map
+    processCallsLoop ownerParty updatedCidMap mcms rest
