@@ -134,6 +134,7 @@ func TestCCIPSend(t *testing.T) {
 							VersionTag:               types.TEXT(versionTag),
 							MessageSentObserver:      types.PARTY(partyCCIP),
 							StorageLocations:         []types.TEXT{"ipfs://test-send"},
+							StorageLocationsAdmin:    types.PARTY(partyCCIP),
 							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
 							// MUST be a real GENMAP, not a Go map.
 							RemoteChainFeeConfigs: types.GENMAP{

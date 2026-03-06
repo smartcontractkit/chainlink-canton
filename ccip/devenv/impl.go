@@ -263,11 +263,12 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		cv := sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
 			Template: ccvs.CommitteeVerifier{
-				Owner:               types.PARTY(participant.PartyID), // TODO: use different ccv owner?
-				CcipOwner:           types.PARTY(participant.PartyID),
-				VersionTag:          types.TEXT("49ff34ed"),
-				MessageSentObserver: types.PARTY(participant.PartyID),
-				StorageLocations:    storageLocations,
+				Owner:                 types.PARTY(participant.PartyID), // TODO: use different ccv owner?
+				CcipOwner:             types.PARTY(participant.PartyID),
+				VersionTag:            types.TEXT("49ff34ed"),
+				MessageSentObserver:   types.PARTY(participant.PartyID),
+				StorageLocations:      storageLocations,
+				StorageLocationsAdmin: types.PARTY(participant.PartyID),
 			},
 		}
 		config.Config.Params.CommitteeVerifiers = append(config.Config.Params.CommitteeVerifiers, cv)
