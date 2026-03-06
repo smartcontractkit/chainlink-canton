@@ -56,9 +56,9 @@ func main() {
 	}
 
 	// Collect all required SDK versions and package paths
-	var packages []string
+	packages := make([]string, len(multiPackage.Packages))
 	sdkVersions := make(map[string]struct{})
-	for _, pkg := range multiPackage.Packages {
+	for i, pkg := range multiPackage.Packages {
 		// Read daml.yaml for package name and version
 		damlYamlPath := filepath.Join(*rootDir, pkg, "daml.yaml")
 		content, err := os.ReadFile(damlYamlPath)
@@ -71,7 +71,7 @@ func main() {
 			log.Fatalf("failed to parse daml.yaml for package %q: %v", pkg, err)
 		}
 		sdkVersions[config.SdkVersion] = struct{}{}
-		packages = append(packages, damlYamlPath)
+		packages[i] = damlYamlPath
 	}
 
 	log.Println("Testing packages:")
