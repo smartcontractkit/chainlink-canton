@@ -8,8 +8,6 @@ import (
 	"io"
 	"math/big"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -157,22 +155,6 @@ func (c *Chain) ConfigureNodes(ctx context.Context, blockchain *blockchain.Input
 func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *deployments.EnvironmentTopology) (datastore.DataStore, error) {
 	// Only using a single participant for now
 	participant := env.BlockChains.CantonChains()[selector].Participants[0]
-
-	// Deploy the json-tests DAR so that it's available on the network.
-	// NOTE: this is hacky, but temporary, until we deploy the real CCIP contracts.
-	_, filename, _, _ := runtime.Caller(0) //nolint:dogsled
-	dir := filepath.Dir(filename)
-	darPath := filepath.Join(dir, "./tests/e2e/json-tests-0.0.1.dar")
-	dar, err := os.ReadFile(darPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read json-tests DAR: %w", err)
-	}
-	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile: dar,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload json-tests DAR: %w", err)
-	}
 
 	l := c.logger
 	l.Info().Msg("Configuring contracts for selector")
