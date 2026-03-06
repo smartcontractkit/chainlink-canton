@@ -36,6 +36,12 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 		if template.MessageSentObserver == "" {
 			return errors.New("message sent observer cannot be empty")
 		}
+		if template.StorageLocationsAdmin == "" {
+			return errors.New("storage locations admin cannot be empty")
+		}
+		if template.PendingStorageLocationsAdmin != nil {
+			return errors.New("pending storage locations admin should not be set, use two-step transfer instead")
+		}
 
 		return nil
 	},
