@@ -131,7 +131,7 @@ hashOpLeafNative op =
     encoded = padLeft32 (intToHex op.chainId)
            <> asciiToHex op.multisigId
            <> padLeft32 (intToHex op.nonce)
-           <> asciiToHex op.targetInstanceId
+           <> asciiToHex op.targetInstanceAddress
            <> asciiToHex op.functionName
            <> op.operationData
   in
@@ -167,7 +167,7 @@ hashTimelockOpId calls predecessor salt =
 -- | Encode a single timelock call for hashing
 encodeTimelockCall : TimelockCall -> BytesHex
 encodeTimelockCall call =
-  asciiToHex call.targetInstanceId
+  asciiToHex call.targetInstanceAddress
   <> asciiToHex call.functionName
   <> encodeOperationData call.operationData
 

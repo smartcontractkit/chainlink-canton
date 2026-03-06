@@ -8,7 +8,7 @@ module MCMS.GlobalConfig.UpgradeTest where
 
 import DA.Map qualified as Map
 import Daml.Script
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSReceiver_GetInstanceId(..))
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSReceiver_GetInstanceId(..), makeInstanceAddress)
 import MCMS.GlobalConfig.Types
 import MCMS.GlobalConfig.V1
 import MCMS.GlobalConfig.V2
@@ -17,11 +17,12 @@ testV1DirectOperations : Script ()
 testV1DirectOperations = script do
     ccipOwner <- allocateParty "ccip_owner"
 
-    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+    let configInstId = "globalconfig"
+    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with
-            instanceId = configInstanceId
+            instanceId = configInstId
             ccipOwner
             chainSelector = 1
             onRampAddress = "aa"
@@ -45,7 +46,7 @@ testV1DirectOperations = script do
 
     instId <- submit ccipOwner do
         exerciseCmd v1Cid GetInstanceIdV1 with viewer = ccipOwner
-    assertMsg "instanceId should match" $ instId == configInstanceId
+    assertMsg "instanceId should match" $ instId == configInstId
 
     debug "testV1DirectOperations PASSED!"
 
@@ -53,11 +54,12 @@ testV1ViaMcmsReceiver : Script ()
 testV1ViaMcmsReceiver = script do
     ccipOwner <- allocateParty "ccip_owner"
 
-    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+    let configInstId = "globalconfig"
+    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with
-            instanceId = configInstanceId
+            instanceId = configInstId
             ccipOwner
             chainSelector = 1
             onRampAddress = "aa"
@@ -68,16 +70,18 @@ testV1ViaMcmsReceiver = script do
 
     instId <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_GetInstanceId with c = ccipOwner
-    assertMsg "instanceId via interface should match" $ instId == configInstanceId
+    assertMsg "instanceId via interface should match" $ instId == configInstId
 
+    -- Pass the contract's CID in the map (required by MCMSReceiver interface)
+    let initialMap = Map.fromList [(configInstanceAddr, coerceContractId v1Cid)]
     returnedMap <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
             functionName = "UpdateDestChainConfig"
             operationData = ""
-            contractIds = Map.empty
+            contractIds = initialMap
 
-    assertMsg "returned map should contain instanceId" $
-        Map.member configInstanceId returnedMap
+    assertMsg "returned map should contain instanceAddress" $
+        Map.member configInstanceAddr returnedMap
 
     -- Sub-choice consumed old V1 and created new V1
     v1Contracts <- query @GlobalConfigV1 ccipOwner
@@ -89,7 +93,8 @@ testNonConsumingMigrateV1ToV2 : Script ()
 testNonConsumingMigrateV1ToV2 = script do
     ccipOwner <- allocateParty "ccip_owner"
 
-    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+    let configInstId = "globalconfig"
+    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
 
     let destConfig = DestChainConfig with
             isEnabled = True
@@ -102,7 +107,7 @@ testNonConsumingMigrateV1ToV2 = script do
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with
-            instanceId = configInstanceId
+            instanceId = configInstId
             ccipOwner
             chainSelector = 1
             onRampAddress = "aa"
@@ -111,15 +116,18 @@ testNonConsumingMigrateV1ToV2 = script do
 
     let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
 
+    -- Pass the contract's CID in the map (required by MCMSReceiver interface)
+    let initialMap = Map.fromList [(configInstanceAddr, coerceContractId v1Cid)]
+
     -- Migrate via MCMSReceiver_Entrypoint (non-consuming: V1 stays alive)
     returnedMap <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
             functionName = "MigrateToV2"
             operationData = ""
-            contractIds = Map.empty
+            contractIds = initialMap
 
-    assertMsg "returned map should contain instanceId" $
-        Map.member configInstanceId returnedMap
+    assertMsg "returned map should contain instanceAddress" $
+        Map.member configInstanceAddr returnedMap
 
     -- V1 should STILL exist (non-consuming migration)
     v1Contracts <- query @GlobalConfigV1 ccipOwner
@@ -131,7 +139,7 @@ testNonConsumingMigrateV1ToV2 = script do
 
     case v2Contracts of
         [(v2Cid, v2)] -> do
-            assertMsg "instanceId preserved" $ v2.instanceId == configInstanceId
+            assertMsg "instanceId preserved" $ v2.instanceId == configInstId
             assertMsg "ccipOwner preserved" $ v2.ccipOwner == ccipOwner
             assertMsg "chainSelector preserved" $ v2.chainSelector == 1
             assertMsg "onRampAddress preserved" $ v2.onRampAddress == "aa"
@@ -151,11 +159,13 @@ testNonConsumingMigrateV1ToV2 = script do
 
             -- V2 operations via MCMSReceiver_Entrypoint
             let v2AsReceiver = toInterfaceContractId @MCMSReceiver v2Cid
+            -- V2 also needs its CID in the map (it was returned from migration under same key)
+            let v2Map = Map.fromList [(configInstanceAddr, coerceContractId v2Cid)]
             _returnedMap2 <- submit ccipOwner do
                 exerciseCmd v2AsReceiver MCMSReceiver_Entrypoint with
                     functionName = "SetNewFeature"
                     operationData = "true"
-                    contractIds = Map.empty
+                    contractIds = v2Map
 
             v2ContractsAfter <- query @GlobalConfigV2 ccipOwner
             case v2ContractsAfter of
@@ -171,11 +181,12 @@ testArchiveV1AfterMigration : Script ()
 testArchiveV1AfterMigration = script do
     ccipOwner <- allocateParty "ccip_owner"
 
-    let configInstanceId = "globalconfig@" <> partyToText ccipOwner
+    let configInstId = "globalconfig"
+    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with
-            instanceId = configInstanceId
+            instanceId = configInstId
             ccipOwner
             chainSelector = 1
             onRampAddress = "aa"
@@ -184,11 +195,12 @@ testArchiveV1AfterMigration = script do
 
     -- Migrate (non-consuming)
     let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
+    let initialMap = Map.fromList [(configInstanceAddr, coerceContractId v1Cid)]
     _returnedMap <- submit ccipOwner do
         exerciseCmd v1AsReceiver MCMSReceiver_Entrypoint with
             functionName = "MigrateToV2"
             operationData = ""
-            contractIds = Map.empty
+            contractIds = initialMap
 
     -- V1 and V2 coexist
     v1Contracts <- query @GlobalConfigV1 ccipOwner

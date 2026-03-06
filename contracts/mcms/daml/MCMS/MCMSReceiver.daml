@@ -22,19 +22,49 @@ data ArgValue
 -- MCMS RECEIVER INTERFACE
 -- ===========================================================================
 
--- | View for MCMSReceiver interface
+-- | View data for MCMSReceiver interface
+--
+-- instanceId: A unique, immutable identifier for the contract (e.g., "onramp-mainnet-v1")
+--             This NEVER changes, even when the contract is updated or signatory changes.
+--
+-- instanceAddress: CALCULATED as "instanceId@partyId" (follows CCIP.RawInstanceAddress pattern)
+--   - Created using: makeInstanceAddress instanceId owner
+--   - The caller can calculate the full instanceAddress using the view's instanceId and owner
+--
+-- IMPORTANT: Implementers of MCMSReceiver MUST:
+--   1. Store instanceId (stable identifier) in the template, NOT the full instanceAddress
+--   2. Calculate instanceAddress = makeInstanceAddress instanceId owner when needed
+--   3. Look up their own ContractId from the contractIds map using the calculated instanceAddress
+--   4. After exercising any consuming choice, insert the NEW ContractId into the map
+--      under the instanceAddress key before returning
+--   5. Return the updated contractIds map from mcmsEntrypoint
+--
+-- Example implementation pattern:
+--   mcmsEntrypoint functionName operationData contractIds = do
+--     let instanceAddress = makeInstanceAddress instanceId owner
+--     selfCid <- case Map.lookup instanceAddress contractIds of
+--       None -> abort "E_SELF_CID_NOT_IN_MAP"
+--       Some cid -> pure (coerceContractId cid)
+--     case functionName of
+--       "DoSomething" -> do
+--         newCid <- exercise selfCid DoSomething
+--         pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
+--
 data MCMSReceiverView = MCMSReceiverView
   with
-    owner : Party
-    instanceId : Text  -- Stable identifier that doesn't change when contract updates
+    owner : Party       -- The controlling party
+    instanceId : Text   -- Stable identifier (without @partyId suffix)
   deriving (Show, Eq)
 
 -- | MCMSReceiver interface
 -- Target contracts implement this to receive direct calls from MCMS
 --
 -- Key design:
---   - instanceId: Stable identifier (e.g., "onramp-mainnet-v1")
---   - MCMS validates instanceId matches op.targetInstanceId in the Merkle proof
+--   - instanceId: Stable identifier stored in template (does NOT contain @partyId)
+--   - instanceAddress: CALCULATED as makeInstanceAddress instanceId owner
+--   - MCMS parses instanceId from call.targetInstanceAddress (merkle leaf)
+--   - MCMS validates instanceId matches targetView.instanceId
+--   - MCMS validates the signatory matches the partyId parsed from call.targetInstanceAddress
 --   - Delegation pattern: ccip_owner authority flows from MCMS to target
 interface MCMSReceiver where
   viewtype MCMSReceiverView
@@ -43,18 +73,17 @@ interface MCMSReceiver where
   -- MCMS has already verified the Merkle proof and signatures
   --
   -- Parameters:
-  --   selfCid: The contract ID of this MCMSReceiver (passed automatically
-  --            by the choice body via `self`; implementors receive it as a parameter)
-  --   functionName: The function to call (e.g., "increment", "setConfig")
+  --   functionName: The function to call (e.g., "Increment", "SetConfig")
   --   operationData: Serialized parameters (hex) - contract decodes this
-  --   contractIds: Map of instanceId → contractId for any contracts the implementer might need
+  --   contractIds: Map of instanceAddress → contractId for any contracts the implementer might need
   --                Receiving contract uses coerceContractId to cast to specific types
+  --                IMPORTANT: This map includes the receiver's own CID under its calculated instanceAddress
   --
-  -- Returns: Map of ALL updated CIDs (including self under own instanceId key)
+  -- Returns: Map of ALL updated CIDs (including self under own instanceAddress key)
   --          Implementer is responsible for adding their own updated CID to the returned map
-  mcmsEntrypoint : ContractId MCMSReceiver -> Text -> Text -> Map.Map Text (ContractId ()) -> Update (Map.Map Text (ContractId ()))
+  mcmsEntrypoint : Text -> Text -> Map.Map Text (ContractId ()) -> Update (Map.Map Text (ContractId ()))
 
-  -- | Non-consuming choice to get instance ID (for validation)
+  -- | Non-consuming choice to get instance id (for validation)
   nonconsuming choice MCMSReceiver_GetInstanceId : Text
     with
       c : Party  -- Controller (anyone can query)
@@ -67,26 +96,43 @@ interface MCMSReceiver where
   -- Only ccip_owner can call this (MCMS has ccip_owner as signatory)
   -- The implementation dispatches based on functionName by exercising
   -- consuming sub-choices on the implementing template.
-  -- Uses `self` (available in all choice bodies) to pass own CID to mcmsEntrypoint.
+  -- The implementer looks up their own CID from contractIds map.
   nonconsuming choice MCMSReceiver_Entrypoint : Map.Map Text (ContractId ())
     with
       functionName : Text                         -- Function to execute
       operationData : Text                        -- Serialized parameters (hex)
-      contractIds : Map.Map Text (ContractId ())  -- Map of instanceId → contractId for target to use
+      contractIds : Map.Map Text (ContractId ())  -- Map of instanceAddress → contractId for target to use
     controller (view this).owner
     do
-      ((((this `mcmsEntrypoint` self) functionName) operationData) contractIds)
+      (((this `mcmsEntrypoint` functionName) operationData) contractIds)
 
 -- ===========================================================================
 -- HELPER FUNCTIONS
 -- ===========================================================================
 
--- | Parse partyId from instanceId format "baseId@partyId"
+-- | Create instanceAddress from instanceId and owner party
+-- Format: "instanceId@partyId"
+-- Following CCIP's RawInstanceAddress pattern
+makeInstanceAddress : Text -> Party -> Text
+makeInstanceAddress instId owner =
+    if T.isInfixOf "@" instId
+    then error "instanceId cannot contain '@'"
+    else instId <> "@" <> partyToText owner
+
+-- | Parse instanceId from instanceAddress format "instanceId@partyId"
+-- Returns the instanceId text before the @ separator
+parseInstanceIdText : Text -> Optional Text
+parseInstanceIdText instanceAddress =
+  case T.splitOn "@" instanceAddress of
+    [instId, _partyId] -> Some instId
+    _ -> None
+
+-- | Parse partyId from instanceAddress format "instanceId@partyId"
 -- Returns the partyId text after the @ separator
 parsePartyIdText : Text -> Optional Text
-parsePartyIdText instanceId =
-  case T.splitOn "@" instanceId of
-    [_baseId, partyId] -> Some partyId
+parsePartyIdText instanceAddress =
+  case T.splitOn "@" instanceAddress of
+    [_instanceId, partyId] -> Some partyId
     _ -> None
 
 -- | Parse Int from hex string (simple implementation)

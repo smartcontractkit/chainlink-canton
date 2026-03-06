@@ -38,9 +38,9 @@ selfDispatchTestValidUntil = datetime 2030 Jan 1 0 0 0
 selfDispatchTestBaseMcmsId : Text
 selfDispatchTestBaseMcmsId = "mcms-daml-test"
 
--- Helper to create instanceId
-mkInstanceId : Text -> Party -> Text
-mkInstanceId base party = base <> "@" <> partyToText party
+-- Helper to create instanceAddress from instanceId and owner
+mkInstanceAddress : Text -> Party -> Text
+mkInstanceAddress instId party = instId <> "@" <> partyToText party
 
 -- ===========================================================================
 -- TIMELOCK SELF-DISPATCH TEST VECTORS
@@ -54,7 +54,7 @@ timelockScheduleOp = Op
   { chainId = 1
   , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-proposer"
   , nonce = 0
-  , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+  , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "ScheduleBatch"
   , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c617903313230403030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303014746573742d7363686564756c652d73616c742d310000000000000000"
   }
@@ -101,7 +101,7 @@ timelockBypasserOp = Op
   { chainId = 1
   , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
   , nonce = 0
-  , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+  , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "BypasserExecuteBatch"
   , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c617903333030"
   }
@@ -142,8 +142,8 @@ timelockBypasserSignatures =
       }
   ]
 
-timelockTestInstanceId : Text
-timelockTestInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+timelockTestInstanceAddress : Text
+timelockTestInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
 
 -- ===========================================================================
 -- SELF-DISPATCH VIA TIMELOCK TESTS
@@ -159,7 +159,7 @@ testScheduleBatch = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId selfDispatchTestBaseMcmsId ccipOwner
+      instanceId = selfDispatchTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState with config = selfDispatchTestConfig
       canceller = emptyRoleState
@@ -180,7 +180,7 @@ testScheduleBatch = script do
       signatures = timelockScheduleSignatures
 
   -- ExecuteOp with ScheduleBatch
-  let calls = [TimelockCall timelockTestInstanceId "UpdateMinDelay" "120"]
+  let calls = [TimelockCall timelockTestInstanceAddress "UpdateMinDelay" "120"]
   let salt = "test-schedule-salt-1"
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
@@ -237,7 +237,7 @@ testBypasserExecuteBatch = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId selfDispatchTestBaseMcmsId ccipOwner
+      instanceId = selfDispatchTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -290,7 +290,7 @@ testUpdateMinDelay = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId selfDispatchTestBaseMcmsId ccipOwner
+      instanceId = selfDispatchTestBaseMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -318,7 +318,7 @@ testBlockUnblockFunction = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId "test-block" ccipOwner
+      instanceId = "test-block"
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -351,7 +351,7 @@ testSetConfigDirect = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId "test-setconfig" ccipOwner
+      instanceId = "test-setconfig"
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -390,7 +390,7 @@ testCancelBatch : Script ()
 testCancelBatch = script do
   ccipOwner <- allocateParty "ccip_owner"
 
-  let mcmsInstanceId = mkInstanceId "test-cancel" ccipOwner
+  let mcmsInstId = "test-cancel"
 
   -- Create MCMS with a pre-scheduled operation
   let testOpId = "test-op-id-to-cancel"
@@ -399,7 +399,7 @@ testCancelBatch = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = mcmsInstId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState with config = selfDispatchTestConfig
@@ -444,7 +444,7 @@ testTimelockViewFunctions = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId "test-views" ccipOwner
+      instanceId = "test-views"
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
