@@ -25,26 +25,16 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 	t.Run("returns latest and finalized headers", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
-		jwt := "token"
 		offset := int64(42)
 
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(
-			mock.MatchedBy(func(ctx context.Context) bool {
-				md, ok := metadata.FromOutgoingContext(ctx)
-				if !ok {
-					return false
-				}
-				values := md.Get("authorization")
-
-				return len(values) == 1 && values[0] == "Bearer "+jwt
-			}),
+			mock.Anything,
 			mock.Anything,
 		).Return(&ledgerv2.GetLedgerEndResponse{Offset: offset}, nil)
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                jwt,
 		}
 
 		latest, finalized, err := reader.LatestAndFinalizedBlock(ctx)
@@ -71,7 +61,6 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                "token",
 		}
 
 		latest, finalized, err := reader.LatestAndFinalizedBlock(ctx)
@@ -95,7 +84,6 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                "token",
 		}
 
 		blockZero := big.NewInt(0)
@@ -123,7 +111,6 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                "token",
 		}
 
 		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(4)})
@@ -251,7 +238,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -369,7 +355,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -398,7 +383,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -433,7 +417,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -604,7 +587,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -758,7 +740,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -881,7 +862,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,

@@ -13,7 +13,6 @@ import (
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -84,15 +83,15 @@ type sourceReader struct {
 	lggr                logger.Logger
 	stateServiceClient  ledgerv2.StateServiceClient
 	updateServiceClient ledgerv2.UpdateServiceClient
-	jwt                 string
 
 	config ReaderConfig
 }
 
+// NewSourceReader creates a new canton source reader.
+// Auth is handled via gRPC dial options (WithTransportCredentials, WithPerRPCCredentials).
 func NewSourceReader(
 	lggr logger.Logger,
-	grpcEndpoint,
-	jwt string,
+	grpcEndpoint string,
 	config ReaderConfig,
 	opts ...grpc.DialOption,
 ) (chainaccess.SourceReader, error) {
@@ -111,7 +110,6 @@ func NewSourceReader(
 		lggr:                lggr,
 		stateServiceClient:  ledgerv2.NewStateServiceClient(conn),
 		updateServiceClient: ledgerv2.NewUpdateServiceClient(conn),
-		jwt:                 jwt,
 		config:              config,
 	}, nil
 }
@@ -137,7 +135,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 	} else {
 		// If toBlock is nil, we need to get the latest ledger end to avoid streaming indefinitely
 		// and to ensure we return a slice as expected by the interface.
-		ledgerEnd, err := c.stateServiceClient.GetLedgerEnd(c.authCtx(ctx), &ledgerv2.GetLedgerEndRequest{})
+		ledgerEnd, err := c.stateServiceClient.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get ledger end for open-ended query: %w", err)
 		}
@@ -145,7 +143,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		end = &e
 	}
 
-	updates, err := c.updateServiceClient.GetUpdates(c.authCtx(ctx), &ledgerv2.GetUpdatesRequest{
+	updates, err := c.updateServiceClient.GetUpdates(ctx, &ledgerv2.GetUpdatesRequest{
 		BeginExclusive: begin.Int64(),
 		EndInclusive:   end,
 		UpdateFormat: &ledgerv2.UpdateFormat{
@@ -465,7 +463,7 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 // LatestAndFinalizedBlock returns the latest offset of the canton validator we are connected to.
 // The latest "block" on Canton is always finalized.
 func (c *sourceReader) LatestAndFinalizedBlock(ctx context.Context) (latest, finalized *protocol.BlockHeader, err error) {
-	end, err := c.stateServiceClient.GetLedgerEnd(c.authCtx(ctx), &ledgerv2.GetLedgerEndRequest{})
+	end, err := c.stateServiceClient.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get ledger end: %w", err)
 	}
@@ -486,10 +484,6 @@ func (c *sourceReader) LatestAndFinalizedBlock(ctx context.Context) (latest, fin
 			// TODO: determine if we can get an offset's timestamp.
 			// Timestamp: time.Time{},
 		}, nil
-}
-
-func (c *sourceReader) authCtx(ctx context.Context) context.Context {
-	return metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", fmt.Sprintf("Bearer %s", c.jwt)))
 }
 
 func intToBytes32(i uint64) protocol.Bytes32 {
