@@ -79,12 +79,6 @@ type TimelockCall struct {
 	OperationData         string // hex encoded
 }
 
-// BlockedFunction matches Canton BlockedFunction (per-target blocked function)
-type BlockedFunction struct {
-	TargetInstanceAddress string
-	FunctionName          string
-}
-
 // ZeroHash represents "no predecessor" in timelock operations
 const ZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
@@ -92,27 +86,8 @@ const ZeroHash = "00000000000000000000000000000000000000000000000000000000000000
 // TYPE CONVERSION HELPERS (local <-> generated mcms bindings)
 // ===========================================================================
 
-// ToMCMSTimelockCall converts local TimelockCall to generated mcms.TimelockCall
-func ToMCMSTimelockCall(call TimelockCall) mcms.TimelockCall {
-	return mcms.TimelockCall{
-		TargetInstanceAddress: types.TEXT(call.TargetInstanceAddress),
-		FunctionName:          types.TEXT(call.FunctionName),
-		OperationData:         types.TEXT(call.OperationData),
-	}
-}
-
-// ToMCMSTimelockCalls converts a slice of local TimelockCall to mcms.TimelockCall
-func ToMCMSTimelockCalls(calls []TimelockCall) []mcms.TimelockCall {
-	result := make([]mcms.TimelockCall, len(calls))
-	for i, call := range calls {
-		result[i] = ToMCMSTimelockCall(call)
-	}
-
-	return result
-}
-
-// FromMCMSTimelockCall converts mcms.TimelockCall to local TimelockCall
-func FromMCMSTimelockCall(call mcms.TimelockCall) TimelockCall {
+// UnwrapTimelockCall extracts plain Go types from mcms.TimelockCall for hashing.
+func UnwrapTimelockCall(call mcms.TimelockCall) TimelockCall {
 	return TimelockCall{
 		TargetInstanceAddress: string(call.TargetInstanceAddress),
 		FunctionName:          string(call.FunctionName),
@@ -120,11 +95,12 @@ func FromMCMSTimelockCall(call mcms.TimelockCall) TimelockCall {
 	}
 }
 
-// FromMCMSTimelockCalls converts a slice of mcms.TimelockCall to local TimelockCall
-func FromMCMSTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
+// UnwrapTimelockCalls extracts plain Go types from mcms.TimelockCall slice for hashing.
+// This is needed because HashTimelockOpId requires plain Go types, not DAML-wrapped types.
+func UnwrapTimelockCalls(calls []mcms.TimelockCall) []TimelockCall {
 	result := make([]TimelockCall, len(calls))
 	for i, call := range calls {
-		result[i] = FromMCMSTimelockCall(call)
+		result[i] = UnwrapTimelockCall(call)
 	}
 
 	return result
@@ -167,6 +143,55 @@ func MustEncodeBypasserExecuteBatch(t testing.TB, encoder mcms.MCMSEncoder, para
 	require.NoError(t, err, "failed to encode BypasserExecuteBatchParams")
 
 	return choice
+}
+
+// MustEncodeSetConfigParams encodes SetConfigParams and returns the full EncodedChoice.
+// Use choice.Choice for the function name, choice.OperationData for hex data.
+func MustEncodeSetConfigParams(t testing.TB, encoder mcms.MCMSEncoder, params mcms.SetConfigParams) *bind.EncodedChoice {
+	t.Helper()
+	choice, err := encoder.SetConfigParams(params)
+	require.NoError(t, err, "failed to encode SetConfigParams")
+
+	return choice
+}
+
+// ToBindingSignerInfo converts local SignerInfo to mcms.SignerInfo binding type.
+func ToBindingSignerInfo(si SignerInfo) mcms.SignerInfo {
+	return mcms.SignerInfo{
+		SignerAddress: types.TEXT(si.SignerAddress),
+		SignerIndex:   types.INT64(si.SignerIndex),
+		SignerGroup:   types.INT64(si.SignerGroup),
+	}
+}
+
+// ToBindingSignerInfos converts a slice of local SignerInfo to mcms.SignerInfo binding types.
+func ToBindingSignerInfos(signers []SignerInfo) []mcms.SignerInfo {
+	result := make([]mcms.SignerInfo, len(signers))
+	for i, si := range signers {
+		result[i] = ToBindingSignerInfo(si)
+	}
+
+	return result
+}
+
+// ToINT64Slice converts []int to []types.INT64.
+func ToINT64Slice(ints []int) []types.INT64 {
+	result := make([]types.INT64, len(ints))
+	for i, v := range ints {
+		result[i] = types.INT64(v)
+	}
+
+	return result
+}
+
+// ToBindingSetConfigParams converts local config to mcms.SetConfigParams binding type.
+func ToBindingSetConfigParams(signers []SignerInfo, groupQuorums, groupParents []int, clearRoot bool) mcms.SetConfigParams {
+	return mcms.SetConfigParams{
+		Signers:      ToBindingSignerInfos(signers),
+		GroupQuorums: ToINT64Slice(groupQuorums),
+		GroupParents: ToINT64Slice(groupParents),
+		ClearRoot:    types.BOOL(clearRoot),
+	}
 }
 
 // MCMSRootMetadata matches Canton RootMetadata
@@ -341,6 +366,7 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 
 // HashTimelockOpId computes the operation ID for timelock operations
 // Matches Canton's hashTimelockOpId: keccak256(encodedCalls || predecessor || salt)
+// Note: predecessor and salt are BytesHex (already hex-encoded), used directly without conversion.
 func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 	// Encode calls
 	var sb strings.Builder
@@ -350,9 +376,9 @@ func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 		sb.WriteString(EncodeOperationDataForHash(call.OperationData))
 	}
 
-	// Combine with predecessor and salt
-	sb.WriteString(AsciiToHex(predecessor))
-	sb.WriteString(AsciiToHex(salt))
+	// Combine with predecessor and salt (already BytesHex, no conversion needed)
+	sb.WriteString(predecessor)
+	sb.WriteString(salt)
 
 	data, err := hex.DecodeString(sb.String())
 	if err != nil {
@@ -564,6 +590,18 @@ func AsciiToHex(s string) string {
 	return hex.EncodeToString([]byte(s))
 }
 
+// EncodeMinDelay encodes a delay value (in seconds) for UpdateMinDelay operationData.
+// Daml's parseInt expects a decimal string, but BytesHex requires valid hex (even length).
+// This pads the number with a leading zero if needed: 1 → "01", 120 → "0120"
+func EncodeMinDelay(seconds int) string {
+	s := fmt.Sprintf("%d", seconds)
+	if len(s)%2 != 0 {
+		s = "0" + s
+	}
+
+	return s
+}
+
 // ===========================================================================
 // CONFIG HELPERS
 // ===========================================================================
@@ -604,53 +642,6 @@ func New2of3Config(signers []*MCMSSigner) MCMSConfig {
 		Signers:      signerInfos,
 		GroupQuorums: groupQuorums,
 		GroupParents: groupParents,
-	}
-}
-
-// ===========================================================================
-// CANTON VALUE BUILDERS
-// ===========================================================================
-
-// These helpers create Canton API values for MCMS contracts
-
-// BuildSignerInfoValue creates Canton Value for SignerInfo
-func BuildSignerInfoValue(si SignerInfo) map[string]any {
-	return map[string]any{
-		"signerAddress": si.SignerAddress,
-		"signerIndex":   si.SignerIndex,
-		"signerGroup":   si.SignerGroup,
-	}
-}
-
-// BuildRawSignatureValue creates Canton Value for RawSignature
-func BuildRawSignatureValue(sig RawSignature) map[string]any {
-	return map[string]any{
-		"publicKey": sig.PublicKey,
-		"r":         sig.R,
-		"s":         sig.S,
-	}
-}
-
-// BuildOpValue creates Canton Value for Op
-func BuildOpValue(op MCMSOp) map[string]any {
-	return map[string]any{
-		"chainId":               op.ChainId,
-		"multisigId":            op.MultisigId,
-		"nonce":                 op.Nonce,
-		"targetInstanceAddress": op.TargetInstanceAddress,
-		"functionName":          op.FunctionName,
-		"operationData":         op.OperationData,
-	}
-}
-
-// BuildMetadataValue creates Canton Value for RootMetadata
-func BuildMetadataValue(meta MCMSRootMetadata) map[string]any {
-	return map[string]any{
-		"chainId":              meta.ChainId,
-		"multisigId":           meta.MultisigId,
-		"preOpCount":           meta.PreOpCount,
-		"postOpCount":          meta.PostOpCount,
-		"overridePreviousRoot": meta.OverridePreviousRoot,
 	}
 }
 
@@ -822,191 +813,27 @@ func HexToHash(hexStr string) common.Hash {
 // OPERATION DATA ENCODING (like Aptos BCS)
 // ===========================================================================
 
-// SetConfigParams matches Canton SetConfigParams for encoding
-type SetConfigParams struct {
-	Signers      []SignerInfo
-	GroupQuorums []int // Length 32
-	GroupParents []int // Length 32
-	ClearRoot    bool
-}
+// MustEncodeBlockedFunction encodes a BlockedFunction to hex bytes using binding's MarshalHex.
+func MustEncodeBlockedFunction(t testing.TB, bf mcms.BlockedFunction) string {
+	t.Helper()
+	encoded, err := bf.MarshalHex()
+	require.NoError(t, err, "failed to encode BlockedFunction")
 
-// EncodeSetConfigParams encodes SetConfigParams to hex bytes
-// Format matches Canton MCMS.Codec.encodeSetConfigParams
-func EncodeSetConfigParams(params SetConfigParams) string {
-	var buf []byte
-
-	// Encode signers list
-	buf = append(buf, byte(len(params.Signers))) // numSigners (1 byte)
-	for _, signer := range params.Signers {
-		// Address: length + hex bytes
-		addrBytes, _ := hex.DecodeString(signer.SignerAddress)
-		buf = append(buf, byte(len(addrBytes))) // addressLen (1 byte)
-		buf = append(buf, addrBytes...)         // address bytes
-
-		// SignerIndex (4 bytes, big-endian)
-		indexBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(indexBytes, uint32(signer.SignerIndex)) //nolint:gosec
-		buf = append(buf, indexBytes...)
-
-		// SignerGroup (4 bytes, big-endian)
-		groupBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(groupBytes, uint32(signer.SignerGroup)) //nolint:gosec
-		buf = append(buf, groupBytes...)
-	}
-
-	// Encode group quorums
-	buf = append(buf, byte(len(params.GroupQuorums))) // numQuorums (1 byte)
-	for _, quorum := range params.GroupQuorums {
-		quorumBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(quorumBytes, uint32(quorum)) //nolint:gosec
-		buf = append(buf, quorumBytes...)
-	}
-
-	// Encode group parents
-	buf = append(buf, byte(len(params.GroupParents))) // numParents (1 byte)
-	for _, parent := range params.GroupParents {
-		parentBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(parentBytes, uint32(parent)) //nolint:gosec
-		buf = append(buf, parentBytes...)
-	}
-
-	// Encode clearRoot (1 byte)
-	if params.ClearRoot {
-		buf = append(buf, 0x01)
-	} else {
-		buf = append(buf, 0x00)
-	}
-
-	return hex.EncodeToString(buf)
-}
-
-// DecodeSetConfigParams decodes SetConfigParams from hex bytes
-// Format matches Canton MCMS.Codec.decodeSetConfigParams
-func DecodeSetConfigParams(hexData string) (*SetConfigParams, error) {
-	data, err := hex.DecodeString(hexData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode hex: %w", err)
-	}
-
-	if len(data) < 1 {
-		return nil, fmt.Errorf("data too short: need at least 1 byte for signer count")
-	}
-
-	offset := 0
-	result := &SetConfigParams{}
-
-	// Decode signers list
-	numSigners := int(data[offset])
-	offset++
-
-	result.Signers = make([]SignerInfo, numSigners)
-	for i := range numSigners {
-		if offset >= len(data) {
-			return nil, fmt.Errorf("data truncated at signer %d address length", i)
-		}
-
-		// Address length (in bytes)
-		addrLen := int(data[offset])
-		offset++
-
-		if offset+addrLen > len(data) {
-			return nil, fmt.Errorf("data truncated at signer %d address", i)
-		}
-
-		// Address bytes -> hex string
-		addrBytes := data[offset : offset+addrLen]
-		result.Signers[i].SignerAddress = hex.EncodeToString(addrBytes)
-		offset += addrLen
-
-		// SignerIndex (4 bytes, big-endian)
-		if offset+4 > len(data) {
-			return nil, fmt.Errorf("data truncated at signer %d index", i)
-		}
-		result.Signers[i].SignerIndex = int(binary.BigEndian.Uint32(data[offset : offset+4]))
-		offset += 4
-
-		// SignerGroup (4 bytes, big-endian)
-		if offset+4 > len(data) {
-			return nil, fmt.Errorf("data truncated at signer %d group", i)
-		}
-		result.Signers[i].SignerGroup = int(binary.BigEndian.Uint32(data[offset : offset+4]))
-		offset += 4
-	}
-
-	// Decode group quorums
-	if offset >= len(data) {
-		return nil, fmt.Errorf("data truncated at quorums count")
-	}
-	numQuorums := int(data[offset])
-	offset++
-
-	result.GroupQuorums = make([]int, numQuorums)
-	for i := range numQuorums {
-		if offset+4 > len(data) {
-			return nil, fmt.Errorf("data truncated at quorum %d", i)
-		}
-		result.GroupQuorums[i] = int(binary.BigEndian.Uint32(data[offset : offset+4]))
-		offset += 4
-	}
-
-	// Decode group parents
-	if offset >= len(data) {
-		return nil, fmt.Errorf("data truncated at parents count")
-	}
-	numParents := int(data[offset])
-	offset++
-
-	result.GroupParents = make([]int, numParents)
-	for i := range numParents {
-		if offset+4 > len(data) {
-			return nil, fmt.Errorf("data truncated at parent %d", i)
-		}
-		result.GroupParents[i] = int(binary.BigEndian.Uint32(data[offset : offset+4]))
-		offset += 4
-	}
-
-	// Decode clearRoot
-	if offset >= len(data) {
-		return nil, fmt.Errorf("data truncated at clearRoot")
-	}
-	result.ClearRoot = data[offset] == 0x01
-	offset++
-
-	// Verify all data was consumed
-	if offset != len(data) {
-		return nil, fmt.Errorf("trailing bytes after decoding: %d extra bytes", len(data)-offset)
-	}
-
-	return result, nil
-}
-
-// EncodeBlockedFunction encodes a BlockedFunction to hex bytes
-// Format matches Canton MCMS.Codec.encodeBlockedFunction:
-//
-//	encodeText(targetInstanceAddress) <> encodeText(functionName)
-//
-// where encodeText = uint8(len) <> asciiBytes
-func EncodeBlockedFunction(bf BlockedFunction) string {
-	targetBytes := []byte(bf.TargetInstanceAddress)
-	fnBytes := []byte(bf.FunctionName)
-	buf := make([]byte, 0, 1+len(targetBytes)+1+len(fnBytes))
-	// targetInstanceAddress
-	buf = append(buf, byte(len(targetBytes)))
-	buf = append(buf, targetBytes...)
-	// functionName
-	buf = append(buf, byte(len(fnBytes)))
-	buf = append(buf, fnBytes...)
-
-	return hex.EncodeToString(buf)
+	return encoded
 }
 
 // EncodeSelfDispatchSetConfig encodes role + SetConfigParams for self-dispatch set_config
 // Format matches Canton MCMS.Codec.encodeSelfDispatchSetConfig:
 //
 //	uint8(roleToInt(role)) <> encodeSetConfigParams(params)
-func EncodeSelfDispatchSetConfig(role MCMSRole, params SetConfigParams) string {
+func EncodeSelfDispatchSetConfig(role MCMSRole, params mcms.SetConfigParams) (string, error) {
 	roleByte := hex.EncodeToString([]byte{byte(role)})
-	return roleByte + EncodeSetConfigParams(params)
+	encoded, err := params.MarshalHex()
+	if err != nil {
+		return "", fmt.Errorf("MarshalHex failed: %w", err)
+	}
+
+	return roleByte + encoded, nil
 }
 
 // ===========================================================================
@@ -1043,28 +870,41 @@ func encodeText(s string) []byte {
 	return buf
 }
 
+// encodeTextUint16 encodes a hex string with uint16 byte-count prefix
+// Format: uint16(byteCount) + hexString (where byteCount = len(hexString) / 2)
+// Matches Canton MCMS.Codec usage for operationData, predecessor, salt
+func encodeTextUint16(s string) []byte {
+	textBytes := []byte(s)
+	byteCount := len(textBytes) / 2 // Hex string: 2 chars per byte
+	buf := make([]byte, 0, 2+len(textBytes))
+	buf = append(buf, byte(byteCount>>8), byte(byteCount&0xff)) // uint16 big-endian
+	buf = append(buf, textBytes...)
+
+	return buf
+}
+
 // encodeTimelockCall encodes a TimelockCall
-// Format: encodeText(targetInstanceAddress) + encodeText(functionName) + encodeText(operationData)
+// Format: encodeText(targetInstanceAddress) + encodeText(functionName) + encodeTextUint16(operationData)
 // Matches Canton MCMS.Codec.encodeTimelockCall
 func encodeTimelockCall(call TimelockCall) []byte {
-	// Calculate size: 3 length bytes + string contents
-	size := 3 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
+	// Calculate size: 2 uint8 length bytes + 1 uint16 length (2 bytes) + string contents
+	size := 4 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
 	buf := make([]byte, 0, size)
 	buf = append(buf, encodeText(call.TargetInstanceAddress)...)
 	buf = append(buf, encodeText(call.FunctionName)...)
-	buf = append(buf, encodeText(call.OperationData)...)
+	buf = append(buf, encodeTextUint16(call.OperationData)...) // uint16 prefix for operationData
 
 	return buf
 }
 
 // EncodeScheduleBatchParams encodes ScheduleBatchParams to hex bytes
-// Format: numCalls (1 byte) + calls + encodeText(predecessor) + encodeText(salt) + int64(delaySecs)
+// Format: numCalls (1 byte) + calls + encodeTextUint16(predecessor) + encodeTextUint16(salt) + int64(delaySecs)
 // Matches Canton MCMS.Codec.encodeScheduleBatchParams
 func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
-	// Estimate size: 1 (numCalls) + calls + predecessor + salt + 8 (delay as int64)
-	estimatedSize := 1 + len(params.Predecessor) + 1 + len(params.Salt) + 1 + 8
+	// Estimate size: 1 (numCalls) + calls + predecessor (2+len) + salt (2+len) + 8 (delay as int64)
+	estimatedSize := 1 + len(params.Predecessor) + 2 + len(params.Salt) + 2 + 8
 	for _, call := range params.Calls {
-		estimatedSize += 3 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
+		estimatedSize += 4 + len(call.TargetInstanceAddress) + len(call.FunctionName) + len(call.OperationData)
 	}
 	buf := make([]byte, 0, estimatedSize)
 
@@ -1074,11 +914,11 @@ func EncodeScheduleBatchParams(params ScheduleBatchParams) string {
 		buf = append(buf, encodeTimelockCall(call)...)
 	}
 
-	// Encode predecessor (text)
-	buf = append(buf, encodeText(params.Predecessor)...)
+	// Encode predecessor with uint16 byte-count prefix (matches Daml Codec.daml line 379)
+	buf = append(buf, encodeTextUint16(params.Predecessor)...)
 
-	// Encode salt (text)
-	buf = append(buf, encodeText(params.Salt)...)
+	// Encode salt with uint16 byte-count prefix (matches Daml Codec.daml line 380)
+	buf = append(buf, encodeTextUint16(params.Salt)...)
 
 	// Encode delaySecs (8 bytes, big-endian INT64 to match DAML INT type)
 	delayBytes := make([]byte, 8)

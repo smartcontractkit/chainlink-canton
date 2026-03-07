@@ -4,6 +4,7 @@ module MCMS.MCMSReceiver where
 
 import DA.Map qualified as Map
 import DA.Text qualified as T
+import DA.Crypto.Text (BytesHex)
 
 -- ===========================================================================
 -- ARGUMENT VALUE TYPE
@@ -74,14 +75,14 @@ interface MCMSReceiver where
   --
   -- Parameters:
   --   functionName: The function to call (e.g., "Increment", "SetConfig")
-  --   operationData: Serialized parameters (hex) - contract decodes this
+  --   operationData: Serialized parameters (BytesHex) - contract decodes this (uint16 length prefix)
   --   contractIds: Map of instanceAddress → contractId for any contracts the implementer might need
   --                Receiving contract uses coerceContractId to cast to specific types
   --                IMPORTANT: This map includes the receiver's own CID under its calculated instanceAddress
   --
   -- Returns: Map of ALL updated CIDs (including self under own instanceAddress key)
   --          Implementer is responsible for adding their own updated CID to the returned map
-  mcmsEntrypoint : Text -> Text -> Map.Map Text (ContractId ()) -> Update (Map.Map Text (ContractId ()))
+  mcmsEntrypoint : Text -> BytesHex -> Map.Map Text (ContractId ()) -> Update (Map.Map Text (ContractId ()))
 
   -- | Non-consuming choice to get instance id (for validation)
   nonconsuming choice MCMSReceiver_GetInstanceId : Text
@@ -100,7 +101,7 @@ interface MCMSReceiver where
   nonconsuming choice MCMSReceiver_Entrypoint : Map.Map Text (ContractId ())
     with
       functionName : Text                         -- Function to execute
-      operationData : Text                        -- Serialized parameters (hex)
+      operationData : BytesHex                    -- Serialized parameters (hex) - uint16 length prefix
       contractIds : Map.Map Text (ContractId ())  -- Map of instanceAddress → contractId for target to use
     controller (view this).owner
     do

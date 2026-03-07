@@ -84,7 +84,7 @@ data Op = Op
     nonce : Int                   -- Must match current opCount (enforces order)
     targetInstanceAddress : Text  -- Target contract address (format: instanceId@partyId)
     functionName : Text           -- Function to call
-    operationData : Text          -- Serialized parameters (hex)
+    operationData : BytesHex      -- Serialized parameters (hex) - uses uint16 length prefix
   deriving (Show, Eq)
 
 -- | Metadata about a merkle root
@@ -199,7 +199,7 @@ data TimelockCall = TimelockCall
   with
     targetInstanceAddress : Text  -- Target contract's address (format: instanceId@partyId)
     functionName : Text           -- Function to call on target
-    operationData : Text          -- Hex-encoded parameters
+    operationData : BytesHex      -- Hex-encoded parameters - uses uint16 length prefix
   deriving (Show, Eq, Ord)
 
 data BlockedFunction = BlockedFunction
