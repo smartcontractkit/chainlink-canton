@@ -9,7 +9,6 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "00e0042db7f6dc044e2a2dd5a9b7af7e53425ca2d8d9468469939d8e6d95e553"
+	PackageID   = "20fafd369eb71f49603d260f4516a890aab037a79f395a725f6723b9a8b48665"
 	SDKVersion  = "3.4.10"
 )
 
@@ -171,8 +170,9 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
-	CcvCid       types.CONTRACT_ID `json:"ccvCid"`
-	VerifierArgs types.TEXT        `json:"verifierArgs"`
+	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
+	VerifierArgs    types.TEXT         `json:"verifierArgs"`
+	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVSendInput to a map for DAML arguments
@@ -188,6 +188,14 @@ func (t CCVSendInput) ToMap() map[string]any {
 	}()
 
 	m["verifierArgs"] = string(t.VerifierArgs)
+
+	m["ccvExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcvExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvExtraContext
+	}()
 
 	return m
 }
@@ -216,21 +224,21 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // Send is a Record type
 type Send struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	RouterCid           types.CONTRACT_ID                          `json:"routerCid"`
-	ExecutorCid         types.CONTRACT_ID                          `json:"executorCid"`
-	DestChainSelector   types.NUMERIC                              `json:"destChainSelector"`
-	Receiver            types.TEXT                                 `json:"receiver"`
-	Payload             types.TEXT                                 `json:"payload"`
-	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                               `json:"blockConfirmations" hex:"optional"`
-	ExecutorArgs        *types.TEXT                                `json:"executorArgs" hex:"optional"`
-	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
-	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
-	FeeTokenInput       interfaces.TokenInput                      `json:"feeTokenInput"`
-	FeeTokenHoldingCids []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
-	TokenTransfer       *TokenTransferInput                        `json:"tokenTransfer" hex:"optional"`
-	CcvSendInputs       []CCVSendInput                             `json:"ccvSendInputs"`
+	Context             common.CCIPContext                       `json:"context"`
+	RouterCid           types.CONTRACT_ID                        `json:"routerCid"`
+	ExecutorCid         types.CONTRACT_ID                        `json:"executorCid"`
+	DestChainSelector   types.NUMERIC                            `json:"destChainSelector"`
+	Receiver            types.TEXT                               `json:"receiver"`
+	Payload             types.TEXT                               `json:"payload"`
+	CcipReceiveGasLimit types.INT64                              `json:"ccipReceiveGasLimit"`
+	BlockConfirmations  *types.INT64                             `json:"blockConfirmations" hex:"optional"`
+	ExecutorArgs        *types.TEXT                              `json:"executorArgs" hex:"optional"`
+	SenderRequiredCCVs  []common.RawInstanceAddress              `json:"senderRequiredCCVs"`
+	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	FeeTokenInput       interfaces.TokenInput                    `json:"feeTokenInput"`
+	FeeTokenHoldingCids []types.CONTRACT_ID                      `json:"feeTokenHoldingCids"`
+	TokenTransfer       *TokenTransferInput                      `json:"tokenTransfer" hex:"optional"`
+	CcvSendInputs       []CCVSendInput                           `json:"ccvSendInputs"`
 }
 
 // ToMap converts Send to a map for DAML arguments
@@ -386,6 +394,7 @@ type TokenTransferInput struct {
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 	TokenReceiver     *types.TEXT                              `json:"tokenReceiver" hex:"optional"`
 	TokenArgs         types.TEXT                               `json:"tokenArgs"`
+	PoolExtraContext  common.CCIPContext                       `json:"poolExtraContext"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -438,6 +447,14 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	}
 
 	m["tokenArgs"] = string(t.TokenArgs)
+
+	m["poolExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.PoolExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PoolExtraContext
+	}()
 
 	return m
 }

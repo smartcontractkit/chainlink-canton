@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "952ea6d8783d8edc063b80b817cd8d0d778b5b8bf32abbe90f27f59f8dc5716d"
+	PackageID   = "76b605a513bd2fc438e31aba65a3f72448ce444f925f62e910563c9ea9d2c877"
 	SDKVersion  = "3.4.10"
 )
 
@@ -517,6 +516,189 @@ func (t *AddVerifierDataMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// AnyValue is a variant/union type
+type AnyValue struct {
+	AVText       *types.TEXT        `json:"AV_Text,omitempty"`
+	AVInt        *types.INT64       `json:"AV_Int,omitempty"`
+	AVDecimal    *types.NUMERIC     `json:"AV_Decimal,omitempty"`
+	AVBool       *types.BOOL        `json:"AV_Bool,omitempty"`
+	AVDate       *types.DATE        `json:"AV_Date,omitempty"`
+	AVTime       *types.TIMESTAMP   `json:"AV_Time,omitempty"`
+	AVRelTime    *types.RELTIME     `json:"AV_RelTime,omitempty"`
+	AVParty      *types.PARTY       `json:"AV_Party,omitempty"`
+	AVContractId *types.CONTRACT_ID `json:"AV_ContractId,omitempty"`
+	AVList       *[]AnyValue        `json:"AV_List,omitempty"`
+	AVMap        *types.TEXTMAP     `json:"AV_Map,omitempty"`
+}
+
+// MarshalJSON implements custom JSON marshaling for AnyValue
+func (v AnyValue) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(v)
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for AnyValue
+func (v *AnyValue) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, v)
+}
+
+// MarshalHex encodes AnyValue to hex string (Canton MCMS format)
+func (v AnyValue) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes AnyValue from hex string (Canton MCMS format)
+func (v *AnyValue) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+
+// GetVariantTag implements types.VARIANT interface
+func (v AnyValue) GetVariantTag() string {
+
+	if v.AVText != nil {
+		return "AV_Text"
+	}
+
+	if v.AVInt != nil {
+		return "AV_Int"
+	}
+
+	if v.AVDecimal != nil {
+		return "AV_Decimal"
+	}
+
+	if v.AVBool != nil {
+		return "AV_Bool"
+	}
+
+	if v.AVDate != nil {
+		return "AV_Date"
+	}
+
+	if v.AVTime != nil {
+		return "AV_Time"
+	}
+
+	if v.AVRelTime != nil {
+		return "AV_RelTime"
+	}
+
+	if v.AVParty != nil {
+		return "AV_Party"
+	}
+
+	if v.AVContractId != nil {
+		return "AV_ContractId"
+	}
+
+	if v.AVList != nil {
+		return "AV_List"
+	}
+
+	if v.AVMap != nil {
+		return "AV_Map"
+	}
+
+	return ""
+}
+
+// GetVariantValue implements types.VARIANT interface
+func (v AnyValue) GetVariantValue() any {
+
+	if v.AVText != nil {
+		return v.AVText
+	}
+
+	if v.AVInt != nil {
+		return v.AVInt
+	}
+
+	if v.AVDecimal != nil {
+		return v.AVDecimal
+	}
+
+	if v.AVBool != nil {
+		return v.AVBool
+	}
+
+	if v.AVDate != nil {
+		return v.AVDate
+	}
+
+	if v.AVTime != nil {
+		return v.AVTime
+	}
+
+	if v.AVRelTime != nil {
+		return v.AVRelTime
+	}
+
+	if v.AVParty != nil {
+		return v.AVParty
+	}
+
+	if v.AVContractId != nil {
+		return v.AVContractId
+	}
+
+	if v.AVList != nil {
+		return v.AVList
+	}
+
+	if v.AVMap != nil {
+		return v.AVMap
+	}
+
+	return nil
+}
+
+var _ types.VARIANT = (*AnyValue)(nil)
+
+// CCIPContext is a Record type
+type CCIPContext struct {
+	Values types.TEXTMAP `json:"values"`
+}
+
+// ToMap converts CCIPContext to a map for DAML arguments
+func (t CCIPContext) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["values"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Values).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Values
+	}()
+
+	return m
+}
+
+func (t CCIPContext) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CCIPContext) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CCIPContext to hex string (Canton MCMS format)
+func (t CCIPContext) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CCIPContext from hex string (Canton MCMS format)
+func (t *CCIPContext) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CCVFee is a Record type
 type CCVFee struct {
 	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
@@ -693,22 +875,31 @@ func (t *CrossChainVerifierCalculateFee) UnmarshalHex(data string) error {
 
 // CrossChainVerifierForwardToVerifier is a Record type
 type CrossChainVerifierForwardToVerifier struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
-	Caller            types.PARTY                                `json:"caller"`
+	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
+	ExtraContext      CCIPContext       `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT        `json:"verifierArgs"`
+	Caller            types.PARTY       `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierForwardToVerifier to a map for DAML arguments
 func (t CrossChainVerifierForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -750,22 +941,31 @@ func (t *CrossChainVerifierForwardToVerifier) UnmarshalHex(data string) error {
 
 // CrossChainVerifierVerifyMessage is a Record type
 type CrossChainVerifierVerifyMessage struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
-	Caller              types.PARTY                                `json:"caller"`
+	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
+	ExtraContext        CCIPContext       `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
+	VerifierResults     types.TEXT        `json:"verifierResults"`
+	Caller              types.PARTY       `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierVerifyMessage to a map for DAML arguments
 func (t CrossChainVerifierVerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["executingMessageCid"] = func() any {
