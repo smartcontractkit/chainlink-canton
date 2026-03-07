@@ -67,8 +67,8 @@ func argsToMap(args any) map[string]any {
 // APSetConfig is a Record type
 type APSetConfig struct {
 	ApSigners      []SignerInfo  `json:"apSigners"`
-	ApGroupQuorums []types.INT64 `json:"apGroupQuorums"`
-	ApGroupParents []types.INT64 `json:"apGroupParents"`
+	ApGroupQuorums []types.INT64 `json:"apGroupQuorums" hex:"[]uint32"`
+	ApGroupParents []types.INT64 `json:"apGroupParents" hex:"[]uint32"`
 	ApClearRoot    types.BOOL    `json:"apClearRoot"`
 }
 
@@ -803,8 +803,8 @@ type ExecuteScheduledBatch struct {
 	Submitter   types.PARTY    `json:"submitter"`
 	OpId        types.TEXT     `json:"opId"`
 	Calls       []TimelockCall `json:"calls"`
-	Predecessor types.TEXT     `json:"predecessor"`
-	Salt        types.TEXT     `json:"salt"`
+	Predecessor types.TEXT     `json:"predecessor" hex:"bytes16"`
+	Salt        types.TEXT     `json:"salt" hex:"bytes16"`
 	TargetCids  types.GENMAP   `json:"targetCids"`
 }
 
@@ -1953,7 +1953,7 @@ func (t *MCMSReceiverView) UnmarshalHex(data string) error {
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
 	FunctionName  types.TEXT   `json:"functionName"`
-	OperationData types.TEXT   `json:"operationData"`
+	OperationData types.TEXT   `json:"operationData" hex:"bytes16"`
 	ContractIds   types.GENMAP `json:"contractIds"`
 }
 
@@ -2093,8 +2093,8 @@ func (t *MCMSState) UnmarshalHex(data string) error {
 // MultisigConfig is a Record type
 type MultisigConfig struct {
 	Signers      []SignerInfo  `json:"signers"`
-	GroupQuorums []types.INT64 `json:"groupQuorums"`
-	GroupParents []types.INT64 `json:"groupParents"`
+	GroupQuorums []types.INT64 `json:"groupQuorums" hex:"[]uint32"`
+	GroupParents []types.INT64 `json:"groupParents" hex:"[]uint32"`
 }
 
 // ToMap converts MultisigConfig to a map for DAML arguments
@@ -2162,7 +2162,7 @@ type Op struct {
 	Nonce                 types.INT64 `json:"nonce"`
 	TargetInstanceAddress types.TEXT  `json:"targetInstanceAddress"`
 	FunctionName          types.TEXT  `json:"functionName"`
-	OperationData         types.TEXT  `json:"operationData"`
+	OperationData         types.TEXT  `json:"operationData" hex:"bytes16"`
 }
 
 // ToMap converts Op to a map for DAML arguments
@@ -2445,8 +2445,8 @@ func (t *RootMetadata) UnmarshalHex(data string) error {
 // ScheduleBatchParams is a Record type
 type ScheduleBatchParams struct {
 	Calls       []TimelockCall `json:"calls"`
-	Predecessor types.TEXT     `json:"predecessor"`
-	Salt        types.TEXT     `json:"salt"`
+	Predecessor types.TEXT     `json:"predecessor" hex:"bytes16"`
+	Salt        types.TEXT     `json:"salt" hex:"bytes16"`
 	DelaySecs   types.INT64    `json:"delaySecs"`
 }
 
@@ -2578,8 +2578,8 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 // SetConfigParams is a Record type
 type SetConfigParams struct {
 	Signers      []SignerInfo  `json:"signers"`
-	GroupQuorums []types.INT64 `json:"groupQuorums"`
-	GroupParents []types.INT64 `json:"groupParents"`
+	GroupQuorums []types.INT64 `json:"groupQuorums" hex:"[]uint32"`
+	GroupParents []types.INT64 `json:"groupParents" hex:"[]uint32"`
 	ClearRoot    types.BOOL    `json:"clearRoot"`
 }
 
@@ -2765,8 +2765,8 @@ func (t *SetValue) UnmarshalHex(data string) error {
 // SignerInfo is a Record type
 type SignerInfo struct {
 	SignerAddress types.TEXT  `json:"signerAddress"`
-	SignerIndex   types.INT64 `json:"signerIndex"`
-	SignerGroup   types.INT64 `json:"signerGroup"`
+	SignerIndex   types.INT64 `json:"signerIndex" hex:"uint32"`
+	SignerGroup   types.INT64 `json:"signerGroup" hex:"uint32"`
 }
 
 // ToMap converts SignerInfo to a map for DAML arguments
@@ -2808,7 +2808,7 @@ func (t *SignerInfo) UnmarshalHex(data string) error {
 type TimelockCall struct {
 	TargetInstanceAddress types.TEXT `json:"targetInstanceAddress"`
 	FunctionName          types.TEXT `json:"functionName"`
-	OperationData         types.TEXT `json:"operationData"`
+	OperationData         types.TEXT `json:"operationData" hex:"bytes16"`
 }
 
 // ToMap converts TimelockCall to a map for DAML arguments
@@ -2882,6 +2882,7 @@ type MCMSEncoder interface {
 	Reset(args Reset) (*bind.EncodedChoice, error)
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
+	SetConfigParams(args SetConfigParams) (*bind.EncodedChoice, error)
 	SetRoot(args SetRoot) (*bind.EncodedChoice, error)
 	SetValue(args SetValue) (*bind.EncodedChoice, error)
 }
@@ -3025,6 +3026,11 @@ func (e *encoder) ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, 
 
 // SetConfig encodes parameters for the SetConfig choice.
 func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetConfig", args)
+}
+
+// SetConfigParams encodes parameters for the SetConfig choice.
+func (e *encoder) SetConfigParams(args SetConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetConfig", args)
 }
 

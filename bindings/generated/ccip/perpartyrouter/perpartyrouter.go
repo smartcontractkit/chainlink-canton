@@ -595,7 +595,7 @@ func (t *Execute) UnmarshalHex(data string) error {
 // ExecuteResult is a Record type
 type ExecuteResult struct {
 	Router             types.CONTRACT_ID            `json:"router"`
-	TokenReceiveTicket *types.CONTRACT_ID           `json:"tokenReceiveTicket"`
+	TokenReceiveTicket *types.CONTRACT_ID           `json:"tokenReceiveTicket" hex:"optional"`
 	MessageId          types.TEXT                   `json:"messageId"`
 	Message            common.MessageV1             `json:"message"`
 	State              common.MessageExecutionState `json:"state"`
@@ -1044,6 +1044,24 @@ func (t HasRouter) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes HasRouter from hex string (Canton MCMS format)
 func (t *HasRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// HasRouterMCMSParams is HasRouter without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type HasRouterMCMSParams struct {
+	PartyOwner types.PARTY `json:"partyOwner"`
+}
+
+// MarshalHex encodes HasRouterMCMSParams to hex string for MCMS operationData.
+func (t HasRouterMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes HasRouterMCMSParams from hex string.
+func (t *HasRouterMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1528,7 +1546,7 @@ type PrepareExecute2 struct {
 	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	EncodedMessage     types.TEXT                                 `json:"encodedMessage"`
 	ReceiverParty      types.PARTY                                `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY                               `json:"tokenReceiverParty"`
+	TokenReceiverParty *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
 	Caller             types.PARTY                                `json:"caller"`
 }
 
@@ -1586,6 +1604,27 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type PrepareExecute2MCMSParams struct {
+	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	EncodedMessage     types.TEXT                                 `json:"encodedMessage"`
+	ReceiverParty      types.PARTY                                `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
+}
+
+// MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
+func (t PrepareExecute2MCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareExecute2MCMSParams from hex string.
+func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // PrepareSend is a Record type
 type PrepareSend struct {
 	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
@@ -1593,10 +1632,10 @@ type PrepareSend struct {
 	Receiver            types.TEXT                                 `json:"receiver"`
 	Payload             types.TEXT                                 `json:"payload"`
 	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                               `json:"blockConfirmations"`
+	BlockConfirmations  *types.INT64                               `json:"blockConfirmations" hex:"optional"`
 	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
-	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId  `json:"tokenInstrumentId"`
-	TokenReceiver       *types.TEXT                                `json:"tokenReceiver"`
+	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId  `json:"tokenInstrumentId" hex:"optional"`
+	TokenReceiver       *types.TEXT                                `json:"tokenReceiver" hex:"optional"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
 }
 
@@ -1711,7 +1750,9 @@ type MCMSEncoder interface {
 	GetRequiredCCVsForSend2(args GetRequiredCCVsForSend2) (*bind.EncodedChoice, error)
 	GetSequenceNumber(args GetSequenceNumber) (*bind.EncodedChoice, error)
 	HasRouter(args HasRouter) (*bind.EncodedChoice, error)
+	HasRouterMCMSParams(args HasRouterMCMSParams) (*bind.EncodedChoice, error)
 	PrepareExecute2(args PrepareExecute2) (*bind.EncodedChoice, error)
+	PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
 	PrepareSend(args PrepareSend) (*bind.EncodedChoice, error)
 }
 
@@ -1787,8 +1828,18 @@ func (e *encoder) HasRouter(args HasRouter) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("HasRouter", args)
 }
 
+// HasRouterMCMSParams encodes MCMS parameters (without Caller) for the HasRouter choice.
+func (e *encoder) HasRouterMCMSParams(args HasRouterMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("HasRouter", args)
+}
+
 // PrepareExecute2 encodes parameters for the PrepareExecute2 choice.
 func (e *encoder) PrepareExecute2(args PrepareExecute2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareExecute2", args)
+}
+
+// PrepareExecute2MCMSParams encodes MCMS parameters (without Caller) for the PrepareExecute2 choice.
+func (e *encoder) PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareExecute2", args)
 }
 

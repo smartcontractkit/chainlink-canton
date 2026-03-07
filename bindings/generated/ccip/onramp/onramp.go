@@ -563,11 +563,11 @@ type PrepareSendFromRouter struct {
 	Receiver              types.TEXT                                `json:"receiver"`
 	Payload               types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations    *types.INT64                              `json:"blockConfirmations"`
+	BlockConfirmations    *types.INT64                              `json:"blockConfirmations" hex:"optional"`
 	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
 	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
-	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	TokenReceiver         *types.TEXT                               `json:"tokenReceiver"`
+	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
+	TokenReceiver         *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
 	FeeToken              splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 

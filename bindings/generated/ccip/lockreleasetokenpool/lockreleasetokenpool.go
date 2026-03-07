@@ -653,6 +653,24 @@ func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// LockReleaseTokenPoolCalculateFeeMCMSParams is LockReleaseTokenPoolCalculateFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolCalculateFeeMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolCalculateFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolCalculateFeeMCMSParams from hex string.
+func (t *LockReleaseTokenPoolCalculateFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // LockReleaseTokenPoolGetRequiredCCVs is a Record type
 type LockReleaseTokenPoolGetRequiredCCVs struct {
 	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
@@ -706,6 +724,28 @@ func (t LockReleaseTokenPoolGetRequiredCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes LockReleaseTokenPoolGetRequiredCCVs from hex string (Canton MCMS format)
 func (t *LockReleaseTokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockReleaseTokenPoolGetRequiredCCVsMCMSParams is LockReleaseTokenPoolGetRequiredCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolGetRequiredCCVsMCMSParams struct {
+	RemoteChainSelector types.NUMERIC                `json:"remoteChainSelector"`
+	Amount              types.NUMERIC                `json:"amount"`
+	Finality            types.INT64                  `json:"finality"`
+	ExtraData           types.TEXT                   `json:"extraData"`
+	Direction           interfaces.TransferDirection `json:"direction"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolGetRequiredCCVsMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolGetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolGetRequiredCCVsMCMSParams from hex string.
+func (t *LockReleaseTokenPoolGetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -785,6 +825,28 @@ func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// LockReleaseTokenPoolLockOrBurnMCMSParams is LockReleaseTokenPoolLockOrBurn without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolLockOrBurnMCMSParams struct {
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	TokenInput        interfaces.TokenInput                      `json:"tokenInput"`
+	SenderInputCids   []types.CONTRACT_ID                        `json:"senderInputCids"`
+	Amount            types.NUMERIC                              `json:"amount"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolLockOrBurnMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolLockOrBurnMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolLockOrBurnMCMSParams from hex string.
+func (t *LockReleaseTokenPoolLockOrBurnMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // LockReleaseTokenPoolReleaseFromTicket is a Record type
 type LockReleaseTokenPoolReleaseFromTicket struct {
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
@@ -844,6 +906,26 @@ func (t LockReleaseTokenPoolReleaseFromTicket) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes LockReleaseTokenPoolReleaseFromTicket from hex string (Canton MCMS format)
 func (t *LockReleaseTokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockReleaseTokenPoolReleaseFromTicketMCMSParams is LockReleaseTokenPoolReleaseFromTicket without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolReleaseFromTicketMCMSParams struct {
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	TokenInput            interfaces.TokenInput                      `json:"tokenInput"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolReleaseFromTicketMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolReleaseFromTicketMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolReleaseFromTicketMCMSParams from hex string.
+func (t *LockReleaseTokenPoolReleaseFromTicketMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -943,6 +1025,25 @@ func (t *LockReleaseTokenPoolVerifyInboundCCVs) UnmarshalHex(data string) error 
 	return hexCodec.Unmarshal(data, t)
 }
 
+// LockReleaseTokenPoolVerifyInboundCCVsMCMSParams is LockReleaseTokenPoolVerifyInboundCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolVerifyInboundCCVsMCMSParams struct {
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolVerifyInboundCCVsMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolVerifyInboundCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolVerifyInboundCCVsMCMSParams from hex string.
+func (t *LockReleaseTokenPoolVerifyInboundCCVsMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // LockReleaseTokenPoolVerifyOutboundCCVs is a Record type
 type LockReleaseTokenPoolVerifyOutboundCCVs struct {
 	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
@@ -999,6 +1100,27 @@ func (t LockReleaseTokenPoolVerifyOutboundCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes LockReleaseTokenPoolVerifyOutboundCCVs from hex string (Canton MCMS format)
 func (t *LockReleaseTokenPoolVerifyOutboundCCVs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams is LockReleaseTokenPoolVerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams struct {
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Amount            types.NUMERIC                              `json:"amount"`
+	TokenArgs         types.TEXT                                 `json:"tokenArgs"`
+}
+
+// MarshalHex encodes LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.
+func (t LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams from hex string.
+func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1109,12 +1231,18 @@ var _ types.VARIANT = (*TransferTimeout)(nil)
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOrBurn) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolLockOrBurnMCMSParams(args LockReleaseTokenPoolLockOrBurnMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockReleaseTokenPoolReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolUpdateChainCCVRequirements(args LockReleaseTokenPoolUpdateChainCCVRequirements) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyInboundCCVs(args LockReleaseTokenPoolVerifyInboundCCVs) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolVerifyInboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyInboundCCVsMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1149,8 +1277,18 @@ func (e *encoder) LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalc
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
 }
 
+// LockReleaseTokenPoolCalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolCalculateFee choice.
+func (e *encoder) LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolCalculateFee", args)
+}
+
 // LockReleaseTokenPoolGetRequiredCCVs encodes parameters for the LockReleaseTokenPoolGetRequiredCCVs choice.
 func (e *encoder) LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetRequiredCCVs", args)
+}
+
+// LockReleaseTokenPoolGetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetRequiredCCVs choice.
+func (e *encoder) LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetRequiredCCVs", args)
 }
 
@@ -1159,8 +1297,18 @@ func (e *encoder) LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOr
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolLockOrBurn", args)
 }
 
+// LockReleaseTokenPoolLockOrBurnMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolLockOrBurn choice.
+func (e *encoder) LockReleaseTokenPoolLockOrBurnMCMSParams(args LockReleaseTokenPoolLockOrBurnMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolLockOrBurn", args)
+}
+
 // LockReleaseTokenPoolReleaseFromTicket encodes parameters for the LockReleaseTokenPoolReleaseFromTicket choice.
 func (e *encoder) LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolReleaseFromTicket", args)
+}
+
+// LockReleaseTokenPoolReleaseFromTicketMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolReleaseFromTicket choice.
+func (e *encoder) LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockReleaseTokenPoolReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolReleaseFromTicket", args)
 }
 
@@ -1174,8 +1322,18 @@ func (e *encoder) LockReleaseTokenPoolVerifyInboundCCVs(args LockReleaseTokenPoo
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyInboundCCVs", args)
 }
 
+// LockReleaseTokenPoolVerifyInboundCCVsMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolVerifyInboundCCVs choice.
+func (e *encoder) LockReleaseTokenPoolVerifyInboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyInboundCCVsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyInboundCCVs", args)
+}
+
 // LockReleaseTokenPoolVerifyOutboundCCVs encodes parameters for the LockReleaseTokenPoolVerifyOutboundCCVs choice.
 func (e *encoder) LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyOutboundCCVs", args)
+}
+
+// LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolVerifyOutboundCCVs choice.
+func (e *encoder) LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyOutboundCCVs", args)
 }
 

@@ -521,6 +521,24 @@ func (t *CommitteeVerifierCalculateFee) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CommitteeVerifierCalculateFeeMCMSParams is CommitteeVerifierCalculateFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CommitteeVerifierCalculateFeeMCMSParams struct {
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+}
+
+// MarshalHex encodes CommitteeVerifierCalculateFeeMCMSParams to hex string for MCMS operationData.
+func (t CommitteeVerifierCalculateFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierCalculateFeeMCMSParams from hex string.
+func (t *CommitteeVerifierCalculateFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
 	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
@@ -574,6 +592,26 @@ func (t CommitteeVerifierForwardToVerifier) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CommitteeVerifierForwardToVerifier from hex string (Canton MCMS format)
 func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CommitteeVerifierForwardToVerifierMCMSParams is CommitteeVerifierForwardToVerifier without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CommitteeVerifierForwardToVerifierMCMSParams struct {
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+}
+
+// MarshalHex encodes CommitteeVerifierForwardToVerifierMCMSParams to hex string for MCMS operationData.
+func (t CommitteeVerifierForwardToVerifierMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierForwardToVerifierMCMSParams from hex string.
+func (t *CommitteeVerifierForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -635,6 +673,26 @@ func (t *CommitteeVerifierVerifyMessage) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// CommitteeVerifierVerifyMessageMCMSParams is CommitteeVerifierVerifyMessage without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type CommitteeVerifierVerifyMessageMCMSParams struct {
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+}
+
+// MarshalHex encodes CommitteeVerifierVerifyMessageMCMSParams to hex string for MCMS operationData.
+func (t CommitteeVerifierVerifyMessageMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierVerifyMessageMCMSParams from hex string.
+func (t *CommitteeVerifierVerifyMessageMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SignatureConfig is a Record type
 type SignatureConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
@@ -688,8 +746,11 @@ func (t *SignatureConfig) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
+	CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
+	CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
+	CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -729,13 +790,28 @@ func (e *encoder) CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateF
 	return e.EncodeChoiceArgs("CommitteeVerifierCalculateFee", args)
 }
 
+// CommitteeVerifierCalculateFeeMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierCalculateFee choice.
+func (e *encoder) CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierCalculateFee", args)
+}
+
 // CommitteeVerifierForwardToVerifier encodes parameters for the CommitteeVerifierForwardToVerifier choice.
 func (e *encoder) CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
 }
 
+// CommitteeVerifierForwardToVerifierMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierForwardToVerifier choice.
+func (e *encoder) CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
+}
+
 // CommitteeVerifierVerifyMessage encodes parameters for the CommitteeVerifierVerifyMessage choice.
 func (e *encoder) CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
+}
+
+// CommitteeVerifierVerifyMessageMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierVerifyMessage choice.
+func (e *encoder) CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
 }
 

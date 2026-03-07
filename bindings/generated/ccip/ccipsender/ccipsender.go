@@ -223,13 +223,13 @@ type Send struct {
 	Receiver            types.TEXT                                 `json:"receiver"`
 	Payload             types.TEXT                                 `json:"payload"`
 	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                               `json:"blockConfirmations"`
-	ExecutorArgs        *types.TEXT                                `json:"executorArgs"`
+	BlockConfirmations  *types.INT64                               `json:"blockConfirmations" hex:"optional"`
+	ExecutorArgs        *types.TEXT                                `json:"executorArgs" hex:"optional"`
 	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
 	FeeTokenInput       interfaces.TokenInput                      `json:"feeTokenInput"`
 	FeeTokenHoldingCids []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
-	TokenTransfer       *TokenTransferInput                        `json:"tokenTransfer"`
+	TokenTransfer       *TokenTransferInput                        `json:"tokenTransfer" hex:"optional"`
 	CcvSendInputs       []CCVSendInput                             `json:"ccvSendInputs"`
 }
 
@@ -384,7 +384,7 @@ type TokenTransferInput struct {
 	SenderInputCids   []types.CONTRACT_ID                      `json:"senderInputCids"`
 	Amount            types.NUMERIC                            `json:"amount"`
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	TokenReceiver     *types.TEXT                              `json:"tokenReceiver"`
+	TokenReceiver     *types.TEXT                              `json:"tokenReceiver" hex:"optional"`
 	TokenArgs         types.TEXT                               `json:"tokenArgs"`
 }
 

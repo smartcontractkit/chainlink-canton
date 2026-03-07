@@ -233,6 +233,23 @@ func (t *GetCursedSubjects) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetCursedSubjectsMCMSParams is GetCursedSubjects without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetCursedSubjectsMCMSParams struct {
+}
+
+// MarshalHex encodes GetCursedSubjectsMCMSParams to hex string for MCMS operationData.
+func (t GetCursedSubjectsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetCursedSubjectsMCMSParams from hex string.
+func (t *GetCursedSubjectsMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // IsCursed is a Record type
 type IsCursed struct {
 	Caller types.PARTY `json:"caller"`
@@ -265,6 +282,23 @@ func (t IsCursed) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes IsCursed from hex string (Canton MCMS format)
 func (t *IsCursed) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// IsCursedMCMSParams is IsCursed without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type IsCursedMCMSParams struct {
+}
+
+// MarshalHex encodes IsCursedMCMSParams to hex string for MCMS operationData.
+func (t IsCursedMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsCursedMCMSParams from hex string.
+func (t *IsCursedMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -304,6 +338,24 @@ func (t IsCursedForChain) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes IsCursedForChain from hex string (Canton MCMS format)
 func (t *IsCursedForChain) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// IsCursedForChainMCMSParams is IsCursedForChain without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type IsCursedForChainMCMSParams struct {
+	ChainSelector types.NUMERIC `json:"chainSelector"`
+}
+
+// MarshalHex encodes IsCursedForChainMCMSParams to hex string for MCMS operationData.
+func (t IsCursedForChainMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes IsCursedForChainMCMSParams from hex string.
+func (t *IsCursedForChainMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -869,8 +921,11 @@ type MCMSEncoder interface {
 	CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error)
 	CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error)
 	GetCursedSubjects(args GetCursedSubjects) (*bind.EncodedChoice, error)
+	GetCursedSubjectsMCMSParams(args GetCursedSubjectsMCMSParams) (*bind.EncodedChoice, error)
 	IsCursed(args IsCursed) (*bind.EncodedChoice, error)
+	IsCursedMCMSParams(args IsCursedMCMSParams) (*bind.EncodedChoice, error)
 	IsCursedForChain(args IsCursedForChain) (*bind.EncodedChoice, error)
+	IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*bind.EncodedChoice, error)
 	Uncurse(args Uncurse) (*bind.EncodedChoice, error)
 	UncurseChain(args UncurseChain) (*bind.EncodedChoice, error)
 	UncurseGlobal(args UncurseGlobal) (*bind.EncodedChoice, error)
@@ -930,13 +985,28 @@ func (e *encoder) GetCursedSubjects(args GetCursedSubjects) (*bind.EncodedChoice
 	return e.EncodeChoiceArgs("GetCursedSubjects", args)
 }
 
+// GetCursedSubjectsMCMSParams encodes MCMS parameters (without Caller) for the GetCursedSubjects choice.
+func (e *encoder) GetCursedSubjectsMCMSParams(args GetCursedSubjectsMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetCursedSubjects", args)
+}
+
 // IsCursed encodes parameters for the IsCursed choice.
 func (e *encoder) IsCursed(args IsCursed) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("IsCursed", args)
 }
 
+// IsCursedMCMSParams encodes MCMS parameters (without Caller) for the IsCursed choice.
+func (e *encoder) IsCursedMCMSParams(args IsCursedMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("IsCursed", args)
+}
+
 // IsCursedForChain encodes parameters for the IsCursedForChain choice.
 func (e *encoder) IsCursedForChain(args IsCursedForChain) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("IsCursedForChain", args)
+}
+
+// IsCursedForChainMCMSParams encodes MCMS parameters (without Caller) for the IsCursedForChain choice.
+func (e *encoder) IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("IsCursedForChain", args)
 }
 

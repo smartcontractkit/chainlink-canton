@@ -144,7 +144,7 @@ type ExecuteFromRouterResult struct {
 	Message             common.MessageV1   `json:"message"`
 	SourceChainSelector types.NUMERIC      `json:"sourceChainSelector"`
 	SequenceNumber      types.NUMERIC      `json:"sequenceNumber"`
-	TokenReceiveTicket  *types.CONTRACT_ID `json:"tokenReceiveTicket"`
+	TokenReceiveTicket  *types.CONTRACT_ID `json:"tokenReceiveTicket" hex:"optional"`
 }
 
 // ToMap converts ExecuteFromRouterResult to a map for DAML arguments
@@ -478,7 +478,7 @@ type PrepareExecute struct {
 	EncodedMessage     types.TEXT        `json:"encodedMessage"`
 	RmnRemoteCid       types.CONTRACT_ID `json:"rmnRemoteCid"`
 	ReceiverParty      types.PARTY       `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty"`
+	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty" hex:"optional"`
 	Caller             types.PARTY       `json:"caller"`
 }
 
@@ -536,12 +536,34 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type PrepareExecuteMCMSParams struct {
+	EncodedMessage     types.TEXT        `json:"encodedMessage"`
+	RmnRemoteCid       types.CONTRACT_ID `json:"rmnRemoteCid"`
+	ReceiverParty      types.PARTY       `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty" hex:"optional"`
+}
+
+// MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.
+func (t PrepareExecuteMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareExecuteMCMSParams from hex string.
+func (t *PrepareExecuteMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ExecuteFromRouter(args ExecuteFromRouter) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error)
 	PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error)
+	PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -583,6 +605,11 @@ func (e *encoder) GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bi
 
 // PrepareExecute encodes parameters for the PrepareExecute choice.
 func (e *encoder) PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareExecute", args)
+}
+
+// PrepareExecuteMCMSParams encodes MCMS parameters (without Caller) for the PrepareExecute choice.
+func (e *encoder) PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareExecute", args)
 }
 

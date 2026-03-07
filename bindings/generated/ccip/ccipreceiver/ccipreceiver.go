@@ -60,7 +60,7 @@ type CCIPMessageReceived struct {
 	Router             types.CONTRACT_ID               `json:"router"`
 	MessageId          types.TEXT                      `json:"messageId"`
 	Message            common.MessageV1                `json:"message"`
-	TokenReleaseResult *interfaces.ReleaseOrMintResult `json:"tokenReleaseResult"`
+	TokenReleaseResult *interfaces.ReleaseOrMintResult `json:"tokenReleaseResult" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -443,7 +443,7 @@ type Execute2 struct {
 	Context                splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid              types.CONTRACT_ID                          `json:"routerCid"`
 	EncodedMessage         types.TEXT                                 `json:"encodedMessage"`
-	TokenTransfer          *TokenTransferInput                        `json:"tokenTransfer"`
+	TokenTransfer          *TokenTransferInput                        `json:"tokenTransfer" hex:"optional"`
 	CcvInputs              []CCVInput                                 `json:"ccvInputs"`
 	AdditionalRequiredCCVs []common.RawInstanceAddress                `json:"additionalRequiredCCVs"`
 }
@@ -568,6 +568,23 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetRequiredCCVsMCMSParams struct {
+}
+
+// MarshalHex encodes GetRequiredCCVsMCMSParams to hex string for MCMS operationData.
+func (t GetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsMCMSParams from hex string.
+func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
 	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
@@ -674,6 +691,7 @@ func (t *UpdateRequiredCCVs) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	Execute2(args Execute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
+	GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error)
 }
 
@@ -711,6 +729,11 @@ func (e *encoder) Execute2(args Execute2) (*bind.EncodedChoice, error) {
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
 func (e *encoder) GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
+}
+
+// GetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the GetRequiredCCVs choice.
+func (e *encoder) GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
 }
 
