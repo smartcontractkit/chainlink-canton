@@ -573,7 +573,7 @@ var _ types.VARIANT = (*TransferInstructionStatus)(nil)
 
 // TransferInstructionView is a Record type
 type TransferInstructionView struct {
-	OriginalInstructionCid *types.CONTRACT_ID                    `json:"originalInstructionCid"`
+	OriginalInstructionCid *types.CONTRACT_ID                    `json:"originalInstructionCid" hex:"optional"`
 	Transfer               Transfer                              `json:"transfer"`
 	Status                 TransferInstructionStatus             `json:"status"`
 	Meta                   splice_api_token_metadata_v1.Metadata `json:"meta"`

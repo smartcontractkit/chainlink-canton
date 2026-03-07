@@ -163,6 +163,25 @@ func (t *ApplyFeeTokenUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ApplyFeeTokenUpdatesMCMSParams is ApplyFeeTokenUpdates without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type ApplyFeeTokenUpdatesMCMSParams struct {
+	FeeTokensToRemove []splice_api_token_holding_v1.InstrumentId `json:"feeTokensToRemove"`
+	FeeTokensToAdd    []FeeTokenArgs                             `json:"feeTokensToAdd"`
+}
+
+// MarshalHex encodes ApplyFeeTokenUpdatesMCMSParams to hex string for MCMS operationData.
+func (t ApplyFeeTokenUpdatesMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyFeeTokenUpdatesMCMSParams from hex string.
+func (t *ApplyFeeTokenUpdatesMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DestChainConfig2 is a Record type
 type DestChainConfig2 struct {
 	IsEnabled                   types.BOOL    `json:"isEnabled"`
@@ -723,6 +742,24 @@ func (t *FeeQuoterFinalizeFee) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// FeeQuoterFinalizeFeeMCMSParams is FeeQuoterFinalizeFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type FeeQuoterFinalizeFeeMCMSParams struct {
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+}
+
+// MarshalHex encodes FeeQuoterFinalizeFeeMCMSParams to hex string for MCMS operationData.
+func (t FeeQuoterFinalizeFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterFinalizeFeeMCMSParams from hex string.
+func (t *FeeQuoterFinalizeFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FeeQuoterGetTokenTransferFee is a Record type
 type FeeQuoterGetTokenTransferFee struct {
 	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
@@ -767,6 +804,25 @@ func (t FeeQuoterGetTokenTransferFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes FeeQuoterGetTokenTransferFee from hex string (Canton MCMS format)
 func (t *FeeQuoterGetTokenTransferFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterGetTokenTransferFeeMCMSParams is FeeQuoterGetTokenTransferFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type FeeQuoterGetTokenTransferFeeMCMSParams struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	Token             splice_api_token_holding_v1.InstrumentId `json:"token"`
+}
+
+// MarshalHex encodes FeeQuoterGetTokenTransferFeeMCMSParams to hex string for MCMS operationData.
+func (t FeeQuoterGetTokenTransferFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterGetTokenTransferFeeMCMSParams from hex string.
+func (t *FeeQuoterGetTokenTransferFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -894,6 +950,24 @@ func (t *GetDestChainConfig2) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetDestChainConfig2MCMSParams is GetDestChainConfig2 without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetDestChainConfig2MCMSParams struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+}
+
+// MarshalHex encodes GetDestChainConfig2MCMSParams to hex string for MCMS operationData.
+func (t GetDestChainConfig2MCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetDestChainConfig2MCMSParams from hex string.
+func (t *GetDestChainConfig2MCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetDestinationChainGasPrice is a Record type
 type GetDestinationChainGasPrice struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
@@ -933,6 +1007,24 @@ func (t *GetDestinationChainGasPrice) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetDestinationChainGasPriceMCMSParams is GetDestinationChainGasPrice without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetDestinationChainGasPriceMCMSParams struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+}
+
+// MarshalHex encodes GetDestinationChainGasPriceMCMSParams to hex string for MCMS operationData.
+func (t GetDestinationChainGasPriceMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetDestinationChainGasPriceMCMSParams from hex string.
+func (t *GetDestinationChainGasPriceMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetFeeTokens is a Record type
 type GetFeeTokens struct {
 	Caller types.PARTY `json:"caller"`
@@ -965,6 +1057,23 @@ func (t GetFeeTokens) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetFeeTokens from hex string (Canton MCMS format)
 func (t *GetFeeTokens) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFeeTokensMCMSParams is GetFeeTokens without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetFeeTokensMCMSParams struct {
+}
+
+// MarshalHex encodes GetFeeTokensMCMSParams to hex string for MCMS operationData.
+func (t GetFeeTokensMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFeeTokensMCMSParams from hex string.
+func (t *GetFeeTokensMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1014,6 +1123,24 @@ func (t *GetPremiumMultiplierWeiPerEth) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetPremiumMultiplierWeiPerEthMCMSParams is GetPremiumMultiplierWeiPerEth without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetPremiumMultiplierWeiPerEthMCMSParams struct {
+	Token splice_api_token_holding_v1.InstrumentId `json:"token"`
+}
+
+// MarshalHex encodes GetPremiumMultiplierWeiPerEthMCMSParams to hex string for MCMS operationData.
+func (t GetPremiumMultiplierWeiPerEthMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetPremiumMultiplierWeiPerEthMCMSParams from hex string.
+func (t *GetPremiumMultiplierWeiPerEthMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetTokenPrice is a Record type
 type GetTokenPrice struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
@@ -1055,6 +1182,24 @@ func (t GetTokenPrice) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetTokenPrice from hex string (Canton MCMS format)
 func (t *GetTokenPrice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetTokenPriceMCMSParams is GetTokenPrice without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetTokenPriceMCMSParams struct {
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+}
+
+// MarshalHex encodes GetTokenPriceMCMSParams to hex string for MCMS operationData.
+func (t GetTokenPriceMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetTokenPriceMCMSParams from hex string.
+func (t *GetTokenPriceMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1291,19 +1436,46 @@ func (t *UpdatePrices) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// UpdatePricesMCMSParams is UpdatePrices without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type UpdatePricesMCMSParams struct {
+	PriceUpdates PriceUpdates `json:"priceUpdates"`
+}
+
+// MarshalHex encodes UpdatePricesMCMSParams to hex string for MCMS operationData.
+func (t UpdatePricesMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdatePricesMCMSParams from hex string.
+func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error)
+	ApplyFeeTokenUpdatesMCMSParams(args ApplyFeeTokenUpdatesMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error)
+	FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error)
+	FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error)
+	GetDestChainConfig2MCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error)
 	GetDestinationChainGasPrice(args GetDestinationChainGasPrice) (*bind.EncodedChoice, error)
+	GetDestinationChainGasPriceMCMSParams(args GetDestinationChainGasPriceMCMSParams) (*bind.EncodedChoice, error)
 	GetFeeTokens(args GetFeeTokens) (*bind.EncodedChoice, error)
+	GetFeeTokensMCMSParams(args GetFeeTokensMCMSParams) (*bind.EncodedChoice, error)
 	GetPremiumMultiplierWeiPerEth(args GetPremiumMultiplierWeiPerEth) (*bind.EncodedChoice, error)
+	GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error)
 	GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error)
+	GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error)
 	UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error)
+	UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1343,8 +1515,18 @@ func (e *encoder) ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.Encoded
 	return e.EncodeChoiceArgs("ApplyFeeTokenUpdates", args)
 }
 
+// ApplyFeeTokenUpdatesMCMSParams encodes MCMS parameters (without Caller) for the ApplyFeeTokenUpdates choice.
+func (e *encoder) ApplyFeeTokenUpdatesMCMSParams(args ApplyFeeTokenUpdatesMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyFeeTokenUpdates", args)
+}
+
 // FeeQuoterFinalizeFee encodes parameters for the FeeQuoterFinalizeFee choice.
 func (e *encoder) FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FeeQuoterFinalizeFee", args)
+}
+
+// FeeQuoterFinalizeFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterFinalizeFee choice.
+func (e *encoder) FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("FeeQuoterFinalizeFee", args)
 }
 
@@ -1353,8 +1535,18 @@ func (e *encoder) FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee
 	return e.EncodeChoiceArgs("FeeQuoterGetTokenTransferFee", args)
 }
 
+// FeeQuoterGetTokenTransferFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterGetTokenTransferFee choice.
+func (e *encoder) FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FeeQuoterGetTokenTransferFee", args)
+}
+
 // GetDestChainConfig2 encodes parameters for the GetDestChainConfig2 choice.
 func (e *encoder) GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChainConfig2", args)
+}
+
+// GetDestChainConfig2MCMSParams encodes MCMS parameters (without Caller) for the GetDestChainConfig2 choice.
+func (e *encoder) GetDestChainConfig2MCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetDestChainConfig2", args)
 }
 
@@ -1363,8 +1555,18 @@ func (e *encoder) GetDestinationChainGasPrice(args GetDestinationChainGasPrice) 
 	return e.EncodeChoiceArgs("GetDestinationChainGasPrice", args)
 }
 
+// GetDestinationChainGasPriceMCMSParams encodes MCMS parameters (without Caller) for the GetDestinationChainGasPrice choice.
+func (e *encoder) GetDestinationChainGasPriceMCMSParams(args GetDestinationChainGasPriceMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestinationChainGasPrice", args)
+}
+
 // GetFeeTokens encodes parameters for the GetFeeTokens choice.
 func (e *encoder) GetFeeTokens(args GetFeeTokens) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFeeTokens", args)
+}
+
+// GetFeeTokensMCMSParams encodes MCMS parameters (without Caller) for the GetFeeTokens choice.
+func (e *encoder) GetFeeTokensMCMSParams(args GetFeeTokensMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetFeeTokens", args)
 }
 
@@ -1373,13 +1575,28 @@ func (e *encoder) GetPremiumMultiplierWeiPerEth(args GetPremiumMultiplierWeiPerE
 	return e.EncodeChoiceArgs("GetPremiumMultiplierWeiPerEth", args)
 }
 
+// GetPremiumMultiplierWeiPerEthMCMSParams encodes MCMS parameters (without Caller) for the GetPremiumMultiplierWeiPerEth choice.
+func (e *encoder) GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetPremiumMultiplierWeiPerEth", args)
+}
+
 // GetTokenPrice encodes parameters for the GetTokenPrice choice.
 func (e *encoder) GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetTokenPrice", args)
 }
 
+// GetTokenPriceMCMSParams encodes MCMS parameters (without Caller) for the GetTokenPrice choice.
+func (e *encoder) GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetTokenPrice", args)
+}
+
 // UpdatePrices encodes parameters for the UpdatePrices choice.
 func (e *encoder) UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdatePrices", args)
+}
+
+// UpdatePricesMCMSParams encodes MCMS parameters (without Caller) for the UpdatePrices choice.
+func (e *encoder) UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("UpdatePrices", args)
 }
 

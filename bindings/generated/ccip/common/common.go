@@ -127,6 +127,27 @@ func (t *AddCCVFee) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// AddCCVFeeMCMSParams is AddCCVFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type AddCCVFeeMCMSParams struct {
+	CcvInstanceId     types.TEXT    `json:"ccvInstanceId"`
+	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	DestGasLimit      types.INT64   `json:"destGasLimit"`
+	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
+}
+
+// MarshalHex encodes AddCCVFeeMCMSParams to hex string for MCMS operationData.
+func (t AddCCVFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCCVFeeMCMSParams from hex string.
+func (t *AddCCVFeeMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AddCCVVerification is a Record type
 type AddCCVVerification struct {
 	CcvInstanceId types.TEXT  `json:"ccvInstanceId"`
@@ -165,6 +186,25 @@ func (t AddCCVVerification) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddCCVVerification from hex string (Canton MCMS format)
 func (t *AddCCVVerification) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddCCVVerificationMCMSParams is AddCCVVerification without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type AddCCVVerificationMCMSParams struct {
+	CcvInstanceId types.TEXT `json:"ccvInstanceId"`
+	VersionTag    types.TEXT `json:"versionTag"`
+}
+
+// MarshalHex encodes AddCCVVerificationMCMSParams to hex string for MCMS operationData.
+func (t AddCCVVerificationMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCCVVerificationMCMSParams from hex string.
+func (t *AddCCVVerificationMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -219,6 +259,29 @@ func (t AddExecutorWithFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddExecutorWithFee from hex string (Canton MCMS format)
 func (t *AddExecutorWithFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddExecutorWithFeeMCMSParams is AddExecutorWithFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type AddExecutorWithFeeMCMSParams struct {
+	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
+	ExecutorArgs       types.TEXT    `json:"executorArgs"`
+	BlockConfirmations types.INT64   `json:"blockConfirmations"`
+	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+	DestGasLimit       types.INT64   `json:"destGasLimit"`
+	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
+}
+
+// MarshalHex encodes AddExecutorWithFeeMCMSParams to hex string for MCMS operationData.
+func (t AddExecutorWithFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddExecutorWithFeeMCMSParams from hex string.
+func (t *AddExecutorWithFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -283,6 +346,29 @@ func (t *AddTokenSend) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// AddTokenSendMCMSParams is AddTokenSend without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type AddTokenSendMCMSParams struct {
+	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
+	PoolOwner        types.PARTY                              `json:"poolOwner"`
+	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Amount           types.NUMERIC                            `json:"amount"`
+	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
+	ExtraData        types.TEXT                               `json:"extraData"`
+}
+
+// MarshalHex encodes AddTokenSendMCMSParams to hex string for MCMS operationData.
+func (t AddTokenSendMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddTokenSendMCMSParams from hex string.
+func (t *AddTokenSendMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // AddTokenSendFee is a Record type
 type AddTokenSendFee struct {
 	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
@@ -330,6 +416,28 @@ func (t AddTokenSendFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddTokenSendFee from hex string (Canton MCMS format)
 func (t *AddTokenSendFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddTokenSendFeeMCMSParams is AddTokenSendFee without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type AddTokenSendFeeMCMSParams struct {
+	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
+	PoolOwner         types.PARTY   `json:"poolOwner"`
+	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
+}
+
+// MarshalHex encodes AddTokenSendFeeMCMSParams to hex string for MCMS operationData.
+func (t AddTokenSendFeeMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddTokenSendFeeMCMSParams from hex string.
+func (t *AddTokenSendFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -384,6 +492,27 @@ func (t AddVerifierData) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddVerifierData from hex string (Canton MCMS format)
 func (t *AddVerifierData) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// AddVerifierDataMCMSParams is AddVerifierData without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type AddVerifierDataMCMSParams struct {
+	CcvInstanceId        types.TEXT    `json:"ccvInstanceId"`
+	VersionTag           types.TEXT    `json:"versionTag"`
+	VerifierBlob         types.TEXT    `json:"verifierBlob"`
+	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
+}
+
+// MarshalHex encodes AddVerifierDataMCMSParams to hex string for MCMS operationData.
+func (t AddVerifierDataMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddVerifierDataMCMSParams from hex string.
+func (t *AddVerifierDataMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -755,11 +884,11 @@ type ExecutingMessageV1 struct {
 	Message                           MessageV1             `json:"message"`
 	MessageId                         types.TEXT            `json:"messageId"`
 	Receiver                          types.PARTY           `json:"receiver"`
-	TokenReceiver                     *types.PARTY          `json:"tokenReceiver"`
+	TokenReceiver                     *types.PARTY          `json:"tokenReceiver" hex:"optional"`
 	Executor                          types.PARTY           `json:"executor"`
 	ObservingParties                  []types.PARTY         `json:"observingParties"`
 	CcvVerifications                  []CCVVerification     `json:"ccvVerifications"`
-	InboundPoolCCVs                   *[]RawInstanceAddress `json:"inboundPoolCCVs"`
+	InboundPoolCCVs                   *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
 	OffRampInstanceAddress            RawInstanceAddress    `json:"offRampInstanceAddress"`
 	TokenAdminRegistryInstanceAddress RawInstanceAddress    `json:"tokenAdminRegistryInstanceAddress"`
 }
@@ -1106,6 +1235,23 @@ func (t *ExecutingMessageV1Archive) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ExecutingMessageV1ArchiveMCMSParams is ExecutingMessageV1Archive without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type ExecutingMessageV1ArchiveMCMSParams struct {
+}
+
+// MarshalHex encodes ExecutingMessageV1ArchiveMCMSParams to hex string for MCMS operationData.
+func (t ExecutingMessageV1ArchiveMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutingMessageV1ArchiveMCMSParams from hex string.
+func (t *ExecutingMessageV1ArchiveMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecutorFee is a Record type
 type ExecutorFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
@@ -1274,6 +1420,23 @@ func (t *FeeTokenAmount) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// FeeTokenAmountMCMSParams is FeeTokenAmount without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type FeeTokenAmountMCMSParams struct {
+}
+
+// MarshalHex encodes FeeTokenAmountMCMSParams to hex string for MCMS operationData.
+func (t FeeTokenAmountMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeTokenAmountMCMSParams from hex string.
+func (t *FeeTokenAmountMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FinalizeFee is a Record type
 type FinalizeFee struct {
 	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
@@ -1352,6 +1515,24 @@ func (t *GetDestChainConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetDestChainConfigMCMSParams is GetDestChainConfig without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetDestChainConfigMCMSParams struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+}
+
+// MarshalHex encodes GetDestChainConfigMCMSParams to hex string for MCMS operationData.
+func (t GetDestChainConfigMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetDestChainConfigMCMSParams from hex string.
+func (t *GetDestChainConfigMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetSourceChainConfig is a Record type
 type GetSourceChainConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
@@ -1387,6 +1568,24 @@ func (t GetSourceChainConfig) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetSourceChainConfig from hex string (Canton MCMS format)
 func (t *GetSourceChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetSourceChainConfigMCMSParams is GetSourceChainConfig without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetSourceChainConfigMCMSParams struct {
+	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
+}
+
+// MarshalHex encodes GetSourceChainConfigMCMSParams to hex string for MCMS operationData.
+func (t GetSourceChainConfigMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetSourceChainConfigMCMSParams from hex string.
+func (t *GetSourceChainConfigMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1728,7 +1927,7 @@ type MessageV1 struct {
 	Sender              types.TEXT       `json:"sender"`
 	Receiver            types.TEXT       `json:"receiver"`
 	DestBlob            types.TEXT       `json:"destBlob"`
-	TokenTransfer       *TokenTransferV1 `json:"tokenTransfer"`
+	TokenTransfer       *TokenTransferV1 `json:"tokenTransfer" hex:"optional"`
 	MessageData         types.TEXT       `json:"messageData"`
 }
 
@@ -1838,7 +2037,7 @@ func (t *RawInstanceAddress) UnmarshalHex(data string) error {
 type Receipt struct {
 	IssuerType        IssuerType    `json:"issuerType"`
 	IssuerAddress     types.TEXT    `json:"issuerAddress"`
-	VersionTag        *types.TEXT   `json:"versionTag"`
+	VersionTag        *types.TEXT   `json:"versionTag" hex:"optional"`
 	DestGasLimit      types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
 	FeeTokenAmount    types.NUMERIC `json:"feeTokenAmount"`
@@ -1927,21 +2126,21 @@ type SendingMessageV1 struct {
 	TokenReceiver                     types.TEXT                                `json:"tokenReceiver"`
 	FeeToken                          splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 	NetworkFeeUSDCents                types.NUMERIC                             `json:"networkFeeUSDCents"`
-	ExpectedTokenInstrumentId         *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId"`
-	OutboundPoolCCVs                  *[]RawInstanceAddress                     `json:"outboundPoolCCVs"`
+	ExpectedTokenInstrumentId         *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
+	OutboundPoolCCVs                  *[]RawInstanceAddress                     `json:"outboundPoolCCVs" hex:"optional"`
 	ExecutorArgs                      types.TEXT                                `json:"executorArgs"`
-	ExecutorFee                       *ExecutorFee                              `json:"executorFee"`
+	ExecutorFee                       *ExecutorFee                              `json:"executorFee" hex:"optional"`
 	ExecutorFeeTokenAmount            types.NUMERIC                             `json:"executorFeeTokenAmount"`
 	ObservingParties                  []types.PARTY                             `json:"observingParties"`
 	CcvFees                           []CCVFee                                  `json:"ccvFees"`
-	TokenSendFee                      *TokenSendFee                             `json:"tokenSendFee"`
+	TokenSendFee                      *TokenSendFee                             `json:"tokenSendFee" hex:"optional"`
 	FeesFinalized                     types.BOOL                                `json:"feesFinalized"`
 	CcvFeeTokenAmounts                []types.NUMERIC                           `json:"ccvFeeTokenAmounts"`
 	TokenSendFeeTokenAmount           types.NUMERIC                             `json:"tokenSendFeeTokenAmount"`
 	NetworkFeeTokenAmount             types.NUMERIC                             `json:"networkFeeTokenAmount"`
-	TokenSendData                     *TokenSendData                            `json:"tokenSendData"`
+	TokenSendData                     *TokenSendData                            `json:"tokenSendData" hex:"optional"`
 	VerifierData                      []VerifierData                            `json:"verifierData"`
-	Message                           *MessageV1                                `json:"message"`
+	Message                           *MessageV1                                `json:"message" hex:"optional"`
 	EncodedMessage                    types.TEXT                                `json:"encodedMessage"`
 	MessageId                         types.TEXT                                `json:"messageId"`
 }
@@ -3326,16 +3525,26 @@ func IIExecutorInterfaceIDWithPackageID(packageID string) string {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AddCCVFee(args AddCCVFee) (*bind.EncodedChoice, error)
+	AddCCVFeeMCMSParams(args AddCCVFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error)
+	AddCCVVerificationMCMSParams(args AddCCVVerificationMCMSParams) (*bind.EncodedChoice, error)
 	AddExecutorWithFee(args AddExecutorWithFee) (*bind.EncodedChoice, error)
+	AddExecutorWithFeeMCMSParams(args AddExecutorWithFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error)
+	AddTokenSendMCMSParams(args AddTokenSendMCMSParams) (*bind.EncodedChoice, error)
 	AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error)
+	AddTokenSendFeeMCMSParams(args AddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
+	AddVerifierDataMCMSParams(args AddVerifierDataMCMSParams) (*bind.EncodedChoice, error)
 	ExecutingMessageV1Archive(args ExecutingMessageV1Archive) (*bind.EncodedChoice, error)
+	ExecutingMessageV1ArchiveMCMSParams(args ExecutingMessageV1ArchiveMCMSParams) (*bind.EncodedChoice, error)
 	FeeTokenAmount(args FeeTokenAmount) (*bind.EncodedChoice, error)
+	FeeTokenAmountMCMSParams(args FeeTokenAmountMCMSParams) (*bind.EncodedChoice, error)
 	FinalizeFee(args FinalizeFee) (*bind.EncodedChoice, error)
 	GetDestChainConfig(args GetDestChainConfig) (*bind.EncodedChoice, error)
+	GetDestChainConfigMCMSParams(args GetDestChainConfigMCMSParams) (*bind.EncodedChoice, error)
 	GetSourceChainConfig(args GetSourceChainConfig) (*bind.EncodedChoice, error)
+	GetSourceChainConfigMCMSParams(args GetSourceChainConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoice, error)
 	SetOutboundPoolCCVs(args SetOutboundPoolCCVs) (*bind.EncodedChoice, error)
 	UpdateDestChainConfig(args UpdateDestChainConfig) (*bind.EncodedChoice, error)
@@ -3374,8 +3583,18 @@ func (e *encoder) AddCCVFee(args AddCCVFee) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddCCVFee", args)
 }
 
+// AddCCVFeeMCMSParams encodes MCMS parameters (without Caller) for the AddCCVFee choice.
+func (e *encoder) AddCCVFeeMCMSParams(args AddCCVFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCCVFee", args)
+}
+
 // AddCCVVerification encodes parameters for the AddCCVVerification choice.
 func (e *encoder) AddCCVVerification(args AddCCVVerification) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCCVVerification", args)
+}
+
+// AddCCVVerificationMCMSParams encodes MCMS parameters (without Caller) for the AddCCVVerification choice.
+func (e *encoder) AddCCVVerificationMCMSParams(args AddCCVVerificationMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddCCVVerification", args)
 }
 
@@ -3384,8 +3603,18 @@ func (e *encoder) AddExecutorWithFee(args AddExecutorWithFee) (*bind.EncodedChoi
 	return e.EncodeChoiceArgs("AddExecutorWithFee", args)
 }
 
+// AddExecutorWithFeeMCMSParams encodes MCMS parameters (without Caller) for the AddExecutorWithFee choice.
+func (e *encoder) AddExecutorWithFeeMCMSParams(args AddExecutorWithFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddExecutorWithFee", args)
+}
+
 // AddTokenSend encodes parameters for the AddTokenSend choice.
 func (e *encoder) AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSend", args)
+}
+
+// AddTokenSendMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSend choice.
+func (e *encoder) AddTokenSendMCMSParams(args AddTokenSendMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddTokenSend", args)
 }
 
@@ -3394,8 +3623,18 @@ func (e *encoder) AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, er
 	return e.EncodeChoiceArgs("AddTokenSendFee", args)
 }
 
+// AddTokenSendFeeMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSendFee choice.
+func (e *encoder) AddTokenSendFeeMCMSParams(args AddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddTokenSendFee", args)
+}
+
 // AddVerifierData encodes parameters for the AddVerifierData choice.
 func (e *encoder) AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddVerifierData", args)
+}
+
+// AddVerifierDataMCMSParams encodes MCMS parameters (without Caller) for the AddVerifierData choice.
+func (e *encoder) AddVerifierDataMCMSParams(args AddVerifierDataMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddVerifierData", args)
 }
 
@@ -3404,8 +3643,18 @@ func (e *encoder) ExecutingMessageV1Archive(args ExecutingMessageV1Archive) (*bi
 	return e.EncodeChoiceArgs("ExecutingMessageV1Archive", args)
 }
 
+// ExecutingMessageV1ArchiveMCMSParams encodes MCMS parameters (without Caller) for the ExecutingMessageV1Archive choice.
+func (e *encoder) ExecutingMessageV1ArchiveMCMSParams(args ExecutingMessageV1ArchiveMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ExecutingMessageV1Archive", args)
+}
+
 // FeeTokenAmount encodes parameters for the FeeTokenAmount choice.
 func (e *encoder) FeeTokenAmount(args FeeTokenAmount) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FeeTokenAmount", args)
+}
+
+// FeeTokenAmountMCMSParams encodes MCMS parameters (without Caller) for the FeeTokenAmount choice.
+func (e *encoder) FeeTokenAmountMCMSParams(args FeeTokenAmountMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("FeeTokenAmount", args)
 }
 
@@ -3419,8 +3668,18 @@ func (e *encoder) GetDestChainConfig(args GetDestChainConfig) (*bind.EncodedChoi
 	return e.EncodeChoiceArgs("GetDestChainConfig", args)
 }
 
+// GetDestChainConfigMCMSParams encodes MCMS parameters (without Caller) for the GetDestChainConfig choice.
+func (e *encoder) GetDestChainConfigMCMSParams(args GetDestChainConfigMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetDestChainConfig", args)
+}
+
 // GetSourceChainConfig encodes parameters for the GetSourceChainConfig choice.
 func (e *encoder) GetSourceChainConfig(args GetSourceChainConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetSourceChainConfig", args)
+}
+
+// GetSourceChainConfigMCMSParams encodes MCMS parameters (without Caller) for the GetSourceChainConfig choice.
+func (e *encoder) GetSourceChainConfigMCMSParams(args GetSourceChainConfigMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetSourceChainConfig", args)
 }
 
