@@ -6,8 +6,6 @@ import DA.Crypto.Text (keccak256)
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
-import DA.TextMap qualified as TextMap
-
 import qualified CCIP.Context
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
@@ -15,8 +13,6 @@ import qualified CCIP.RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
-
-import qualified Splice.Api.Token.MetadataV1
 
 -- | Helper to create a fresh ExecutingMessageV1 for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
@@ -85,10 +81,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults1
             caller = owner
@@ -113,10 +107,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults2
             caller = owner
@@ -158,10 +150,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults4
             caller = owner
@@ -184,10 +174,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults5
             caller = owner
@@ -210,10 +198,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = verifierResults6
             caller = owner
@@ -265,10 +251,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults =
                 "01234567" <> -- invalid version tag
@@ -277,10 +261,8 @@ setup = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
@@ -289,10 +271,8 @@ setup = script do
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV1_7_0 <> -- version tag
@@ -319,10 +299,8 @@ setup = script do
             remoteChainFeeConfigs = Map.empty
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2]
             caller = owner
@@ -339,10 +317,8 @@ setup = script do
     executingMessageCid <- createExecMsg owner
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner
@@ -354,10 +330,8 @@ setup = script do
     executingMessageCid <- createExecMsg owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_VerifyMessage with
-            context = Splice.Api.Token.MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner

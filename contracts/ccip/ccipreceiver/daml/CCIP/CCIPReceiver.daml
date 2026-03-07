@@ -11,24 +11,22 @@ import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
 import DA.List (dedup)
 
+import qualified CCIP.Context
 import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
-import qualified CCIP.GlobalConfig
 import qualified CCIP.TokenAdminRegistry
 
-import qualified Splice.Api.Token.MetadataV1
-
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
--- with the attestation data that verifier needs.
+-- with the attestation data and per-CCV extra context.
 data CCVInput = CCVInput
     with
         ccvCid : ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier
         verifierResults : BytesHex
+        ccvExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
 -- | Token transfer input, provided only when the message includes a
@@ -38,6 +36,7 @@ data TokenTransferInput = TokenTransferInput
         tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
         tokenReceiverParty : Party
         tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        poolExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
 template CCIPReceiver
@@ -73,9 +72,9 @@ template CCIPReceiver
         -- TODO: consider allowing arbitrary callers
         nonconsuming choice Execute : ContractId CCIPMessageReceived
             with
-                -- CCIP Choice Context
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
-                
+                -- CCIP context for internal orchestration (PerPartyRouter calls).
+                context : CCIP.Context.CCIPContext
+
                 -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
 
@@ -94,6 +93,10 @@ template CCIPReceiver
                 additionalRequiredCCVs : [RawInstanceAddress]
             controller owner
             do
+                -- Extract CIDs from context using typed accessors for pool/CCV calls.
+                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
+                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
+
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1
                 emCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
                     context = context
@@ -106,7 +109,8 @@ template CCIPReceiver
                 emCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
-                            context = context
+                            rmnRemoteCid = rmnRemoteCid
+                            extraContext = input.ccvExtraContext
                             executingMessageCid = cid
                             verifierResults = input.verifierResults
                             caller = owner
@@ -117,7 +121,8 @@ template CCIPReceiver
                     None -> pure emCid
                     Some tt -> exercise tt.tokenPoolCid
                         CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundCCVs with
-                            context = context
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            extraContext = tt.poolExtraContext
                             executingMessageCid = emCid
                             caller = owner
 
@@ -134,7 +139,9 @@ template CCIPReceiver
                     (Some tt, Some ticketCid) -> do
                         releaseResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
-                                context = context
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
+                                rmnRemoteCid = rmnRemoteCid
+                                extraContext = tt.poolExtraContext
                                 tokenReceiveTicketCid = ticketCid
                                 tokenInput = tt.tokenInput
                                 caller = owner

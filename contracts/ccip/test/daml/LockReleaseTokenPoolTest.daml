@@ -7,8 +7,6 @@ import DA.Assert
 import DA.List (head)
 import DA.Map qualified as Map
 import DA.Optional
-import DA.TextMap qualified as TextMap
-
 import qualified CCIP.Context
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
@@ -109,7 +107,7 @@ testLockOrBurn = script do
             chainCCVRequirements = Map.empty
             chainFeeConfigs = Map.empty
             remoteTokens = Map.fromList [(destChainSelector, destTokenAddr)]
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
     -- Create SendingMessageV1 with token transfer fields.
@@ -181,10 +179,8 @@ testLockOrBurn = script do
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5000000.0
-            context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [
-                    (CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    ]
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -287,7 +283,7 @@ testReleaseFromTicket = script do
             chainCCVRequirements = Map.empty
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates via TAR)
@@ -322,9 +318,9 @@ testReleaseFromTicket = script do
                       <> disclose disclosedPreapproval <> disclose disclosedRmn) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
-            context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (CCIP.Context.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)]
+            tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = rmnRemote
+            extraContext = CCIP.Context.emptyCCIPContext
             tokenInput = tokenInput
             caller = receiver
 
