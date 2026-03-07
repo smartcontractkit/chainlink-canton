@@ -168,12 +168,16 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		Str("Receiver", hex.EncodeToString(message.Receiver)).
 		Msg("Executing message...")
 
+	emptyCCIPCtx := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+		{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
+	}}}}
 	ccvElements := make([]*apiv2.Value, len(verifiers))
 	for i, ccvCid := range ccvContractIDs {
 		ccvElements[i] = &apiv2.Value{
 			Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 				{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvCid}},
 				{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(verifierResults[i])}}},
+				{Label: "ccvExtraContext", Value: emptyCCIPCtx},
 			}}},
 		}
 	}
