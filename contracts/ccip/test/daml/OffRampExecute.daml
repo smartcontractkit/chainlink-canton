@@ -73,6 +73,7 @@ testExecuteWithCCVVerification = script do
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = ccipOwner
+            customObservers = []
             cursedSubjects = []
 
     -- Deploy TokenAdminRegistry
@@ -223,6 +224,7 @@ testExecuteFailsMissingCCV = script do
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = ccipOwner
+            customObservers = []
             cursedSubjects = []
 
     -- Deploy TokenAdminRegistry
@@ -353,6 +355,7 @@ testExecuteWrongReceiver = script do
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = ccipOwner
+            customObservers = []
             cursedSubjects = []
 
     -- Deploy TokenAdminRegistry
