@@ -18,6 +18,7 @@ import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import CCIP.Tickets qualified as Tickets
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
+import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
 
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
@@ -72,7 +73,7 @@ testLockOrBurn = script do
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
             instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = "test-lock-release-pool"
             caller = poolOwner
@@ -263,7 +264,7 @@ testReleaseFromTicket = script do
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
             instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = "test-lock-release-pool"
             caller = poolOwner

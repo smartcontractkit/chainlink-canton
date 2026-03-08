@@ -34,6 +34,13 @@ type SharedTwoParticipantEnvironment struct {
 	RandomUser      string
 }
 
+// SharedTAREnvironment extends SharedCantonEnvironment with TokenAdminRegistry package.
+// Used for tests that interact with TokenAdminRegistry contracts.
+type SharedTAREnvironment struct {
+	SharedCantonEnvironment
+	TarPkgID string
+}
+
 var (
 	sharedEnv     *SharedCantonEnvironment
 	sharedEnvOnce sync.Once
@@ -42,6 +49,10 @@ var (
 	sharedTwoPartEnv     *SharedTwoParticipantEnvironment
 	sharedTwoPartEnvOnce sync.Once
 	errSharedTwoPartEnv  error
+
+	sharedTAREnv     *SharedTAREnvironment
+	sharedTAREnvOnce sync.Once
+	errSharedTAREnv  error
 )
 
 // GetSharedEnvironment initializes the shared test environment once and returns it.
@@ -73,7 +84,7 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 		}
 
 		mcmsPkgID := packageIDs[0]
-		signers := createSigners(t, 3)
+		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedEnv = &SharedCantonEnvironment{
@@ -122,7 +133,7 @@ func GetSharedTwoParticipantEnvironment(t *testing.T) *SharedTwoParticipantEnvir
 		}
 
 		mcmsPkgID := packageIDs[0]
-		signers := createSigners(t, 3)
+		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedTwoPartEnv = &SharedTwoParticipantEnvironment{
@@ -144,4 +155,72 @@ func GetSharedTwoParticipantEnvironment(t *testing.T) *SharedTwoParticipantEnvir
 	require.NotNil(t, sharedTwoPartEnv, "two-participant environment is nil")
 
 	return sharedTwoPartEnv
+}
+
+// GetSharedTAREnvironment initializes a shared environment with TokenAdminRegistry support.
+// Used by tests that interact with TokenAdminRegistry contracts.
+func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
+	t.Helper()
+
+	sharedTAREnvOnce.Do(func() {
+		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
+		participant := env.Chain.Participants[0]
+
+		mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
+		if err != nil {
+			errSharedTAREnv = err
+
+			return
+		}
+
+		commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
+		if err != nil {
+			errSharedTAREnv = err
+
+			return
+		}
+
+		tarDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
+		if err != nil {
+			errSharedTAREnv = err
+
+			return
+		}
+
+		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, commonDar, tarDar}, participant)
+		if err != nil {
+			errSharedTAREnv = err
+
+			return
+		}
+
+		if len(packageIDs) < 3 {
+			errSharedTAREnv = err
+
+			return
+		}
+
+		mcmsPkgID := packageIDs[0]
+		tarPkgID := packageIDs[len(packageIDs)-1]
+		signers := createSigners(t)
+		sortedSigners := SortSignersByAddress(signers)
+
+		sharedTAREnv = &SharedTAREnvironment{
+			SharedCantonEnvironment: SharedCantonEnvironment{
+				Participant:   participant,
+				McmsPkgID:     mcmsPkgID,
+				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
+				CcipOwner:     participant.PartyID,
+				Signers:       signers,
+				SortedSigners: sortedSigners,
+				Config:        New2of3Config(signers),
+			},
+			TarPkgID: tarPkgID,
+		}
+	})
+
+	require.NoError(t, errSharedTAREnv, "failed to initialize TAR environment")
+	require.NotNil(t, sharedTAREnv, "TAR environment is nil")
+
+	return sharedTAREnv
 }

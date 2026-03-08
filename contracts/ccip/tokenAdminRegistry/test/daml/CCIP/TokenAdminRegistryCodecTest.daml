@@ -1,0 +1,209 @@
+-- | Round-trip tests for TokenAdminRegistry codec functions
+module CCIP.TokenAdminRegistryCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import qualified Splice.Api.Token.HoldingV1
+import CCIP.TokenAdminRegistryCodec
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..))
+
+-- ===========================================================================
+-- TEXT ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testTextRoundtrip : Script ()
+testTextRoundtrip = do
+  -- Empty string
+  let emptyText = ""
+      encodedEmpty = encodeText emptyText
+  case decodeTextAt encodedEmpty 0 of
+    None -> abort "Failed to decode empty text"
+    Some (decoded, _) -> decoded === emptyText
+
+  -- Normal text
+  let normalText = "hello-world"
+      encodedNormal = encodeText normalText
+  case decodeTextAt encodedNormal 0 of
+    None -> abort "Failed to decode normal text"
+    Some (decoded, _) -> decoded === normalText
+
+  -- Text with special chars
+  let specialText = "pool-instance-123"
+      encodedSpecial = encodeText specialText
+  case decodeTextAt encodedSpecial 0 of
+    None -> abort "Failed to decode special text"
+    Some (decoded, _) -> decoded === specialText
+
+  pure ()
+
+-- ===========================================================================
+-- POOL REGISTRATION ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testPoolRegistrationRoundtrip : Script ()
+testPoolRegistrationRoundtrip = do
+  alice <- allocateParty "Alice"
+
+  let poolReg = PoolRegistration with
+        poolOwner = alice
+        poolInstanceId = "pool-instance-v1"
+
+      encoded = encodePoolRegistration poolReg
+
+  case decodePoolRegistrationAt encoded 0 of
+    None -> abort "Failed to decode PoolRegistration"
+    Some (decoded, _) -> do
+      decoded.poolOwner === poolReg.poolOwner
+      decoded.poolInstanceId === poolReg.poolInstanceId
+
+  pure ()
+
+testPoolRegistrationEmptyInstanceId : Script ()
+testPoolRegistrationEmptyInstanceId = do
+  alice <- allocateParty "Alice"
+
+  let poolReg = PoolRegistration with
+        poolOwner = alice
+        poolInstanceId = ""
+
+      encoded = encodePoolRegistration poolReg
+
+  case decodePoolRegistrationAt encoded 0 of
+    None -> abort "Failed to decode PoolRegistration with empty instanceId"
+    Some (decoded, _) -> do
+      decoded.poolOwner === poolReg.poolOwner
+      decoded.poolInstanceId === ""
+
+  pure ()
+
+-- ===========================================================================
+-- SET_POOL PARAMS TESTS
+-- ===========================================================================
+
+testSetPoolParamsWithPool : Script ()
+testSetPoolParamsWithPool = do
+  alice <- allocateParty "Alice"
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      poolReg = PoolRegistration with
+        poolOwner = alice
+        poolInstanceId = "lock-release-pool-v1"
+
+      encoded = encodeSetPoolParams instrumentId (Some poolReg)
+
+  case decodeSetPoolParams encoded of
+    None -> abort "Failed to decode set_pool params with pool"
+    Some (decodedInstrumentId, decodedPool) -> do
+      decodedInstrumentId === instrumentId
+      case decodedPool of
+        None -> abort "Expected Some pool, got None"
+        Some p -> do
+          p.poolOwner === poolReg.poolOwner
+          p.poolInstanceId === poolReg.poolInstanceId
+
+  pure ()
+
+testSetPoolParamsNoPool : Script ()
+testSetPoolParamsNoPool = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      encoded = encodeSetPoolParams instrumentId None
+
+  case decodeSetPoolParams encoded of
+    None -> abort "Failed to decode set_pool params without pool"
+    Some (decodedInstrumentId, decodedPool) -> do
+      decodedInstrumentId === instrumentId
+      decodedPool === None
+
+  pure ()
+
+-- ===========================================================================
+-- PROPOSE_ADMINISTRATOR PARAMS TESTS
+-- ===========================================================================
+
+testProposeAdminParamsRoundtrip : Script ()
+testProposeAdminParamsRoundtrip = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+  newAdmin <- allocateParty "NewAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
+      encoded = encodeProposeAdminParams instrumentId newAdmin
+
+  case decodeProposeAdminParams encoded of
+    None -> abort "Failed to decode propose_admin params"
+    Some (decodedInstrumentId, decodedAdmin) -> do
+      decodedInstrumentId === instrumentId
+      decodedAdmin === newAdmin
+
+  pure ()
+
+-- ===========================================================================
+-- TRANSFER_ADMIN_ROLE PARAMS TESTS
+-- ===========================================================================
+
+testTransferAdminParamsRoundtrip : Script ()
+testTransferAdminParamsRoundtrip = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+  newAdmin <- allocateParty "NewAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
+      encoded = encodeTransferAdminParams instrumentId newAdmin
+
+  case decodeTransferAdminParams encoded of
+    None -> abort "Failed to decode transfer_admin params"
+    Some (decodedInstrumentId, decodedAdmin) -> do
+      decodedInstrumentId === instrumentId
+      decodedAdmin === newAdmin
+
+  pure ()
+
+-- ===========================================================================
+-- ACCEPT_ADMIN_ROLE PARAMS TESTS
+-- ===========================================================================
+
+testAcceptAdminParamsRoundtrip : Script ()
+testAcceptAdminParamsRoundtrip = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
+      encoded = encodeAcceptAdminParams instrumentId
+
+  case decodeAcceptAdminParams encoded of
+    None -> abort "Failed to decode accept_admin params"
+    Some decodedInstrumentId ->
+      decodedInstrumentId === instrumentId
+
+  pure ()
+
+-- ===========================================================================
+-- INVALID DATA REJECTION TESTS
+-- ===========================================================================
+
+testInvalidDataRejection : Script ()
+testInvalidDataRejection = do
+  -- Empty data should fail
+  case decodeSetPoolParams "" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeSetPoolParams to fail on empty data"
+
+  -- Truncated data should fail
+  case decodeSetPoolParams "00" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeSetPoolParams to fail on truncated data"
+
+  -- Invalid bool value should fail (neither 00 nor 01)
+  -- First need valid instrumentId, then invalid bool
+  tokenAdmin <- allocateParty "TokenAdmin"
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "T"
+      validInstrumentIdEncoded = encodeAcceptAdminParams instrumentId
+      -- Append invalid bool (02 instead of 00 or 01)
+      invalidData = validInstrumentIdEncoded <> "02"
+
+  case decodeSetPoolParams invalidData of
+    None -> pure ()  -- Expected - should fail on invalid bool
+    Some _ -> abort "Expected decodeSetPoolParams to fail on invalid bool"
+
+  pure ()

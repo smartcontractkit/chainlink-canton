@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "1766b3daaf5a70e76138bba6007aa0e3a7fc34bf7dadb11b955107fa984dbd77"
+	PackageID   = "188c5e85c545d8281c0df330cf0ba87be297beafdad83f3fe1236c165f4bfbc3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -181,23 +182,65 @@ func (t *TokenAdminRegistry) UnmarshalHex(data string) error {
 
 // Choice methods for TokenAdminRegistry
 
-// TokenAdminRegistryGetTokenConfig exercises the TokenAdminRegistry_GetTokenConfig choice on this TokenAdminRegistry contract
+// TokenAdminRegistryConsumeReceiveTicket exercises the TokenAdminRegistry_ConsumeReceiveTicket choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
+func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_GetTokenConfig",
+		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// TokenAdminRegistryGetTokenConfigWithPackageID exercises the TokenAdminRegistry_GetTokenConfig choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfigWithPackageID(contractID string, packageID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
+// TokenAdminRegistryConsumeReceiveTicketWithPackageID exercises the TokenAdminRegistry_ConsumeReceiveTicket choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_GetTokenConfig",
+		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetOutboundPoolCCVs exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVs(contractID string, args TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetOutboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetInboundPoolCCVs exercises the TokenAdminRegistry_SetInboundPoolCCVs choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetInboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetInboundPoolCCVs choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -265,27 +308,6 @@ func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRoleWithPackageID(con
 	}
 }
 
-// TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IsAdministrator",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IsAdministrator",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // TokenAdminRegistryProposeAdministrator exercises the TokenAdminRegistry_ProposeAdministrator choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID string, args TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
@@ -303,69 +325,6 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ProposeAdministrator",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryIssueReceiveTicket exercises the TokenAdminRegistry_IssueReceiveTicket choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicket(contractID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryIssueReceiveTicketWithPackageID exercises the TokenAdminRegistry_IssueReceiveTicket choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryConsumeReceiveTicket exercises the TokenAdminRegistry_ConsumeReceiveTicket choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryConsumeReceiveTicketWithPackageID exercises the TokenAdminRegistry_ConsumeReceiveTicket choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistrySetOutboundPoolCCVs exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVs(contractID string, args TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistrySetOutboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -391,26 +350,114 @@ func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID st
 	}
 }
 
-// TokenAdminRegistrySetInboundPoolCCVs exercises the TokenAdminRegistry_SetInboundPoolCCVs choice on this TokenAdminRegistry contract
+// TokenAdminRegistryGetTokenConfig exercises the TokenAdminRegistry_GetTokenConfig choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Choice:     "TokenAdminRegistry_GetTokenConfig",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// TokenAdminRegistrySetInboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetInboundPoolCCVs choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+// TokenAdminRegistryGetTokenConfigWithPackageID exercises the TokenAdminRegistry_GetTokenConfig choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfigWithPackageID(contractID string, packageID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Choice:     "TokenAdminRegistry_GetTokenConfig",
 		Arguments:  argsToMap(args),
 	}
 }
+
+// TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryIssueReceiveTicket exercises the TokenAdminRegistry_IssueReceiveTicket choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicket(contractID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryIssueReceiveTicketWithPackageID exercises the TokenAdminRegistry_IssueReceiveTicket choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for TokenAdminRegistry
+
+var _ mcms.IMCMSReceiver = (*TokenAdminRegistry)(nil)
 
 // TokenAdminRegistryAcceptAdminRole is a Record type
 type TokenAdminRegistryAcceptAdminRole struct {

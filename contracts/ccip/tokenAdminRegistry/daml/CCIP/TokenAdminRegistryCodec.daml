@@ -1,0 +1,96 @@
+-- | Codec module for TokenAdminRegistry MCMS parameter encoding/decoding
+-- Used by the MCMSReceiver interface implementation to decode operationData
+module CCIP.TokenAdminRegistryCodec
+  ( decodeSetPoolParams
+  , decodeProposeAdminParams
+  , decodeTransferAdminParams
+  , decodeAcceptAdminParams
+  , encodeSetPoolParams
+  , encodeProposeAdminParams
+  , encodeTransferAdminParams
+  , encodeAcceptAdminParams
+  , encodePoolRegistration
+  , decodePoolRegistrationAt
+  , encodeText
+  , decodeTextAt
+  ) where
+
+import CCIP.MCMSCodecUtils
+  ( encodeText
+  , decodeTextAt
+  , encodeParty
+  , decodePartyAt
+  , encodeInstrumentId
+  , decodeInstrumentId
+  , decodeBoolAt
+  )
+
+import DA.Crypto.Text (BytesHex)
+import qualified Splice.Api.Token.HoldingV1
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..))
+
+-- ===========================================================================
+-- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
+-- ===========================================================================
+
+decodeSetPoolParams : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Optional PoolRegistration)
+decodeSetPoolParams encoded = do
+  (instrumentId, offset1) <- decodeInstrumentId encoded 0
+  (hasPool, offset2) <- decodeBoolAt encoded offset1
+  if hasPool
+    then do
+      (poolReg, _) <- decodePoolRegistrationAt encoded offset2
+      Some (instrumentId, Some poolReg)
+    else Some (instrumentId, None)
+
+decodeProposeAdminParams : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Party)
+decodeProposeAdminParams encoded = do
+  (instrumentId, offset1) <- decodeInstrumentId encoded 0
+  (admin, _) <- decodePartyAt encoded offset1
+  Some (instrumentId, admin)
+
+decodeTransferAdminParams : BytesHex -> Optional (Splice.Api.Token.HoldingV1.InstrumentId, Party)
+decodeTransferAdminParams = decodeProposeAdminParams
+
+decodeAcceptAdminParams : BytesHex -> Optional Splice.Api.Token.HoldingV1.InstrumentId
+decodeAcceptAdminParams encoded = do
+  (instrumentId, _) <- decodeInstrumentId encoded 0
+  Some instrumentId
+
+-- ===========================================================================
+-- ENCODE FUNCTIONS (for tests and Go integration)
+-- ===========================================================================
+
+encodeSetPoolParams : Splice.Api.Token.HoldingV1.InstrumentId -> Optional PoolRegistration -> BytesHex
+encodeSetPoolParams instrumentId optPoolReg =
+  let
+    instrumentIdEncoded = encodeInstrumentId instrumentId
+  in
+    case optPoolReg of
+      None -> instrumentIdEncoded <> "00"
+      Some poolReg -> instrumentIdEncoded <> "01" <> encodePoolRegistration poolReg
+
+encodeProposeAdminParams : Splice.Api.Token.HoldingV1.InstrumentId -> Party -> BytesHex
+encodeProposeAdminParams instrumentId newAdmin =
+  encodeInstrumentId instrumentId <> encodeParty newAdmin
+
+encodeTransferAdminParams : Splice.Api.Token.HoldingV1.InstrumentId -> Party -> BytesHex
+encodeTransferAdminParams = encodeProposeAdminParams
+
+encodeAcceptAdminParams : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
+encodeAcceptAdminParams = encodeInstrumentId
+
+-- ===========================================================================
+-- POOL REGISTRATION ENCODING/DECODING
+-- Format: [party][text]
+-- ===========================================================================
+
+encodePoolRegistration : PoolRegistration -> BytesHex
+encodePoolRegistration pr =
+  encodeParty pr.poolOwner <> encodeText pr.poolInstanceId
+
+decodePoolRegistrationAt : BytesHex -> Int -> Optional (PoolRegistration, Int)
+decodePoolRegistrationAt encoded offset = do
+  (poolOwner, offset1) <- decodePartyAt encoded offset
+  (poolInstanceId, offset2) <- decodeTextAt encoded offset1
+  Some (PoolRegistration poolOwner poolInstanceId, offset2)
