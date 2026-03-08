@@ -193,6 +193,15 @@ template TokenAdminRegistry
             do
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
+                -- Trust model: TAR is currently a concrete trusted internal
+                -- dependency chosen by `owner`/`ccipOwner`, not an adversarial
+                -- extension point. That is why this code relies on TAR's own
+                -- tokenConfigs plus the message-carried TAR snapshot before
+                -- mutating SendingMessageV1 under TAR's authority.
+                -- TODO: investigate whether we can/should ever have a TAR
+                -- interface with this code here. If TAR becomes interface-backed,
+                -- re-check whether these mapping reads and snapshot checks are
+                -- still the right trust boundary.
                 assertMsg "TAR outbound: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
@@ -227,6 +236,10 @@ template TokenAdminRegistry
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+                -- Same trust model as outbound: this is written for concrete TAR
+                -- implementations today, and assumes the TAR selected by
+                -- `owner`/`ccipOwner` is honest about its mappings and preserves
+                -- the snapshot-checking invariants before updating the message.
                 assertMsg "TAR: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR: instance address mismatch"
                     instanceId owner execMsg.deps.tokenAdminRegistry
