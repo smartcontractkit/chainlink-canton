@@ -142,16 +142,22 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy FeeQuoter: %w", err)
 		}
 		addresses = append(addresses, deployFeeQuoterReport.Output)
+		feeQuoterRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployFeeQuoterReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse FeeQuoter raw instance address: %w", err)
+		}
 
 		// Deploy OffRamp
 		deployOffRampReport, err := operations.ExecuteOperation(b, offramp.Deploy, deps, contract.DeployInput[offrampBinding.OffRamp]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
 			Template: offrampBinding.OffRamp{
-				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
-				GlobalConfigInstanceAddress:       globalConfigRawInstanceAddress.Binding(),
-				RmnRemoteInstanceAddress:          rmnRemoteRawInstanceAddress.Binding(),
-				TokenAdminRegistryInstanceAddress: tokenAdminRegistryRawInstanceAddress.Binding(),
+				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				Deps: offrampBinding.OffRampDeps{
+					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
+					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
+					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
+				},
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -159,16 +165,24 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OffRamp: %w", err)
 		}
 		addresses = append(addresses, deployOffRampReport.Output)
+		offRampRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployOffRampReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse OffRamp raw instance address: %w", err)
+		}
 
 		// Deploy OnRamp
 		deployOnRampReport, err := operations.ExecuteOperation(b, onramp.Deploy, deps, contract.DeployInput[onrampBinding.OnRamp]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
 			Template: onrampBinding.OnRamp{
-				CcipOwner:                         types.PARTY(input.CCIPOwnerParty),
-				GlobalConfigInstanceAddress:       globalConfigRawInstanceAddress.Binding(),
-				RmnRemoteInstanceAddress:          rmnRemoteRawInstanceAddress.Binding(),
-				TokenAdminRegistryInstanceAddress: tokenAdminRegistryRawInstanceAddress.Binding(),
+				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				Deps: onrampBinding.OnRampDeps{
+					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
+					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
+					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
+					FeeQuoter:         feeQuoterRawInstanceAddress.Binding(),
+					CcvRegistry:       common.RawInstanceAddress{},
+				},
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
 		})
@@ -176,13 +190,25 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy OnRamp: %w", err)
 		}
 		addresses = append(addresses, deployOnRampReport.Output)
+		onRampRawInstanceAddress, err := contracts.RawInstanceAddressFromString(deployOnRampReport.Output.Labels.List()[0])
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to parse OnRamp raw instance address: %w", err)
+		}
 
 		// Deploy PerPartyRouterFactory
 		deployPerPartyRouterFactoryReport, err := operations.ExecuteOperation(b, per_party_router_factory.Deploy, deps, contract.DeployInput[perpartyrouter.PerPartyRouterFactory]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
 			Template: perpartyrouter.PerPartyRouterFactory{
-				CcipOwner:         types.PARTY(input.CCIPOwnerParty),
+				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				Deps: perpartyrouter.PerPartyRouterDeps{
+					OnRamp:             onRampRawInstanceAddress.Binding(),
+					OffRamp:            offRampRawInstanceAddress.Binding(),
+					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
+					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
+					FeeQuoter:          feeQuoterRawInstanceAddress.Binding(),
+					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
+				},
 				RegisteredRouters: nil,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
@@ -205,7 +231,9 @@ var DeployChainContracts = operations.NewSequence(
 					MessageSentObserver:      committeeVerifier.Template.MessageSentObserver,
 					StorageLocation:          committeeVerifier.Template.StorageLocation,
 					SignerConfigs:            committeeVerifier.Template.SignerConfigs,
-					RmnRemoteInstanceAddress: rmnRemoteRawInstanceAddress.Binding(),
+					Deps: ccvs.CommitteeVerifierDeps{
+						RmnRemote: rmnRemoteRawInstanceAddress.Binding(),
+					},
 					RemoteChainFeeConfigs:    committeeVerifier.Template.RemoteChainFeeConfigs,
 				},
 				OwnerParty: committeeVerifier.Template.Owner,
