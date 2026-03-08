@@ -42,13 +42,14 @@ data TransferTimeout
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
 
--- | Per-chain CCV requirements for the pool.
--- This partially matches the EVM pattern in AdvancedPoolHooks.sol which is primarily based on chain selector:
+-- | Per-chain pool configuration combining CCV requirements and allowed remote pools.
+-- Matches the EVM pattern where RemoteChainConfig holds both remote pools and CCV config:
 -- https://github.com/smartcontractkit/chainlink-ccip/blob/afc2e9e58c953fbdeee724ac5fae021155ca6325/chains/evm/contracts/pools/AdvancedPoolHooks.sol#L235
-data ChainCCVConfig = ChainCCVConfig
+data ChainPoolConfig = ChainPoolConfig
     with
         inboundCCVs : [RawInstanceAddress]   -- Required CCVs for incoming transfers
         outboundCCVs : [RawInstanceAddress]  -- Required CCVs for outgoing transfers
+        remotePools : [BytesHex]             -- Allowed remote pool addresses for this chain
     deriving (Eq, Show)
 
 -- | Per-chain fee config for outbound pool fee calculation.
@@ -89,8 +90,8 @@ template LockReleaseTokenPool
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
-        -- CCV requirements per remote chain selector
-        chainCCVRequirements : Map.Map (Numeric 0) ChainCCVConfig
+        -- Per-chain pool config: CCV requirements and allowed remote pools
+        chainPoolConfigs : Map.Map (Numeric 0) ChainPoolConfig
         -- Fee config per remote chain selector
         chainFeeConfigs : Map.Map (Numeric 0) PoolFeeConfig
         -- Destination token address per remote chain, matching EVM's getRemoteToken()
@@ -122,8 +123,8 @@ template LockReleaseTokenPool
                         direction = arg.direction
                         caller = arg.caller
 
-            tokenPool_verifyInboundCCVsImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyInboundCCVs
+            tokenPool_verifyInboundMessageImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyInboundMessage
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         extraContext = arg.extraContext
@@ -177,17 +178,18 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
-                case Map.lookup remoteChainSelector chainCCVRequirements of
+                case Map.lookup remoteChainSelector chainPoolConfigs of
                     None -> pure []
                     Some config -> case direction of
                         CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
 
-        -- Declare inbound CCV requirements on ExecutingMessageV1 via TAR.
+        -- Validate inbound token transfer message and record pool CCV requirements.
         -- Validates that the message has a token transfer targeting this pool's instrument,
+        -- validates the source pool address against the allowed remote pools for the source chain,
         -- looks up per-chain CCV requirements, and records them on the executing message.
         -- OffRamp performs the actual CCV coverage check.
-        nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+        nonconsuming choice LockReleaseTokenPool_VerifyInboundMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 extraContext : CCIP.Context.CCIPContext
@@ -206,15 +208,18 @@ template LockReleaseTokenPool
                 assertMsg "pool: destTokenAddress does not match pool instrumentId"
                     (tt.destTokenAddress == expectedAddr)
 
-                let requiredAddrs = case Map.lookup message.sourceChainSelector chainCCVRequirements of
-                        None -> []
-                        Some config -> config.inboundCCVs
+                chainCfg <- case Map.lookup message.sourceChainSelector chainPoolConfigs of
+                    None -> abort "pool: unsupported source chain"
+                    Some cfg -> pure cfg
+
+                assertMsg "pool: invalid sourcePoolAddress"
+                    (tt.sourcePoolAddress `elem` chainCfg.remotePools)
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_SetInboundPoolCCVs with
                         executingMessageCid
                         poolInstanceId = instanceId
-                        poolCCVs = requiredAddrs
+                        poolCCVs = chainCfg.inboundCCVs
                         caller = poolOwner
 
         -- Declare outbound CCV requirements on SendingMessageV1 via TAR.
@@ -231,7 +236,7 @@ template LockReleaseTokenPool
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
 
-                let poolCCVs = case Map.lookup sm.destChainSelector chainCCVRequirements of
+                let poolCCVs = case Map.lookup sm.destChainSelector chainPoolConfigs of
                         None -> []
                         Some cfg -> cfg.outboundCCVs
 
@@ -315,13 +320,13 @@ template LockReleaseTokenPool
                             poolChangeCids = transferResult.senderChangeCids
                     _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
-        -- Update chain CCV requirements.
-        choice LockReleaseTokenPool_UpdateChainCCVRequirements : ContractId LockReleaseTokenPool
+        -- Update per-chain pool configuration (CCV requirements and remote pools).
+        choice LockReleaseTokenPool_UpdateChainPoolConfigs : ContractId LockReleaseTokenPool
             with
-                newChainCCVRequirements : Map.Map (Numeric 0) ChainCCVConfig
+                newChainPoolConfigs : Map.Map (Numeric 0) ChainPoolConfig
             controller poolOwner
             do
-                create this with chainCCVRequirements = newChainCCVRequirements
+                create this with chainPoolConfigs = newChainPoolConfigs
 
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain

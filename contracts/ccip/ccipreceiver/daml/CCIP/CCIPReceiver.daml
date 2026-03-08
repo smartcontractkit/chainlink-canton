@@ -120,7 +120,7 @@ template CCIPReceiver
                 emCid <- case tokenTransfer of
                     None -> pure emCid
                     Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundCCVs with
+                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
                             tokenAdminRegistryCid = tokenAdminRegistryCid
                             extraContext = tt.poolExtraContext
                             executingMessageCid = emCid
