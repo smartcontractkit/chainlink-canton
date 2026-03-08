@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "0eddb87899e6521d1dc53e55b8b6417cebff781d4e16f755990e2584ddfaa9d1"
+	PackageID   = "57e322caa489744d1bb724ad5250d29651d879d4b57f7687f94f90a1ac749739"
 	SDKVersion  = "3.4.10"
 )
 
@@ -307,27 +307,6 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(
 	}
 }
 
-// TokenAdminRegistryIssueReceiveTicket exercises the TokenAdminRegistry_IssueReceiveTicket choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicket(contractID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryIssueReceiveTicketWithPackageID exercises the TokenAdminRegistry_IssueReceiveTicket choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryIssueReceiveTicketWithPackageID(contractID string, packageID string, args TokenAdminRegistryIssueReceiveTicket) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IssueReceiveTicket",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // TokenAdminRegistryConsumeReceiveTicket exercises the TokenAdminRegistry_ConsumeReceiveTicket choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID string, args TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
@@ -370,6 +349,27 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(c
 	}
 }
 
+// TokenAdminRegistrySetInboundPoolCCVs exercises the TokenAdminRegistry_SetInboundPoolCCVs choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetInboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetInboundPoolCCVs choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Archive exercises the Archive choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
@@ -391,23 +391,23 @@ func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID st
 	}
 }
 
-// TokenAdminRegistrySetInboundPoolCCVs exercises the TokenAdminRegistry_SetInboundPoolCCVs choice on this TokenAdminRegistry contract
+// TokenAdminRegistryFinalizeExecute exercises the TokenAdminRegistry_FinalizeExecute choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+func (t TokenAdminRegistry) TokenAdminRegistryFinalizeExecute(contractID string, args TokenAdminRegistryFinalizeExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Choice:     "TokenAdminRegistry_FinalizeExecute",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// TokenAdminRegistrySetInboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetInboundPoolCCVs choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVsWithPackageID(contractID string, packageID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
+// TokenAdminRegistryFinalizeExecuteWithPackageID exercises the TokenAdminRegistry_FinalizeExecute choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryFinalizeExecuteWithPackageID(contractID string, packageID string, args TokenAdminRegistryFinalizeExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
+		Choice:     "TokenAdminRegistry_FinalizeExecute",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -548,6 +548,77 @@ func (t *TokenAdminRegistryConsumeReceiveTicketMCMSParams) UnmarshalHex(data str
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TokenAdminRegistryFinalizeExecute is a Record type
+type TokenAdminRegistryFinalizeExecute struct {
+	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
+	TicketReceiver      types.PARTY       `json:"ticketReceiver"`
+	ReturnData          types.TEXT        `json:"returnData"`
+	Caller              types.PARTY       `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistryFinalizeExecute to a map for DAML arguments
+func (t TokenAdminRegistryFinalizeExecute) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["executingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutingMessageCid
+	}()
+
+	m["ticketReceiver"] = t.TicketReceiver.ToMap()
+
+	m["returnData"] = string(t.ReturnData)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistryFinalizeExecute) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistryFinalizeExecute) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryFinalizeExecute to hex string (Canton MCMS format)
+func (t TokenAdminRegistryFinalizeExecute) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryFinalizeExecute from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryFinalizeExecute) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenAdminRegistryFinalizeExecuteMCMSParams is TokenAdminRegistryFinalizeExecute without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type TokenAdminRegistryFinalizeExecuteMCMSParams struct {
+	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
+	TicketReceiver      types.PARTY       `json:"ticketReceiver"`
+	ReturnData          types.TEXT        `json:"returnData"`
+}
+
+// MarshalHex encodes TokenAdminRegistryFinalizeExecuteMCMSParams to hex string for MCMS operationData.
+func (t TokenAdminRegistryFinalizeExecuteMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryFinalizeExecuteMCMSParams from hex string.
+func (t *TokenAdminRegistryFinalizeExecuteMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryGetTokenConfig is a Record type
 type TokenAdminRegistryGetTokenConfig struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
@@ -674,66 +745,6 @@ func (t TokenAdminRegistryIsAdministratorMCMSParams) MarshalHex() (string, error
 
 // UnmarshalHex decodes TokenAdminRegistryIsAdministratorMCMSParams from hex string.
 func (t *TokenAdminRegistryIsAdministratorMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// TokenAdminRegistryIssueReceiveTicket is a Record type
-type TokenAdminRegistryIssueReceiveTicket struct {
-	InstrumentId        splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	PoolOwner           types.PARTY                              `json:"poolOwner"`
-	Receiver            types.PARTY                              `json:"receiver"`
-	TokenReceiver       types.PARTY                              `json:"tokenReceiver"`
-	Amount              types.NUMERIC                            `json:"amount"`
-	MessageHash         types.TEXT                               `json:"messageHash"`
-	SourceChainSelector types.NUMERIC                            `json:"sourceChainSelector"`
-}
-
-// ToMap converts TokenAdminRegistryIssueReceiveTicket to a map for DAML arguments
-func (t TokenAdminRegistryIssueReceiveTicket) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["instrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.InstrumentId
-	}()
-
-	m["poolOwner"] = t.PoolOwner.ToMap()
-
-	m["receiver"] = t.Receiver.ToMap()
-
-	m["tokenReceiver"] = t.TokenReceiver.ToMap()
-
-	m["amount"] = t.Amount
-
-	m["messageHash"] = string(t.MessageHash)
-
-	m["sourceChainSelector"] = t.SourceChainSelector
-
-	return m
-}
-
-func (t TokenAdminRegistryIssueReceiveTicket) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes TokenAdminRegistryIssueReceiveTicket to hex string (Canton MCMS format)
-func (t TokenAdminRegistryIssueReceiveTicket) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenAdminRegistryIssueReceiveTicket from hex string (Canton MCMS format)
-func (t *TokenAdminRegistryIssueReceiveTicket) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1188,11 +1199,12 @@ type MCMSEncoder interface {
 	TokenAdminRegistryAcceptAdminRoleMCMSParams(args TokenAdminRegistryAcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryConsumeReceiveTicket(args TokenAdminRegistryConsumeReceiveTicket) (*bind.EncodedChoice, error)
 	TokenAdminRegistryConsumeReceiveTicketMCMSParams(args TokenAdminRegistryConsumeReceiveTicketMCMSParams) (*bind.EncodedChoice, error)
+	TokenAdminRegistryFinalizeExecute(args TokenAdminRegistryFinalizeExecute) (*bind.EncodedChoice, error)
+	TokenAdminRegistryFinalizeExecuteMCMSParams(args TokenAdminRegistryFinalizeExecuteMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryGetTokenConfig(args TokenAdminRegistryGetTokenConfig) (*bind.EncodedChoice, error)
 	TokenAdminRegistryGetTokenConfigMCMSParams(args TokenAdminRegistryGetTokenConfigMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryIsAdministrator(args TokenAdminRegistryIsAdministrator) (*bind.EncodedChoice, error)
 	TokenAdminRegistryIsAdministratorMCMSParams(args TokenAdminRegistryIsAdministratorMCMSParams) (*bind.EncodedChoice, error)
-	TokenAdminRegistryIssueReceiveTicket(args TokenAdminRegistryIssueReceiveTicket) (*bind.EncodedChoice, error)
 	TokenAdminRegistryProposeAdministrator(args TokenAdminRegistryProposeAdministrator) (*bind.EncodedChoice, error)
 	TokenAdminRegistryProposeAdministratorMCMSParams(args TokenAdminRegistryProposeAdministratorMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistrySetInboundPoolCCVs(args TokenAdminRegistrySetInboundPoolCCVs) (*bind.EncodedChoice, error)
@@ -1252,6 +1264,16 @@ func (e *encoder) TokenAdminRegistryConsumeReceiveTicketMCMSParams(args TokenAdm
 	return e.EncodeChoiceArgs("TokenAdminRegistryConsumeReceiveTicket", args)
 }
 
+// TokenAdminRegistryFinalizeExecute encodes parameters for the TokenAdminRegistryFinalizeExecute choice.
+func (e *encoder) TokenAdminRegistryFinalizeExecute(args TokenAdminRegistryFinalizeExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("TokenAdminRegistryFinalizeExecute", args)
+}
+
+// TokenAdminRegistryFinalizeExecuteMCMSParams encodes MCMS parameters (without Caller) for the TokenAdminRegistryFinalizeExecute choice.
+func (e *encoder) TokenAdminRegistryFinalizeExecuteMCMSParams(args TokenAdminRegistryFinalizeExecuteMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("TokenAdminRegistryFinalizeExecute", args)
+}
+
 // TokenAdminRegistryGetTokenConfig encodes parameters for the TokenAdminRegistryGetTokenConfig choice.
 func (e *encoder) TokenAdminRegistryGetTokenConfig(args TokenAdminRegistryGetTokenConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TokenAdminRegistryGetTokenConfig", args)
@@ -1270,11 +1292,6 @@ func (e *encoder) TokenAdminRegistryIsAdministrator(args TokenAdminRegistryIsAdm
 // TokenAdminRegistryIsAdministratorMCMSParams encodes MCMS parameters (without Caller) for the TokenAdminRegistryIsAdministrator choice.
 func (e *encoder) TokenAdminRegistryIsAdministratorMCMSParams(args TokenAdminRegistryIsAdministratorMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("TokenAdminRegistryIsAdministrator", args)
-}
-
-// TokenAdminRegistryIssueReceiveTicket encodes parameters for the TokenAdminRegistryIssueReceiveTicket choice.
-func (e *encoder) TokenAdminRegistryIssueReceiveTicket(args TokenAdminRegistryIssueReceiveTicket) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("TokenAdminRegistryIssueReceiveTicket", args)
 }
 
 // TokenAdminRegistryProposeAdministrator encodes parameters for the TokenAdminRegistryProposeAdministrator choice.
