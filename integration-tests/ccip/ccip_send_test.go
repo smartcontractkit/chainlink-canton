@@ -560,9 +560,10 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}
 
-	ccvSendInput := ccipsender.CCVSendInput{
-		CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-		VerifierArgs:    types.TEXT(""),
+	ccvArg := ccipsender.CantonCCVArgV1{
+		CcvCid:        types.CONTRACT_ID(disclosedCCV.ContractId),
+		CcvRawAddress: committeeVerifierRawAddr.Binding(),
+		CcvArgs:       types.TEXT(""),
 		CcvExtraContext: common.CCIPContext{},
 	}
 
@@ -598,19 +599,24 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:             sendContext,
-		RouterCid:           types.CONTRACT_ID(routerCid),
-		ExecutorCid:         types.CONTRACT_ID(executorCid),
-		DestChainSelector:   types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:            types.TEXT(receiverHex),
-		Payload:             types.TEXT(testPayloadHex),
-		CcipReceiveGasLimit: types.INT64(100000),
-		SenderRequiredCCVs:  []common.RawInstanceAddress{},
+		Context:           sendContext,
+		RouterCid:         types.CONTRACT_ID(routerCid),
+		DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Receiver:          types.TEXT(receiverHex),
+		Payload:           types.TEXT(testPayloadHex),
+		ExtraArgs: ccipsender.CantonExtraArgsV1{
+			GasLimit:           types.INT64(100000),
+			BlockConfirmations: nil,
+			Ccvs:               []ccipsender.CantonCCVArgV1{ccvArg},
+			ExecutorCid:        types.CONTRACT_ID(executorCid),
+			ExecutorArgs:       nil,
+			TokenReceiver:      nil,
+			TokenArgs:          types.TEXT(""),
+		},
 		FeeToken:            feeTokenInstrumentId,
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer:       nil,
-		CcvSendInputs:       []ccipsender.CCVSendInput{ccvSendInput},
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)

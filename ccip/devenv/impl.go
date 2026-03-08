@@ -1034,8 +1034,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
-	senderRequiredCCVs := make([]common.RawInstanceAddress, 0, len(opts.CCVs))
+	ccvArgsV1 := make([]ccipsender.CantonCCVArgV1, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1080,15 +1079,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+		ccvArgsV1 = append(ccvArgsV1, ccipsender.CantonCCVArgV1{
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
-			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
+			CcvRawAddress:   rawAddr.Binding(),
+			CcvArgs:         types.TEXT(hex.EncodeToString(ccvItem.Args)),
 			CcvExtraContext: common.CCIPContext{},
 		})
-		if ccvSendInputs[len(ccvSendInputs)-1].CcvCid == "" {
+		if ccvArgsV1[len(ccvArgsV1)-1].CcvCid == "" {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("empty ccv contract ID for verifier address %s", verifierAddress.String())
 		}
-		senderRequiredCCVs = append(senderRequiredCCVs, rawAddr.Binding())
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
 		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
 		if len(fallbackVerifierDestAddress) == 0 {
@@ -1117,14 +1116,20 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:             sendContext,
-		RouterCid:           routerCID,
-		ExecutorCid:         executorCID,
-		DestChainSelector:   types.NUMERIC(fmt.Sprintf("%d", dest)),
-		Receiver:            types.TEXT(hex.EncodeToString(fields.Receiver)),
-		Payload:             types.TEXT(hex.EncodeToString(fields.Data)),
-		CcipReceiveGasLimit: types.INT64(opts.ExecutionGasLimit),
-		SenderRequiredCCVs:  senderRequiredCCVs,
+		Context:           sendContext,
+		RouterCid:         routerCID,
+		DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+		Receiver:          types.TEXT(hex.EncodeToString(fields.Receiver)),
+		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
+		ExtraArgs: ccipsender.CantonExtraArgsV1{
+			GasLimit:           types.INT64(opts.ExecutionGasLimit),
+			BlockConfirmations: nil,
+			Ccvs:               ccvArgsV1,
+			ExecutorCid:        executorCID,
+			ExecutorArgs:       nil,
+			TokenReceiver:      nil,
+			TokenArgs:          types.TEXT(""),
+		},
 		FeeToken:            feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
 			TransferFactory: routerCID,
@@ -1136,19 +1141,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 		FeeTokenHoldingCids: nil,
 		TokenTransfer:       nil,
-		CcvSendInputs:       ccvSendInputs,
 	}
 	sendArgsMap := sendArgs.ToMap()
-	// Some environments still run a legacy CCIPSender schema without ccvRawAddress in CCVSendInput.
-	// Build this field explicitly without ccvRawAddress for compatibility across schema versions.
-	ccvSendInputsArg := make([]any, 0, len(ccvSendInputs))
-	for _, input := range ccvSendInputs {
-		ccvSendInputsArg = append(ccvSendInputsArg, map[string]any{
-			"ccvCid":       input.CcvCid,
-			"verifierArgs": string(input.VerifierArgs),
-		})
-	}
-	sendArgsMap["ccvSendInputs"] = ccvSendInputsArg
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
 			"empty contract ID before send: ccipSender=%q router=%q executor=%q onRamp=%q globalConfig=%q tokenAdminRegistry=%q feeQuoter=%q rmnRemote=%q",

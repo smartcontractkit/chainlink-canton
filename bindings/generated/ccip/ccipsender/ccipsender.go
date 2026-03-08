@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "20fafd369eb71f49603d260f4516a890aab037a79f395a725f6723b9a8b48665"
+	PackageID   = "1d04c889ec1c8b08f99d2ccb68de5918226820edeb3f4449b6150b66ccc4f089"
 	SDKVersion  = "3.4.10"
 )
 
@@ -168,15 +168,16 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 	}
 }
 
-// CCVSendInput is a Record type
-type CCVSendInput struct {
-	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
-	VerifierArgs    types.TEXT         `json:"verifierArgs"`
-	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
+// CantonCCVArgV1 is a Record type
+type CantonCCVArgV1 struct {
+	CcvCid          types.CONTRACT_ID         `json:"ccvCid"`
+	CcvRawAddress   common.RawInstanceAddress `json:"ccvRawAddress"`
+	CcvArgs         types.TEXT                `json:"ccvArgs"`
+	CcvExtraContext common.CCIPContext        `json:"ccvExtraContext"`
 }
 
-// ToMap converts CCVSendInput to a map for DAML arguments
-func (t CCVSendInput) ToMap() map[string]any {
+// ToMap converts CantonCCVArgV1 to a map for DAML arguments
+func (t CantonCCVArgV1) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["ccvCid"] = func() any {
@@ -187,7 +188,15 @@ func (t CCVSendInput) ToMap() map[string]any {
 		return t.CcvCid
 	}()
 
-	m["verifierArgs"] = string(t.VerifierArgs)
+	m["ccvRawAddress"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcvRawAddress).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRawAddress
+	}()
+
+	m["ccvArgs"] = string(t.CcvArgs)
 
 	m["ccvExtraContext"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -200,24 +209,122 @@ func (t CCVSendInput) ToMap() map[string]any {
 	return m
 }
 
-func (t CCVSendInput) MarshalJSON() ([]byte, error) {
+func (t CantonCCVArgV1) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *CCVSendInput) UnmarshalJSON(data []byte) error {
+func (t *CantonCCVArgV1) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes CCVSendInput to hex string (Canton MCMS format)
-func (t CCVSendInput) MarshalHex() (string, error) {
+// MarshalHex encodes CantonCCVArgV1 to hex string (Canton MCMS format)
+func (t CantonCCVArgV1) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes CCVSendInput from hex string (Canton MCMS format)
-func (t *CCVSendInput) UnmarshalHex(data string) error {
+// UnmarshalHex decodes CantonCCVArgV1 from hex string (Canton MCMS format)
+func (t *CantonCCVArgV1) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CantonExtraArgsV1 is a Record type
+type CantonExtraArgsV1 struct {
+	GasLimit           types.INT64       `json:"gasLimit"`
+	BlockConfirmations *types.INT64      `json:"blockConfirmations" hex:"optional"`
+	Ccvs               []CantonCCVArgV1  `json:"ccvs"`
+	ExecutorCid        types.CONTRACT_ID `json:"executorCid"`
+	ExecutorArgs       *types.TEXT       `json:"executorArgs" hex:"optional"`
+	TokenReceiver      *types.TEXT       `json:"tokenReceiver" hex:"optional"`
+	TokenArgs          types.TEXT        `json:"tokenArgs"`
+}
+
+// ToMap converts CantonExtraArgsV1 to a map for DAML arguments
+func (t CantonExtraArgsV1) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["gasLimit"] = int64(t.GasLimit)
+
+	if t.BlockConfirmations != nil {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.BlockConfirmations),
+		}
+	} else {
+		m["blockConfirmations"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["ccvs"] = func() []any {
+		res := make([]any, 0, len(t.Ccvs))
+		for _, e := range t.Ccvs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["executorCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutorCid
+	}()
+
+	if t.ExecutorArgs != nil {
+		m["executorArgs"] = map[string]any{
+			"_type": "optional",
+			"value": string(*t.ExecutorArgs),
+		}
+	} else {
+		m["executorArgs"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenReceiver != nil {
+		m["tokenReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": string(*t.TokenReceiver),
+		}
+	} else {
+		m["tokenReceiver"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["tokenArgs"] = string(t.TokenArgs)
+
+	return m
+}
+
+func (t CantonExtraArgsV1) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CantonExtraArgsV1) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CantonExtraArgsV1 to hex string (Canton MCMS format)
+func (t CantonExtraArgsV1) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CantonExtraArgsV1 from hex string (Canton MCMS format)
+func (t *CantonExtraArgsV1) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -226,19 +333,14 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 type Send struct {
 	Context             common.CCIPContext                       `json:"context"`
 	RouterCid           types.CONTRACT_ID                        `json:"routerCid"`
-	ExecutorCid         types.CONTRACT_ID                        `json:"executorCid"`
 	DestChainSelector   types.NUMERIC                            `json:"destChainSelector"`
 	Receiver            types.TEXT                               `json:"receiver"`
 	Payload             types.TEXT                               `json:"payload"`
-	CcipReceiveGasLimit types.INT64                              `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                             `json:"blockConfirmations" hex:"optional"`
-	ExecutorArgs        *types.TEXT                              `json:"executorArgs" hex:"optional"`
-	SenderRequiredCCVs  []common.RawInstanceAddress              `json:"senderRequiredCCVs"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
 	FeeTokenInput       interfaces.TokenInput                    `json:"feeTokenInput"`
 	FeeTokenHoldingCids []types.CONTRACT_ID                      `json:"feeTokenHoldingCids"`
 	TokenTransfer       *TokenTransferInput                      `json:"tokenTransfer" hex:"optional"`
-	CcvSendInputs       []CCVSendInput                           `json:"ccvSendInputs"`
+	ExtraArgs           CantonExtraArgsV1                        `json:"extraArgs"`
 }
 
 // ToMap converts Send to a map for DAML arguments
@@ -261,56 +363,11 @@ func (t Send) ToMap() map[string]any {
 		return t.RouterCid
 	}()
 
-	m["executorCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutorCid
-	}()
-
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["receiver"] = string(t.Receiver)
 
 	m["payload"] = string(t.Payload)
-
-	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	if t.BlockConfirmations != nil {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-			"value": int64(*t.BlockConfirmations),
-		}
-	} else {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	if t.ExecutorArgs != nil {
-		m["executorArgs"] = map[string]any{
-			"_type": "optional",
-			"value": string(*t.ExecutorArgs),
-		}
-	} else {
-		m["executorArgs"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["senderRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.SenderRequiredCCVs))
-		for _, e := range t.SenderRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
 
 	m["feeToken"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -347,17 +404,12 @@ func (t Send) ToMap() map[string]any {
 		}
 	}
 
-	m["ccvSendInputs"] = func() []any {
-		res := make([]any, 0, len(t.CcvSendInputs))
-		for _, e := range t.CcvSendInputs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+	m["extraArgs"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraArgs).(mapper); ok {
+			return m.toMap()
 		}
-		return res
+		return t.ExtraArgs
 	}()
 
 	return m
@@ -392,8 +444,6 @@ type TokenTransferInput struct {
 	SenderInputCids   []types.CONTRACT_ID                      `json:"senderInputCids"`
 	Amount            types.NUMERIC                            `json:"amount"`
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	TokenReceiver     *types.TEXT                              `json:"tokenReceiver" hex:"optional"`
-	TokenArgs         types.TEXT                               `json:"tokenArgs"`
 	PoolExtraContext  common.CCIPContext                       `json:"poolExtraContext"`
 }
 
@@ -434,19 +484,6 @@ func (t TokenTransferInput) ToMap() map[string]any {
 		}
 		return t.TokenInstrumentId
 	}()
-
-	if t.TokenReceiver != nil {
-		m["tokenReceiver"] = map[string]any{
-			"_type": "optional",
-			"value": string(*t.TokenReceiver),
-		}
-	} else {
-		m["tokenReceiver"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["tokenArgs"] = string(t.TokenArgs)
 
 	m["poolExtraContext"] = func() any {
 		type mapper interface{ toMap() map[string]any }
