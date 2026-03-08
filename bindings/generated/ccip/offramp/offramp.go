@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "2e93cefaaa92d9fe094d4acc3ef0be304a78771a97db9bdc9785601f4fdff965"
+	PackageID   = "4d7eab01cc580637c12fe92ca6beed74ceec16fbea240ae44492b739e4f4e99d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -140,11 +140,12 @@ func (t *ExecuteFromRouter) UnmarshalHex(data string) error {
 
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
-	MessageId           types.TEXT         `json:"messageId"`
-	Message             common.MessageV1   `json:"message"`
-	SourceChainSelector types.NUMERIC      `json:"sourceChainSelector"`
-	SequenceNumber      types.NUMERIC      `json:"sequenceNumber"`
-	TokenReceiveTicket  *types.CONTRACT_ID `json:"tokenReceiveTicket" hex:"optional"`
+	MessageId             types.TEXT         `json:"messageId"`
+	Message               common.MessageV1   `json:"message"`
+	SourceChainSelector   types.NUMERIC      `json:"sourceChainSelector"`
+	SequenceNumber        types.NUMERIC      `json:"sequenceNumber"`
+	TokenReceiveTicket    *types.CONTRACT_ID `json:"tokenReceiveTicket" hex:"optional"`
+	ExecutionStateChanged types.CONTRACT_ID  `json:"executionStateChanged"`
 }
 
 // ToMap converts ExecuteFromRouterResult to a map for DAML arguments
@@ -175,6 +176,14 @@ func (t ExecuteFromRouterResult) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["executionStateChanged"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutionStateChanged).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutionStateChanged
+	}()
 
 	return m
 }

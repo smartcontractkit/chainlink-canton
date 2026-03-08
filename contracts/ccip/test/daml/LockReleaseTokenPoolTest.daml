@@ -149,13 +149,15 @@ testLockOrBurn = script do
             executorFeeTokenAmount = 0.0
             ccvFees = []
             tokenSendFee = None
-            feesFinalized = False
             ccvFeeTokenAmounts = []
             tokenSendFeeTokenAmount = 0.0
             networkFeeTokenAmount = 0.0
             verifierData = []
+            ccvOwners = []
             tokenSendData = None
             observingParties = [sender]
+            -- Skips SetOutboundPoolCCVs step; AddTokenSend requires PoolVerified state.
+            state = SendingMessageV1.SendingMessageState_PoolVerified
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -274,7 +276,7 @@ testReleaseFromTicket = script do
             ccipOwner = ccipOwner
             cursedSubjects = []
 
-    -- Deploy LockReleaseTokenPool
+    -- Deploy LockReleaseTokenPool with source chain config for inbound
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -282,17 +284,21 @@ testReleaseFromTicket = script do
             instanceId = "test-lock-release-pool"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.empty
+            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
+                inboundCCVs = []
+                outboundCCVs = []
+                remotePools = [])]
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
-    -- Create TokenReceiveTicket (simulating what OffRamp creates via TAR)
+    -- Create TokenReceiveTicket (simulating what OffRamp creates via finalize)
     tokenReceiveTicket <- submit ccipOwner do
         createCmd Tickets.TokenReceiveTicket with
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
+            ccvOwners = []
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -446,9 +452,11 @@ testVerifyInboundMessage = script do
             executor = ccipOwner
             observingParties = [receiver, ccipOwner, poolOwner]
             ccvVerifications = []
+            ccvOwners = []
             inboundPoolCCVs = None
             offRampInstanceAddress = offRampInstanceAddress
             tokenAdminRegistryInstanceAddress = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should succeed
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
@@ -566,9 +574,11 @@ testVerifyInboundMessageInvalidSourcePool = script do
             executor = ccipOwner
             observingParties = [receiver, ccipOwner, poolOwner]
             ccvVerifications = []
+            ccvOwners = []
             inboundPoolCCVs = None
             offRampInstanceAddress = offRampInstanceAddress
             tokenAdminRegistryInstanceAddress = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should fail
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
@@ -679,9 +689,11 @@ testVerifyInboundMessageMissingChainConfig = script do
             executor = ccipOwner
             observingParties = [receiver, ccipOwner, poolOwner]
             ccvVerifications = []
+            ccvOwners = []
             inboundPoolCCVs = None
             offRampInstanceAddress = offRampInstanceAddress
             tokenAdminRegistryInstanceAddress = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should fail (missing chain config)
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry

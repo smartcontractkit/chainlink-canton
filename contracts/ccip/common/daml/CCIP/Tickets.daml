@@ -2,6 +2,7 @@
 module CCIP.Tickets where
 
 import DA.Crypto.Text (BytesHex)
+import DA.List (dedup)
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -27,10 +28,15 @@ data Receipt = Receipt
     deriving (Eq, Show)
 
 
--- | Ticket issued by OffRamp (via TokenAdminRegistry) after successful message verification.
+-- | Ticket issued by consuming ExecutingMessageV1 after successful message verification.
+-- The signatory set includes CCV-owner parties accumulated during inbound verification,
+-- giving third-party pools an independent trust check beyond ccipOwner alone.
 template TokenReceiveTicket
     with
         ccipOwner : Party
+        -- CCV owner parties accumulated from ExecutingMessageV1's finalize choice.
+        -- Mirrors the widened signatory set for deterministic pool-side validation.
+        ccvOwners : [Party]
         tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
         poolOwner : Party           -- Observer - pool that should release
         receiver : Party            -- Message receiver (observer)
@@ -42,5 +48,5 @@ template TokenReceiveTicket
         messageHash : BytesHex
         sourceChainSelector : Numeric 0
     where
-        signatory ccipOwner
+        signatory dedup (ccipOwner :: ccvOwners)
         observer poolOwner, receiver, tokenReceiver

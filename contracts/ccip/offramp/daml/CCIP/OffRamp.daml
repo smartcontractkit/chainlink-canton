@@ -6,6 +6,7 @@ import DA.Crypto.Text (BytesHex, keccak256)
 import DA.List (dedup)
 import DA.Optional (fromSomeNote, isSome)
 
+import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
@@ -116,9 +117,11 @@ template OffRamp
                     executor = caller
                     observingParties = observers
                     ccvVerifications = []
+                    ccvOwners = []
                     inboundPoolCCVs = None
                     offRampInstanceAddress = CCIP.RawInstanceAddress.make instanceId ccipOwner
                     tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+                    state = CCIP.ExecutingMessageV1.ExecutingMessageState_Prepared
 
         -- | Process a CCIP execute request from a PerPartyRouter.
         -- Reads CCV verifications and pool verification state from the ExecutingMessageV1
@@ -219,47 +222,37 @@ template OffRamp
                     assertMsg ("offramp: missing required CCV address " <> requiredAddr)
                         (requiredAddr `elem` providedCCVAddresses)
 
-                -- Issue token receive ticket if tokenReceiver is set.
-                -- PrepareExecute guarantees tokenReceiver <-> tokenTransfer consistency.
-                tokenReceiveTicketCid <- case execMsg.tokenReceiver of
-                    None -> pure None
-                    Some tokenReceiver -> do
-                        let tt = fromSomeNote
-                                "offramp: tokenReceiver set but no tokenTransfer"
-                                message.tokenTransfer
-                        let instId = fromSomeNote "offramp: failed to decode destTokenAddress"
-                                (CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress)
-                        configOpt <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_GetTokenConfig with
-                                instrumentId = instId
+                -- Validate owner signatory aggregation matches ccvVerifications
+                let ownersFromVerifications = dedup (map (.ccvOwner) execMsg.ccvVerifications)
+                assertMsg "offramp: owner signatory aggregation mismatch"
+                    (dedup execMsg.ccvOwners == ownersFromVerifications)
+
+                finalizeResult <- case execMsg.tokenReceiver of
+                    None ->
+                        exercise executingMessageCid
+                            CCIP.ExecutingMessageV1.FinalizeExecute with
+                                tokenAdminRegistryInstanceId = tokenAdminRegistry.instanceId
+                                maybePoolOwner = None
+                                maybeTicketReceiver = None
+                                maybeTokenReceiver = None
+                                maybeInstrumentId = None
+                                maybeAmount = None
+                                returnData = ""
+                    Some _ ->
+                        exercise tokenAdminRegistryCid
+                            CCIP.TokenAdminRegistry.TokenAdminRegistry_FinalizeExecute with
+                                executingMessageCid = executingMessageCid
+                                ticketReceiver = routerPartyOwner
+                                returnData = ""
                                 caller = ccipOwner
-                        poolOwner <- case configOpt of
-                            None -> abort "offramp: no token config for instrument"
-                            Some config -> case config.tokenPool of
-                                None -> abort "offramp: no pool registered for instrument"
-                                Some pool -> pure pool.poolOwner
-
-                        ticketCid <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
-                                instrumentId = instId
-                                poolOwner = poolOwner
-                                receiver = routerPartyOwner
-                                tokenReceiver = tokenReceiver
-                                amount = tt.amount
-                                messageHash = messageId
-                                sourceChainSelector = message.sourceChainSelector
-                        pure (Some ticketCid)
-
-                -- Consume the ExecutingMessageV1
-                exercise executingMessageCid CCIP.ExecutingMessageV1.ExecutingMessageV1_Archive with
-                    caller = ccipOwner
 
                 pure ExecuteFromRouterResult with
                     messageId = messageId
                     message = message
                     sourceChainSelector = message.sourceChainSelector
                     sequenceNumber = message.sequenceNumber
-                    tokenReceiveTicket = tokenReceiveTicketCid
+                    tokenReceiveTicket = finalizeResult.tokenReceiveTicket
+                    executionStateChanged = finalizeResult.executionStateChanged
 
 
 data ExecuteFromRouterResult = ExecuteFromRouterResult
@@ -269,4 +262,5 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
         sourceChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
+        executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
     deriving (Eq, Show)

@@ -6,6 +6,7 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Optional (fromOptional, isSome)
 
+import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
@@ -158,13 +159,14 @@ template OnRamp
                     executorFeeTokenAmount = 0.0
                     ccvFees = []
                     tokenSendFee = None
-                    feesFinalized = False
                     ccvFeeTokenAmounts = []
                     tokenSendFeeTokenAmount = 0.0
                     networkFeeTokenAmount = 0.0
                     verifierData = []
+                    ccvOwners = []
                     tokenSendData = None
                     observingParties = [routerPartyOwner]
+                    state = CCIP.SendingMessageV1.SendingMessageState_Prepared
 
         -- | Validate and finalize a CCIP send.
         -- Reads accumulated data from SendingMessageV1. Fee collection happens
@@ -192,7 +194,8 @@ template OnRamp
                     None -> abort "message not yet constructed"
                     Some m -> pure m
 
-                assertMsg "fees not finalized" sendingMsg.feesFinalized
+                assertMsg "sendingMessage not fee-finalized"
+                    (sendingMsg.state == CCIP.SendingMessageV1.SendingMessageState_FeeFinalized)
 
                 assertMsg "sequence number mismatch"
                     (sendingMsg.sequenceNumber == currentSequenceNumber + 1.0)
@@ -276,61 +279,23 @@ template OnRamp
                     _ -> abort "token transfer / token send data mismatch"
 
                 let receipts = assembleReceipts sendingMsg
-                archive sendingMessageCid
+                finalizeResult <- exercise sendingMessageCid CCIP.SendingMessageV1.FinalizeSend with
+                    messageSender = routerPartyOwner
+                    messageSentObservers = concatMap (.messageSentObservers) sendingMsg.verifierData
+                    verifierBlobs = map (.verifierBlob) sendingMsg.verifierData
+                    receipts = receipts
 
                 pure CCIPSendFromRouterResult with
+                    ccipMessageSent = finalizeResult.ccipMessageSent
                     verifierBlobs =
                         map (.verifierBlob) sendingMsg.verifierData
                     messageSentObservers =
                         concatMap (.messageSentObservers) sendingMsg.verifierData
                     receipts
 
-        -- Cancel an in-progress send and issue a refund ticket for locked tokens.
-        -- Validates router, OnRamp, and TAR identity before archiving SendingMessageV1.
-        -- sourceChainSelector = 0 avoids false-positive RMN curse checks.
-        nonconsuming choice CancelSendFromRouter : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
-            with
-                routerPartyOwner : Party
-                routerInstanceId : Text
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-            controller ccipOwner
-            do
-                sendingMsg <- fetch sendingMessageCid
-                assertMsg "cancelSend: ccipOwner mismatch"
-                    (sendingMsg.ccipOwner == ccipOwner)
-                assertMsg "cancelSend: sender mismatch"
-                    (sendingMsg.sender == routerPartyOwner)
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: router instance mismatch"
-                    routerInstanceId routerPartyOwner sendingMsg.routerInstanceAddress
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: onramp instance mismatch"
-                    instanceId ccipOwner sendingMsg.onRampInstanceAddress
-
-                tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: tar mismatch (onramp)"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner tokenAdminRegistryInstanceAddress
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: tar mismatch (sendingMsg)"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner sendingMsg.tokenAdminRegistryInstanceAddress
-
-                archive sendingMessageCid
-
-                case sendingMsg.tokenSendData of
-                    None -> pure None
-                    Some tsd -> do
-                        ticketCid <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
-                                instrumentId = tsd.instrumentId
-                                poolOwner = tsd.poolOwner
-                                receiver = sendingMsg.sender
-                                tokenReceiver = sendingMsg.sender
-                                amount = tsd.amount
-                                messageHash = sendingMsg.messageId
-                                sourceChainSelector = 0.0
-                        pure (Some ticketCid)
-
-
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
     with
+        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
         verifierBlobs : [BytesHex]
         messageSentObservers : [Party]
         receipts : [CCIP.Tickets.Receipt]

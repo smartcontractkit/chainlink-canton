@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "8f94bc99e2713f1dfc2a05e742ce637d5bdb66eef2794af21d22ead9bacac70d"
+	PackageID   = "ac083602f129284a54296680f65c8d35157f878c69352d2c0df26ee20fccb7d4"
 	SDKVersion  = "3.4.10"
 )
 
@@ -133,14 +133,23 @@ func (t *CCIPSendFromRouter) UnmarshalHex(data string) error {
 
 // CCIPSendFromRouterResult is a Record type
 type CCIPSendFromRouterResult struct {
-	VerifierBlobs        []types.TEXT     `json:"verifierBlobs"`
-	MessageSentObservers []types.PARTY    `json:"messageSentObservers"`
-	Receipts             []common.Receipt `json:"receipts"`
+	CcipMessageSent      types.CONTRACT_ID `json:"ccipMessageSent"`
+	VerifierBlobs        []types.TEXT      `json:"verifierBlobs"`
+	MessageSentObservers []types.PARTY     `json:"messageSentObservers"`
+	Receipts             []common.Receipt  `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
 func (t CCIPSendFromRouterResult) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["ccipMessageSent"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcipMessageSent).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcipMessageSent
+	}()
 
 	m["verifierBlobs"] = func() []any {
 		res := make([]any, 0, len(t.VerifierBlobs))
@@ -192,63 +201,6 @@ func (t CCIPSendFromRouterResult) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CCIPSendFromRouterResult from hex string (Canton MCMS format)
 func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CancelSendFromRouter is a Record type
-type CancelSendFromRouter struct {
-	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT        `json:"routerInstanceId"`
-	SendingMessageCid     types.CONTRACT_ID `json:"sendingMessageCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-}
-
-// ToMap converts CancelSendFromRouter to a map for DAML arguments
-func (t CancelSendFromRouter) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
-
-	m["routerInstanceId"] = string(t.RouterInstanceId)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["tokenAdminRegistryCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryCid
-	}()
-
-	return m
-}
-
-func (t CancelSendFromRouter) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CancelSendFromRouter) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CancelSendFromRouter to hex string (Canton MCMS format)
-func (t CancelSendFromRouter) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CancelSendFromRouter from hex string (Canton MCMS format)
-func (t *CancelSendFromRouter) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -488,27 +440,6 @@ func (t OnRamp) PrepareSendFromRouterWithPackageID(contractID string, packageID 
 	}
 }
 
-// CancelSendFromRouter exercises the CancelSendFromRouter choice on this OnRamp contract
-// This method uses the package name in the template ID
-func (t OnRamp) CancelSendFromRouter(contractID string, args CancelSendFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "CancelSendFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CancelSendFromRouterWithPackageID exercises the CancelSendFromRouter choice using the provided package ID instead of package name
-func (t OnRamp) CancelSendFromRouterWithPackageID(contractID string, packageID string, args CancelSendFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "CancelSendFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
@@ -707,7 +638,6 @@ func (t *PrepareSendFromRouter) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
-	CancelSendFromRouter(args CancelSendFromRouter) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
 	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
 }
@@ -742,11 +672,6 @@ func (c *Contract) Encoder() MCMSEncoder {
 // CCIPSendFromRouter encodes parameters for the CCIPSendFromRouter choice.
 func (e *encoder) CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CCIPSendFromRouter", args)
-}
-
-// CancelSendFromRouter encodes parameters for the CancelSendFromRouter choice.
-func (e *encoder) CancelSendFromRouter(args CancelSendFromRouter) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CancelSendFromRouter", args)
 }
 
 // GetRequiredCCVsForSend encodes parameters for the GetRequiredCCVsForSend choice.

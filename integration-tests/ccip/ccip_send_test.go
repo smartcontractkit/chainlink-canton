@@ -560,13 +560,6 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}
 
-	ccvArg := ccipsender.CantonCCVArgV1{
-		CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-		CcvRawAddress:   committeeVerifierRawAddr.Binding(),
-		CcvArgs:         types.TEXT(""),
-		CcvExtraContext: common.CCIPContext{},
-	}
-
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
 		Context: splice_api_token_metadata_v1.ChoiceContext{
 			Values: transferFactoryContextValues,
@@ -607,7 +600,7 @@ func TestCCIPSend(t *testing.T) {
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
 			BlockConfirmations: nil,
-			Ccvs:               []ccipsender.CantonCCVArgV1{ccvArg},
+			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
 			ExecutorCid:        types.CONTRACT_ID(executorCid),
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
@@ -617,6 +610,11 @@ func TestCCIPSend(t *testing.T) {
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer:       nil,
+		CcvSendInputs: []ccipsender.CCVSendInput{{
+			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+			VerifierArgs:    types.TEXT(""),
+			CcvExtraContext: common.CCIPContext{},
+		}},
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)
@@ -659,9 +657,10 @@ func TestCCIPSend(t *testing.T) {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
 				fields := e.Created.GetCreateArguments().GetFields()
-				if len(fields) >= 4 {
-					// fields[3] is the "event" field (CCIPMessageSentEvent)
-					eventField := fields[3].GetValue().GetRecord()
+				if len(fields) >= 5 {
+					// fields[4] is the "event" field (CCIPMessageSentEvent)
+					// (ccipOwner, ccvOwners, sender, observers, event)
+					eventField := fields[4].GetValue().GetRecord()
 					if eventField != nil && len(eventField.Fields) >= 4 {
 						// eventField.Fields[2] is messageId, eventField.Fields[3] is encodedMessage
 						returnedMessageId = eventField.Fields[2].GetValue().GetText()
