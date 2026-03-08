@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "568169f3afb3a78f29f16c007b86b8b12b5567e60a3893708000ae9acee308ae"
+	PackageID   = "4b662af94044577b8823cb0bc872befc22d2c25c77b01e2f4a92799bbe6034ee"
 	SDKVersion  = "3.4.10"
 )
 
@@ -660,11 +660,12 @@ func (t *HasRouterMCMSParams) UnmarshalHex(data string) error {
 
 // PerPartyRouter is a Template type
 type PerPartyRouter struct {
-	InstanceId              types.TEXT   `json:"instanceId"`
-	CcipOwner               types.PARTY  `json:"ccipOwner"`
-	PartyOwner              types.PARTY  `json:"partyOwner"`
-	OutboundSequenceNumbers types.GENMAP `json:"outboundSequenceNumbers"`
-	ExecutionStates         types.GENMAP `json:"executionStates"`
+	InstanceId              types.TEXT         `json:"instanceId"`
+	CcipOwner               types.PARTY        `json:"ccipOwner"`
+	PartyOwner              types.PARTY        `json:"partyOwner"`
+	Deps                    PerPartyRouterDeps `json:"deps"`
+	OutboundSequenceNumbers types.GENMAP       `json:"outboundSequenceNumbers"`
+	ExecutionStates         types.GENMAP       `json:"executionStates"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -689,6 +690,15 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["partyOwner"] = t.PartyOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["deps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Deps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Deps
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() any {
@@ -724,6 +734,15 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["partyOwner"] = t.PartyOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["deps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Deps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Deps
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() any {
@@ -960,11 +979,99 @@ func (t PerPartyRouter) GetRequiredCCVsForExecuteWithPackageID(contractID string
 	}
 }
 
+// PerPartyRouterDeps is a Record type
+type PerPartyRouterDeps struct {
+	OnRamp             common.RawInstanceAddress `json:"onRamp"`
+	OffRamp            common.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
+	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
+	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+}
+
+// ToMap converts PerPartyRouterDeps to a map for DAML arguments
+func (t PerPartyRouterDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["onRamp"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.OnRamp).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRamp
+	}()
+
+	m["offRamp"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.OffRamp).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRamp
+	}()
+
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	return m
+}
+
+func (t PerPartyRouterDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *PerPartyRouterDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes PerPartyRouterDeps to hex string (Canton MCMS format)
+func (t PerPartyRouterDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PerPartyRouterDeps from hex string (Canton MCMS format)
+func (t *PerPartyRouterDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // PerPartyRouterFactory is a Template type
 type PerPartyRouterFactory struct {
-	InstanceId        types.TEXT   `json:"instanceId"`
-	CcipOwner         types.PARTY  `json:"ccipOwner"`
-	RegisteredRouters types.GENMAP `json:"registeredRouters"`
+	InstanceId        types.TEXT         `json:"instanceId"`
+	CcipOwner         types.PARTY        `json:"ccipOwner"`
+	Deps              PerPartyRouterDeps `json:"deps"`
+	RegisteredRouters types.GENMAP       `json:"registeredRouters"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -986,6 +1093,15 @@ func (t PerPartyRouterFactory) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["deps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Deps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Deps
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registeredRouters"] = func() any {
@@ -1010,6 +1126,15 @@ func (t PerPartyRouterFactory) CreateCommandWithPackageID(packageID string) *mod
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["deps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Deps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Deps
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["registeredRouters"] = func() any {

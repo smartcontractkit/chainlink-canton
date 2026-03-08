@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "7ef2a79ea1dde845b094b0aa8880e81b433c2df45a6e5d93d0066f803584b59d"
+	PackageID   = "4186a4aefc2668b9c91dcadf6902b784560686c10c2c40d916a229e0bc6e3175"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1349,6 +1349,75 @@ func (t *DestChainConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ExecutingMessageDeps is a Record type
+type ExecutingMessageDeps struct {
+	OffRamp            RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
+}
+
+// ToMap converts ExecutingMessageDeps to a map for DAML arguments
+func (t ExecutingMessageDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["offRamp"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.OffRamp).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OffRamp
+	}()
+
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	return m
+}
+
+func (t ExecutingMessageDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutingMessageDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutingMessageDeps to hex string (Canton MCMS format)
+func (t ExecutingMessageDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutingMessageDeps from hex string (Canton MCMS format)
+func (t *ExecutingMessageDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecutingMessageState is an enum type
 type ExecutingMessageState string
 
@@ -1395,19 +1464,18 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner                         types.PARTY           `json:"ccipOwner"`
-	Message                           MessageV1             `json:"message"`
-	MessageId                         types.TEXT            `json:"messageId"`
-	Receiver                          types.PARTY           `json:"receiver"`
-	TokenReceiver                     *types.PARTY          `json:"tokenReceiver" hex:"optional"`
-	Executor                          types.PARTY           `json:"executor"`
-	ObservingParties                  []types.PARTY         `json:"observingParties"`
-	CcvVerifications                  []CCVVerification     `json:"ccvVerifications"`
-	CcvOwners                         []types.PARTY         `json:"ccvOwners"`
-	InboundPoolCCVs                   *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	OffRampInstanceAddress            RawInstanceAddress    `json:"offRampInstanceAddress"`
-	TokenAdminRegistryInstanceAddress RawInstanceAddress    `json:"tokenAdminRegistryInstanceAddress"`
-	State                             ExecutingMessageState `json:"state"`
+	CcipOwner        types.PARTY           `json:"ccipOwner"`
+	Message          MessageV1             `json:"message"`
+	MessageId        types.TEXT            `json:"messageId"`
+	Receiver         types.PARTY           `json:"receiver"`
+	TokenReceiver    *types.PARTY          `json:"tokenReceiver" hex:"optional"`
+	Executor         types.PARTY           `json:"executor"`
+	ObservingParties []types.PARTY         `json:"observingParties"`
+	CcvVerifications []CCVVerification     `json:"ccvVerifications"`
+	CcvOwners        []types.PARTY         `json:"ccvOwners"`
+	InboundPoolCCVs  *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
+	Deps             ExecutingMessageDeps  `json:"deps"`
+	State            ExecutingMessageState `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1500,21 +1568,12 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["offRampInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.OffRampInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.OffRampInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	if t.State != "" {
@@ -1613,21 +1672,12 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["offRampInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.OffRampInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.OffRampInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	if t.State != "" {
@@ -3073,6 +3123,93 @@ func (t *Receipt) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SendingMessageDeps is a Record type
+type SendingMessageDeps struct {
+	Router             RawInstanceAddress `json:"router"`
+	OnRamp             RawInstanceAddress `json:"onRamp"`
+	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          RawInstanceAddress `json:"feeQuoter"`
+}
+
+// ToMap converts SendingMessageDeps to a map for DAML arguments
+func (t SendingMessageDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["router"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Router).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Router
+	}()
+
+	m["onRamp"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.OnRamp).(mapper); ok {
+			return m.toMap()
+		}
+		return t.OnRamp
+	}()
+
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
+
+	return m
+}
+
+func (t SendingMessageDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SendingMessageDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SendingMessageDeps to hex string (Canton MCMS format)
+func (t SendingMessageDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SendingMessageDeps from hex string (Canton MCMS format)
+func (t *SendingMessageDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SendingMessageState is an enum type
 type SendingMessageState string
 
@@ -3125,47 +3262,45 @@ var _ types.ENUM = SendingMessageState("")
 
 // SendingMessageV1 is a Template type
 type SendingMessageV1 struct {
-	RouterInstanceAddress             RawInstanceAddress                        `json:"routerInstanceAddress"`
-	OnRampInstanceAddress             RawInstanceAddress                        `json:"onRampInstanceAddress"`
-	TokenAdminRegistryInstanceAddress RawInstanceAddress                        `json:"tokenAdminRegistryInstanceAddress"`
-	CcipOwner                         types.PARTY                               `json:"ccipOwner"`
-	Sender                            types.PARTY                               `json:"sender"`
-	DestChainSelector                 types.NUMERIC                             `json:"destChainSelector"`
-	SequenceNumber                    types.NUMERIC                             `json:"sequenceNumber"`
-	RequiredCCVs                      []RawInstanceAddress                      `json:"requiredCCVs"`
-	ExecutorAddress                   RawInstanceAddress                        `json:"executorAddress"`
-	SourceChainSelector               types.NUMERIC                             `json:"sourceChainSelector"`
-	SenderAddress                     types.TEXT                                `json:"senderAddress"`
-	Receiver                          types.TEXT                                `json:"receiver"`
-	Payload                           types.TEXT                                `json:"payload"`
-	ExecutionGasLimit                 types.INT64                               `json:"executionGasLimit"`
-	CcipReceiveGasLimit               types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations                types.INT64                               `json:"blockConfirmations"`
-	CcvAndExecutorHash                types.TEXT                                `json:"ccvAndExecutorHash"`
-	OnRampAddress                     types.TEXT                                `json:"onRampAddress"`
-	OffRampAddress                    types.TEXT                                `json:"offRampAddress"`
-	TokenReceiver                     types.TEXT                                `json:"tokenReceiver"`
-	TokenArgs                         types.TEXT                                `json:"tokenArgs"`
-	FeeToken                          splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
-	NetworkFeeUSDCents                types.NUMERIC                             `json:"networkFeeUSDCents"`
-	ExpectedTokenInstrumentId         *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
-	OutboundPoolCCVs                  *[]RawInstanceAddress                     `json:"outboundPoolCCVs" hex:"optional"`
-	ExecutorArgs                      types.TEXT                                `json:"executorArgs"`
-	ExecutorFee                       *ExecutorFee                              `json:"executorFee" hex:"optional"`
-	ExecutorFeeTokenAmount            types.NUMERIC                             `json:"executorFeeTokenAmount"`
-	ObservingParties                  []types.PARTY                             `json:"observingParties"`
-	CcvFees                           []CCVFee                                  `json:"ccvFees"`
-	TokenSendFee                      *TokenSendFee                             `json:"tokenSendFee" hex:"optional"`
-	CcvFeeTokenAmounts                []types.NUMERIC                           `json:"ccvFeeTokenAmounts"`
-	TokenSendFeeTokenAmount           types.NUMERIC                             `json:"tokenSendFeeTokenAmount"`
-	NetworkFeeTokenAmount             types.NUMERIC                             `json:"networkFeeTokenAmount"`
-	TokenSendData                     *TokenSendData                            `json:"tokenSendData" hex:"optional"`
-	VerifierData                      []VerifierData                            `json:"verifierData"`
-	CcvOwners                         []types.PARTY                             `json:"ccvOwners"`
-	Message                           *MessageV1                                `json:"message" hex:"optional"`
-	EncodedMessage                    types.TEXT                                `json:"encodedMessage"`
-	MessageId                         types.TEXT                                `json:"messageId"`
-	State                             SendingMessageState                       `json:"state"`
+	Deps                      SendingMessageDeps                        `json:"deps"`
+	CcipOwner                 types.PARTY                               `json:"ccipOwner"`
+	Sender                    types.PARTY                               `json:"sender"`
+	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
+	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
+	RequiredCCVs              []RawInstanceAddress                      `json:"requiredCCVs"`
+	ExecutorAddress           RawInstanceAddress                        `json:"executorAddress"`
+	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
+	SenderAddress             types.TEXT                                `json:"senderAddress"`
+	Receiver                  types.TEXT                                `json:"receiver"`
+	Payload                   types.TEXT                                `json:"payload"`
+	ExecutionGasLimit         types.INT64                               `json:"executionGasLimit"`
+	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
+	BlockConfirmations        types.INT64                               `json:"blockConfirmations"`
+	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
+	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
+	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
+	TokenReceiver             types.TEXT                                `json:"tokenReceiver"`
+	TokenArgs                 types.TEXT                                `json:"tokenArgs"`
+	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
+	NetworkFeeUSDCents        types.NUMERIC                             `json:"networkFeeUSDCents"`
+	ExpectedTokenInstrumentId *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
+	OutboundPoolCCVs          *[]RawInstanceAddress                     `json:"outboundPoolCCVs" hex:"optional"`
+	ExecutorArgs              types.TEXT                                `json:"executorArgs"`
+	ExecutorFee               *ExecutorFee                              `json:"executorFee" hex:"optional"`
+	ExecutorFeeTokenAmount    types.NUMERIC                             `json:"executorFeeTokenAmount"`
+	ObservingParties          []types.PARTY                             `json:"observingParties"`
+	CcvFees                   []CCVFee                                  `json:"ccvFees"`
+	TokenSendFee              *TokenSendFee                             `json:"tokenSendFee" hex:"optional"`
+	CcvFeeTokenAmounts        []types.NUMERIC                           `json:"ccvFeeTokenAmounts"`
+	TokenSendFeeTokenAmount   types.NUMERIC                             `json:"tokenSendFeeTokenAmount"`
+	NetworkFeeTokenAmount     types.NUMERIC                             `json:"networkFeeTokenAmount"`
+	TokenSendData             *TokenSendData                            `json:"tokenSendData" hex:"optional"`
+	VerifierData              []VerifierData                            `json:"verifierData"`
+	CcvOwners                 []types.PARTY                             `json:"ccvOwners"`
+	Message                   *MessageV1                                `json:"message" hex:"optional"`
+	EncodedMessage            types.TEXT                                `json:"encodedMessage"`
+	MessageId                 types.TEXT                                `json:"messageId"`
+	State                     SendingMessageState                       `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -3183,30 +3318,12 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["routerInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RouterInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RouterInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["onRampInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.OnRampInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.OnRampInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -3459,30 +3576,12 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["routerInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RouterInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RouterInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["onRampInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.OnRampInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.OnRampInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
