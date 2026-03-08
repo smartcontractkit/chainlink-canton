@@ -560,13 +560,6 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}
 
-	ccvArg := ccipsender.CantonCCVArgV1{
-		CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-		CcvRawAddress:   committeeVerifierRawAddr.Binding(),
-		CcvArgs:         types.TEXT(""),
-		CcvExtraContext: common.CCIPContext{},
-	}
-
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
 		Context: splice_api_token_metadata_v1.ChoiceContext{
 			Values: transferFactoryContextValues,
@@ -607,7 +600,7 @@ func TestCCIPSend(t *testing.T) {
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
 			BlockConfirmations: nil,
-			Ccvs:               []ccipsender.CantonCCVArgV1{ccvArg},
+			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
 			ExecutorCid:        types.CONTRACT_ID(executorCid),
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
