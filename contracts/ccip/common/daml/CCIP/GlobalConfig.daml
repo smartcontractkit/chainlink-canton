@@ -4,6 +4,7 @@ module CCIP.GlobalConfig where
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex)
 
+import qualified CCIP.Context
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 
 
@@ -71,3 +72,6 @@ template GlobalConfig
             do
                 let newConfigs = Map.insert sourceChainSelector config sourceChainConfigs
                 create this with sourceChainConfigs = newConfigs
+
+lookupGlobalConfigCid : CCIP.Context.CCIPContext -> Update (ContractId GlobalConfig)
+lookupGlobalConfigCid ctx = CCIP.Context.getFromContextU ctx CCIP.Context.globalConfigKey

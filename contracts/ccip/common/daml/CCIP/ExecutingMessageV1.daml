@@ -28,6 +28,14 @@ data ExecutingMessageState
     | ExecutingMessageState_PoolVerified
     deriving (Eq, Show)
 
+data ExecutingMessageDeps = ExecutingMessageDeps
+    with
+        offRamp : RawInstanceAddress
+        globalConfig : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress
+    deriving (Eq, Show)
+
 -- | Build the observer list from receiver, optional token receiver, and executor.
 buildObservingParties : Party -> Optional Party -> Party -> [Party]
 buildObservingParties receiver tokenReceiver executor =
@@ -52,8 +60,7 @@ template ExecutingMessageV1
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.
         inboundPoolCCVs : Optional [RawInstanceAddress]
-        offRampInstanceAddress : RawInstanceAddress
-        tokenAdminRegistryInstanceAddress : RawInstanceAddress
+        deps : ExecutingMessageDeps
         -- State machine:
         --   message-only: Prepared -(FinalizeExecute)-> consumed
         --   token-receive: Prepared -> PoolVerified -(FinalizeExecute)-> consumed

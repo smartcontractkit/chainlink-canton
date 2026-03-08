@@ -82,9 +82,9 @@ template CCIPSender
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
-                (feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter) <- CCIP.Context.lookupFeeQuoterCid context
-                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
-                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
+                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 let tokenInstrumentId = case tokenTransfer of
                         Some tt -> Some tt.tokenInstrumentId

@@ -63,6 +63,16 @@ data ExecutorFee = ExecutorFee
         destBytesOverhead : Int
     deriving (Eq, Show)
 
+data SendingMessageDeps = SendingMessageDeps
+    with
+        router : CCIP.RawInstanceAddress.RawInstanceAddress
+        onRamp : CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
 data SendingMessageState
     = SendingMessageState_Prepared
     | SendingMessageState_PoolVerified
@@ -73,9 +83,7 @@ data SendingMessageState
 
 template SendingMessageV1
     with
-        routerInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-        onRampInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        deps : SendingMessageDeps
         -- User/OnRamp provided fields, populated at PrepareSend
         ccipOwner : Party
         sender : Party

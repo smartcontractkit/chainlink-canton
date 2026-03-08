@@ -118,9 +118,13 @@ testLockOrBurn = script do
         createCmd SendingMessageV1.SendingMessageV1 with
             ccipOwner = ccipOwner
             sender = sender
-            routerInstanceAddress = RawInstanceAddress.make "test-router" sender
-            onRampInstanceAddress = RawInstanceAddress.make "test-onramp" ccipOwner
-            tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "test-router" sender
+                onRamp = RawInstanceAddress.make "test-onramp" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
@@ -454,8 +458,11 @@ testVerifyInboundMessage = script do
             ccvVerifications = []
             ccvOwners = []
             inboundPoolCCVs = None
-            offRampInstanceAddress = offRampInstanceAddress
-            tokenAdminRegistryInstanceAddress = tarInstanceAddress
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should succeed
@@ -576,8 +583,11 @@ testVerifyInboundMessageInvalidSourcePool = script do
             ccvVerifications = []
             ccvOwners = []
             inboundPoolCCVs = None
-            offRampInstanceAddress = offRampInstanceAddress
-            tokenAdminRegistryInstanceAddress = tarInstanceAddress
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should fail
@@ -691,8 +701,11 @@ testVerifyInboundMessageMissingChainConfig = script do
             ccvVerifications = []
             ccvOwners = []
             inboundPoolCCVs = None
-            offRampInstanceAddress = offRampInstanceAddress
-            tokenAdminRegistryInstanceAddress = tarInstanceAddress
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
             state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should fail (missing chain config)
