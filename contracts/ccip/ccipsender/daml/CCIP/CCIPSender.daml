@@ -111,6 +111,7 @@ template CCIPSender
                     senderRequiredCCVs
                     tokenInstrumentId
                     tokenReceiver = extraArgs.tokenReceiver
+                    tokenArgs = extraArgs.tokenArgs
                     feeToken
 
                 -- CalculateFee (CCV + pool, USD cents only)
@@ -137,7 +138,6 @@ template CCIPSender
                             extraContext = tt.poolExtraContext
                             sendingMessageCid = smCid
                             amount = tt.amount
-                            tokenArgs = extraArgs.tokenArgs
                             caller = owner
 
                 -- LockOrBurn (stores token data before executor finalization)

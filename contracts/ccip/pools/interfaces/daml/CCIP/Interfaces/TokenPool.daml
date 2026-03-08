@@ -58,7 +58,6 @@ interface ITokenPool where
             extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             amount : Numeric 0
-            tokenArgs : BytesHex
             caller : Party
         controller caller
         do tokenPool_verifyOutboundCCVsImpl this self arg

@@ -137,7 +137,6 @@ template LockReleaseTokenPool
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
-                        tokenArgs = arg.tokenArgs
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
@@ -226,7 +225,6 @@ template LockReleaseTokenPool
                 extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 amount : Numeric 0
-                tokenArgs : BytesHex
                 caller : Party
             controller caller
             do
