@@ -657,9 +657,10 @@ func TestCCIPSend(t *testing.T) {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
 				fields := e.Created.GetCreateArguments().GetFields()
-				if len(fields) >= 4 {
-					// fields[3] is the "event" field (CCIPMessageSentEvent)
-					eventField := fields[3].GetValue().GetRecord()
+				if len(fields) >= 5 {
+					// fields[4] is the "event" field (CCIPMessageSentEvent)
+					// (ccipOwner, ccvOwners, sender, observers, event)
+					eventField := fields[4].GetValue().GetRecord()
 					if eventField != nil && len(eventField.Fields) >= 4 {
 						// eventField.Fields[2] is messageId, eventField.Fields[3] is encodedMessage
 						returnedMessageId = eventField.Fields[2].GetValue().GetText()
