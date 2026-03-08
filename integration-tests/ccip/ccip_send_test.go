@@ -610,6 +610,11 @@ func TestCCIPSend(t *testing.T) {
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer:       nil,
+		CcvSendInputs: []ccipsender.CCVSendInput{{
+			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+			VerifierArgs:    types.TEXT(""),
+			CcvExtraContext: common.CCIPContext{},
+		}},
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)
