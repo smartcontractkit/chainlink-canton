@@ -13,6 +13,7 @@ import DA.Optional (isNone, fromOptional)
 import qualified CCIP.Events
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
+import qualified CCIP.Tickets
 
 import qualified Splice.Api.Token.HoldingV1
 

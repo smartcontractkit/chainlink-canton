@@ -13,6 +13,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
+import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
