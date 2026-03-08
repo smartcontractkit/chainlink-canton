@@ -14,9 +14,12 @@ import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 
+tokenAdminRegistryKey : Text
+tokenAdminRegistryKey = "token-admin-registry"
+
 lookupTokenAdminRegistryCid : CCIP.Context.CCIPContext -> Update (ContractId TokenAdminRegistry)
 lookupTokenAdminRegistryCid ctx =
-    CCIP.Context.getFromContextU ctx CCIP.Context.tokenAdminRegistryKey
+    CCIP.Context.getFromContextU ctx tokenAdminRegistryKey
 
 template TokenAdminRegistry
     with

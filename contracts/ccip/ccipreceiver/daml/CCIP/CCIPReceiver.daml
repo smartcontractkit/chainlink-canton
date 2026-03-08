@@ -94,7 +94,7 @@ template CCIPReceiver
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1

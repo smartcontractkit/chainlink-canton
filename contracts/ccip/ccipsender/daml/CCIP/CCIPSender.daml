@@ -83,7 +83,7 @@ template CCIPSender
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 let tokenInstrumentId = case tokenTransfer of

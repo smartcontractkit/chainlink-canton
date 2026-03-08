@@ -19,8 +19,11 @@ import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
 
+onRampKey : Text
+onRampKey = "on-ramp"
+
 lookupOnRampCid : CCIP.Context.CCIPContext -> Update (ContractId OnRamp)
-lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx CCIP.Context.onRampKey
+lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
 
 rawInstanceAddress : OnRamp -> CCIP.RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress onRamp = CCIP.RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner

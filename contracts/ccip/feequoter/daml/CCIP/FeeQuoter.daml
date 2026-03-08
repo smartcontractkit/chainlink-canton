@@ -12,8 +12,11 @@ import qualified CCIP.Context
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 
+feeQuoterKey : Text
+feeQuoterKey = "fee-quoter"
+
 lookupFeeQuoterCid : CCIP.Context.CCIPContext -> Update (ContractId FeeQuoter)
-lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx CCIP.Context.feeQuoterKey
+lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 
 rawInstanceAddress : FeeQuoter -> CCIP.RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress feeQuoter = CCIP.RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner

@@ -126,7 +126,7 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
 
                 onRamp <- fetch onRampCid
                 CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
@@ -185,7 +185,7 @@ template PerPartyRouter
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
 
                 onRamp <- fetch onRampCid
                 CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
@@ -275,7 +275,7 @@ template PerPartyRouter
             controller partyOwner
             do
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
 
                 offRamp <- fetch offRampCid
                 CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
@@ -315,7 +315,7 @@ template PerPartyRouter
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
 
                 offRamp <- fetch offRampCid
                 CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"

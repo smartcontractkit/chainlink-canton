@@ -6,8 +6,6 @@ import DA.Crypto.Text (BytesHex)
 import DA.List (elem, notElem, filter)
 import DA.Text qualified as Text
 
-import qualified CCIP.Context
-
 
 -- Global curse subject matching EVM: bytes16(uint128(0x01000000000000000000000000000001))
 globalCurseSubject : BytesHex
@@ -212,5 +210,5 @@ template RMNRemote
             do
                 create this with ccipOwner = newCCIPOwner
 
-lookupRmnRemoteCid : CCIP.Context.CCIPContext -> Update (ContractId RMNRemote)
-lookupRmnRemoteCid ctx = CCIP.Context.getFromContextU ctx CCIP.Context.rmnRemoteKey
+rmnRemoteKey : Text
+rmnRemoteKey = "rmn-remote"
