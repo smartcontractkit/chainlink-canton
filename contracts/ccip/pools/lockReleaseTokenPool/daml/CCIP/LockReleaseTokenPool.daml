@@ -8,6 +8,8 @@
 module CCIP.LockReleaseTokenPool where
 
 import DA.Crypto.Text (BytesHex)
+import DA.Foldable qualified as Foldable
+import DA.List (dedup)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
@@ -23,6 +25,7 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
@@ -266,6 +269,8 @@ template LockReleaseTokenPool
                 -- the RMN instance address (not a stakeholder); PrepareExecute
                 -- performs the authoritative identity + curse check.
                 ticket <- fetch tokenReceiveTicketCid
+
+                -- Best-effort RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner
                     chainSelector = ticket.sourceChainSelector
@@ -273,6 +278,22 @@ template LockReleaseTokenPool
 
                 assertMsg "ReleaseFromTicket: caller must be tokenReceiver"
                     (caller == ticket.tokenReceiver)
+
+                -- Validate required pool CCV owner signatories are present on the ticket.
+                -- This is the pool's local security check: it rejects forged tickets
+                -- that lack the CCV-owner authorization the pool requires.
+                let ticketSignatories = signatory ticket
+                sourceCfg <- case Map.lookup ticket.sourceChainSelector chainPoolConfigs of
+                    None -> abort "ReleaseFromTicket: unsupported source chain"
+                    Some cfg -> pure cfg
+                let requiredPoolOwners = dedup (map CCIP.RawInstanceAddress.ownerParty sourceCfg.inboundCCVs)
+                Foldable.forA_ requiredPoolOwners $ \requiredOwner ->
+                    assertMsg ("ReleaseFromTicket: missing required pool CCV owner " <> show requiredOwner)
+                        (requiredOwner `elem` ticketSignatories)
+
+                -- Consistency check: explicit field must match actual signatories (minus ccipOwner)
+                assertMsg "ReleaseFromTicket: ticket signatory/data mismatch"
+                    (dedup ticket.ccvOwners == dedup (filter (/= ticket.ccipOwner) ticketSignatories))
 
                 -- Consume ticket via TAR. The TAR validates the ticket was issued by
                 -- the correct registry instance and archives it. The TAR is not fetchable

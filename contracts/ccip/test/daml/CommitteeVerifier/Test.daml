@@ -28,9 +28,11 @@ createExecMsg owner = submit owner do
         executor = owner
         observingParties = [owner]
         ccvVerifications = []
+        ccvOwners = []
         inboundPoolCCVs = None
         offRampInstanceAddress = CCIP.RawInstanceAddress.make "test-offramp" owner
         tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make "test-tar" owner
+        state = CCIP.ExecutingMessageV1.ExecutingMessageState_Prepared
 
 setup = script do
     owner <- allocateParty "owner"

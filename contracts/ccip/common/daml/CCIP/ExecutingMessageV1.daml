@@ -7,8 +7,12 @@ module CCIP.ExecutingMessageV1 where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
+import qualified CCIP.Events
+import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.Tickets
+import qualified Splice.Api.Token.HoldingV1
 
 -- | Record of a CCV verification appended via AddCCVVerification.
 -- The ccvOwner is authenticated by Daml's controller mechanism.
@@ -17,6 +21,11 @@ data CCVVerification = CCVVerification
         ccvInstanceId : Text
         ccvOwner : Party
         versionTag : BytesHex
+    deriving (Eq, Show)
+
+data ExecutingMessageState
+    = ExecutingMessageState_Prepared
+    | ExecutingMessageState_PoolVerified
     deriving (Eq, Show)
 
 -- | Build the observer list from receiver, optional token receiver, and executor.
@@ -38,20 +47,24 @@ template ExecutingMessageV1
         executor : Party
         observingParties : [Party]
         ccvVerifications : [CCVVerification]
+        -- Explicit list of CCV owner parties accumulated via AddCCVVerification.
+        ccvOwners : [Party]
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.
         inboundPoolCCVs : Optional [RawInstanceAddress]
         offRampInstanceAddress : RawInstanceAddress
         tokenAdminRegistryInstanceAddress : RawInstanceAddress
+        -- State machine:
+        --   message-only: Prepared -(FinalizeExecute)-> consumed
+        --   token-receive: Prepared -> PoolVerified -(FinalizeExecute)-> consumed
+        state : ExecutingMessageState
     where
-        signatory ccipOwner
+        signatory dedup (ccipOwner :: ccvOwners)
         observer observingParties
 
-        -- Consumed by OffRamp.ExecuteFromRouter after successful execution,
-        -- or for cleanup if Execute never completed.
-        -- TODO: it's possible that CCV verifiers/Token Pool contain state, consider
-        -- only allowing `ccipOwner` to archive.
-        choice ExecutingMessageV1_Archive : ()
+        -- Cleanup choice for failed or abandoned flows. Not used for the success path
+        -- (which goes through FinalizeExecute).
+        choice CancelExecute : ()
             with
                 caller : Party
             controller caller
@@ -59,8 +72,9 @@ template ExecutingMessageV1
                 assertMsg "executingMessage: caller must be ccipOwner, receiver, or executor"
                     (caller == ccipOwner || caller == receiver || caller == executor)
 
-        -- Append a CCV verification record. CCV exercises this after successful
-        -- signature verification; ccvOwner = caller is Daml-authenticated.
+        -- Append a CCV verification record and widen the signatory set.
+        -- CCV exercises this after successful signature verification;
+        -- ccvOwner = caller is Daml-authenticated.
         choice AddCCVVerification : ContractId ExecutingMessageV1
             with
                 ccvInstanceId : Text
@@ -68,11 +82,15 @@ template ExecutingMessageV1
                 caller : Party
             controller caller
             do
+                assertMsg "executingMessage: duplicate CCV verification"
+                    (all (\v -> v.ccvInstanceId /= ccvInstanceId) ccvVerifications)
+
                 create this with
                     ccvVerifications = ccvVerifications ++ [CCVVerification with
                         ccvInstanceId
                         ccvOwner = caller
                         versionTag]
+                    ccvOwners = dedup (ccvOwners ++ [caller])
 
         -- Record the pool's inbound CCV requirements. Only exercisable by ccipOwner,
         -- authorized through TAR's signatory context when pool calls
@@ -82,5 +100,72 @@ template ExecutingMessageV1
                 poolCCVs : [RawInstanceAddress]
             controller ccipOwner
             do
+                assertMsg "executingMessage: SetInboundPoolCCVs only allowed in Prepared"
+                    (state == ExecutingMessageState_Prepared)
+                assertMsg "executingMessage: inbound pool verification only valid for token transfers"
+                    (tokenReceiver /= None)
                 assertMsg "setInboundPoolCCVs: already set" (inboundPoolCCVs == None)
-                create this with inboundPoolCCVs = Some poolCCVs
+                create this with
+                    inboundPoolCCVs = Some poolCCVs
+                    state = ExecutingMessageState_PoolVerified
+
+        -- Consuming finalize choice for the success path. Always consumes the
+        -- executing message and emits an ExecutionStateChanged event. For token
+        -- transfers it also creates a TokenReceiveTicket.
+        choice FinalizeExecute : FinalizeExecuteResult
+            with
+                tokenAdminRegistryInstanceId : Text
+                maybePoolOwner : Optional Party
+                maybeTicketReceiver : Optional Party
+                maybeTokenReceiver : Optional Party
+                maybeInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
+                maybeAmount : Optional (Numeric 0)
+                returnData : BytesHex
+            controller ccipOwner
+            do
+                let isTokenTransfer = tokenReceiver /= None
+                assertMsg "executingMessage: invalid state for FinalizeExecute"
+                    (if isTokenTransfer
+                        then state == ExecutingMessageState_PoolVerified
+                        else state == ExecutingMessageState_Prepared)
+                tokenReceiveTicket <- case (maybePoolOwner, maybeTicketReceiver, maybeTokenReceiver, maybeInstrumentId, maybeAmount) of
+                    (Some poolOwner, Some ticketReceiver, Some resolvedTokenReceiver, Some instrumentId, Some amount) -> do
+                        assertMsg "executingMessage: ticket receiver mismatch"
+                            (ticketReceiver == receiver)
+                        assertMsg "executingMessage: token receiver mismatch"
+                            (Some resolvedTokenReceiver == tokenReceiver)
+                        ticketCid <- create CCIP.Tickets.TokenReceiveTicket with
+                            ccipOwner = ccipOwner
+                            ccvOwners = ccvOwners
+                            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+                            poolOwner = poolOwner
+                            receiver = ticketReceiver
+                            tokenReceiver = resolvedTokenReceiver
+                            instrumentId = instrumentId
+                            amount = amount
+                            messageHash = messageId
+                            sourceChainSelector = message.sourceChainSelector
+                        pure (Some ticketCid)
+                    (None, None, None, None, None) ->
+                        pure None
+                    _ ->
+                        abort "executingMessage: inconsistent finalize parameters"
+                eventCid <- create CCIP.Events.ExecutionStateChanged with
+                    ccipOwner = ccipOwner
+                    ccvOwners = ccvOwners
+                    receiver = receiver
+                    event = CCIP.Events.ExecutionStateChangedEvent with
+                        sourceChainSelector = message.sourceChainSelector
+                        sequenceNumber = message.sequenceNumber
+                        messageId = messageId
+                        state = CCIP.Internal.SUCCESS
+                        returnData = returnData
+                pure FinalizeExecuteResult with
+                    tokenReceiveTicket = tokenReceiveTicket
+                    executionStateChanged = eventCid
+
+data FinalizeExecuteResult = FinalizeExecuteResult
+    with
+        tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
+        executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
+    deriving (Eq, Show)

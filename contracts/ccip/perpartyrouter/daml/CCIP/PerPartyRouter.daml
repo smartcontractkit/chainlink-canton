@@ -7,6 +7,7 @@ import DA.Optional (fromOptional)
 import DA.Time (addRelTime, hours)
 
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Interfaces.TokenPool
@@ -214,50 +215,11 @@ template PerPartyRouter
                         outboundSequenceNumbers
                 routerCid <- create this with outboundSequenceNumbers = newSeqNumbers
 
-                -- TODO: create in OnRamp
-                ccipMessageSentCid <- create CCIPMessageSent with
-                    ccipOwner
-                    sender = partyOwner
-                    observers = result.messageSentObservers
-                    event = CCIPMessageSentEvent with
-                        destChainSelector = destChain
-                        sequenceNumber = sendingMsg.sequenceNumber
-                        messageId = sendingMsg.messageId
-                        encodedMessage = sendingMsg.encodedMessage
-                        verifierBlobs = result.verifierBlobs
-                        receipts = result.receipts
-
                 pure CCIPSendResult with
                     router = routerCid
-                    ccipMessageSent = ccipMessageSentCid
+                    ccipMessageSent = result.ccipMessageSent
                     messageId = sendingMsg.messageId
                     feeChangeCids
-
-        -- | Cancel an in-progress send and reclaim locked tokens.
-        -- Delegates to OnRamp.CancelSendFromRouter which validates identity
-        -- and issues a refund ticket if tokens were locked.
-        nonconsuming choice CancelSend : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
-            with
-                context : CCIP.Context.CCIPContext
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-            controller partyOwner
-            do
-                (onRampCid : ContractId CCIP.OnRamp.OnRamp) <- CCIP.Context.lookupOnRampCid context
-                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
-
-                onRamp <- fetch onRampCid
-                assertMsg "router: onramp ccipowner mismatch"
-                    (onRamp.ccipOwner == ccipOwner)
-
-                sendingMsg <- fetch sendingMessageCid
-                assertMsg "router: sender mismatch"
-                    (sendingMsg.sender == partyOwner)
-
-                exercise onRampCid CCIP.OnRamp.CancelSendFromRouter with
-                    routerPartyOwner = partyOwner
-                    routerInstanceId = instanceId
-                    sendingMessageCid
-                    tokenAdminRegistryCid
 
         -- | Prepare an inbound message for execution.
         -- Performs early replay check and delegates to OffRamp.PrepareExecute.
@@ -337,19 +299,10 @@ template PerPartyRouter
                 let newStates = Map.insert result.messageId CCIP.Internal.SUCCESS executionStates
                 routerCid <- create this with executionStates = newStates
 
-                _ <- create ExecutionStateChanged with
-                    ccipOwner = ccipOwner
-                    receiver = partyOwner
-                    event = ExecutionStateChangedEvent with
-                        sourceChainSelector = result.sourceChainSelector
-                        sequenceNumber = result.sequenceNumber
-                        messageId = result.messageId
-                        state = CCIP.Internal.SUCCESS
-                        returnData = ""
-
                 pure ExecuteResult with
                     router = routerCid
                     tokenReceiveTicket = result.tokenReceiveTicket
+                    executionStateChanged = result.executionStateChanged
                     messageId = result.messageId
                     message = result.message
                     state = CCIP.Internal.SUCCESS
@@ -402,7 +355,7 @@ template PerPartyRouter
 data CCIPSendResult = CCIPSendResult
     with
         router : ContractId PerPartyRouter
-        ccipMessageSent : ContractId CCIPMessageSent
+        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
@@ -411,46 +364,8 @@ data ExecuteResult = ExecuteResult
     with
         router : ContractId PerPartyRouter
         tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
+        executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
         messageId : BytesHex
         message : CCIP.MessageCodecV1.MessageV1
         state : CCIP.Internal.MessageExecutionState
-    deriving (Eq, Show)
-
-
-template CCIPMessageSent
-    with
-        ccipOwner : Party
-        sender : Party
-        observers : [Party]
-        event : CCIPMessageSentEvent
-    where
-        signatory ccipOwner
-        observer sender, observers
-
-data CCIPMessageSentEvent = CCIPMessageSentEvent
-    with
-        destChainSelector : Numeric 0
-        sequenceNumber : Numeric 0
-        messageId : BytesHex
-        encodedMessage : BytesHex
-        verifierBlobs : [BytesHex]
-        receipts : [CCIP.Tickets.Receipt]
-    deriving (Eq, Show)
-
-template ExecutionStateChanged
-    with
-        ccipOwner : Party
-        receiver : Party
-        event : ExecutionStateChangedEvent
-    where
-        signatory ccipOwner
-        observer receiver
-
-data ExecutionStateChangedEvent = ExecutionStateChangedEvent
-    with
-        sourceChainSelector : Numeric 0
-        sequenceNumber : Numeric 0
-        messageId : BytesHex
-        state : CCIP.Internal.MessageExecutionState
-        returnData : BytesHex
     deriving (Eq, Show)
