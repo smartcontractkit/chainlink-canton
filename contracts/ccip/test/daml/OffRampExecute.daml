@@ -144,7 +144,7 @@ testExecuteWithCCVVerification = script do
     executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(RMNRemote.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
@@ -165,7 +165,7 @@ testExecuteWithCCVVerification = script do
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(RMNRemote.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
                  (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
                  (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
@@ -291,7 +291,7 @@ testExecuteFailsMissingCCV = script do
     executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(RMNRemote.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
@@ -302,7 +302,7 @@ testExecuteFailsMissingCCV = script do
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(RMNRemote.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
                  (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
                  (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
@@ -419,7 +419,7 @@ testExecuteWrongReceiver = script do
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = CCIP.Context.CCIPContext with
-                values = TextMap.fromList [(RMNRemote.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver  -- Providing receiver, but message.receiver is otherParty

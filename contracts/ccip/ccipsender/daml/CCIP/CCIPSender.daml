@@ -14,7 +14,6 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
@@ -83,7 +82,7 @@ template CCIPSender
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
-                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
+                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 let tokenInstrumentId = case tokenTransfer of

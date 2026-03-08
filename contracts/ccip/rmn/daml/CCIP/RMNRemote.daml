@@ -210,5 +210,3 @@ template RMNRemote
             do
                 create this with ccipOwner = newCCIPOwner
 
-rmnRemoteKey : Text
-rmnRemoteKey = "rmn-remote"

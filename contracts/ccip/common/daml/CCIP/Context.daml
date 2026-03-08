@@ -3,6 +3,9 @@ module CCIP.Context where
 import DA.Time
 import DA.TextMap (TextMap)
 import DA.TextMap qualified as TextMap
+-- TODO: resolve circular dependency (ccip-common → ccip-rmn) so the key and
+-- lookup can live in CCIP.RMNRemote alongside the template instead of here.
+import qualified CCIP.RMNRemote
 
 -- Forked from Splice.Api.Token.MetadataV1.AnyValue.
 -- Owned by CCIP to allow future extension without Splice dependency.
@@ -142,3 +145,9 @@ instance FromAnyValue a => FromAnyValue [a] where
 instance FromAnyValue CCIPContext where
   fromAnyValue (AV_Map values) = Right $ CCIPContext with values
   fromAnyValue av = Left $ "expected map, got: " <> show av
+
+rmnRemoteKey : Text
+rmnRemoteKey = "rmn-remote"
+
+lookupRmnRemoteCid : CCIPContext -> Update (ContractId CCIP.RMNRemote.RMNRemote)
+lookupRmnRemoteCid ctx = getFromContextU ctx rmnRemoteKey
