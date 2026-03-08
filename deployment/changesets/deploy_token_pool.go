@@ -29,8 +29,8 @@ type DeployTokenPoolConfig struct {
 	Decimals     int64
 	// Qualifier is optional (e.g. token symbol) for AddressRef and idempotency.
 	Qualifier string
-	// Optional; defaults to empty. ChainCCVRequirements can be set for chain-specific CCV requirements.
-	ChainCCVRequirements types.GENMAP
+	// Optional; defaults to empty. ChainPoolConfigs can be set for chain-specific pool config (CCV requirements, remote pools).
+	ChainPoolConfigs types.GENMAP
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
 	PoolReceiveContext common.CCIPContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
@@ -65,9 +65,9 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 
 	cfg := config.Config
-	chainCCVReqs := cfg.ChainCCVRequirements
-	if chainCCVReqs == nil {
-		chainCCVReqs = types.GENMAP{}
+	chainPoolConfigs := cfg.ChainPoolConfigs
+	if chainPoolConfigs == nil {
+		chainPoolConfigs = types.GENMAP{}
 	}
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
@@ -85,7 +85,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		InstanceId:           "", // set by deploy operation
 		InstrumentId:         cfg.InstrumentId,
 		Decimals:             types.INT64(cfg.Decimals),
-		ChainCCVRequirements: chainCCVReqs,
+		ChainPoolConfigs: chainPoolConfigs,
 		PoolReceiveContext:   poolReceiveContext,
 		TransferTimeout:      transferTimeout,
 	}
