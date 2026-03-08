@@ -1035,6 +1035,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	)
 
 	senderRequiredCCVs := make([]common.RawInstanceAddress, 0, len(opts.CCVs))
+	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1079,6 +1080,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			}
 		}
 		senderRequiredCCVs = append(senderRequiredCCVs, rawAddr.Binding())
+		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
+			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
+			CcvExtraContext: common.CCIPContext{},
+		})
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
 		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
 		if len(fallbackVerifierDestAddress) == 0 {
@@ -1132,6 +1138,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 		FeeTokenHoldingCids: nil,
 		TokenTransfer:       nil,
+		CcvSendInputs:       ccvSendInputs,
 	}
 	sendArgsMap := sendArgs.ToMap()
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {
