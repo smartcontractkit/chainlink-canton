@@ -167,6 +167,7 @@ testCCIPSend = script do
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
+            tokenArgs = ""
             feeToken = testFeeTokenId
 
     -- Executor fee and message finalization
@@ -237,6 +238,7 @@ testCCIPSend = script do
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
+            tokenArgs = ""
             feeToken = testFeeTokenId
 
     -- Executor fee and message finalization for second message
@@ -517,6 +519,7 @@ testPrepareSendExtraArgs = script do
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
+            tokenArgs = ""
             feeToken = feeTokenId
 
     Some sm <- user `queryContractId` smCid
@@ -541,9 +544,11 @@ testPrepareSendExtraArgs = script do
             senderRequiredCCVs = []
             tokenInstrumentId = Some tokenInstrumentId
             tokenReceiver = None
+            tokenArgs = "aabbccdd"
             feeToken = feeTokenId
 
     Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
     smTokenOnly.requiredCCVs === []
+    smTokenOnly.tokenArgs === "aabbccdd"
 
     pure ()

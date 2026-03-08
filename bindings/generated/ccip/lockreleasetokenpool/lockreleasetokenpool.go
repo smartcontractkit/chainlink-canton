@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "3fdc747f6aef575934a205f7c586c44e244d3dd51c4908da4b1c89245c82beef"
+	PackageID   = "990b5aa16b5e22bfc68b742d8627e0e95e51660c34c4f86d592557319f1f415c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1089,7 +1089,6 @@ type LockReleaseTokenPoolVerifyOutboundCCVs struct {
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 	Amount                types.NUMERIC      `json:"amount"`
-	TokenArgs             types.TEXT         `json:"tokenArgs"`
 	Caller                types.PARTY        `json:"caller"`
 }
 
@@ -1122,8 +1121,6 @@ func (t LockReleaseTokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 	}()
 
 	m["amount"] = t.Amount
-
-	m["tokenArgs"] = string(t.TokenArgs)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1159,7 +1156,6 @@ type LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams struct {
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 	Amount                types.NUMERIC      `json:"amount"`
-	TokenArgs             types.TEXT         `json:"tokenArgs"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.

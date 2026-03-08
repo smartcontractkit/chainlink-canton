@@ -66,6 +66,7 @@ template OnRamp
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
                 tokenReceiver : Optional BytesHex
+                tokenArgs : BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller ccipOwner
             do
@@ -143,6 +144,7 @@ template OnRamp
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
                     tokenReceiver = resolvedTokenReceiver
+                    tokenArgs = tokenArgs
                     message = None
                     encodedMessage = ""
                     messageId = ""

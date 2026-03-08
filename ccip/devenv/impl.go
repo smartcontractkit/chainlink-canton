@@ -1130,7 +1130,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			TokenReceiver:      nil,
 			TokenArgs:          types.TEXT(""),
 		},
-		FeeToken:            feeTokenInstrument,
+		FeeToken: feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
 			TransferFactory: routerCID,
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{

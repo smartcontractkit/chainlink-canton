@@ -104,6 +104,7 @@ template PerPartyRouter
                 senderRequiredCCVs : [RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
                 tokenReceiver : Optional BytesHex
+                tokenArgs : BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
@@ -136,6 +137,7 @@ template PerPartyRouter
                     senderRequiredCCVs
                     tokenInstrumentId
                     tokenReceiver
+                    tokenArgs
                     feeToken
 
         -- | Finalize a CCIP send. Collects total fee from sender, delegates to

@@ -561,9 +561,9 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	ccvArg := ccipsender.CantonCCVArgV1{
-		CcvCid:        types.CONTRACT_ID(disclosedCCV.ContractId),
-		CcvRawAddress: committeeVerifierRawAddr.Binding(),
-		CcvArgs:       types.TEXT(""),
+		CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+		CcvRawAddress:   committeeVerifierRawAddr.Binding(),
+		CcvArgs:         types.TEXT(""),
 		CcvExtraContext: common.CCIPContext{},
 	}
 

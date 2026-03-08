@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "ce938f35418e606c760391e2e42e653d6837a892e1e487098a0feac3490e5e2a"
+	PackageID   = "3aafb9fad66bc32e4460906f900b1665d2e0ae7f4932201faa66dbfd347e5e1a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -778,7 +778,6 @@ type TokenPoolVerifyOutboundCCVs struct {
 	ExtraContext          common.CCIPContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
 	Amount                types.NUMERIC      `json:"amount"`
-	TokenArgs             types.TEXT         `json:"tokenArgs"`
 	Caller                types.PARTY        `json:"caller"`
 }
 
@@ -811,8 +810,6 @@ func (t TokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 	}()
 
 	m["amount"] = t.Amount
-
-	m["tokenArgs"] = string(t.TokenArgs)
 
 	m["caller"] = t.Caller.ToMap()
 

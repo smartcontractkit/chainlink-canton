@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "76b605a513bd2fc438e31aba65a3f72448ce444f925f62e910563c9ea9d2c877"
+	PackageID   = "eeeef6ee68bcc5d936b9f8f32ccc67aa9ce82124cf40c5367b7560bdb212d890"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2324,6 +2324,7 @@ type SendingMessageV1 struct {
 	OnRampAddress                     types.TEXT                                `json:"onRampAddress"`
 	OffRampAddress                    types.TEXT                                `json:"offRampAddress"`
 	TokenReceiver                     types.TEXT                                `json:"tokenReceiver"`
+	TokenArgs                         types.TEXT                                `json:"tokenArgs"`
 	FeeToken                          splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 	NetworkFeeUSDCents                types.NUMERIC                             `json:"networkFeeUSDCents"`
 	ExpectedTokenInstrumentId         *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
@@ -2456,6 +2457,9 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenReceiver"] = string(t.TokenReceiver)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenArgs"] = string(t.TokenArgs)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeToken"] = func() any {
@@ -2713,6 +2717,9 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tokenReceiver"] = string(t.TokenReceiver)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tokenArgs"] = string(t.TokenArgs)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeToken"] = func() any {

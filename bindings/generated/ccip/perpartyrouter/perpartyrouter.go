@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "bced40007a4fa7cb4d309344792f8a294b0fc521d2b2cd0a1a54b000a0cd4feb"
+	PackageID   = "680248183289ccff7f46e34f624f2c341dddc57b950eb3993222bbed029a5b2d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1635,6 +1635,7 @@ type PrepareSend struct {
 	SenderRequiredCCVs  []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
 	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
+	TokenArgs           types.TEXT                                `json:"tokenArgs"`
 	FeeToken            splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
@@ -1703,6 +1704,8 @@ func (t PrepareSend) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["tokenArgs"] = string(t.TokenArgs)
 
 	m["feeToken"] = func() any {
 		type mapper interface{ toMap() map[string]any }

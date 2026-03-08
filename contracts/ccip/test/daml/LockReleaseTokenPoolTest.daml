@@ -135,6 +135,7 @@ testLockOrBurn = script do
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
             tokenReceiver = "0000000000000000000000000000000000000001"
+            tokenArgs = ""
             message = None
             encodedMessage = ""
             messageId = ""
