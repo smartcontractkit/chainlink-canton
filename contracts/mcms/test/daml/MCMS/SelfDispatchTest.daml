@@ -56,7 +56,7 @@ timelockScheduleOp = Op
   , nonce = 0
   , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "ScheduleBatch"
-  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c617903313230403030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303014746573742d7363686564756c652d73616c742d310000000000000000"
+  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c61790002012000200000000000000000000000000000000000000000000000000000000000000000000f7363686564756c652d73616c742d310000000000000000"
   }
 
 timelockScheduleMetadata : RootMetadata
@@ -69,11 +69,11 @@ timelockScheduleMetadata = RootMetadata
   }
 
 timelockScheduleRoot : Text
-timelockScheduleRoot = "462a85783716ef00366bb6b65af7b85ce80884b0ffab8a1fbe378997da62c369"
+timelockScheduleRoot = "51934b7f76cae30f9d5b180faa295f7fb5359eb2bb014817b77e530f93f44813"
 
 timelockScheduleMetadataProof : [Text]
 timelockScheduleMetadataProof =
-  [ "973c337a865c8099c310206040680321beb55f77304723cd68dc29eb6c09a778"
+  [ "e72e067d8d1fcd93b73ffe09e2935a68caeae612feb392094f18d26e3d1095ef"
   ]
 
 timelockScheduleOpProof : [Text]
@@ -85,13 +85,13 @@ timelockScheduleSignatures : [RawSignature]
 timelockScheduleSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "9b01dff3a5a04a93b09cca31de2eb930c8394657e30047d8d56ed75622eaa33c"
-      , s = "3c122b01accd6b78fda436b90f4948d6394c848bcdc326eee0a7c4893d7c50e2"
+      , r = "c2f24a7501025cec9d95e4f48997b43d53f68e9ef291eb555176db0159999ced"
+      , s = "46d356972569bb29cac42ea8ad9d8b3dc2cc0902673f2e150c69a18a9b6cf490"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "36e71c2e1ec4c2e51d904ad448fb1da3d7a0ec2e85d944056baafae76d415964"
-      , s = "4ad8f2892c3cabbae022663676b16dfaa1b165f79b0c743a32e8643b473b766f"
+      , r = "7fbe521cac6a2c04aeec1373819e998ec7268a38c28cfabe46dd3fedec198588"
+      , s = "2ea327490399f66724654d24bf8eb6ab454eb281b4c5fd081ed5b3f7bf091ac4"
       }
   ]
 
@@ -103,7 +103,7 @@ timelockBypasserOp = Op
   , nonce = 0
   , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
   , functionName = "BypasserExecuteBatch"
-  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c617903333030"
+  , operationData = "01226d636d732d64616d6c2d7465737440636369705f6f776e65722d39636566653934640e5570646174654d696e44656c617900020300"
   }
 
 timelockBypasserMetadata : RootMetadata
@@ -116,11 +116,11 @@ timelockBypasserMetadata = RootMetadata
   }
 
 timelockBypasserRoot : Text
-timelockBypasserRoot = "464d670bd8568b66fb1a19a6a683ba72260e9535116f763aae73ab2ddb825612"
+timelockBypasserRoot = "a7f733bbc8cf7c0035e22238ef30c67f9a88ae91a370e8ac2e41fb333469f0bf"
 
 timelockBypasserMetadataProof : [Text]
 timelockBypasserMetadataProof =
-  [ "2a0046e1617945e2205d28e3174de50226fe7ddd7ad23ff09214cc0263d54983"
+  [ "26846df654a6717b38591aa8a76e2b59ee922e4533e2b797112789398fc5dfdd"
   ]
 
 timelockBypasserOpProof : [Text]
@@ -132,13 +132,13 @@ timelockBypasserSignatures : [RawSignature]
 timelockBypasserSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "72e369e8815adfe05164fc772522abf2f8c56e7b7579ffd5604f218fc80c9a79"
-      , s = "7276149ed2b7d66b9efa534a34f1a14c4a30853fb0ae87a7e0c2e4310cb34efd"
+      , r = "928c0f1fc2b9ad1fb135f35f678a8a1705d1ace95fbd398d215eb9cdea1872d8"
+      , s = "127e32720f5cfd2c90b7c687dde9b3da1bad8a1e1bbec27f032b4d60dc19f33c"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "f6c8024ccddfa96be1628ec74e349ec8cfd3d7ca795ec94db1a950722424e67a"
-      , s = "691723d1a51e4d533a3401695381ed2dcc2b8edd40337ddc8575bb6e0ef6fd8b"
+      , r = "383d298f5c7358105f679271d316a2d8579fe7616d7846bbc0bfb0a04d13bf88"
+      , s = "4cf5060d2f554ea9c8c75b3fd2cec53eb84569ea7f84e7056590038493606346"
       }
   ]
 
@@ -180,8 +180,8 @@ testScheduleBatch = script do
       signatures = timelockScheduleSignatures
 
   -- ExecuteOp with ScheduleBatch
-  let calls = [TimelockCall timelockTestInstanceAddress "UpdateMinDelay" "120"]
-  let salt = "test-schedule-salt-1"
+  let calls = [TimelockCall timelockTestInstanceAddress "UpdateMinDelay" "0120"]
+  let salt = "7363686564756c652d73616c742d31"
   mcmsCid <- submit ccipOwner do
     exerciseCmd mcmsCid ExecuteOp with
       targetRole = Proposer
