@@ -80,14 +80,14 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 
 	template := lockreleasetokenpool.LockReleaseTokenPool{
-		CcipOwner:            types.PARTY(cfg.CcipOwner),
-		PoolOwner:            types.PARTY(cfg.PoolOwner),
-		InstanceId:           "", // set by deploy operation
-		InstrumentId:         cfg.InstrumentId,
-		Decimals:             types.INT64(cfg.Decimals),
-		ChainPoolConfigs: chainPoolConfigs,
-		PoolReceiveContext:   poolReceiveContext,
-		TransferTimeout:      transferTimeout,
+		CcipOwner:          types.PARTY(cfg.CcipOwner),
+		PoolOwner:          types.PARTY(cfg.PoolOwner),
+		InstanceId:         "", // set by deploy operation
+		InstrumentId:       cfg.InstrumentId,
+		Decimals:           types.INT64(cfg.Decimals),
+		ChainPoolConfigs:   chainPoolConfigs,
+		PoolReceiveContext: poolReceiveContext,
+		TransferTimeout:    transferTimeout,
 	}
 
 	qualifier := ptr.String(cfg.Qualifier)
