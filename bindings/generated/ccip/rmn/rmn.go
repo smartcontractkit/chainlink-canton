@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "368ae91d00bc8328c37148aef66c683f2e23e107cf72e7ac06490607ff38fef3"
+	PackageID   = "0182784b1c77df1525d49a70b7a43a3466c46d19e243148a10625f0d716a71eb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -235,6 +235,59 @@ func (t CurseMultiple) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CurseMultiple from hex string (Canton MCMS format)
 func (t *CurseMultiple) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FetchRawInstanceAddress is a Record type
+type FetchRawInstanceAddress struct {
+	Caller types.PARTY `json:"caller"`
+}
+
+// ToMap converts FetchRawInstanceAddress to a map for DAML arguments
+func (t FetchRawInstanceAddress) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FetchRawInstanceAddress) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FetchRawInstanceAddress) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FetchRawInstanceAddress to hex string (Canton MCMS format)
+func (t FetchRawInstanceAddress) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FetchRawInstanceAddress from hex string (Canton MCMS format)
+func (t *FetchRawInstanceAddress) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FetchRawInstanceAddressMCMSParams is FetchRawInstanceAddress without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type FetchRawInstanceAddressMCMSParams struct {
+}
+
+// MarshalHex encodes FetchRawInstanceAddressMCMSParams to hex string for MCMS operationData.
+func (t FetchRawInstanceAddressMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FetchRawInstanceAddressMCMSParams from hex string.
+func (t *FetchRawInstanceAddressMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -687,6 +740,27 @@ func (t RMNRemote) RemoveCustomObserversWithPackageID(contractID string, package
 	}
 }
 
+// FetchRawInstanceAddress exercises the FetchRawInstanceAddress choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) FetchRawInstanceAddress(contractID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "FetchRawInstanceAddress",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FetchRawInstanceAddressWithPackageID exercises the FetchRawInstanceAddress choice using the provided package ID instead of package name
+func (t RMNRemote) FetchRawInstanceAddressWithPackageID(contractID string, packageID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "FetchRawInstanceAddress",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // GetCursedSubjects exercises the GetCursedSubjects choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) GetCursedSubjects(contractID string, args GetCursedSubjects) *model.ExerciseCommand {
@@ -1066,6 +1140,8 @@ type MCMSEncoder interface {
 	CurseChain(args CurseChain) (*bind.EncodedChoice, error)
 	CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error)
 	CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error)
+	FetchRawInstanceAddress(args FetchRawInstanceAddress) (*bind.EncodedChoice, error)
+	FetchRawInstanceAddressMCMSParams(args FetchRawInstanceAddressMCMSParams) (*bind.EncodedChoice, error)
 	GetCursedSubjects(args GetCursedSubjects) (*bind.EncodedChoice, error)
 	GetCursedSubjectsMCMSParams(args GetCursedSubjectsMCMSParams) (*bind.EncodedChoice, error)
 	IsCursed(args IsCursed) (*bind.EncodedChoice, error)
@@ -1130,6 +1206,16 @@ func (e *encoder) CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error) {
 // CurseMultiple encodes parameters for the CurseMultiple choice.
 func (e *encoder) CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CurseMultiple", args)
+}
+
+// FetchRawInstanceAddress encodes parameters for the FetchRawInstanceAddress choice.
+func (e *encoder) FetchRawInstanceAddress(args FetchRawInstanceAddress) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FetchRawInstanceAddress", args)
+}
+
+// FetchRawInstanceAddressMCMSParams encodes MCMS parameters (without Caller) for the FetchRawInstanceAddress choice.
+func (e *encoder) FetchRawInstanceAddressMCMSParams(args FetchRawInstanceAddressMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FetchRawInstanceAddress", args)
 }
 
 // GetCursedSubjects encodes parameters for the GetCursedSubjects choice.
