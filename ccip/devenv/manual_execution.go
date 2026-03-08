@@ -239,7 +239,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Get ExecutionStateChangedEvent from events
-	expectedTemplateID := perpartyrouter.ExecutionStateChanged{}.GetTemplateID()
+	expectedTemplateID := common.ExecutionStateChanged{}.GetTemplateID()
 	for _, event := range updateRes.GetTransaction().GetEvents() {
 		//nolint:nestif // need to check if all of these are nil
 		if createdEvent := event.GetCreated(); createdEvent != nil {
@@ -263,9 +263,9 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no ExecutionStateChanged event found in update %s", res.GetTransaction().GetUpdateId())
 }
 
-// parseExecutionStateChangedEvent parses a perpartyrouter.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
+// parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
 func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	executionStateChanged, err := bindings.UnmarshalCreatedEvent[perpartyrouter.ExecutionStateChanged](event)
+	executionStateChanged, err := bindings.UnmarshalCreatedEvent[common.ExecutionStateChanged](event)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to unmarshal ExecutionStateChanged event: %w", err)
 	}
