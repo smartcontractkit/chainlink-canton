@@ -143,9 +143,9 @@ template PerPartyRouter
                 CCIP.RawInstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                    caller = partyOwner
+                    expectedRawInstanceAddress = deps.rmnRemote
 
                 let currentSeqNum = fromOptional 0.0
                         (Map.lookup destChainSelector outboundSequenceNumbers)
@@ -198,9 +198,9 @@ template PerPartyRouter
                 CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                    caller = partyOwner
+                    expectedRawInstanceAddress = deps.rmnRemote
 
                 sendingMsg <- fetch sendingMessageCid
                 let destChain = sendingMsg.destChainSelector
@@ -280,9 +280,9 @@ template PerPartyRouter
                 CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                    caller = partyOwner
+                    expectedRawInstanceAddress = deps.rmnRemote
 
                 -- Early replay check (informational; Execute is authoritative)
                 let messageId = keccak256 encodedMessage
@@ -328,9 +328,9 @@ template PerPartyRouter
                 CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                    caller = partyOwner
+                    expectedRawInstanceAddress = deps.rmnRemote
 
                 execMsg <- fetch executingMessageCid
                 let messageId = execMsg.messageId
