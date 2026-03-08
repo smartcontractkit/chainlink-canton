@@ -6,8 +6,6 @@ import DA.Crypto.Text (BytesHex)
 import DA.List (dedup, elem, notElem, filter)
 import DA.Text qualified as Text
 
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
 
 
 -- Global curse subject matching EVM: bytes16(uint128(0x01000000000000000000000000000001))
@@ -139,20 +137,14 @@ template RMNRemote
                 pure (globalCurseSubject `elem` cursedSubjects
                       || chainSubject `elem` cursedSubjects)
 
-        nonconsuming choice AssertRawInstanceAddress : ()
+        -- Returns (instanceId, owner) so callers can verify the address.
+        -- TODO: ccip-rmn cannot depend on ccip-common (cycle), so callers
+        -- must do the RawInstanceAddress comparison themselves.
+        nonconsuming choice FetchRawInstanceAddress : (Text, Party)
             with
                 caller : Party
-                expectedRawInstanceAddress : RawInstanceAddress
             controller caller
-            do
-                -- RMN is a concrete trusted dependency, not an arbitrary interface.
-                -- That lets callers rely on this template-level self-assertion
-                -- without the "malicious interface lies in its view" problem.
-                CCIP.RawInstanceAddress.assertEqual
-                    "rmn: instance address mismatch"
-                    instanceId
-                    rmnOwner
-                    expectedRawInstanceAddress
+            do pure (instanceId, rmnOwner)
 
         -- Get all cursed subjects
         nonconsuming choice GetCursedSubjects : [BytesHex]

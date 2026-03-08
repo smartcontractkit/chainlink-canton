@@ -122,9 +122,11 @@ template CommitteeVerifier
                         (Map.lookup message.sourceChainSelector signerConfigs)
 
                 -- Validate RMN instance and check source chain curse
-                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
                     caller = owner
-                    expectedRawInstanceAddress = deps.rmnRemote
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
                     (execMsg.deps.rmnRemote == deps.rmnRemote)
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
@@ -201,9 +203,11 @@ template CommitteeVerifier
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse
-                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
                     caller = owner
-                    expectedRawInstanceAddress = deps.rmnRemote
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
                 assertMsg "verifier: sending message rmn mismatch"
                     (sendingMsg.deps.rmnRemote == deps.rmnRemote)
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with

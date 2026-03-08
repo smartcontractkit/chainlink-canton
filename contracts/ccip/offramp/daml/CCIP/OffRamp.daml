@@ -114,9 +114,11 @@ template OffRamp
                     _ -> pure ()
 
                 -- Validate RMN instance address and check curse
-                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
                     caller = ccipOwner
-                    expectedRawInstanceAddress = deps.rmnRemote
+                CCIP.RawInstanceAddress.assertEqual "prepareExecute: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
                     chainSelector = message.sourceChainSelector
@@ -182,9 +184,11 @@ template OffRamp
                     (execMsg.receiver == routerPartyOwner)
 
                 -- Re-check RMN curse (PrepareExecute may not have been atomic with Execute)
-                exercise rmnRemoteCid CCIP.RMNRemote.AssertRawInstanceAddress with
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
                     caller = ccipOwner
-                    expectedRawInstanceAddress = execMsg.deps.rmnRemote
+                CCIP.RawInstanceAddress.assertEqual "offramp: rmn mismatch"
+                    rmnInstanceId rmnOwner execMsg.deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
                     chainSelector = message.sourceChainSelector
