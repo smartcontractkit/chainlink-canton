@@ -17,7 +17,6 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RMNRemote
 import qualified CCIP.TokenAdminRegistry
 
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
@@ -94,7 +93,7 @@ template CCIPReceiver
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
-                rmnRemoteCid <- CCIP.Context.getFromContextU context CCIP.RMNRemote.rmnRemoteKey
+                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1

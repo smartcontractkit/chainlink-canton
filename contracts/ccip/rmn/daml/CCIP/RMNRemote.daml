@@ -3,7 +3,7 @@
 module CCIP.RMNRemote where
 
 import DA.Crypto.Text (BytesHex)
-import DA.List (elem, notElem, filter)
+import DA.List (dedup, elem, notElem, filter)
 import DA.Text qualified as Text
 
 
@@ -96,6 +96,14 @@ digitToHex n = case n of
     10 -> "a"; 11 -> "b"; 12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
     _ -> error ("Invalid hex digit: " <> show n)
 
+mergeCustomObservers : Party -> Party -> [Party] -> [Party] -> [Party]
+mergeCustomObservers rmnOwner ccipOwner current additions =
+    filter (\p -> p /= rmnOwner && p /= ccipOwner) (dedup (current ++ additions))
+
+removeCustomObservers : [Party] -> [Party] -> [Party]
+removeCustomObservers current removals =
+    filter (`notElem` removals) current
+
 
 -- | RMN contract providing curse capability for emergency stops.
 -- Separate rmnOwner party allows independent control from ccipOwner.
@@ -104,10 +112,11 @@ template RMNRemote
         instanceId : Text              -- Unique identifier for this RMN instance
         rmnOwner : Party               -- Party controlling curse operations
         ccipOwner : Party              -- For deployment association/validation
+        customObservers : [Party]      -- Additional parties allowed to observe RMN state
         cursedSubjects : [BytesHex]    -- Currently cursed subjects (global or chain-specific)
     where
         signatory rmnOwner
-        observer ccipOwner
+        observer ccipOwner, customObservers
 
         -- Check if globally cursed (party-as-parameter pattern for open access)
         nonconsuming choice IsCursed : Bool
@@ -202,13 +211,30 @@ template RMNRemote
             do
                 create this with cursedSubjects = filter (`notElem` subjects) cursedSubjects
 
+        -- Add additional observer parties managed by rmnOwner.
+        choice AddCustomObservers : ContractId RMNRemote
+            with
+                parties : [Party]
+            controller rmnOwner
+            do
+                create this with
+                    customObservers = mergeCustomObservers rmnOwner ccipOwner customObservers parties
+
+        -- Remove additional observer parties managed by rmnOwner.
+        choice RemoveCustomObservers : ContractId RMNRemote
+            with
+                parties : [Party]
+            controller rmnOwner
+            do
+                create this with
+                    customObservers = removeCustomObservers customObservers parties
+
         -- Update ccipOwner (for deployment migrations)
         choice UpdateCCIPOwner : ContractId RMNRemote
             with
                 newCCIPOwner : Party
             controller rmnOwner
             do
-                create this with ccipOwner = newCCIPOwner
-
-rmnRemoteKey : Text
-rmnRemoteKey = "rmn-remote"
+                create this with
+                    ccipOwner = newCCIPOwner
+                    customObservers = filter (/= newCCIPOwner) customObservers

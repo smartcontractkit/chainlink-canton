@@ -56,6 +56,7 @@ setup = script do
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = owner
+            customObservers = []
             cursedSubjects = []
 
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
