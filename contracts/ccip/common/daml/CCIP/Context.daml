@@ -30,24 +30,6 @@ data CCIPContext = CCIPContext
 emptyCCIPContext : CCIPContext
 emptyCCIPContext = CCIPContext with values = TextMap.empty
 
--- Context keys for CCIP system contracts
-onRampKey : Text
-onRampKey = "on-ramp"
-
-offRampKey : Text
-offRampKey = "off-ramp"
-
-globalConfigKey : Text
-globalConfigKey = "global-config"
-
-tokenAdminRegistryKey : Text
-tokenAdminRegistryKey = "token-admin-registry"
-
-feeQuoterKey : Text
-feeQuoterKey = "fee-quoter"
-
-rmnRemoteKey : Text
-rmnRemoteKey = "rmn-remote"
 
 class ToAnyValue a where
   toAnyValue : a -> AnyValue
@@ -77,27 +59,6 @@ lookupFromContextU context k = either fail pure $ lookupFromContext context k
 
 getFromContextU : FromAnyValue a => CCIPContext -> Text -> Update a
 getFromContextU context k = either fail pure $ getFromContext context k
-
--- Typed accessor functions for CCIP system CIDs.
--- Return type is generic ContractId t; concrete type is inferred at call sites
--- from how the CID is used (e.g., exercised on a specific template choice).
-lookupOnRampCid : Template t => CCIPContext -> Update (ContractId t)
-lookupOnRampCid ctx = getFromContextU ctx onRampKey
-
-lookupOffRampCid : Template t => CCIPContext -> Update (ContractId t)
-lookupOffRampCid ctx = getFromContextU ctx offRampKey
-
-lookupGlobalConfigCid : Template t => CCIPContext -> Update (ContractId t)
-lookupGlobalConfigCid ctx = getFromContextU ctx globalConfigKey
-
-lookupTokenAdminRegistryCid : Template t => CCIPContext -> Update (ContractId t)
-lookupTokenAdminRegistryCid ctx = getFromContextU ctx tokenAdminRegistryKey
-
-lookupFeeQuoterCid : Template t => CCIPContext -> Update (ContractId t)
-lookupFeeQuoterCid ctx = getFromContextU ctx feeQuoterKey
-
-lookupRmnRemoteCid : Template t => CCIPContext -> Update (ContractId t)
-lookupRmnRemoteCid ctx = getFromContextU ctx rmnRemoteKey
 
 addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
 addOptionalAnyValue _k None m = m

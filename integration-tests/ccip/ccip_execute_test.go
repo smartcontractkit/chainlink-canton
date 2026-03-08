@@ -286,14 +286,14 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					{
 						Qualifier: ccvQualifier,
 						Template: ccvs.CommitteeVerifier{
-							Owner:                    types.PARTY(partyCCIP),
-							CcipOwner:                types.PARTY(partyCCIP),
-							VersionTag:               types.TEXT(versionTag),
-							MessageSentObserver:      types.PARTY(partyCCIP),
-							StorageLocation:          "ipfs://test-receive",
-							SignerConfigs:            nil,                         // Will be configured later during lane setup
-							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
-							RemoteChainFeeConfigs:    nil,
+							Owner:                 types.PARTY(partyCCIP),
+							CcipOwner:             types.PARTY(partyCCIP),
+							VersionTag:            types.TEXT(versionTag),
+							MessageSentObserver:   types.PARTY(partyCCIP),
+							StorageLocation:       "ipfs://test-receive",
+							SignerConfigs:         nil,                          // Will be configured later during lane setup
+							Deps:                  ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							RemoteChainFeeConfigs: nil,
 						},
 					},
 				},

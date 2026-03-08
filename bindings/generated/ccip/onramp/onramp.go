@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "ac083602f129284a54296680f65c8d35157f878c69352d2c0df26ee20fccb7d4"
+	PackageID   = "51bc1e42dcfb9d2ce588d7c8ecdcd6d362cfb4295a99e829f3c67cd04c9c9e5e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -252,12 +252,9 @@ func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
 
 // OnRamp is a Template type
 type OnRamp struct {
-	InstanceId                        types.TEXT                `json:"instanceId"`
-	CcipOwner                         types.PARTY               `json:"ccipOwner"`
-	GlobalConfigInstanceAddress       common.RawInstanceAddress `json:"globalConfigInstanceAddress"`
-	RmnRemoteInstanceAddress          common.RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
-	TokenAdminRegistryInstanceAddress common.RawInstanceAddress `json:"tokenAdminRegistryInstanceAddress"`
-	CcvRegistryInstanceAddress        common.RawInstanceAddress `json:"ccvRegistryInstanceAddress"`
+	InstanceId types.TEXT  `json:"instanceId"`
+	CcipOwner  types.PARTY `json:"ccipOwner"`
+	Deps       OnRampDeps  `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -281,39 +278,12 @@ func (t OnRamp) CreateCommand() *model.CreateCommand {
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["globalConfigInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.GlobalConfigInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.GlobalConfigInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rmnRemoteInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccvRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.CcvRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.CcvRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	return &model.CreateCommand{
@@ -333,39 +303,12 @@ func (t OnRamp) CreateCommandWithPackageID(packageID string) *model.CreateComman
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["globalConfigInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.GlobalConfigInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.GlobalConfigInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rmnRemoteInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccvRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.CcvRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.CcvRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	return &model.CreateCommand{
@@ -480,6 +423,84 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
 	}
+}
+
+// OnRampDeps is a Record type
+type OnRampDeps struct {
+	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+}
+
+// ToMap converts OnRampDeps to a map for DAML arguments
+func (t OnRampDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
+
+	m["ccvRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcvRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvRegistry
+	}()
+
+	return m
+}
+
+func (t OnRampDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *OnRampDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes OnRampDeps to hex string (Canton MCMS format)
+func (t OnRampDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes OnRampDeps from hex string (Canton MCMS format)
+func (t *OnRampDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // PrepareSendFromRouter is a Record type

@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "3b295adb9f095bae5fecc1e03bd229a2fc1f173d91ed152aa8495f70e926da4b"
+	PackageID   = "c784efd7855edb6b57a03483535daf81b8233f5abb740d60ea3f0e141dc10864"
 	SDKVersion  = "3.4.10"
 )
 
@@ -96,15 +96,15 @@ func (t *CCVFeeConfig) UnmarshalHex(data string) error {
 
 // CommitteeVerifier is a Template type
 type CommitteeVerifier struct {
-	InstanceId               types.TEXT                `json:"instanceId"`
-	Owner                    types.PARTY               `json:"owner"`
-	CcipOwner                types.PARTY               `json:"ccipOwner"`
-	VersionTag               types.TEXT                `json:"versionTag"`
-	MessageSentObserver      types.PARTY               `json:"messageSentObserver"`
-	StorageLocation          types.TEXT                `json:"storageLocation"`
-	SignerConfigs            types.GENMAP              `json:"signerConfigs"`
-	RmnRemoteInstanceAddress common.RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
-	RemoteChainFeeConfigs    types.GENMAP              `json:"remoteChainFeeConfigs"`
+	InstanceId            types.TEXT            `json:"instanceId"`
+	Owner                 types.PARTY           `json:"owner"`
+	CcipOwner             types.PARTY           `json:"ccipOwner"`
+	VersionTag            types.TEXT            `json:"versionTag"`
+	MessageSentObserver   types.PARTY           `json:"messageSentObserver"`
+	StorageLocation       types.TEXT            `json:"storageLocation"`
+	SignerConfigs         types.GENMAP          `json:"signerConfigs"`
+	Deps                  CommitteeVerifierDeps `json:"deps"`
+	RemoteChainFeeConfigs types.GENMAP          `json:"remoteChainFeeConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -148,12 +148,12 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rmnRemoteInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteInstanceAddress
+		return t.Deps
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -201,12 +201,12 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rmnRemoteInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.RmnRemoteInstanceAddress
+		return t.Deps
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -418,6 +418,48 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(cont
 // Verify interface implementations for CommitteeVerifier
 
 var _ common.IICrossChainVerifier = (*CommitteeVerifier)(nil)
+
+// CommitteeVerifierDeps is a Record type
+type CommitteeVerifierDeps struct {
+	RmnRemote common.RawInstanceAddress `json:"rmnRemote"`
+}
+
+// ToMap converts CommitteeVerifierDeps to a map for DAML arguments
+func (t CommitteeVerifierDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	return m
+}
+
+func (t CommitteeVerifierDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CommitteeVerifierDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CommitteeVerifierDeps to hex string (Canton MCMS format)
+func (t CommitteeVerifierDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CommitteeVerifierDeps from hex string (Canton MCMS format)
+func (t *CommitteeVerifierDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // CommitteeVerifierApplySignatureConfigs is a Record type
 type CommitteeVerifierApplySignatureConfigs struct {

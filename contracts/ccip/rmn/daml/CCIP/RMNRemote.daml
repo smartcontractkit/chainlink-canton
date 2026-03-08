@@ -209,3 +209,6 @@ template RMNRemote
             controller rmnOwner
             do
                 create this with ccipOwner = newCCIPOwner
+
+rmnRemoteKey : Text
+rmnRemoteKey = "rmn-remote"

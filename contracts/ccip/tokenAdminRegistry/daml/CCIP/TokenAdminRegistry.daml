@@ -6,12 +6,20 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
+
+tokenAdminRegistryKey : Text
+tokenAdminRegistryKey = "token-admin-registry"
+
+lookupTokenAdminRegistryCid : CCIP.Context.CCIPContext -> Update (ContractId TokenAdminRegistry)
+lookupTokenAdminRegistryCid ctx =
+    CCIP.Context.getFromContextU ctx tokenAdminRegistryKey
 
 template TokenAdminRegistry
     with
@@ -187,7 +195,7 @@ template TokenAdminRegistry
                 sm <- fetch sendingMessageCid
                 assertMsg "TAR outbound: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
-                    instanceId owner sm.tokenAdminRegistryInstanceAddress
+                    instanceId owner sm.deps.tokenAdminRegistry
 
                 instrumentId <- case sm.expectedTokenInstrumentId of
                     None -> abort "TAR outbound: missing expected token instrument"
@@ -221,7 +229,7 @@ template TokenAdminRegistry
                 execMsg <- fetch executingMessageCid
                 assertMsg "TAR: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR: instance address mismatch"
-                    instanceId owner execMsg.tokenAdminRegistryInstanceAddress
+                    instanceId owner execMsg.deps.tokenAdminRegistry
 
                 let tt = fromSomeNote
                         "TokenAdminRegistry_SetInboundPoolCCVs: no token transfer in message"
@@ -254,7 +262,7 @@ template TokenAdminRegistry
                 execMsg <- fetch executingMessageCid
                 assertMsg "TAR finalize: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR finalize: instance address mismatch"
-                    instanceId owner execMsg.tokenAdminRegistryInstanceAddress
+                    instanceId owner execMsg.deps.tokenAdminRegistry
 
                 resolvedTokenReceiver <- case execMsg.tokenReceiver of
                     None -> abort "TAR finalize: expected token transfer"
