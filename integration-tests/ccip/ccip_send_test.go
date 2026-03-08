@@ -129,12 +129,12 @@ func TestCCIPSend(t *testing.T) {
 					{
 						Qualifier: ccvQualifier,
 						Template: ccvs.CommitteeVerifier{
-							Owner:                    types.PARTY(partyCCIP),
-							CcipOwner:                types.PARTY(partyCCIP),
-							VersionTag:               types.TEXT(versionTag),
-							MessageSentObserver:      types.PARTY(partyCCIP),
-							StorageLocation:          "ipfs://test-send",
-							Deps: ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							Owner:               types.PARTY(partyCCIP),
+							CcipOwner:           types.PARTY(partyCCIP),
+							VersionTag:          types.TEXT(versionTag),
+							MessageSentObserver: types.PARTY(partyCCIP),
+							StorageLocation:     "ipfs://test-send",
+							Deps:                ccvs.CommitteeVerifierDeps{}, // Set by sequence
 							// MUST be a real GENMAP, not a Go map.
 							RemoteChainFeeConfigs: types.GENMAP{
 								strconv.FormatUint(remoteSelector, 10): ccvs.CCVFeeConfig{
