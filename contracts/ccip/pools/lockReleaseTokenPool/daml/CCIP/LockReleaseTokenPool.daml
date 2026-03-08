@@ -291,10 +291,6 @@ template LockReleaseTokenPool
                     assertMsg ("ReleaseFromTicket: missing required pool CCV owner " <> show requiredOwner)
                         (requiredOwner `elem` ticketSignatories)
 
-                -- Consistency check: explicit field must match actual signatories (minus ccipOwner)
-                assertMsg "ReleaseFromTicket: ticket signatory/data mismatch"
-                    (dedup ticket.ccvOwners == dedup (filter (/= ticket.ccipOwner) ticketSignatories))
-
                 -- Consume ticket via TAR. The TAR validates the ticket was issued by
                 -- the correct registry instance and archives it. The TAR is not fetchable
                 -- by the pool (visibility), but the caller discloses it.
