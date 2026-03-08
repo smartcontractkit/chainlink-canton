@@ -156,7 +156,8 @@ testLockOrBurn = script do
             ccvOwners = []
             tokenSendData = None
             observingParties = [sender]
-            state = SendingMessageV1.SendingMessageState_Prepared
+            -- Skips SetOutboundPoolCCVs step; AddTokenSend requires PoolVerified state.
+            state = SendingMessageV1.SendingMessageState_PoolVerified
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -275,7 +276,7 @@ testReleaseFromTicket = script do
             ccipOwner = ccipOwner
             cursedSubjects = []
 
-    -- Deploy LockReleaseTokenPool
+    -- Deploy LockReleaseTokenPool with source chain config for inbound
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -283,7 +284,10 @@ testReleaseFromTicket = script do
             instanceId = "test-lock-release-pool"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.empty
+            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
+                inboundCCVs = []
+                outboundCCVs = []
+                remotePools = [])]
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
