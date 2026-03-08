@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "240aae6337a75aeed41b088a296fb197cebdc8de0559eebe794cd49751070d94"
+	PackageID   = "368ae91d00bc8328c37148aef66c683f2e23e107cf72e7ac06490607ff38fef3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -49,6 +49,48 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddCustomObservers is a Record type
+type AddCustomObservers struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddCustomObservers to a map for DAML arguments
+func (t AddCustomObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddCustomObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddCustomObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCustomObservers to hex string (Canton MCMS format)
+func (t AddCustomObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCustomObservers from hex string (Canton MCMS format)
+func (t *AddCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Curse is a Record type
@@ -362,10 +404,11 @@ func (t *IsCursedForChainMCMSParams) UnmarshalHex(data string) error {
 
 // RMNRemote is a Template type
 type RMNRemote struct {
-	InstanceId     types.TEXT   `json:"instanceId"`
-	RmnOwner       types.PARTY  `json:"rmnOwner"`
-	CcipOwner      types.PARTY  `json:"ccipOwner"`
-	CursedSubjects []types.TEXT `json:"cursedSubjects"`
+	InstanceId      types.TEXT    `json:"instanceId"`
+	RmnOwner        types.PARTY   `json:"rmnOwner"`
+	CcipOwner       types.PARTY   `json:"ccipOwner"`
+	CustomObservers []types.PARTY `json:"customObservers"`
+	CursedSubjects  []types.TEXT  `json:"cursedSubjects"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -390,6 +433,15 @@ func (t RMNRemote) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["customObservers"] = func() []any {
+		res := make([]any, 0, len(t.CustomObservers))
+		for _, e := range t.CustomObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["cursedSubjects"] = func() []any {
@@ -418,6 +470,15 @@ func (t RMNRemote) CreateCommandWithPackageID(packageID string) *model.CreateCom
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["customObservers"] = func() []any {
+		res := make([]any, 0, len(t.CustomObservers))
+		for _, e := range t.CustomObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["cursedSubjects"] = func() []any {
@@ -584,6 +645,48 @@ func (t RMNRemote) CurseChainWithPackageID(contractID string, packageID string, 
 	}
 }
 
+// AddCustomObservers exercises the AddCustomObservers choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) AddCustomObservers(contractID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddCustomObserversWithPackageID exercises the AddCustomObservers choice using the provided package ID instead of package name
+func (t RMNRemote) AddCustomObserversWithPackageID(contractID string, packageID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObservers exercises the RemoveCustomObservers choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) RemoveCustomObservers(contractID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObserversWithPackageID exercises the RemoveCustomObservers choice using the provided package ID instead of package name
+func (t RMNRemote) RemoveCustomObserversWithPackageID(contractID string, packageID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // GetCursedSubjects exercises the GetCursedSubjects choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) GetCursedSubjects(contractID string, args GetCursedSubjects) *model.ExerciseCommand {
@@ -729,6 +832,48 @@ func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID str
 		Choice:     "UpdateCCIPOwner",
 		Arguments:  argsToMap(args),
 	}
+}
+
+// RemoveCustomObservers is a Record type
+type RemoveCustomObservers struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemoveCustomObservers to a map for DAML arguments
+func (t RemoveCustomObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveCustomObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveCustomObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveCustomObservers to hex string (Canton MCMS format)
+func (t RemoveCustomObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveCustomObservers from hex string (Canton MCMS format)
+func (t *RemoveCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // Uncurse is a Record type
@@ -916,6 +1061,7 @@ func (t *UpdateCCIPOwner) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error)
 	Curse(args Curse) (*bind.EncodedChoice, error)
 	CurseChain(args CurseChain) (*bind.EncodedChoice, error)
 	CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error)
@@ -926,6 +1072,7 @@ type MCMSEncoder interface {
 	IsCursedMCMSParams(args IsCursedMCMSParams) (*bind.EncodedChoice, error)
 	IsCursedForChain(args IsCursedForChain) (*bind.EncodedChoice, error)
 	IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*bind.EncodedChoice, error)
+	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
 	Uncurse(args Uncurse) (*bind.EncodedChoice, error)
 	UncurseChain(args UncurseChain) (*bind.EncodedChoice, error)
 	UncurseGlobal(args UncurseGlobal) (*bind.EncodedChoice, error)
@@ -958,6 +1105,11 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// AddCustomObservers encodes parameters for the AddCustomObservers choice.
+func (e *encoder) AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCustomObservers", args)
 }
 
 // Curse encodes parameters for the Curse choice.
@@ -1008,6 +1160,11 @@ func (e *encoder) IsCursedForChain(args IsCursedForChain) (*bind.EncodedChoice, 
 // IsCursedForChainMCMSParams encodes MCMS parameters (without Caller) for the IsCursedForChain choice.
 func (e *encoder) IsCursedForChainMCMSParams(args IsCursedForChainMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("IsCursedForChain", args)
+}
+
+// RemoveCustomObservers encodes parameters for the RemoveCustomObservers choice.
+func (e *encoder) RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 
 // Uncurse encodes parameters for the Uncurse choice.
