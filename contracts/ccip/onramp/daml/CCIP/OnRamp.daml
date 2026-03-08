@@ -94,9 +94,11 @@ template OnRamp
                 CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: rmn instance address mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
+                    caller = ccipOwner
+                CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
@@ -242,9 +244,11 @@ template OnRamp
                     globalConfig.instanceId globalConfig.ccipOwner
                     sendingMsg.deps.globalConfig
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner sendingMsg.deps.rmnRemote
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
+                    caller = ccipOwner
+                CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
+                    rmnInstanceId rmnOwner sendingMsg.deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "tar mismatch"

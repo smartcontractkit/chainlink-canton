@@ -122,9 +122,11 @@ template CommitteeVerifier
                         (Map.lookup message.sourceChainSelector signerConfigs)
 
                 -- Validate RMN instance and check source chain curse
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
+                    caller = owner
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
                     (execMsg.deps.rmnRemote == deps.rmnRemote)
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
@@ -201,10 +203,11 @@ template CommitteeVerifier
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse
-                -- TODO: Replace fetch with nonconsuming getter choice for RMNRemote
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "verifier: rmn instance address mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
+                    caller = owner
+                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
                 assertMsg "verifier: sending message rmn mismatch"
                     (sendingMsg.deps.rmnRemote == deps.rmnRemote)
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with

@@ -7,6 +7,7 @@ import DA.List (dedup, elem, notElem, filter)
 import DA.Text qualified as Text
 
 
+
 -- Global curse subject matching EVM: bytes16(uint128(0x01000000000000000000000000000001))
 globalCurseSubject : BytesHex
 globalCurseSubject = "01000000000000000000000000000001"
@@ -135,6 +136,15 @@ template RMNRemote
                 let chainSubject = chainSelectorToSubject chainSelector
                 pure (globalCurseSubject `elem` cursedSubjects
                       || chainSubject `elem` cursedSubjects)
+
+        -- Returns (instanceId, owner) so callers can verify the address.
+        -- TODO: ccip-rmn cannot depend on ccip-common (cycle), so callers
+        -- must do the RawInstanceAddress comparison themselves.
+        nonconsuming choice FetchRawInstanceAddress : (Text, Party)
+            with
+                caller : Party
+            controller caller
+            do pure (instanceId, rmnOwner)
 
         -- Get all cursed subjects
         nonconsuming choice GetCursedSubjects : [BytesHex]
