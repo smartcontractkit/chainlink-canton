@@ -292,7 +292,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							MessageSentObserver:      types.PARTY(partyCCIP),
 							StorageLocation:          "ipfs://test-receive",
 							SignerConfigs:            nil,                         // Will be configured later during lane setup
-							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
+							Deps: ccvs.CommitteeVerifierDeps{}, // Set by sequence
 							RemoteChainFeeConfigs:    nil,
 						},
 					},

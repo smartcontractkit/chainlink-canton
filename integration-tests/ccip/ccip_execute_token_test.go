@@ -183,7 +183,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 								}}}}},
 							}}}},
 						}}}}}},
-						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						}}}}},
 						{Label: "remoteChainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
 				}},
@@ -262,9 +264,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-offramp-receive"}}},
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "globalConfigInstanceAddress", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
-						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
-						{Label: "tokenAdminRegistryInstanceAddress", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "globalConfig", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+							{Label: "tokenAdminRegistry", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+						}}}}},
 					}},
 				}},
 			}},
@@ -285,6 +289,14 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-factory-receive"}}},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "onRamp", Value: rawInstanceAddress("placeholder-onramp@" + partyCCIP)},
+							{Label: "offRamp", Value: rawInstanceAddress("test-offramp-receive@" + partyCCIP)},
+							{Label: "globalConfig", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
+							{Label: "tokenAdminRegistry", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+							{Label: "feeQuoter", Value: rawInstanceAddress("placeholder-feequoter@" + partyCCIP)},
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						}}}}},
 						{Label: "registeredRouters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
 				}},
