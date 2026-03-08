@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "d6b8a9b97afae8b110ec6e5f556e72fb9ba4c3de46b45d768e72c8b24ab44642"
+	PackageID   = "8f94bc99e2713f1dfc2a05e742ce637d5bdb66eef2794af21d22ead9bacac70d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -568,6 +568,7 @@ type PrepareSendFromRouter struct {
 	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
 	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver         *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
+	TokenArgs             types.TEXT                                `json:"tokenArgs"`
 	FeeToken              splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
@@ -666,6 +667,8 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["tokenArgs"] = string(t.TokenArgs)
 
 	m["feeToken"] = func() any {
 		type mapper interface{ toMap() map[string]any }
