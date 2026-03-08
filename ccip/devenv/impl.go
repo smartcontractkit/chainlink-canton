@@ -341,7 +341,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				VersionTag:               types.TEXT("49ff34ed"),
 				MessageSentObserver:      types.PARTY(participant.PartyID),
 				StorageLocation:          storageLocation,
-				RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
+				Deps: ccvs.CommitteeVerifierDeps{}, // Set by sequence
 				// MUST be a real GENMAP, not a Go map.
 				RemoteChainFeeConfigs: remoteChainFeeConfigs,
 			},
