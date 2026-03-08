@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "47eb56828ca066b32389d3ff8aa3b2f3cf884e39763abd13afce2caaddd62c19"
+	PackageID   = "6700425ab2c12d86a8a3a8a7c9fc0d02a8b24e5bf61b92770287a4e219d833a4"
 	SDKVersion  = "3.4.10"
 )
 
@@ -541,22 +540,31 @@ func (t *CommitteeVerifierCalculateFeeMCMSParams) UnmarshalHex(data string) erro
 
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
-	Caller            types.PARTY                                `json:"caller"`
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
+	Caller            types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
 func (t CommitteeVerifierForwardToVerifier) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -599,9 +607,10 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
 // CommitteeVerifierForwardToVerifierMCMSParams is CommitteeVerifierForwardToVerifier without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CommitteeVerifierForwardToVerifierMCMSParams struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
 }
 
 // MarshalHex encodes CommitteeVerifierForwardToVerifierMCMSParams to hex string for MCMS operationData.
@@ -618,22 +627,31 @@ func (t *CommitteeVerifierForwardToVerifierMCMSParams) UnmarshalHex(data string)
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
-	Caller              types.PARTY                                `json:"caller"`
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
+	Caller              types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
 func (t CommitteeVerifierVerifyMessage) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["executingMessageCid"] = func() any {
@@ -676,9 +694,10 @@ func (t *CommitteeVerifierVerifyMessage) UnmarshalHex(data string) error {
 // CommitteeVerifierVerifyMessageMCMSParams is CommitteeVerifierVerifyMessage without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CommitteeVerifierVerifyMessageMCMSParams struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
 }
 
 // MarshalHex encodes CommitteeVerifierVerifyMessageMCMSParams to hex string for MCMS operationData.

@@ -571,6 +571,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvContractIDs[0]}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
+								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
 						}}}}},
 						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},

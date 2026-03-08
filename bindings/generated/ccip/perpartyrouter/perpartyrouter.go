@@ -9,7 +9,6 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "d585dcc60094cc0f0ed3455d84a6b877ac8ac9be05b79febb34a2f7c4a0e45ea"
+	PackageID   = "bced40007a4fa7cb4d309344792f8a294b0fc521d2b2cd0a1a54b000a0cd4feb"
 	SDKVersion  = "3.4.10"
 )
 
@@ -256,10 +255,10 @@ func (t *CCIPMessageSentEvent) UnmarshalHex(data string) error {
 
 // CCIPSend is a Record type
 type CCIPSend struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid   types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	FeeTokenInput       interfaces.TokenInput                      `json:"feeTokenInput"`
-	FeeTokenHoldingCids []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
+	Context             common.CCIPContext    `json:"context"`
+	SendingMessageCid   types.CONTRACT_ID     `json:"sendingMessageCid"`
+	FeeTokenInput       interfaces.TokenInput `json:"feeTokenInput"`
+	FeeTokenHoldingCids []types.CONTRACT_ID   `json:"feeTokenHoldingCids"`
 }
 
 // ToMap converts CCIPSend to a map for DAML arguments
@@ -388,8 +387,8 @@ func (t *CCIPSendResult) UnmarshalHex(data string) error {
 
 // CancelSend is a Record type
 type CancelSend struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Context           common.CCIPContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
 }
 
 // ToMap converts CancelSend to a map for DAML arguments
@@ -529,9 +528,9 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context              splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ExecutingMessageCid  types.CONTRACT_ID                          `json:"executingMessageCid"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress                `json:"receiverRequiredCCVs"`
+	Context              common.CCIPContext          `json:"context"`
+	ExecutingMessageCid  types.CONTRACT_ID           `json:"executingMessageCid"`
+	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -871,9 +870,9 @@ func (t *GetExecutionState) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute2 is a Record type
 type GetRequiredCCVsForExecute2 struct {
-	Context              splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress                `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC                              `json:"sourceChainSelector"`
+	Context              common.CCIPContext          `json:"context"`
+	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC               `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
@@ -930,8 +929,8 @@ func (t *GetRequiredCCVsForExecute2) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForSend2 is a Record type
 type GetRequiredCCVsForSend2 struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           common.CCIPContext `json:"context"`
+	DestChainSelector types.NUMERIC      `json:"destChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
@@ -1543,11 +1542,11 @@ func (t PerPartyRouterFactory) HasRouterWithPackageID(contractID string, package
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	EncodedMessage     types.TEXT                                 `json:"encodedMessage"`
-	ReceiverParty      types.PARTY                                `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
-	Caller             types.PARTY                                `json:"caller"`
+	Context            common.CCIPContext `json:"context"`
+	EncodedMessage     types.TEXT         `json:"encodedMessage"`
+	ReceiverParty      types.PARTY        `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
+	Caller             types.PARTY        `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1607,10 +1606,10 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	EncodedMessage     types.TEXT                                 `json:"encodedMessage"`
-	ReceiverParty      types.PARTY                                `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
+	Context            common.CCIPContext `json:"context"`
+	EncodedMessage     types.TEXT         `json:"encodedMessage"`
+	ReceiverParty      types.PARTY        `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
@@ -1627,16 +1626,16 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 
 // PrepareSend is a Record type
 type PrepareSend struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	DestChainSelector   types.NUMERIC                              `json:"destChainSelector"`
-	Receiver            types.TEXT                                 `json:"receiver"`
-	Payload             types.TEXT                                 `json:"payload"`
-	CcipReceiveGasLimit types.INT64                                `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                               `json:"blockConfirmations" hex:"optional"`
-	SenderRequiredCCVs  []common.RawInstanceAddress                `json:"senderRequiredCCVs"`
-	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId  `json:"tokenInstrumentId" hex:"optional"`
-	TokenReceiver       *types.TEXT                                `json:"tokenReceiver" hex:"optional"`
-	FeeToken            splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
+	Context             common.CCIPContext                        `json:"context"`
+	DestChainSelector   types.NUMERIC                             `json:"destChainSelector"`
+	Receiver            types.TEXT                                `json:"receiver"`
+	Payload             types.TEXT                                `json:"payload"`
+	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
+	BlockConfirmations  *types.INT64                              `json:"blockConfirmations" hex:"optional"`
+	SenderRequiredCCVs  []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
+	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
+	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
+	FeeToken            splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
 // ToMap converts PrepareSend to a map for DAML arguments

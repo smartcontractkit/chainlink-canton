@@ -9,7 +9,6 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "58ebdbf8369b6a0adcad70d8d2488795699d70317faeb2cf6bb7210ad45f7671"
+	PackageID   = "3fdc747f6aef575934a205f7c586c44e244d3dd51c4908da4b1c89245c82beef"
 	SDKVersion  = "3.4.10"
 )
 
@@ -118,16 +117,16 @@ func (t *ChainCCVConfig) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	InstanceId           types.TEXT                                 `json:"instanceId"`
-	CcipOwner            types.PARTY                                `json:"ccipOwner"`
-	PoolOwner            types.PARTY                                `json:"poolOwner"`
-	InstrumentId         splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
-	Decimals             types.INT64                                `json:"decimals"`
-	ChainCCVRequirements types.GENMAP                               `json:"chainCCVRequirements"`
-	ChainFeeConfigs      types.GENMAP                               `json:"chainFeeConfigs"`
-	RemoteTokens         types.GENMAP                               `json:"remoteTokens"`
-	PoolReceiveContext   splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
-	TransferTimeout      TransferTimeout                            `json:"transferTimeout"`
+	InstanceId           types.TEXT                               `json:"instanceId"`
+	CcipOwner            types.PARTY                              `json:"ccipOwner"`
+	PoolOwner            types.PARTY                              `json:"poolOwner"`
+	InstrumentId         splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Decimals             types.INT64                              `json:"decimals"`
+	ChainCCVRequirements types.GENMAP                             `json:"chainCCVRequirements"`
+	ChainFeeConfigs      types.GENMAP                             `json:"chainFeeConfigs"`
+	RemoteTokens         types.GENMAP                             `json:"remoteTokens"`
+	PoolReceiveContext   common.CCIPContext                       `json:"poolReceiveContext"`
+	TransferTimeout      TransferTimeout                          `json:"transferTimeout"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -752,24 +751,33 @@ func (t *LockReleaseTokenPoolGetRequiredCCVsMCMSParams) UnmarshalHex(data string
 
 // LockReleaseTokenPoolLockOrBurn is a Record type
 type LockReleaseTokenPoolLockOrBurn struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	TokenInput        interfaces.TokenInput                      `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID                        `json:"senderInputCids"`
-	Amount            types.NUMERIC                              `json:"amount"`
-	Caller            types.PARTY                                `json:"caller"`
+	RmnRemoteCid      types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext    `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID     `json:"sendingMessageCid"`
+	TokenInput        interfaces.TokenInput `json:"tokenInput"`
+	SenderInputCids   []types.CONTRACT_ID   `json:"senderInputCids"`
+	Amount            types.NUMERIC         `json:"amount"`
+	Caller            types.PARTY           `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolLockOrBurn to a map for DAML arguments
 func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -828,11 +836,12 @@ func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalHex(data string) error {
 // LockReleaseTokenPoolLockOrBurnMCMSParams is LockReleaseTokenPoolLockOrBurn without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolLockOrBurnMCMSParams struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	TokenInput        interfaces.TokenInput                      `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID                        `json:"senderInputCids"`
-	Amount            types.NUMERIC                              `json:"amount"`
+	RmnRemoteCid      types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext    `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID     `json:"sendingMessageCid"`
+	TokenInput        interfaces.TokenInput `json:"tokenInput"`
+	SenderInputCids   []types.CONTRACT_ID   `json:"senderInputCids"`
+	Amount            types.NUMERIC         `json:"amount"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolLockOrBurnMCMSParams to hex string for MCMS operationData.
@@ -849,22 +858,40 @@ func (t *LockReleaseTokenPoolLockOrBurnMCMSParams) UnmarshalHex(data string) err
 
 // LockReleaseTokenPoolReleaseFromTicket is a Record type
 type LockReleaseTokenPoolReleaseFromTicket struct {
-	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
-	TokenInput            interfaces.TokenInput                      `json:"tokenInput"`
-	Caller                types.PARTY                                `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	Caller                types.PARTY           `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolReleaseFromTicket to a map for DAML arguments
 func (t LockReleaseTokenPoolReleaseFromTicket) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["tokenAdminRegistryCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["rmnRemoteCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemoteCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemoteCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["tokenReceiveTicketCid"] = func() any {
@@ -913,9 +940,11 @@ func (t *LockReleaseTokenPoolReleaseFromTicket) UnmarshalHex(data string) error 
 // LockReleaseTokenPoolReleaseFromTicketMCMSParams is LockReleaseTokenPoolReleaseFromTicket without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolReleaseFromTicketMCMSParams struct {
-	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
-	TokenInput            interfaces.TokenInput                      `json:"tokenInput"`
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID     `json:"tokenReceiveTicketCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolReleaseFromTicketMCMSParams to hex string for MCMS operationData.
@@ -973,21 +1002,30 @@ func (t *LockReleaseTokenPoolUpdateChainCCVRequirements) UnmarshalHex(data strin
 
 // LockReleaseTokenPoolVerifyInboundCCVs is a Record type
 type LockReleaseTokenPoolVerifyInboundCCVs struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	Caller              types.PARTY                                `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
+	Caller                types.PARTY        `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolVerifyInboundCCVs to a map for DAML arguments
 func (t LockReleaseTokenPoolVerifyInboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["tokenAdminRegistryCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["executingMessageCid"] = func() any {
@@ -1028,8 +1066,9 @@ func (t *LockReleaseTokenPoolVerifyInboundCCVs) UnmarshalHex(data string) error 
 // LockReleaseTokenPoolVerifyInboundCCVsMCMSParams is LockReleaseTokenPoolVerifyInboundCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolVerifyInboundCCVsMCMSParams struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolVerifyInboundCCVsMCMSParams to hex string for MCMS operationData.
@@ -1046,23 +1085,32 @@ func (t *LockReleaseTokenPoolVerifyInboundCCVsMCMSParams) UnmarshalHex(data stri
 
 // LockReleaseTokenPoolVerifyOutboundCCVs is a Record type
 type LockReleaseTokenPoolVerifyOutboundCCVs struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	Amount            types.NUMERIC                              `json:"amount"`
-	TokenArgs         types.TEXT                                 `json:"tokenArgs"`
-	Caller            types.PARTY                                `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
+	Amount                types.NUMERIC      `json:"amount"`
+	TokenArgs             types.TEXT         `json:"tokenArgs"`
+	Caller                types.PARTY        `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolVerifyOutboundCCVs to a map for DAML arguments
 func (t LockReleaseTokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = func() any {
+	m["tokenAdminRegistryCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Context).(mapper); ok {
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
 			return m.toMap()
 		}
-		return t.Context
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -1107,10 +1155,11 @@ func (t *LockReleaseTokenPoolVerifyOutboundCCVs) UnmarshalHex(data string) error
 // LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams is LockReleaseTokenPoolVerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	Amount            types.NUMERIC                              `json:"amount"`
-	TokenArgs         types.TEXT                                 `json:"tokenArgs"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
+	Amount                types.NUMERIC      `json:"amount"`
+	TokenArgs             types.TEXT         `json:"tokenArgs"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.

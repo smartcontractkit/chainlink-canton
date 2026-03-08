@@ -1081,8 +1081,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			}
 		}
 		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
-			CcvCid:       types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
-			VerifierArgs: types.TEXT(hex.EncodeToString(ccvItem.Args)),
+			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
+			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
+			CcvExtraContext: common.CCIPContext{},
 		})
 		if ccvSendInputs[len(ccvSendInputs)-1].CcvCid == "" {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("empty ccv contract ID for verifier address %s", verifierAddress.String())
@@ -1105,13 +1106,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 	receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(contracts.HexToInstanceAddress(onRampRef.Address).Bytes()))
 
-	sendContext := splice_api_token_metadata_v1.ChoiceContext{
+	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
-			"on-ramp":              splice_api_token_metadata_v1.AnyValue{AVContractId: &onRampCID},
-			"global-config":        splice_api_token_metadata_v1.AnyValue{AVContractId: &globalConfigCID},
-			"token-admin-registry": splice_api_token_metadata_v1.AnyValue{AVContractId: &tokenAdminRegistryCID},
-			"fee-quoter":           splice_api_token_metadata_v1.AnyValue{AVContractId: &feeQuoterCID},
-			"rmn-remote":           splice_api_token_metadata_v1.AnyValue{AVContractId: &rmnRemoteCID},
+			"on-ramp":              common.AnyValue{AVContractId: &onRampCID},
+			"global-config":        common.AnyValue{AVContractId: &globalConfigCID},
+			"token-admin-registry": common.AnyValue{AVContractId: &tokenAdminRegistryCID},
+			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCID},
+			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCID},
 		},
 	}
 

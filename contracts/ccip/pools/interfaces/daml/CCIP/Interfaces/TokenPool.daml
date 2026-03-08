@@ -6,6 +6,7 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
@@ -43,7 +44,8 @@ interface ITokenPool where
     -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1 via TAR.
     nonconsuming choice TokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            extraContext : CCIP.Context.CCIPContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             caller : Party
         controller caller
@@ -52,7 +54,8 @@ interface ITokenPool where
     -- Verify outbound CCVs and record pool-required CCVs on SendingMessageV1 via TAR.
     nonconsuming choice TokenPool_VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             amount : Numeric 0
             tokenArgs : BytesHex
@@ -64,7 +67,9 @@ interface ITokenPool where
     -- The pool should consume the ticket via TokenAdminRegistry_ConsumeReceiveTicket.
     nonconsuming choice TokenPool_ReleaseFromTicket : ReleaseOrMintResult
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            extraContext : CCIP.Context.CCIPContext
             tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
             tokenInput : TokenInput
             caller : Party
@@ -75,7 +80,8 @@ interface ITokenPool where
     -- truth for the locked amount, which it records via SendingMessageV1.AddTokenSend.
     nonconsuming choice TokenPool_LockOrBurn : LockOrBurnResult
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             tokenInput : TokenInput
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]

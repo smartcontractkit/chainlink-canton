@@ -561,8 +561,9 @@ func TestCCIPSend(t *testing.T) {
 	}
 
 	ccvSendInput := ccipsender.CCVSendInput{
-		CcvCid:       types.CONTRACT_ID(disclosedCCV.ContractId),
-		VerifierArgs: types.TEXT(""),
+		CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+		VerifierArgs:    types.TEXT(""),
+		CcvExtraContext: common.CCIPContext{},
 	}
 
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
@@ -586,13 +587,13 @@ func TestCCIPSend(t *testing.T) {
 	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
 	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
 	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
-	sendContext := splice_api_token_metadata_v1.ChoiceContext{
+	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
-			"on-ramp":              splice_api_token_metadata_v1.AnyValue{AVContractId: &onRampCid},
-			"global-config":        splice_api_token_metadata_v1.AnyValue{AVContractId: &globalConfigCid},
-			"token-admin-registry": splice_api_token_metadata_v1.AnyValue{AVContractId: &tarCid},
-			"fee-quoter":           splice_api_token_metadata_v1.AnyValue{AVContractId: &feeQuoterCid},
-			"rmn-remote":           splice_api_token_metadata_v1.AnyValue{AVContractId: &rmnRemoteCid},
+			"on-ramp":              common.AnyValue{AVContractId: &onRampCid},
+			"global-config":        common.AnyValue{AVContractId: &globalConfigCid},
+			"token-admin-registry": common.AnyValue{AVContractId: &tarCid},
+			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCid},
+			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
 		},
 	}
 

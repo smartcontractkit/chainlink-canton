@@ -14,17 +14,19 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
+import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
 
 -- | Per-CCV send input. Pairs a verifier contract (via interface)
--- with optional per-CCV forwarding arguments.
+-- with optional per-CCV forwarding arguments and per-CCV extra context.
 data CCVSendInput = CCVSendInput
     with
         ccvCid : ContractId ICCV.ICrossChainVerifier
         verifierArgs : BytesHex
+        ccvExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
 -- | Token transfer input for outbound sends.
@@ -37,6 +39,7 @@ data TokenTransferInput = TokenTransferInput
         tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         tokenReceiver : Optional BytesHex
         tokenArgs : BytesHex
+        poolExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
 template CCIPSender
@@ -49,8 +52,8 @@ template CCIPSender
         -- | Sends an outbound CCIP message end-to-end.
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult
             with
-                -- CCIP Choice Context
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                -- CCIP context for internal orchestration (PerPartyRouter calls).
+                context : CCIP.Context.CCIPContext
 
                 -- CCIP contract IDs
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
@@ -72,7 +75,10 @@ template CCIPSender
                 ccvSendInputs : [CCVSendInput]
             controller owner
             do
-                feeQuoterCid <- CCIP.Context.getFromContextU @(ContractId CCIP.FeeQuoter.FeeQuoter) context CCIP.Context.feeQuoterKey
+                -- Extract CIDs from context using typed accessors for pool/CCV calls.
+                (feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter) <- CCIP.Context.lookupFeeQuoterCid context
+                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
+                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
 
                 let tokenInstrumentId = case tokenTransfer of
                         Some tt -> Some tt.tokenInstrumentId
@@ -115,7 +121,8 @@ template CCIPSender
                     None -> pure smCid
                     Some tt -> exercise tt.tokenPoolCid
                         CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
-                            context = context
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            extraContext = tt.poolExtraContext
                             sendingMessageCid = smCid
                             amount = tt.amount
                             tokenArgs = tt.tokenArgs
@@ -127,7 +134,8 @@ template CCIPSender
                     Some tt -> do
                         lockResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
-                                context = context
+                                rmnRemoteCid = rmnRemoteCid
+                                extraContext = tt.poolExtraContext
                                 sendingMessageCid = smCid
                                 tokenInput = tt.tokenInput
                                 senderInputCids = tt.senderInputCids
@@ -153,7 +161,8 @@ template CCIPSender
                 smCid <- foldlA (\cid input ->
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_ForwardToVerifier with
-                            context = context
+                            rmnRemoteCid = rmnRemoteCid
+                            extraContext = input.ccvExtraContext
                             sendingMessageCid = cid
                             verifierArgs = input.verifierArgs
                             caller = owner

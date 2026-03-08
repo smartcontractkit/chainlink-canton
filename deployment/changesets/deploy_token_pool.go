@@ -9,9 +9,9 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
@@ -32,7 +32,7 @@ type DeployTokenPoolConfig struct {
 	// Optional; defaults to empty. ChainCCVRequirements can be set for chain-specific CCV requirements.
 	ChainCCVRequirements types.GENMAP
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
-	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext
+	PoolReceiveContext common.CCIPContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
@@ -71,7 +71,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
-		poolReceiveContext = splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}}
+		poolReceiveContext = common.CCIPContext{Values: types.TEXTMAP{}}
 	}
 	transferTimeout := cfg.TransferTimeout
 	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {

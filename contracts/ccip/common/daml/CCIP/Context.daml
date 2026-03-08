@@ -4,10 +4,33 @@ import DA.Time
 import DA.TextMap (TextMap)
 import DA.TextMap qualified as TextMap
 
-import Splice.Api.Token.MetadataV1
+-- Forked from Splice.Api.Token.MetadataV1.AnyValue.
+-- Owned by CCIP to allow future extension without Splice dependency.
+data AnyValue
+  = AV_Text Text
+  | AV_Int Int
+  | AV_Decimal Decimal
+  | AV_Bool Bool
+  | AV_Date Date
+  | AV_Time Time
+  | AV_RelTime RelTime
+  | AV_Party Party
+  | AV_ContractId (ContractId ())
+  | AV_List [AnyValue]
+  | AV_Map (TextMap AnyValue)
+  deriving (Eq, Show)
 
--- Choice context keys
---------------------------------------
+-- Forked from Splice.Api.Token.MetadataV1.ChoiceContext.
+-- CCIP-specific context for passing contract dependencies and custom state.
+data CCIPContext = CCIPContext
+    with
+        values : TextMap AnyValue
+    deriving (Eq, Show)
+
+emptyCCIPContext : CCIPContext
+emptyCCIPContext = CCIPContext with values = TextMap.empty
+
+-- Context keys for CCIP system contracts
 onRampKey : Text
 onRampKey = "on-ramp"
 
@@ -26,28 +49,14 @@ feeQuoterKey = "fee-quoter"
 rmnRemoteKey : Text
 rmnRemoteKey = "rmn-remote"
 
--- Choice context creation and parsing
---------------------------------------
-
--- | Values that can be converted to AnyValue
 class ToAnyValue a where
   toAnyValue : a -> AnyValue
 
--- | Convenience function to create maps that contain an optional value if it is
--- set. See its use sites for examples.
-addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
-addOptionalAnyValue _k None m = m
-addOptionalAnyValue k (Some value) m = TextMap.insert k (toAnyValue value) m
-
--- | Attempt to parse a value from AnyValue.
---
--- If a type implements both `ToAnyValue` and `FromAnyValue` then it must hold that
--- `fromAnyValue (toAnyValue x) = Right x` for all `x`.
 class FromAnyValue a where
   fromAnyValue : AnyValue -> Either Text a
 
--- | Lookup and decode a value within a choice context.
-lookupFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text (Optional a)
+-- Lookup and decode a value within a CCIPContext.
+lookupFromContext : FromAnyValue a => CCIPContext -> Text -> Either Text (Optional a)
 lookupFromContext context k = do
   case TextMap.lookup k context.values of
     None -> pure None
@@ -55,26 +64,46 @@ lookupFromContext context k = do
       Left err -> fail $ "Failed to decode context value for '" <> k <> "': " <> err
       Right v -> pure (Some v)
 
--- | Get a value from a choice context, failing if it is not present or fails to parse.
-getFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text a
+-- Get a value, failing if missing.
+getFromContext : FromAnyValue a => CCIPContext -> Text -> Either Text a
 getFromContext context k = do
   optValue <- lookupFromContext context k
   case optValue of
     None -> fail $ "Missing context entry for: " <> k
     Some v -> pure v
 
--- | Convenience version of `lookupFromContext` that raises the failure within the `Update`.
-lookupFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update (Optional a)
+lookupFromContextU : FromAnyValue a => CCIPContext -> Text -> Update (Optional a)
 lookupFromContextU context k = either fail pure $ lookupFromContext context k
 
--- | Convenience version of `getFromContext` that raises the failure within the `Update`.
-getFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update a
+getFromContextU : FromAnyValue a => CCIPContext -> Text -> Update a
 getFromContextU context k = either fail pure $ getFromContext context k
 
+-- Typed accessor functions for CCIP system CIDs.
+-- Return type is generic ContractId t; concrete type is inferred at call sites
+-- from how the CID is used (e.g., exercised on a specific template choice).
+lookupOnRampCid : Template t => CCIPContext -> Update (ContractId t)
+lookupOnRampCid ctx = getFromContextU ctx onRampKey
 
--- instances for ToAnyValue
----------------------------
+lookupOffRampCid : Template t => CCIPContext -> Update (ContractId t)
+lookupOffRampCid ctx = getFromContextU ctx offRampKey
 
+lookupGlobalConfigCid : Template t => CCIPContext -> Update (ContractId t)
+lookupGlobalConfigCid ctx = getFromContextU ctx globalConfigKey
+
+lookupTokenAdminRegistryCid : Template t => CCIPContext -> Update (ContractId t)
+lookupTokenAdminRegistryCid ctx = getFromContextU ctx tokenAdminRegistryKey
+
+lookupFeeQuoterCid : Template t => CCIPContext -> Update (ContractId t)
+lookupFeeQuoterCid ctx = getFromContextU ctx feeQuoterKey
+
+lookupRmnRemoteCid : Template t => CCIPContext -> Update (ContractId t)
+lookupRmnRemoteCid ctx = getFromContextU ctx rmnRemoteKey
+
+addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
+addOptionalAnyValue _k None m = m
+addOptionalAnyValue k (Some value) m = TextMap.insert k (toAnyValue value) m
+
+-- ToAnyValue instances
 instance ToAnyValue Text where
   toAnyValue t = AV_Text t
 
@@ -95,6 +124,7 @@ instance ToAnyValue Time where
 
 instance ToAnyValue RelTime where
   toAnyValue x = AV_RelTime x
+
 instance ToAnyValue Party where
   toAnyValue p = AV_Party p
 
@@ -104,13 +134,10 @@ instance ToAnyValue (ContractId t) where
 instance ToAnyValue a => ToAnyValue [a] where
   toAnyValue = AV_List . map toAnyValue
 
-instance ToAnyValue ChoiceContext where
-  toAnyValue (ChoiceContext values) = AV_Map values
-
+instance ToAnyValue CCIPContext where
+  toAnyValue (CCIPContext values) = AV_Map values
 
 -- FromAnyValue instances
--------------------------
-
 instance FromAnyValue Text where
   fromAnyValue (AV_Text t) = Right t
   fromAnyValue av = Left $ "expected Text, got: " <> show av
@@ -134,6 +161,7 @@ instance FromAnyValue Date where
 instance FromAnyValue Time where
   fromAnyValue (AV_Time t) = Right t
   fromAnyValue av = Left $ "expected Time, got: " <> show av
+
 instance FromAnyValue RelTime where
   fromAnyValue (AV_RelTime t) = Right t
   fromAnyValue av = Left $ "expected RelTime, got: " <> show av
@@ -150,6 +178,6 @@ instance FromAnyValue a => FromAnyValue [a] where
   fromAnyValue (AV_List avs) = mapA fromAnyValue avs
   fromAnyValue av = Left $ "expected list, got: " <> show av
 
-instance FromAnyValue ChoiceContext where
-  fromAnyValue (AV_Map values) = Right $ ChoiceContext with values
+instance FromAnyValue CCIPContext where
+  fromAnyValue (AV_Map values) = Right $ CCIPContext with values
   fromAnyValue av = Left $ "expected map, got: " <> show av

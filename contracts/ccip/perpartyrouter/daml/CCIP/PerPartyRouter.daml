@@ -95,7 +95,7 @@ template PerPartyRouter
         -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 destChainSelector : Numeric 0
                 receiver : BytesHex
                 payload : BytesHex
@@ -107,12 +107,11 @@ template PerPartyRouter
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
-                -- Get Cids from context
-                onRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OnRamp.OnRamp) context CCIP.Context.onRampKey
-                globalConfigCid <- CCIP.Context.getFromContextU @(ContractId CCIP.GlobalConfig.GlobalConfig) context CCIP.Context.globalConfigKey
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
-                feeQuoterCid <- CCIP.Context.getFromContextU @(ContractId CCIP.FeeQuoter.FeeQuoter) context CCIP.Context.feeQuoterKey
-                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+                (onRampCid : ContractId CCIP.OnRamp.OnRamp) <- CCIP.Context.lookupOnRampCid context
+                (globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig) <- CCIP.Context.lookupGlobalConfigCid context
+                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
+                (feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter) <- CCIP.Context.lookupFeeQuoterCid context
+                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
@@ -145,17 +144,16 @@ template PerPartyRouter
         -- authorization is needed for the sender-side Splice transfer.
         nonconsuming choice CCIPSend : CCIPSendResult
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 feeTokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
             controller partyOwner
             do
-                -- Get Cids from context
-                onRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OnRamp.OnRamp) context CCIP.Context.onRampKey
-                globalConfigCid <- CCIP.Context.getFromContextU @(ContractId CCIP.GlobalConfig.GlobalConfig) context CCIP.Context.globalConfigKey
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
-                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+                (onRampCid : ContractId CCIP.OnRamp.OnRamp) <- CCIP.Context.lookupOnRampCid context
+                (globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig) <- CCIP.Context.lookupGlobalConfigCid context
+                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
+                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
@@ -238,13 +236,12 @@ template PerPartyRouter
         -- and issues a refund ticket if tokens were locked.
         nonconsuming choice CancelSend : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             controller partyOwner
             do
-                -- Get Cids from context
-                onRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OnRamp.OnRamp) context CCIP.Context.onRampKey
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
+                (onRampCid : ContractId CCIP.OnRamp.OnRamp) <- CCIP.Context.lookupOnRampCid context
+                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
 
                 onRamp <- fetch onRampCid
                 assertMsg "router: onramp ccipowner mismatch"
@@ -265,16 +262,15 @@ template PerPartyRouter
         -- TODO: consider relaxing to allow `controller caller`
         nonconsuming choice PrepareExecute : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
                 caller : Party
             controller partyOwner
             do
-                -- Get Cids from context
-                offRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OffRamp.OffRamp) context CCIP.Context.offRampKey
-                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+                (offRampCid : ContractId CCIP.OffRamp.OffRamp) <- CCIP.Context.lookupOffRampCid context
+                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
                 assertMsg "router: offramp ccipowner mismatch"
@@ -302,16 +298,15 @@ template PerPartyRouter
         -- TODO: consider relaxing to allow `controller caller`
         choice Execute : ExecuteResult
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 receiverRequiredCCVs : [RawInstanceAddress]
             controller partyOwner
             do
-                -- Get Cids from context
-                offRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OffRamp.OffRamp) context CCIP.Context.offRampKey
-                globalConfigCid <- CCIP.Context.getFromContextU @(ContractId CCIP.GlobalConfig.GlobalConfig) context CCIP.Context.globalConfigKey
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
-                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
+                (offRampCid : ContractId CCIP.OffRamp.OffRamp) <- CCIP.Context.lookupOffRampCid context
+                (globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig) <- CCIP.Context.lookupGlobalConfigCid context
+                (tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) <- CCIP.Context.lookupTokenAdminRegistryCid context
+                (rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote) <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
                 assertMsg "router: offramp ccipowner mismatch"
@@ -374,13 +369,12 @@ template PerPartyRouter
         -- | Get all required CCV raw instance addresses for sending a message.
         nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress]
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 destChainSelector : Numeric 0
             controller partyOwner
             do
-                -- Get Cids from context
-                onRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OnRamp.OnRamp) context CCIP.Context.onRampKey
-                globalConfigCid <- CCIP.Context.getFromContextU @(ContractId CCIP.GlobalConfig.GlobalConfig) context CCIP.Context.globalConfigKey
+                (onRampCid : ContractId CCIP.OnRamp.OnRamp) <- CCIP.Context.lookupOnRampCid context
+                (globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig) <- CCIP.Context.lookupGlobalConfigCid context
 
                 exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
                     globalConfigCid = globalConfigCid
@@ -389,14 +383,13 @@ template PerPartyRouter
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : CCIP.Context.CCIPContext
                 receiverRequiredCCVs : [RawInstanceAddress]
                 sourceChainSelector : Numeric 0
             controller partyOwner
             do
-                -- Get Cids from context
-                offRampCid <- CCIP.Context.getFromContextU @(ContractId CCIP.OffRamp.OffRamp) context CCIP.Context.offRampKey
-                globalConfigCid <- CCIP.Context.getFromContextU @(ContractId CCIP.GlobalConfig.GlobalConfig) context CCIP.Context.globalConfigKey
+                (offRampCid : ContractId CCIP.OffRamp.OffRamp) <- CCIP.Context.lookupOffRampCid context
+                (globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig) <- CCIP.Context.lookupGlobalConfigCid context
 
                 exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecute with
                     globalConfigCid = globalConfigCid

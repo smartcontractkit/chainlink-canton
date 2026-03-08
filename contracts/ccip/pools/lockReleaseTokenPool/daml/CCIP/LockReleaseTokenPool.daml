@@ -59,6 +59,25 @@ data PoolFeeConfig = PoolFeeConfig
         destBytesOverhead : Int
     deriving (Eq, Show)
 
+-- | Convert CCIP AnyValue to Splice AnyValue at TransferFactory boundary.
+toSpliceAnyValue : CCIP.Context.AnyValue -> Splice.Api.Token.MetadataV1.AnyValue
+toSpliceAnyValue (CCIP.Context.AV_Text t) = Splice.Api.Token.MetadataV1.AV_Text t
+toSpliceAnyValue (CCIP.Context.AV_Int i) = Splice.Api.Token.MetadataV1.AV_Int i
+toSpliceAnyValue (CCIP.Context.AV_Decimal d) = Splice.Api.Token.MetadataV1.AV_Decimal d
+toSpliceAnyValue (CCIP.Context.AV_Bool b) = Splice.Api.Token.MetadataV1.AV_Bool b
+toSpliceAnyValue (CCIP.Context.AV_Date d) = Splice.Api.Token.MetadataV1.AV_Date d
+toSpliceAnyValue (CCIP.Context.AV_Time t) = Splice.Api.Token.MetadataV1.AV_Time t
+toSpliceAnyValue (CCIP.Context.AV_RelTime r) = Splice.Api.Token.MetadataV1.AV_RelTime r
+toSpliceAnyValue (CCIP.Context.AV_Party p) = Splice.Api.Token.MetadataV1.AV_Party p
+toSpliceAnyValue (CCIP.Context.AV_ContractId c) = Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId c)
+toSpliceAnyValue (CCIP.Context.AV_List xs) = Splice.Api.Token.MetadataV1.AV_List (map toSpliceAnyValue xs)
+toSpliceAnyValue (CCIP.Context.AV_Map m) = Splice.Api.Token.MetadataV1.AV_Map (TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList m)))
+
+-- | Convert CCIPContext to Splice ChoiceContext for TransferFactory calls.
+toSpliceChoiceContext : CCIP.Context.CCIPContext -> Splice.Api.Token.MetadataV1.ChoiceContext
+toSpliceChoiceContext ctx = Splice.Api.Token.MetadataV1.ChoiceContext with
+    values = TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList ctx.values))
+
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 -- Performs best-effort RMN curse checks via disclosed RMNRemote contract.
 -- The pool cannot validate the RMN instance address (not a stakeholder);
@@ -79,8 +98,9 @@ template LockReleaseTokenPool
         -- Context merged into extraArgs for transfers TO the pool (LockOrBurn).
         -- For tokens following Splice patterns (e.g., Amulet), this should contain
         -- the pool's preapproval CID under the key the TransferFactory expects
-        -- (e.g., "transfer-preapproval"). Enables direct transfers without pending state.
-        poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
+        -- TransferFactory boundary.
+        poolReceiveContext : CCIP.Context.CCIPContext
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
     where
@@ -105,14 +125,16 @@ template LockReleaseTokenPool
             tokenPool_verifyInboundCCVsImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyInboundCCVs
                     with
-                        context = arg.context
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        extraContext = arg.extraContext
                         executingMessageCid = arg.executingMessageCid
                         caller = arg.caller
 
             tokenPool_verifyOutboundCCVsImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_VerifyOutboundCCVs
                     with
-                        context = arg.context
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
                         tokenArgs = arg.tokenArgs
@@ -121,7 +143,9 @@ template LockReleaseTokenPool
             tokenPool_releaseFromTicketImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_ReleaseFromTicket
                     with
-                        context = arg.context
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        rmnRemoteCid = arg.rmnRemoteCid
+                        extraContext = arg.extraContext
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
                         tokenInput = arg.tokenInput
                         caller = arg.caller
@@ -129,7 +153,8 @@ template LockReleaseTokenPool
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_LockOrBurn
                     with
-                        context = arg.context
+                        rmnRemoteCid = arg.rmnRemoteCid
+                        extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         tokenInput = arg.tokenInput
                         senderInputCids = arg.senderInputCids
@@ -165,14 +190,12 @@ template LockReleaseTokenPool
         -- OffRamp performs the actual CCV coverage check.
         nonconsuming choice LockReleaseTokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                extraContext : CCIP.Context.CCIPContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 caller : Party
             controller caller
             do
-                -- Get Cids from context
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
-
                 execMsg <- fetch executingMessageCid
                 let message = execMsg.message
 
@@ -199,15 +222,14 @@ template LockReleaseTokenPool
         -- Looks up per-chain CCV requirements and records them on the sending message.
         nonconsuming choice LockReleaseTokenPool_VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 amount : Numeric 0
                 tokenArgs : BytesHex
                 caller : Party
             controller caller
             do
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
-
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
 
@@ -228,16 +250,14 @@ template LockReleaseTokenPool
         -- atomically. If any check fails, the entire transaction rolls back.
         nonconsuming choice LockReleaseTokenPool_ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                extraContext : CCIP.Context.CCIPContext
                 tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 caller : Party
             controller caller
             do
-                -- Get Cids from context
-                tokenAdminRegistryCid <- CCIP.Context.getFromContextU @(ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry) context CCIP.Context.tokenAdminRegistryKey
-                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
-
                 -- Best-effort RMN curse check for the source chain (matches EVM
                 -- TokenPool._validateReleaseOrMint). The pool cannot validate
                 -- the RMN instance address (not a stakeholder); PrepareExecute
@@ -334,7 +354,8 @@ template LockReleaseTokenPool
         -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
         nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+                extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 tokenInput : CCIP.Interfaces.TokenPool.TokenInput
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
@@ -342,8 +363,6 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller, poolOwner
             do
-                rmnRemoteCid <- CCIP.Context.getFromContextU @(ContractId CCIP.RMNRemote.RMNRemote) context CCIP.Context.rmnRemoteKey
-
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
 
@@ -358,8 +377,10 @@ template LockReleaseTokenPool
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
 
+                -- Convert pool's CCIPContext to Splice ChoiceContext at TransferFactory boundary.
+                let splicePoolCtx = toSpliceChoiceContext poolReceiveContext
                 let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
-                        values = TextMap.union poolReceiveContext.values tokenInput.extraArgs.context.values
+                        values = TextMap.union splicePoolCtx.values tokenInput.extraArgs.context.values
                 let mergedExtraArgs = tokenInput.extraArgs with context = mergedContext
                 now <- getTime
                 let executeBefore = case transferTimeout of
@@ -401,4 +422,3 @@ template LockReleaseTokenPool
                             senderChangeCids = transferResult.senderChangeCids
                             sendingMessageCid = newSendingMessageCid
                     _ -> abort "LockOrBurn: transfer did not complete directly"
-
