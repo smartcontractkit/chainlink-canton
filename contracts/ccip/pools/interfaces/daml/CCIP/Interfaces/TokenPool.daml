@@ -23,7 +23,7 @@ interface ITokenPool where
     viewtype TokenPoolView
 
     tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [RawInstanceAddress]
-    tokenPool_verifyInboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyInboundCCVs -> Update (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
+    tokenPool_verifyInboundMessageImpl : ContractId ITokenPool -> TokenPool_VerifyInboundMessage -> Update (ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1)
     tokenPool_verifyOutboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyOutboundCCVs -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
@@ -41,15 +41,16 @@ interface ITokenPool where
         controller caller
         do tokenPool_getRequiredCCVsImpl this self arg
 
-    -- Verify inbound CCVs and mark pool verification on ExecutingMessageV1 via TAR.
-    nonconsuming choice TokenPool_VerifyInboundCCVs : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+    -- Validate inbound token transfer message and record pool CCV requirements on ExecutingMessageV1 via TAR.
+    -- Validates source pool address against allowed remote pools and records inbound CCVs.
+    nonconsuming choice TokenPool_VerifyInboundMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
             extraContext : CCIP.Context.CCIPContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             caller : Party
         controller caller
-        do tokenPool_verifyInboundCCVsImpl this self arg
+        do tokenPool_verifyInboundMessageImpl this self arg
 
     -- Verify outbound CCVs and record pool-required CCVs on SendingMessageV1 via TAR.
     nonconsuming choice TokenPool_VerifyOutboundCCVs : ContractId CCIP.SendingMessageV1.SendingMessageV1
