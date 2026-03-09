@@ -52,15 +52,18 @@ template CommitteeVerifier
 
         -- | Storage locations for off-chain components to read from.
         storageLocations : [Text]
+        -- | The current admin party that's allowed to update storage locations and transfer the admin role.
         storageLocationsAdmin : Party
-        pendingStorageLocationsAdmin : Optional Party
+        -- | The pending admin party for the two-step storage location admin role transfer process.
+        -- | pendingStorageLocationsAdmin /= storageLocationsAdmin indicates that a transfer is in progress.
+        pendingStorageLocationsAdmin : Party
 
         signerConfigs : Map.Map (Numeric 0) SignatureConfig
         deps : CommitteeVerifierDeps
         remoteChainFeeConfigs : Map.Map (Numeric 0) CCVFeeConfig
     where
         signatory owner
-        observer storageLocationsAdmin :: optional [] pure pendingStorageLocationsAdmin
+        observer [storageLocationsAdmin, pendingStorageLocationsAdmin]
         
         -- Ensure that for each signerConfig the number of signer keys is >= threshold and that threshold > 0
         ensure versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
@@ -116,18 +119,15 @@ template CommitteeVerifier
                 newAdmin : Party
             controller storageLocationsAdmin
             do
-                create this with pendingStorageLocationsAdmin = Some newAdmin
+                create this with pendingStorageLocationsAdmin = newAdmin
 
         -- | Completes the transfer of the storage locations admin role.
         -- Caller must be the proposed new storage locations admin.
         choice CommitteeVerifier_AcceptStorageLocationsAdmin : ContractId CommitteeVerifier
-            with
-                caller : Party
-            controller caller
+            controller pendingStorageLocationsAdmin
             do
-                let proposedAdmin = fromSomeNote "No pending storage locations admin" pendingStorageLocationsAdmin
-                assertMsg "Only the pending storage locations admin can accept the role" (proposedAdmin == caller)
-                create this with storageLocationsAdmin = proposedAdmin, pendingStorageLocationsAdmin = None
+                assertMsg "No pending admin transfer to accept" (pendingStorageLocationsAdmin /= storageLocationsAdmin)
+                create this with storageLocationsAdmin = pendingStorageLocationsAdmin
 
         -- | Updates the storage locations identifiers.
         -- Caller must be the storage locations admin.

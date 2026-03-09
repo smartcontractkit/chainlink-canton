@@ -39,8 +39,8 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 		if template.StorageLocationsAdmin == "" {
 			return errors.New("storage locations admin cannot be empty")
 		}
-		if template.PendingStorageLocationsAdmin != nil {
-			return errors.New("pending storage locations admin should not be set, use two-step transfer instead")
+		if template.PendingStorageLocationsAdmin != template.StorageLocationsAdmin {
+			return errors.New("pending storage locations admin should not be set, set to the same value as StorageLocationsAdmin use two-step transfer instead")
 		}
 
 		return nil
@@ -109,13 +109,7 @@ var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExercisePara
 	Version:      Version,
 	Description:  "Accepts a pending transfer of the storage locations admin role",
 	ContractType: ContractType,
-	Validate: func(input ccvs.CommitteeVerifierAcceptStorageLocationsAdmin) error {
-		if input.Caller == "" {
-			return errors.New("caller cannot be empty")
-		}
-
-		return nil
-	},
-	Template: ccvs.CommitteeVerifier{},
-	Method:   ccvs.CommitteeVerifier{}.CommitteeVerifierAcceptStorageLocationsAdmin,
+	Validate:     nil,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.CommitteeVerifierAcceptStorageLocationsAdmin,
 })

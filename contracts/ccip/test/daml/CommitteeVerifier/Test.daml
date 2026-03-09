@@ -84,7 +84,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys1)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -112,7 +112,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys2)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -139,7 +139,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 20, signerKeys = pubKeys3)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -159,7 +159,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys4)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -185,7 +185,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 4, signerKeys = pubKeys5)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -211,7 +211,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys6)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -235,7 +235,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 0, signerKeys = [])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -252,7 +252,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = []
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = PayloadBuilder.getPubkeysForIndices [0])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -270,7 +270,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = pubKeys9)]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -320,7 +320,7 @@ testCommitteeVerifier = script do
             ccipOwner = owner
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
@@ -389,9 +389,9 @@ testStorageLocation = script do
             ccipOwner = owner
             storageLocations = []
             storageLocationsAdmin = owner
-            pendingStorageLocationsAdmin = None
+            pendingStorageLocationsAdmin = owner
             signerConfigs = Map.empty
-            rmnRemoteInstanceAddress = rmnRemoteInstanceAddress
+            deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
             remoteChainFeeConfigs = Map.empty
 
     -- Transfer storage location admin role to another party
@@ -401,14 +401,11 @@ testStorageLocation = script do
 
     -- Accept admin role from wrong party, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin with
-            caller = owner
+        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin
 
     -- Accept admin role
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin with
-            caller = admin
-
+        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin
     let newLocations = ["ipfs://new-location1", "ipfs://new-location2"]
 
     -- Update storage locations with new admin, should succeed
