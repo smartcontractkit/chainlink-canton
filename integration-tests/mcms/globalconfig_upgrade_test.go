@@ -60,9 +60,10 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	require.Equal(t, configInstanceID, instId, "V1 instanceId should match")
 
 	// Exercise UpdateDestChainConfig via MCMSReceiver_Entrypoint to prove V1 works
+	instanceAddr := configInstanceID + "@" + ccipOwner
 	v1Cid = exerciseMCMSReceiverEntrypoint(
 		t, participant, mcmsPkgID, ccipOwner, v1Cid,
-		"UpdateDestChainConfig", "", nil,
+		"UpdateDestChainConfig", "", map[string]string{instanceAddr: v1Cid},
 	)
 	t.Logf("V1 after UpdateDestChainConfig: %s", v1Cid)
 
@@ -93,7 +94,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 
 	v2Cid := exerciseMCMSReceiverEntrypoint(
 		t, participant, mcmsPkgID, ccipOwner, v1Cid,
-		"MigrateToV2", "", nil,
+		"MigrateToV2", "", map[string]string{instanceAddr: v1Cid},
 	)
 	t.Logf("MigrateToV2 created V2: %s", v2Cid)
 
@@ -112,7 +113,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 
 	v2Cid = exerciseMCMSReceiverEntrypoint(
 		t, participant, mcmsPkgID, ccipOwner, v2Cid,
-		"SetNewFeature", "true", nil,
+		"SetNewFeature", "true", map[string]string{instanceAddr: v2Cid},
 	)
 	t.Logf("V2 after SetNewFeature: %s", v2Cid)
 
@@ -208,7 +209,6 @@ func exerciseMCMSReceiverEntrypoint(
 
 	choiceArg := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 		Fields: []*apiv2.RecordField{
-			{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
 			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: functionName}}},
 			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: operationData}}},
 			{Label: "contractIds", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: cidEntries}}}},

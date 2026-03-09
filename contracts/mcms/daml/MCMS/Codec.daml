@@ -8,8 +8,10 @@ module MCMS.Codec
   , encodeSelfDispatchSetConfig
   , decodeSelfDispatchSetConfig
   , encodeUint8
+  , encodeUint16
   , encodeUint32
   , decodeUint8
+  , decodeUint16
   , decodeUint32
   , extractBytes
   , encodeText
@@ -184,6 +186,18 @@ decodeUint32WithOffset encoded offset = do
   value <- decodeUint32 hex
   return (value, offset + 4)
 
+-- | Encode uint16 (2 bytes) - for long fields like operationData
+encodeUint16 : Int -> Optional BytesHex
+encodeUint16 n =
+  if n < 0 || n > 65535 then None
+  else Some (padLeft 4 "0" (intToHex n))
+
+-- | Decode uint16 (2 bytes)
+decodeUint16 : BytesHex -> Optional Int
+decodeUint16 hex =
+  if byteCount hex /= 2 then None
+  else fromHex hex
+
 -- | Encode int64 (8 bytes)
 encodeInt64 : Int -> Optional BytesHex
 encodeInt64 n =
@@ -322,45 +336,65 @@ decodeSelfDispatchSetConfig encoded = do
 -- TIMELOCK CALL ENCODING (for schedule_batch self-dispatch)
 -- ===========================================================================
 
+-- | Encode TimelockCall with uint16 length prefix for operationData (supports >255 bytes)
 encodeTimelockCall : TimelockCall -> BytesHex
 encodeTimelockCall tc =
-  encodeText tc.targetInstanceAddress <> encodeText tc.functionName <> encodeText tc.operationData
+  encodeText tc.targetInstanceAddress                      -- uint8 length (short)
+  <> encodeText tc.functionName                            -- uint8 length (short)
+  <> fromSome (encodeUint16 (byteCount tc.operationData))  -- uint16 length prefix
+  <> tc.operationData                                      -- raw BytesHex data
 
+-- | Decode TimelockCall with uint16 length prefix for operationData
 decodeTimelockCall : BytesHex -> Int -> Optional (TimelockCall, Int)
 decodeTimelockCall encoded offset = do
   (targetInstanceAddress, offset1) <- decodeText encoded offset
   (functionName, offset2) <- decodeText encoded offset1
-  (operationData, offset3) <- decodeText encoded offset2
-  Some (TimelockCall targetInstanceAddress functionName operationData, offset3)
+  -- Decode operationData with uint16 length prefix
+  opLenHex <- extractBytes encoded offset2 2
+  opLen <- decodeUint16 opLenHex
+  operationData <- extractBytes encoded (offset2 + 2) opLen
+  Some (TimelockCall targetInstanceAddress functionName operationData, offset2 + 2 + opLen)
 
 -- ===========================================================================
 -- SCHEDULE BATCH PARAMS (for schedule_batch self-dispatch)
--- Format: numCalls (1 byte) + calls + predecessor (text) + salt (text) + delay (4 bytes)
+-- Format: numCalls (1 byte) + calls + predecessor (BytesHex) + salt (BytesHex) + delay (8 bytes)
 -- ===========================================================================
 
 data ScheduleBatchParams = ScheduleBatchParams
   with
     calls : [TimelockCall]
-    predecessor : Text
-    salt : Text
+    predecessor : BytesHex  -- Hex hash (already hex-encoded)
+    salt : BytesHex         -- Hex value (already hex-encoded)
     delaySecs : Int
   deriving (Show, Eq)
 
+-- | Encode ScheduleBatchParams with uint16 length prefix for predecessor and salt
 encodeScheduleBatchParams : ScheduleBatchParams -> BytesHex
 encodeScheduleBatchParams params =
   let
     callsEncoded = encodeList params.calls encodeTimelockCall
-    predecessorEncoded = encodeText params.predecessor
-    saltEncoded = encodeText params.salt
+    -- Use uint16 for predecessor and salt (BytesHex, no toHex conversion needed)
+    predecessorEncoded = fromSome (encodeUint16 (byteCount params.predecessor)) <> params.predecessor
+    saltEncoded = fromSome (encodeUint16 (byteCount params.salt)) <> params.salt
     delayEncoded = fromSome (encodeInt64 params.delaySecs)
   in
     callsEncoded <> predecessorEncoded <> saltEncoded <> delayEncoded
 
+-- | Decode ScheduleBatchParams with uint16 length prefix for predecessor and salt
 decodeScheduleBatchParams : BytesHex -> Optional ScheduleBatchParams
 decodeScheduleBatchParams encoded = do
   (calls, offset1) <- decodeList encoded 0 decodeTimelockCall
-  (predecessor, offset2) <- decodeText encoded offset1
-  (salt, offset3) <- decodeText encoded offset2
+  -- Decode predecessor with uint16 length prefix (BytesHex, no fromHex needed)
+  predLenHex <- extractBytes encoded offset1 2
+  predLen <- decodeUint16 predLenHex
+  predecessor <- extractBytes encoded (offset1 + 2) predLen
+  let offset2 = offset1 + 2 + predLen
+  -- Decode salt with uint16 length prefix (BytesHex, no fromHex needed)
+  saltLenHex <- extractBytes encoded offset2 2
+  saltLen <- decodeUint16 saltLenHex
+  salt <- extractBytes encoded (offset2 + 2) saltLen
+  let offset3 = offset2 + 2 + saltLen
+  -- Decode delay
   delayHex <- extractBytes encoded offset3 8
   delaySecs <- decodeInt64 delayHex
   Some ScheduleBatchParams

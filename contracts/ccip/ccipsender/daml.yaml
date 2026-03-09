@@ -18,4 +18,5 @@ dependencies:
   - ../offramp/.daml/dist/ccip-offramp-0.0.1.dar
   - ../perpartyrouter/.daml/dist/ccip-perpartyrouter-0.0.1.dar
   - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-0.0.1.dar
+  - ../../mcms/.daml/dist/mcms-0.0.1.dar
   - ../pools/interfaces/.daml/dist/ccip-tokenpool-interfaces-0.0.1.dar
