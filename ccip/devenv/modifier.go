@@ -21,6 +21,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 const (
@@ -44,7 +46,10 @@ func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any
 		// Return placeholder values here, the real values will be pulled from the mounted config in the container.
 		ret[strSelector] = ccip.BlockchainInfo{
 			GRPCLedgerAPIURL: "dontuse",
-			JWT:              "dontuse",
+			Auth: commonconfig.AuthConfig{
+				Type: commonconfig.AuthTypeStatic,
+				JWT:  "dontuse",
+			},
 		}
 	}
 
@@ -107,7 +112,7 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		if readerConfig.CCIPOwnerParty == "" {
 			return nil, fmt.Errorf("CCIPOwnerParty is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
-		if readerConfig.CCIPMessageSentTemplateID == "" {
+		if readerConfig.CCIPMessageSentTemplateID == (contracts.TemplateID{}) {
 			return nil, fmt.Errorf("CCIPMessageSentTemplateID is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
 
@@ -123,7 +128,10 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 			// TODO: we should get the port number programmatically somehow.
 			// This is the default nginx port for the canton ledger API.
 			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
-			JWT:              jwt,
+			Auth: commonconfig.AuthConfig{
+				Type: commonconfig.AuthTypeInsecureStatic,
+				JWT:  jwt,
+			},
 		}
 
 		// find the party that starts with the prefix that is listed in the canton config.

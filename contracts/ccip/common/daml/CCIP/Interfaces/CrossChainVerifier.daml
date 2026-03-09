@@ -2,11 +2,10 @@ module CCIP.Interfaces.CrossChainVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
-
-import qualified Splice.Api.Token.MetadataV1
 
 interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
@@ -15,17 +14,18 @@ interface ICrossChainVerifier where
     crossChainVerifier_calculateFeeImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_CalculateFee -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
     crossChainVerifier_forwardToVerifierImpl : ContractId ICrossChainVerifier -> CrossChainVerifier_ForwardToVerifier -> Update (ContractId CCIP.SendingMessageV1.SendingMessageV1)
 
-    -- | Verify an inbound message and append a CCV verification to ExecutingMessageV1.
+    -- Verify an inbound message and append a CCV verification to ExecutingMessageV1.
     nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            extraContext : CCIP.Context.CCIPContext
             executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             verifierResults : BytesHex
             caller : Party
         controller caller
         do crossChainVerifier_verifyMessageImpl this self arg
 
-    -- | Calculate fee for outbound message (USD cents only).
+    -- Calculate fee for outbound message (USD cents only).
     -- Reads destChainSelector from SendingMessageV1, looks up per-chain
     -- fee config, appends fee via AddCCVFee.
     nonconsuming choice CrossChainVerifier_CalculateFee
@@ -36,12 +36,13 @@ interface ICrossChainVerifier where
         controller caller
         do crossChainVerifier_calculateFeeImpl this self arg
 
-    -- | Forward message for verification and append verifier data to
+    -- Forward message for verification and append verifier data to
     -- SendingMessageV1.
     nonconsuming choice CrossChainVerifier_ForwardToVerifier
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
+            extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             verifierArgs : BytesHex
             caller : Party

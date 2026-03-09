@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
@@ -52,17 +51,22 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 		return nil, fmt.Errorf("canton reader config not found for chain %d", chainSelector)
 	}
 
+	authProvider, err := blockchainInfo.Auth.NewProvider(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create auth provider for chain %d: %w", chainSelector, err)
+	}
+
 	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Named(f.lggr, fmt.Sprintf("CantonSourceReader.%d", chainSelector)),
 		blockchainInfo.GRPCLedgerAPIURL,
-		blockchainInfo.JWT,
 		sourcereader.ReaderConfig{
 			NodeOperatorParty:         readerConfig.NodeOperatorParty,
 			CCIPOwnerParty:            readerConfig.CCIPOwnerParty,
 			CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
 			Authority:                 readerConfig.Authority,
 		},
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // TODO: make this configurable
+		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
+		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create source reader: %w", err)

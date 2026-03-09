@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "98dc91934100d0e44b9663a08fe841b388917797f0f24e723ae829eaec7a1990"
+	PackageID   = "5e70003ac97e55078baca8000557fc5b7c59c761916a75ee0b7b97dd052ffe7e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -67,8 +67,8 @@ func argsToMap(args any) map[string]any {
 // APSetConfig is a Record type
 type APSetConfig struct {
 	ApSigners      []SignerInfo  `json:"apSigners"`
-	ApGroupQuorums []types.INT64 `json:"apGroupQuorums"`
-	ApGroupParents []types.INT64 `json:"apGroupParents"`
+	ApGroupQuorums []types.INT64 `json:"apGroupQuorums" hex:"[]uint32"`
+	ApGroupParents []types.INT64 `json:"apGroupParents" hex:"[]uint32"`
 	ApClearRoot    types.BOOL    `json:"apClearRoot"`
 }
 
@@ -281,15 +281,15 @@ var _ types.VARIANT = (*ArgValue)(nil)
 
 // BlockedFunction is a Record type
 type BlockedFunction struct {
-	TargetInstanceId types.TEXT `json:"targetInstanceId"`
-	FunctionName     types.TEXT `json:"functionName"`
+	TargetInstanceAddress types.TEXT `json:"targetInstanceAddress"`
+	FunctionName          types.TEXT `json:"functionName"`
 }
 
 // ToMap converts BlockedFunction to a map for DAML arguments
 func (t BlockedFunction) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["targetInstanceId"] = string(t.TargetInstanceId)
+	m["targetInstanceAddress"] = string(t.TargetInstanceAddress)
 
 	m["functionName"] = string(t.FunctionName)
 
@@ -597,6 +597,27 @@ func (t Counter) GetInstanceIdChoiceWithPackageID(contractID string, packageID s
 	}
 }
 
+// GetInstanceAddressChoice exercises the GetInstanceAddressChoice choice on this Counter contract
+// This method uses the package name in the template ID
+func (t Counter) GetInstanceAddressChoice(contractID string, args GetInstanceAddressChoice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "GetInstanceAddressChoice",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetInstanceAddressChoiceWithPackageID exercises the GetInstanceAddressChoice choice using the provided package ID instead of package name
+func (t Counter) GetInstanceAddressChoiceWithPackageID(contractID string, packageID string, args GetInstanceAddressChoice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
+		ContractID: contractID,
+		Choice:     "GetInstanceAddressChoice",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Increment exercises the Increment choice on this Counter contract
 // This method uses the package name in the template ID
 func (t Counter) Increment(contractID string, args Increment) *model.ExerciseCommand {
@@ -782,8 +803,8 @@ type ExecuteScheduledBatch struct {
 	Submitter   types.PARTY    `json:"submitter"`
 	OpId        types.TEXT     `json:"opId"`
 	Calls       []TimelockCall `json:"calls"`
-	Predecessor types.TEXT     `json:"predecessor"`
-	Salt        types.TEXT     `json:"salt"`
+	Predecessor types.TEXT     `json:"predecessor" hex:"bytes16"`
+	Salt        types.TEXT     `json:"salt" hex:"bytes16"`
 	TargetCids  types.GENMAP   `json:"targetCids"`
 }
 
@@ -954,6 +975,42 @@ func (t GetBlockedFunctionsCount) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetBlockedFunctionsCount from hex string (Canton MCMS format)
 func (t *GetBlockedFunctionsCount) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetInstanceAddressChoice is a Record type
+type GetInstanceAddressChoice struct {
+	Viewer types.PARTY `json:"viewer"`
+}
+
+// ToMap converts GetInstanceAddressChoice to a map for DAML arguments
+func (t GetInstanceAddressChoice) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["viewer"] = t.Viewer.ToMap()
+
+	return m
+}
+
+func (t GetInstanceAddressChoice) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetInstanceAddressChoice) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetInstanceAddressChoice to hex string (Canton MCMS format)
+func (t GetInstanceAddressChoice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetInstanceAddressChoice from hex string (Canton MCMS format)
+func (t *GetInstanceAddressChoice) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1896,7 +1953,7 @@ func (t *MCMSReceiverView) UnmarshalHex(data string) error {
 // MCMSReceiverEntrypoint is a Record type
 type MCMSReceiverEntrypoint struct {
 	FunctionName  types.TEXT   `json:"functionName"`
-	OperationData types.TEXT   `json:"operationData"`
+	OperationData types.TEXT   `json:"operationData" hex:"bytes16"`
 	ContractIds   types.GENMAP `json:"contractIds"`
 }
 
@@ -2036,8 +2093,8 @@ func (t *MCMSState) UnmarshalHex(data string) error {
 // MultisigConfig is a Record type
 type MultisigConfig struct {
 	Signers      []SignerInfo  `json:"signers"`
-	GroupQuorums []types.INT64 `json:"groupQuorums"`
-	GroupParents []types.INT64 `json:"groupParents"`
+	GroupQuorums []types.INT64 `json:"groupQuorums" hex:"[]uint32"`
+	GroupParents []types.INT64 `json:"groupParents" hex:"[]uint32"`
 }
 
 // ToMap converts MultisigConfig to a map for DAML arguments
@@ -2100,12 +2157,12 @@ func (t *MultisigConfig) UnmarshalHex(data string) error {
 
 // Op is a Record type
 type Op struct {
-	ChainId          types.INT64 `json:"chainId"`
-	MultisigId       types.TEXT  `json:"multisigId"`
-	Nonce            types.INT64 `json:"nonce"`
-	TargetInstanceId types.TEXT  `json:"targetInstanceId"`
-	FunctionName     types.TEXT  `json:"functionName"`
-	OperationData    types.TEXT  `json:"operationData"`
+	ChainId               types.INT64 `json:"chainId"`
+	MultisigId            types.TEXT  `json:"multisigId"`
+	Nonce                 types.INT64 `json:"nonce"`
+	TargetInstanceAddress types.TEXT  `json:"targetInstanceAddress"`
+	FunctionName          types.TEXT  `json:"functionName"`
+	OperationData         types.TEXT  `json:"operationData" hex:"bytes16"`
 }
 
 // ToMap converts Op to a map for DAML arguments
@@ -2118,7 +2175,7 @@ func (t Op) ToMap() map[string]any {
 
 	m["nonce"] = int64(t.Nonce)
 
-	m["targetInstanceId"] = string(t.TargetInstanceId)
+	m["targetInstanceAddress"] = string(t.TargetInstanceAddress)
 
 	m["functionName"] = string(t.FunctionName)
 
@@ -2388,8 +2445,8 @@ func (t *RootMetadata) UnmarshalHex(data string) error {
 // ScheduleBatchParams is a Record type
 type ScheduleBatchParams struct {
 	Calls       []TimelockCall `json:"calls"`
-	Predecessor types.TEXT     `json:"predecessor"`
-	Salt        types.TEXT     `json:"salt"`
+	Predecessor types.TEXT     `json:"predecessor" hex:"bytes16"`
+	Salt        types.TEXT     `json:"salt" hex:"bytes16"`
 	DelaySecs   types.INT64    `json:"delaySecs"`
 }
 
@@ -2521,8 +2578,8 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 // SetConfigParams is a Record type
 type SetConfigParams struct {
 	Signers      []SignerInfo  `json:"signers"`
-	GroupQuorums []types.INT64 `json:"groupQuorums"`
-	GroupParents []types.INT64 `json:"groupParents"`
+	GroupQuorums []types.INT64 `json:"groupQuorums" hex:"[]uint32"`
+	GroupParents []types.INT64 `json:"groupParents" hex:"[]uint32"`
 	ClearRoot    types.BOOL    `json:"clearRoot"`
 }
 
@@ -2708,8 +2765,8 @@ func (t *SetValue) UnmarshalHex(data string) error {
 // SignerInfo is a Record type
 type SignerInfo struct {
 	SignerAddress types.TEXT  `json:"signerAddress"`
-	SignerIndex   types.INT64 `json:"signerIndex"`
-	SignerGroup   types.INT64 `json:"signerGroup"`
+	SignerIndex   types.INT64 `json:"signerIndex" hex:"uint32"`
+	SignerGroup   types.INT64 `json:"signerGroup" hex:"uint32"`
 }
 
 // ToMap converts SignerInfo to a map for DAML arguments
@@ -2749,16 +2806,16 @@ func (t *SignerInfo) UnmarshalHex(data string) error {
 
 // TimelockCall is a Record type
 type TimelockCall struct {
-	TargetInstanceId types.TEXT `json:"targetInstanceId"`
-	FunctionName     types.TEXT `json:"functionName"`
-	OperationData    types.TEXT `json:"operationData"`
+	TargetInstanceAddress types.TEXT `json:"targetInstanceAddress"`
+	FunctionName          types.TEXT `json:"functionName"`
+	OperationData         types.TEXT `json:"operationData" hex:"bytes16"`
 }
 
 // ToMap converts TimelockCall to a map for DAML arguments
 func (t TimelockCall) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["targetInstanceId"] = string(t.TargetInstanceId)
+	m["targetInstanceAddress"] = string(t.TargetInstanceAddress)
 
 	m["functionName"] = string(t.FunctionName)
 
@@ -2809,6 +2866,7 @@ type MCMSEncoder interface {
 	ExecuteScheduledBatch(args ExecuteScheduledBatch) (*bind.EncodedChoice, error)
 	GetBlockedFunctions(args GetBlockedFunctions) (*bind.EncodedChoice, error)
 	GetBlockedFunctionsCount(args GetBlockedFunctionsCount) (*bind.EncodedChoice, error)
+	GetInstanceAddressChoice(args GetInstanceAddressChoice) (*bind.EncodedChoice, error)
 	GetInstanceIdChoice(args GetInstanceIdChoice) (*bind.EncodedChoice, error)
 	GetMinDelay(args GetMinDelay) (*bind.EncodedChoice, error)
 	GetState(args GetState) (*bind.EncodedChoice, error)
@@ -2824,6 +2882,7 @@ type MCMSEncoder interface {
 	Reset(args Reset) (*bind.EncodedChoice, error)
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
+	SetConfigParams(args SetConfigParams) (*bind.EncodedChoice, error)
 	SetRoot(args SetRoot) (*bind.EncodedChoice, error)
 	SetValue(args SetValue) (*bind.EncodedChoice, error)
 }
@@ -2888,6 +2947,11 @@ func (e *encoder) GetBlockedFunctions(args GetBlockedFunctions) (*bind.EncodedCh
 // GetBlockedFunctionsCount encodes parameters for the GetBlockedFunctionsCount choice.
 func (e *encoder) GetBlockedFunctionsCount(args GetBlockedFunctionsCount) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetBlockedFunctionsCount", args)
+}
+
+// GetInstanceAddressChoice encodes parameters for the GetInstanceAddressChoice choice.
+func (e *encoder) GetInstanceAddressChoice(args GetInstanceAddressChoice) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetInstanceAddressChoice", args)
 }
 
 // GetInstanceIdChoice encodes parameters for the GetInstanceIdChoice choice.
@@ -2962,6 +3026,11 @@ func (e *encoder) ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, 
 
 // SetConfig encodes parameters for the SetConfig choice.
 func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetConfig", args)
+}
+
+// SetConfigParams encodes parameters for the SetConfig choice.
+func (e *encoder) SetConfigParams(args SetConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetConfig", args)
 }
 

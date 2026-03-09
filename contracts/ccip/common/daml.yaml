@@ -15,3 +15,4 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
+  - ../../mcms/.daml/dist/mcms-0.0.1.dar

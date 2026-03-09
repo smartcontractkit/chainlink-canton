@@ -8,7 +8,6 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "a28095e22bcaa8a20a2ae2eb2acdd3c5a74af2cb5b9ef472f0b05ab7c6746587"
+	PackageID   = "9d7b0b7f993b0d9675757671ca3c9552cb69961adadb3b9988d5b07e984222ff"
 	SDKVersion  = "3.4.10"
 )
 
@@ -60,7 +59,7 @@ type CCIPMessageReceived struct {
 	Router             types.CONTRACT_ID               `json:"router"`
 	MessageId          types.TEXT                      `json:"messageId"`
 	Message            common.MessageV1                `json:"message"`
-	TokenReleaseResult *interfaces.ReleaseOrMintResult `json:"tokenReleaseResult"`
+	TokenReleaseResult *interfaces.ReleaseOrMintResult `json:"tokenReleaseResult" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -395,8 +394,9 @@ func (t CCIPReceiver) UpdateRequiredCCVsWithPackageID(contractID string, package
 
 // CCVInput is a Record type
 type CCVInput struct {
-	CcvCid          types.CONTRACT_ID `json:"ccvCid"`
-	VerifierResults types.TEXT        `json:"verifierResults"`
+	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
+	VerifierResults types.TEXT         `json:"verifierResults"`
+	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVInput to a map for DAML arguments
@@ -412,6 +412,14 @@ func (t CCVInput) ToMap() map[string]any {
 	}()
 
 	m["verifierResults"] = string(t.VerifierResults)
+
+	m["ccvExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcvExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvExtraContext
+	}()
 
 	return m
 }
@@ -440,12 +448,12 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context                splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	RouterCid              types.CONTRACT_ID                          `json:"routerCid"`
-	EncodedMessage         types.TEXT                                 `json:"encodedMessage"`
-	TokenTransfer          *TokenTransferInput                        `json:"tokenTransfer"`
-	CcvInputs              []CCVInput                                 `json:"ccvInputs"`
-	AdditionalRequiredCCVs []common.RawInstanceAddress                `json:"additionalRequiredCCVs"`
+	Context                common.CCIPContext          `json:"context"`
+	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
+	EncodedMessage         types.TEXT                  `json:"encodedMessage"`
+	TokenTransfer          *TokenTransferInput         `json:"tokenTransfer" hex:"optional"`
+	CcvInputs              []CCVInput                  `json:"ccvInputs"`
+	AdditionalRequiredCCVs []common.RawInstanceAddress `json:"additionalRequiredCCVs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -568,11 +576,29 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GetRequiredCCVsMCMSParams is GetRequiredCCVs without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetRequiredCCVsMCMSParams struct {
+}
+
+// MarshalHex encodes GetRequiredCCVsMCMSParams to hex string for MCMS operationData.
+func (t GetRequiredCCVsMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetRequiredCCVsMCMSParams from hex string.
+func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
 	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
 	TokenReceiverParty types.PARTY           `json:"tokenReceiverParty"`
 	TokenInput         interfaces.TokenInput `json:"tokenInput"`
+	PoolExtraContext   common.CCIPContext    `json:"poolExtraContext"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -595,6 +621,14 @@ func (t TokenTransferInput) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.TokenInput
+	}()
+
+	m["poolExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.PoolExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PoolExtraContext
 	}()
 
 	return m
@@ -674,6 +708,7 @@ func (t *UpdateRequiredCCVs) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	Execute2(args Execute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
+	GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
 	UpdateRequiredCCVs(args UpdateRequiredCCVs) (*bind.EncodedChoice, error)
 }
 
@@ -711,6 +746,11 @@ func (e *encoder) Execute2(args Execute2) (*bind.EncodedChoice, error) {
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
 func (e *encoder) GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
+}
+
+// GetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the GetRequiredCCVs choice.
+func (e *encoder) GetRequiredCCVsMCMSParams(args GetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetRequiredCCVs", args)
 }
 

@@ -24,21 +24,26 @@ template GlobalConfigV2
                 owner = ccipOwner
                 instanceId
 
-            mcmsEntrypoint selfCid functionName operationData contractIds = do
-                let selfV2Cid : ContractId GlobalConfigV2 = coerceContractId selfCid
+            mcmsEntrypoint functionName operationData contractIds = do
+                -- Calculate full instanceAddress for map lookup
+                let instanceAddress = makeInstanceAddress instanceId ccipOwner
+                selfCid <- case Map.lookup instanceAddress contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instanceAddress
+                    Some cid -> pure (coerceContractId cid : ContractId GlobalConfigV2)
+
                 case functionName of
                     "UpdateDestChainConfig" -> do
-                        newCid <- exercise selfV2Cid V2_UpdateDestChainConfig
-                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+                        newCid <- exercise selfCid V2_UpdateDestChainConfig
+                        pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
                     "UpdateSourceChainConfig" -> do
-                        newCid <- exercise selfV2Cid V2_UpdateSourceChainConfig
-                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+                        newCid <- exercise selfCid V2_UpdateSourceChainConfig
+                        pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
                     "SetNewFeature" -> do
                         let enabled = operationData == "true"
-                        newCid <- exercise selfV2Cid (V2_SetNewFeature enabled)
-                        pure (Map.insert instanceId (coerceContractId newCid) contractIds)
+                        newCid <- exercise selfCid (V2_SetNewFeature enabled)
+                        pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
@@ -81,6 +86,12 @@ template GlobalConfigV2
                 viewer : Party
             controller viewer
             do pure instanceId
+
+        nonconsuming choice GetInstanceAddressV2 : Text
+            with
+                viewer : Party
+            controller viewer
+            do pure (makeInstanceAddress instanceId ccipOwner)
 
         choice UpdateDestChainConfigV2 : ContractId GlobalConfigV2
             with

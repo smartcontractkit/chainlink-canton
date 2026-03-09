@@ -14,3 +14,4 @@ dependencies:
   - daml-stdlib
   - ../common/.daml/dist/ccip-common-0.0.1.dar
   - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
+  - ../../mcms/.daml/dist/mcms-0.0.1.dar

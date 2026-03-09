@@ -67,12 +67,12 @@ build-ccv-images:
 	cd ../chainlink-ccv/build/devenv && just build-docker
 
 .PHONY: start-devenv
-start-devenv: build-ccv-images build-committeeverifier
+start-devenv: build-ccv-images build-committeeverifier build-eds
 	cd ccip/devenv && go run cmd/ccv/main.go down && go run cmd/ccv/main.go up env-canton-evm.toml
 
 .PHONY: run-e2e-tests
 run-e2e-tests:
-	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCantonSourceReader
+	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCanton2EVM_Basic
 
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests

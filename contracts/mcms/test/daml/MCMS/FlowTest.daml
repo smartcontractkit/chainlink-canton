@@ -46,15 +46,15 @@ realTestInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
 realTestProposerMultisigId : Text
 realTestProposerMultisigId = makeMcmsId realTestInstanceId Proposer
 
--- targetInstanceId includes @partyId matching Daml sandbox partyToText
+-- targetInstanceAddress includes @partyId matching Daml sandbox partyToText
 -- We allocate the party by a fixed PartyIdHint so the real signature vectors stay valid.
--- (These test vectors include partyToText in targetInstanceId via "baseId@partyId".)
+-- (These test vectors include partyToText in targetInstanceAddress via "baseId@partyId".)
 realTestOp : Op
 realTestOp = Op
   { chainId = 1
   , multisigId = realTestProposerMultisigId
   , nonce = 0
-  , targetInstanceId = "counter@ccip_owner-9cefe94d"
+  , targetInstanceAddress = "counter@ccip_owner-9cefe94d"
   , functionName = "Increment"
   , operationData = ""
   }
@@ -100,8 +100,8 @@ realTestSignatures =
 realTestValidUntil : Time
 realTestValidUntil = datetime 2030 Jan 1 0 0 0
 
-mkInstanceId : Text -> Party -> Text
-mkInstanceId base party = base <> "@" <> partyToText party
+mkInstanceAddress : Text -> Party -> Text
+mkInstanceAddress base party = base <> "@" <> partyToText party
 
 -- ===========================================================================
 -- TESTS
@@ -112,16 +112,16 @@ testFullFlow : Script ()
 testFullFlow = script do
   -- Setup
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
-  let 
+  let
     chainId = 1
     mcmsId = "test-mcms"
-    mcmsInstanceId = mkInstanceId mcmsId ccipOwner
-    
+    mcmsInstanceAddr = mkInstanceAddress mcmsId ccipOwner
+
   -- Step 1: Create MCMS
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = mcmsId
       chainId
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -131,11 +131,12 @@ testFullFlow = script do
       timelockTimestamps = Map.empty
 
   -- Step 2: Create Counter with instanceId (stable identifier)
-  let counterId = "counter-v1@" <> partyToText ccipOwner
+  let counterInstId = "counter-v1"
+  let counterId = counterInstId <> "@" <> partyToText ccipOwner
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterId
+      instanceId = counterInstId
       value = 0
 
   -- Step 3: Configure signers (2-of-3)
@@ -149,8 +150,8 @@ testFullFlow = script do
 
   -- Step 4: Prepare operation and metadata
   let 
-    op = Op chainId (makeMcmsId mcmsInstanceId Proposer) 0 counterId "Increment" ""
-    metadata = RootMetadata chainId (makeMcmsId mcmsInstanceId Proposer) 0 1 False
+    op = Op chainId (makeMcmsId mcmsInstanceAddr Proposer) 0 counterId "Increment" ""
+    metadata = RootMetadata chainId (makeMcmsId mcmsInstanceAddr Proposer) 0 1 False
 
   debug "Flow test setup complete"
   pure ()
@@ -165,7 +166,7 @@ testFullFlowWithRealSignatures = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
+      instanceId = realTestMcmsId
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -174,12 +175,12 @@ testFullFlowWithRealSignatures = script do
       blockedFunctions = []
       timelockTimestamps = Map.empty
 
-  -- Step 2: Create Counter (view returns "counter@ccip_owner")
-  let counterId = realTestOp.targetInstanceId
+  -- Step 2: Create Counter (instanceId = "counter", full address = "counter@ccip_owner")
+  let counterId = realTestOp.targetInstanceAddress
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = "counter@" <> partyToText ccipOwner
+      instanceId = "counter"
       value = 0
 
   -- Step 3: SetRoot with REAL signatures
@@ -206,7 +207,7 @@ testReplayProtection = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
+      instanceId = realTestMcmsId
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -249,7 +250,7 @@ testNonceOrdering = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
+      instanceId = realTestMcmsId
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -294,7 +295,7 @@ testRootExpiry = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
+      instanceId = realTestMcmsId
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -318,7 +319,7 @@ testRootExpiry = script do
 -- ===========================================================================
 -- DISCLOSURE TESTS
 -- ===========================================================================
--- Note: Signatory check tests (wrong instanceId, forged partyId, correct owner)
+-- Note: Signatory check tests (wrong instanceAddress, forged partyId, correct owner)
 -- are in ExternalTargetTest.daml to avoid duplication.
 
 -- | Test that a non-stakeholder CAN call ExecuteOp when disclosures are provided
@@ -328,14 +329,14 @@ testNonStakeholderCanExecuteWithDisclosures = script do
   ccipOwner <- allocatePartyByHint (PartyIdHint "ccip_owner-9cefe94d")
   thirdParty <- allocateParty "third_party"
 
-  let mcmsInstanceId = mkInstanceId realTestMcmsId ccipOwner
-  let counterInstanceId = "counter@" <> partyToText ccipOwner
+  let mcmsInstanceAddr = mkInstanceAddress realTestMcmsId ccipOwner
+  let counterInstanceAddr = "counter@" <> partyToText ccipOwner
 
   -- Create MCMS owned by ccipOwner
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mcmsInstanceId
+      instanceId = realTestMcmsId
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState
@@ -348,7 +349,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
   counterCid <- submit ccipOwner do
     createCmd Counter with
       owner = ccipOwner
-      instanceId = counterInstanceId
+      instanceId = "counter"
       value = 0
 
   -- Use the external bypasser vectors
@@ -356,11 +357,11 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         { chainId = 1
         , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
         , nonce = 0
-        , targetInstanceId = "mcms-daml-test@ccip_owner-9cefe94d"
+        , targetInstanceAddress = "mcms-daml-test@ccip_owner-9cefe94d"
         , functionName = "BypasserExecuteBatch"
-        , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e7400"
+        , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e740000"
         }
-  let externalBypasserRoot = "f26a0e63c779312478e7b1dc81649c7165f90ec55b0f95c4716572b5d826d1c2"
+  let externalBypasserRoot = "14382bd8921bf7097cdbae29eb45e35f5519a263a36eb97c60de96694abd8e9c"
   let externalBypasserMetadata = RootMetadata
         { chainId = 1
         , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
@@ -368,18 +369,18 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         , postOpCount = 1
         , overridePreviousRoot = False
         }
-  let externalBypasserMetadataProof = ["a4d4ba0d1233922c561ca70a4c98d62a6f7a108af84003c7ecdb1ead4ed0dd81"]
+  let externalBypasserMetadataProof = ["0fac8b1d020c2e6972ed205554e5b459dbe943535198f76f40d586e54d1a2b25"]
   let externalBypasserOpProof = ["6fb0ca7c1189483951018ab7f466e827ed5e91a17d4227fba82fde2ae6d9d206"]
   let externalBypasserSignatures =
         [ RawSignature
             { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-            , r = "9ab498dc1703b5daa8144f97086702399fdb2e35840aba222df665808abb9238"
-            , s = "1684c26717675285f2bc9d49767b5b0817851afb6cfe54e0effb156285e5dda6"
+            , r = "4d9fa9e857e76ed0ce5581c6c81bfc62af2c7ae6a2e913b1fc20c6469ab46453"
+            , s = "2cbe03e2f217757f7968fcd32f7acfd86954cc5f130c68d925fc4f6d616c0df0"
             }
         , RawSignature
             { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-            , r = "7c0161d9bc3671b3fb7e0ef75fcf0abb705bf266da1c7661078d5b7e11f4cad4"
-            , s = "6f3869545411d557ed8509ecdf83a5170e9a83d584a9dca65252e065a44a34bd"
+            , r = "e6dd0fbf58ff307f156fe7f6e12f7356fe2d9a914ea30a89e2d8f11af32adc69"
+            , s = "00dc933c2ca8a4194a2ad85624a13f6e33587393df7bdb8a2bbd5321f276345b"
             }
         ]
 
@@ -405,11 +406,11 @@ testNonStakeholderCanExecuteWithDisclosures = script do
       submitter = ccipOwner  -- The submitter in the choice is still ccipOwner
       op = externalBypasserOp
       opProof = externalBypasserOpProof
-      targetCids = Map.fromList [(counterInstanceId, counterAsMcmsReceiver)]
+      targetCids = Map.fromList [(counterInstanceAddr, counterAsMcmsReceiver)]
 
   -- Verify counter was incremented
   counterContracts <- query @Counter ccipOwner
-  let activeCounters = filter (\(_, c) -> c.instanceId == counterInstanceId) counterContracts
+  let activeCounters = filter (\(_, c) -> c.instanceId == "counter") counterContracts
   case activeCounters of
     [(_, counter)] -> do
       assertMsg "Counter should be incremented to 1" $ counter.value == 1
@@ -476,7 +477,7 @@ testExecuteMcmsOp = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId testMcmsId ccipOwner
+      instanceId = testMcmsId
       chainId = testChainId
       proposer = emptyRoleState with config = testConfig  -- 2-of-3 config
       canceller = emptyRoleState
@@ -557,7 +558,7 @@ testTimelockSchedule = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
+      instanceId = realTestMcmsId
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -597,7 +598,7 @@ testTimelockViewFunctions = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId realTestMcmsId ccipOwner
+      instanceId = realTestMcmsId
       chainId = realTestChainId
       proposer = emptyRoleState with config = realTestConfig
       canceller = emptyRoleState
@@ -635,7 +636,7 @@ testBlockedFunctionCodec = script do
   case decodeBlockedFunction encoded of
     None -> abort "Failed to decode BlockedFunction"
     Some decoded -> do
-      assertMsg "targetInstanceId mismatch" $ decoded.targetInstanceId == bf.targetInstanceId
+      assertMsg "targetInstanceAddress mismatch" $ decoded.targetInstanceAddress == bf.targetInstanceAddress
       assertMsg "functionName mismatch" $ decoded.functionName == bf.functionName
   debug "BlockedFunction codec roundtrip PASSED!"
   pure ()
@@ -672,7 +673,7 @@ testBlockedFunctionOnMCMS = script do
   mcmsCid <- submit ccipOwner do
     createCmd MCMS with
       owner = ccipOwner
-      instanceId = mkInstanceId "test-blocked" ccipOwner
+      instanceId = "test-blocked"
       chainId = 1
       proposer = emptyRoleState
       canceller = emptyRoleState

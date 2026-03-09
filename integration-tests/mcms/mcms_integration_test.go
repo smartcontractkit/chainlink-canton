@@ -10,10 +10,11 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -86,8 +87,7 @@ func createMCMSContract(
 	chainID int64,
 ) string {
 	t.Helper()
-	instanceID := fmt.Sprintf("%s@%s", baseMcmsID, owner)
-	mcmsContract := buildMCMSBindingFromConfig(config, owner, instanceID, chainID)
+	mcmsContract := buildMCMSBindingFromConfig(config, owner, baseMcmsID, chainID)
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -152,61 +152,28 @@ func createCounterContract(
 func TestMCMS_Execute(t *testing.T) {
 	t.Parallel()
 
+	// This test needs 2 participants for contract disclosure testing.
+	// We use dedicated setup here instead of shared environment because:
+	// 1. Two-participant setup has different lifecycle requirements
+	// 2. The randomUser participant needs its own DAR upload
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
-
 	participant := env.Chain.Participants[0]
 	randomUserParticipant := env.Chain.Participants[1]
-
-	// ========================
-	// |   Setup: Upload DAR  |
-	// ========================
 
 	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
 	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant, randomUserParticipant)
 	require.NoError(t, err)
-	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
 	require.NotEmpty(t, packageIDs)
 	mcmsPkgID := packageIDs[0]
 
-	// ========================
-	// |   Setup: Parties     |
-	// ========================
-
 	ccipOwner := participant.PartyID
 	randomUser := randomUserParticipant.PartyID
-	t.Logf("Using CCIP party: %s", ccipOwner)
-	t.Logf("Using user party: %s", randomUser)
 
-	// ========================
-	// |   Setup: Signers     |
-	// ========================
-
-	t.Log("Creating signers...")
-
-	// Create 3 signers for 2-of-3 config
-	signer1, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer2, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer3, err := NewMCMSSigner()
-	require.NoError(t, err)
-
-	signers := []*MCMSSigner{signer1, signer2, signer3}
+	signers := createSigners(t)
 	config := New2of3Config(signers)
-
-	t.Logf("Signer 1: %s", signer1.Address)
-	t.Logf("Signer 2: %s", signer2.Address)
-	t.Logf("Signer 3: %s", signer3.Address)
-
-	// Sort signers by address for consistent ordering
 	sortedSigners := SortSignersByAddress(signers)
-
-	// ========================
-	// |   Contract Constants |
-	// ========================
-
 	chainId := int64(1)
 
 	// Run tests
@@ -255,11 +222,12 @@ func testExecuteOpFlow(
 	// ========================
 
 	baseMcmsId := "mcms-integration-test-" + uuid.New().String()[:8]
-	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
-	multisigId := MakeMcmsId(mcmsInstanceId, MCMSRoleBypasser)                                     // Use Bypasser for external calls
-	counterInstanceId := fmt.Sprintf("counter-env-%s@%s", uuid.New().String()[:8], ccipOwnerParty) // Stable instance ID for Counter
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
+	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser)               // Use Bypasser for external calls
+	counterBaseId := "counter-env-" + uuid.New().String()[:8]                  // Stable base instance ID for Counter
+	counterInstanceAddr := fmt.Sprintf("%s@%s", counterBaseId, ccipOwnerParty) // Full instance address for targeting
 	t.Logf("MCMS ID: %s", multisigId)
-	t.Logf("Counter Instance ID: %s", counterInstanceId)
+	t.Logf("Counter Instance Address: %s", counterInstanceAddr)
 
 	// ========================
 	// |   1. Create MCMS |
@@ -309,7 +277,7 @@ func testExecuteOpFlow(
 
 	mcmsContract := mcms.MCMS{
 		Owner:              types.PARTY(ccipOwnerParty),
-		InstanceId:         types.TEXT(fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)),
+		InstanceId:         types.TEXT(baseMcmsId),
 		ChainId:            types.INT64(chainId),
 		Proposer:           roleState,
 		Canceller:          roleState,
@@ -349,7 +317,7 @@ func testExecuteOpFlow(
 
 	counter := mcms.Counter{
 		Owner:      types.PARTY(ccipOwnerParty),
-		InstanceId: types.TEXT(counterInstanceId),
+		InstanceId: types.TEXT(counterBaseId),
 		Value:      types.INT64(0),
 	}
 
@@ -387,16 +355,16 @@ func testExecuteOpFlow(
 	bypasserParams := mcms.BypasserExecuteBatchParams{
 		Calls: []mcms.TimelockCall{
 			{
-				TargetInstanceId: types.TEXT(counterInstanceId),
-				FunctionName:     types.TEXT("Increment"),
-				OperationData:    types.TEXT(""),
+				TargetInstanceAddress: types.TEXT(counterInstanceAddr),
+				FunctionName:          types.TEXT("Increment"),
+				OperationData:         types.TEXT(""),
 			},
 		},
 	}
 	bypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, bypasserParams)
 
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceId, bypasserChoice.Choice, bypasserChoice.OperationData)
+	proposal.AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -513,15 +481,15 @@ func testExecuteOpFlow(
 		TargetRole: mcms.RoleBypasser,
 		Submitter:  types.PARTY(ccipOwnerParty),
 		Op: mcms.Op{
-			ChainId:          types.INT64(op.ChainId),
-			MultisigId:       types.TEXT(op.MultisigId),
-			Nonce:            types.INT64(op.Nonce),
-			TargetInstanceId: types.TEXT(op.TargetInstanceId),
-			FunctionName:     types.TEXT(op.FunctionName),
-			OperationData:    types.TEXT(op.OperationData),
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
 		OpProof:    opProofTexts,
-		TargetCids: types.GENMAP{counterInstanceId: types.CONTRACT_ID(counterCid)},
+		TargetCids: types.GENMAP{counterInstanceAddr: types.CONTRACT_ID(counterCid)},
 	}
 
 	executeOpRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -601,7 +569,7 @@ func testExecuteOpFlow(
 	t.Log("Summary:")
 	t.Log("  1. Created MCMS with 2-of-3 config")
 	t.Log("  2. Created Counter contract (implements MCMSReceiver)")
-	t.Log("  3. Built proposal with 'Increment' operation targeting instanceId")
+	t.Log("  3. Built proposal with 'Increment' operation targeting instanceAddress")
 	t.Log("  4. Signed with 2 signers (real ECDSA signatures)")
 	t.Log("  5. SetRoot with on-chain verification")
 	t.Log("  6. ExecuteOp - MCMS directly calls Counter.MCMSReceiver_Entrypoint")
@@ -619,8 +587,8 @@ func testSignatureVerificationFails(
 ) {
 	// Use helper to create MCMS contract with bindings
 	baseMcmsId := "mcms-sig-fail-test-" + uuid.New().String()[:8]
-	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
-	multisigId := MakeMcmsId(mcmsInstanceId, MCMSRoleProposer)
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
+	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 
 	t.Log("Creating MCMS contract...")
 	mcmsCid := createMCMSContract(t, participant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
@@ -719,8 +687,8 @@ func testReplayProtection(
 ) {
 	// Use helper to create MCMS contract with bindings
 	baseMcmsId := "mcms-replay-test-" + uuid.New().String()[:8]
-	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
-	multisigId := MakeMcmsId(mcmsInstanceId, MCMSRoleProposer)
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
+	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 
 	t.Log("Creating MCMS contract...")
 	mcmsCid := createMCMSContract(t, participant, mcmsPkgID, config, ccipOwnerParty, baseMcmsId, chainId)
@@ -850,8 +818,8 @@ func testExecuteMCMSOp(
 	// ========================
 
 	baseMcmsId := "mcms-op-test-" + uuid.New().String()[:8]
-	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
-	multisigId := MakeMcmsId(mcmsInstanceId, MCMSRoleProposer)
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
+	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 	t.Logf("MCMS ID: %s", multisigId)
 
 	// ========================
@@ -873,20 +841,16 @@ func testExecuteMCMSOp(
 	newQuorums[0] = 1 // Changed from 2 to 1
 	newParents := make([]int, NumGroups)
 
-	// Encode SetConfigParams into operationData (like Aptos BCS)
-	setConfigParams := SetConfigParams{
-		Signers:      config.Signers,
-		GroupQuorums: newQuorums,
-		GroupParents: newParents,
-		ClearRoot:    false,
-	}
-	encodedParams := EncodeSetConfigParams(setConfigParams)
-	t.Logf("Encoded SetConfig params: %s... (%d bytes)", encodedParams[:min(40, len(encodedParams))], len(encodedParams)/2)
+	// Encode SetConfigParams using the encoder
+	encoder := NewMCMSEncoder(mcmsPkgID)
+	setConfigParams := ToBindingSetConfigParams(config.Signers, newQuorums, newParents, false)
+	encoded := MustEncodeSetConfigParams(t, encoder, setConfigParams)
+	t.Logf("Encoded SetConfig params: %s... (%d bytes)", encoded.OperationData[:min(40, len(encoded.OperationData))], len(encoded.OperationData)/2)
 
-	// Build proposal with MCMS operation targeting this MCMS instanceId
+	// Build proposal with MCMS operation targeting this MCMS instanceAddress
 	// operationData contains the encoded params (like Aptos)
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceId, "SetConfig", encodedParams) // Params encoded in operationData
+	proposal.AddOperation(mcmsInstanceAddr, encoded.Choice, encoded.OperationData) // Params encoded in operationData
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -905,36 +869,25 @@ func testExecuteMCMSOp(
 	t.Log("Signing MCMS proposal with 2 signers...")
 
 	validUntil := time.Now().Add(time.Hour)
-	validUntilMicros := validUntil.UnixMicro()
 
 	signaturesRaw, err := proposal.Sign(validUntil, sortedSigners[:2])
 	require.NoError(t, err)
 
-	signatureValues := make([]*apiv2.Value, len(signaturesRaw))
+	// Convert signatures to binding type
+	bindingSignatures := make([]mcms.RawSignature, len(signaturesRaw))
 	for i, sig := range signaturesRaw {
-		signatureValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "publicKey", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.PublicKey}}},
-				{Label: "r", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.R}}},
-				{Label: "s", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.S}}},
-			},
-		}}}
+		bindingSignatures[i] = mcms.RawSignature{
+			PublicKey: types.TEXT(sig.PublicKey),
+			R:         types.TEXT(sig.R),
+			S:         types.TEXT(sig.S),
+		}
 	}
 
-	metadataProofValues := make([]*apiv2.Value, len(metadataProof))
+	// Convert metadata proof to binding type
+	metadataProofTexts := make([]types.TEXT, len(metadataProof))
 	for i, p := range metadataProof {
-		metadataProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+		metadataProofTexts[i] = types.TEXT(p)
 	}
-
-	metadataValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: proposal.Metadata.MultisigId}}},
-			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PreOpCount)}}},
-			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PostOpCount)}}},
-			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: proposal.Metadata.OverridePreviousRoot}}},
-		},
-	}}}
 
 	// ========================
 	// |   4. SetRoot         |
@@ -942,35 +895,40 @@ func testExecuteMCMSOp(
 
 	t.Log("Calling SetRoot with MCMS proposal...")
 
+	// Use bindings for type safety
+	setRootArgs := mcms.SetRoot{
+		TargetRole: mcms.RoleProposer,
+		Submitter:  types.PARTY(ccipOwnerParty),
+		NewRoot:    types.TEXT(root),
+		ValidUntil: types.TIMESTAMP(validUntil),
+		Metadata: mcms.RootMetadata{
+			ChainId:              types.INT64(proposal.Metadata.ChainId),
+			MultisigId:           types.TEXT(proposal.Metadata.MultisigId),
+			PreOpCount:           types.INT64(proposal.Metadata.PreOpCount),
+			PostOpCount:          types.INT64(proposal.Metadata.PostOpCount),
+			OverridePreviousRoot: types.BOOL(proposal.Metadata.OverridePreviousRoot),
+		},
+		MetadataProof: metadataProofTexts,
+		Signatures:    bindingSignatures,
+	}
+
 	setRootRes, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  mcmsPkgID,
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							ContractId: mcmsCid,
-							Choice:     "SetRoot",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-								Fields: []*apiv2.RecordField{
-									{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
-									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
-									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
-									{Label: "metadata", Value: metadataValue},
-									{Label: "metadataProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: metadataProofValues}}}},
-									{Label: "signatures", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signatureValues}}}},
-								},
-							}}},
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{
+					Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  mcmsPkgID,
+							ModuleName: "MCMS.Main",
+							EntityName: "MCMS",
 						},
+						ContractId:     mcmsCid,
+						Choice:         "SetRoot",
+						ChoiceArgument: ledger.MapToValue(setRootArgs),
 					},
 				},
-			},
+			}},
 			ActAs: []string{ccipOwnerParty},
 		},
 	})
@@ -1013,22 +971,21 @@ func testExecuteMCMSOp(
 
 	t.Log("Calling ExecuteMcmsOp as randomUser (bob) with disclosed contract...")
 
-	// Build op value
+	// Use bindings for type safety
 	op := proposal.Operations[0]
-	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
-			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
-			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
-			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
-			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
+	executeOpArgs := mcms.ExecuteOp{
+		TargetRole: mcms.RoleProposer,
+		Submitter:  types.PARTY(userParty),
+		Op: mcms.Op{
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
-	}}}
-
-	opProofValues := make([]*apiv2.Value, len(opProof))
-	for i, p := range opProof {
-		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+		OpProof:    toTextSlice(opProof),
+		TargetCids: types.GENMAP{},
 	}
 
 	// No separate params - params are encoded in op.operationData (like Aptos BCS)
@@ -1036,30 +993,20 @@ func testExecuteMCMSOp(
 	_, err = userParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  mcmsPkgID,
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							ContractId: mcmsCid,
-							Choice:     "ExecuteOp",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-								Fields: []*apiv2.RecordField{
-									{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Proposer"}}}},
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: userParty}}},
-									{Label: "op", Value: opValue},
-									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
-									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{}}}}},
-								},
-							}}},
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{
+					Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  mcmsPkgID,
+							ModuleName: "MCMS.Main",
+							EntityName: "MCMS",
 						},
+						ContractId:     mcmsCid,
+						Choice:         "ExecuteOp",
+						ChoiceArgument: ledger.MapToValue(executeOpArgs),
 					},
 				},
-			},
+			}},
 			ActAs:              []string{userParty},
 			DisclosedContracts: []*apiv2.DisclosedContract{disclosedMcms}, // Grant bob visibility
 		},
@@ -1080,7 +1027,7 @@ func testExecuteMCMSOp(
 	// ========================
 
 	// Query via GetActiveContracts with verbose to get the actual config
-	// Find the MCMS contract with our instanceId (the old one is archived, new one is active)
+	// Find the MCMS contract with our instanceAddress (the old one is archived, new one is active)
 	var newNumSigners int64 = -1
 	var newQuorum int64 = -1
 	var newMcmsCid string
@@ -1148,8 +1095,8 @@ func testExecuteMCMSOp(
 			}
 		}
 
-		// Check if this is our MCMS by matching instanceId (new multi-role structure)
-		if contractInstanceId != mcmsInstanceId {
+		// Check if this is our MCMS by matching instanceId (base identifier without @partyId)
+		if contractInstanceId != baseMcmsId {
 			continue
 		}
 
@@ -1173,7 +1120,7 @@ func testExecuteMCMSOp(
 
 		break
 	}
-	require.True(t, foundContract, "Should find MCMS contract with instanceId=%s in ACS", mcmsInstanceId)
+	require.True(t, foundContract, "Should find MCMS contract with instanceId=%s in ACS", baseMcmsId)
 	require.NotEmpty(t, newMcmsCid, "Should have new MCMS contract ID")
 	require.NotEqual(t, oldMcmsCid, newMcmsCid, "MCMS contract ID should change after ExecuteMcmsOp (old contract archived, new created)")
 	t.Logf("Found new MCMS contract: %s (changed from %s)", newMcmsCid, oldMcmsCid)
@@ -1219,11 +1166,12 @@ func testSignatoryCheck(
 	// ========================
 
 	baseMcmsId := "mcms-signatory-test-" + uuid.New().String()[:8]
-	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
-	multisigId := MakeMcmsId(mcmsInstanceId, MCMSRoleBypasser) // Use Bypasser for external calls
-	counterInstanceId := fmt.Sprintf("counter-signatory-%s@%s", uuid.New().String()[:8], ccipOwnerParty)
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, ccipOwnerParty)
+	multisigId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleBypasser) // Use Bypasser for external calls
+	counterBaseId := "counter-signatory-" + uuid.New().String()[:8]
+	counterInstanceAddr := fmt.Sprintf("%s@%s", counterBaseId, ccipOwnerParty)
 	t.Logf("MCMS ID: %s", multisigId)
-	t.Logf("Counter Instance ID: %s", counterInstanceId)
+	t.Logf("Counter Instance Address: %s", counterInstanceAddr)
 
 	// ========================
 	// |   1. Create MCMS (owned by ccipOwner) |
@@ -1243,7 +1191,7 @@ func testSignatoryCheck(
 	// - Signatory check: ccipOwnerParty `elem` signatory Counter ✓ PASSES
 
 	t.Log("Creating Counter contract also owned by ccipOwner (same as MCMS owner)...")
-	counterCid := createCounterContract(t, ccipParticipant, mcmsPkgID, ccipOwnerParty, counterInstanceId)
+	counterCid := createCounterContract(t, ccipParticipant, mcmsPkgID, ccipOwnerParty, counterBaseId)
 	t.Logf("Created Counter contract: %s", counterCid)
 
 	// ========================
@@ -1256,16 +1204,16 @@ func testSignatoryCheck(
 	bypasserParams := mcms.BypasserExecuteBatchParams{
 		Calls: []mcms.TimelockCall{
 			{
-				TargetInstanceId: types.TEXT(counterInstanceId),
-				FunctionName:     types.TEXT("Increment"),
-				OperationData:    types.TEXT(""),
+				TargetInstanceAddress: types.TEXT(counterInstanceAddr),
+				FunctionName:          types.TEXT("Increment"),
+				OperationData:         types.TEXT(""),
 			},
 		},
 	}
 	bypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, bypasserParams)
 
 	proposal := NewMCMSProposal(int(chainId), multisigId, 0, false)
-	proposal.AddOperation(mcmsInstanceId, bypasserChoice.Choice, bypasserChoice.OperationData)
+	proposal.AddOperation(mcmsInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -1284,37 +1232,26 @@ func testSignatoryCheck(
 	t.Log("Signing proposal with 2 signers...")
 
 	validUntil := time.Now().Add(time.Hour)
-	validUntilMicros := validUntil.UnixMicro()
 
 	signaturesRaw, err := proposal.Sign(validUntil, sortedSigners[:2])
 	require.NoError(t, err)
 	require.Len(t, signaturesRaw, 2)
 
-	signatureValues := make([]*apiv2.Value, len(signaturesRaw))
+	// Convert signatures to binding type
+	bindingSignatures := make([]mcms.RawSignature, len(signaturesRaw))
 	for i, sig := range signaturesRaw {
-		signatureValues[i] = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-			Fields: []*apiv2.RecordField{
-				{Label: "publicKey", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.PublicKey}}},
-				{Label: "r", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.R}}},
-				{Label: "s", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: sig.S}}},
-			},
-		}}}
+		bindingSignatures[i] = mcms.RawSignature{
+			PublicKey: types.TEXT(sig.PublicKey),
+			R:         types.TEXT(sig.R),
+			S:         types.TEXT(sig.S),
+		}
 	}
 
-	metadataProofValues := make([]*apiv2.Value, len(metadataProof))
+	// Convert metadata proof to binding type
+	metadataProofTexts := make([]types.TEXT, len(metadataProof))
 	for i, p := range metadataProof {
-		metadataProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+		metadataProofTexts[i] = types.TEXT(p)
 	}
-
-	metadataValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: proposal.Metadata.MultisigId}}},
-			{Label: "preOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PreOpCount)}}},
-			{Label: "postOpCount", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(proposal.Metadata.PostOpCount)}}},
-			{Label: "overridePreviousRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: proposal.Metadata.OverridePreviousRoot}}},
-		},
-	}}}
 
 	// ========================
 	// |   5. SetRoot         |
@@ -1322,35 +1259,40 @@ func testSignatoryCheck(
 
 	t.Log("Calling SetRoot (should succeed - root doesn't check ownership)...")
 
+	// Use bindings for type safety
+	setRootArgs := mcms.SetRoot{
+		TargetRole: mcms.RoleBypasser,
+		Submitter:  types.PARTY(ccipOwnerParty),
+		NewRoot:    types.TEXT(root),
+		ValidUntil: types.TIMESTAMP(validUntil),
+		Metadata: mcms.RootMetadata{
+			ChainId:              types.INT64(proposal.Metadata.ChainId),
+			MultisigId:           types.TEXT(proposal.Metadata.MultisigId),
+			PreOpCount:           types.INT64(proposal.Metadata.PreOpCount),
+			PostOpCount:          types.INT64(proposal.Metadata.PostOpCount),
+			OverridePreviousRoot: types.BOOL(proposal.Metadata.OverridePreviousRoot),
+		},
+		MetadataProof: metadataProofTexts,
+		Signatures:    bindingSignatures,
+	}
+
 	setRootRes, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  mcmsPkgID,
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							ContractId: mcmsCid,
-							Choice:     "SetRoot",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-								Fields: []*apiv2.RecordField{
-									{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Bypasser"}}}},
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
-									{Label: "newRoot", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: root}}},
-									{Label: "validUntil", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: validUntilMicros}}},
-									{Label: "metadata", Value: metadataValue},
-									{Label: "metadataProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: metadataProofValues}}}},
-									{Label: "signatures", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: signatureValues}}}},
-								},
-							}}},
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{
+					Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  mcmsPkgID,
+							ModuleName: "MCMS.Main",
+							EntityName: "MCMS",
 						},
+						ContractId:     mcmsCid,
+						Choice:         "SetRoot",
+						ChoiceArgument: ledger.MapToValue(setRootArgs),
 					},
 				},
-			},
+			}},
 			ActAs: []string{ccipOwnerParty},
 		},
 	})
@@ -1375,57 +1317,41 @@ func testSignatoryCheck(
 
 	t.Log("Calling ExecuteOp (should succeed - same owner, signatory check passes)...")
 
-	// Build op value
+	// Use bindings for type safety
 	op := proposal.Operations[0]
-	opValue := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-		Fields: []*apiv2.RecordField{
-			{Label: "chainId", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.ChainId)}}},
-			{Label: "multisigId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.MultisigId}}},
-			{Label: "nonce", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(op.Nonce)}}},
-			{Label: "targetInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.TargetInstanceId}}},
-			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.FunctionName}}},
-			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: op.OperationData}}},
+	executeOpArgs := mcms.ExecuteOp{
+		TargetRole: mcms.RoleBypasser,
+		Submitter:  types.PARTY(ccipOwnerParty),
+		Op: mcms.Op{
+			ChainId:               types.INT64(op.ChainId),
+			MultisigId:            types.TEXT(op.MultisigId),
+			Nonce:                 types.INT64(op.Nonce),
+			TargetInstanceAddress: types.TEXT(op.TargetInstanceAddress),
+			FunctionName:          types.TEXT(op.FunctionName),
+			OperationData:         types.TEXT(op.OperationData),
 		},
-	}}}
-
-	opProofValues := make([]*apiv2.Value, len(opProof))
-	for i, p := range opProof {
-		opProofValues[i] = &apiv2.Value{Sum: &apiv2.Value_Text{Text: p}}
+		OpProof:    toTextSlice(opProof),
+		TargetCids: toContractIDMap(map[string]string{counterInstanceAddr: counterCid}),
 	}
 
 	// ExecuteOp - should SUCCEED because both MCMS and Counter have the same owner
 	executeOpRes, err := ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{
-				{
-					Command: &apiv2.Command_Exercise{
-						Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{
-								PackageId:  mcmsPkgID,
-								ModuleName: "MCMS.Main",
-								EntityName: "MCMS",
-							},
-							ContractId: mcmsCid,
-							Choice:     "ExecuteOp",
-							ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
-								Fields: []*apiv2.RecordField{
-									{Label: "targetRole", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "Bypasser"}}}},
-									{Label: "submitter", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: ccipOwnerParty}}},
-									{Label: "op", Value: opValue},
-									{Label: "opProof", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: opProofValues}}}},
-									{Label: "targetCids", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
-										{
-											Key:   &apiv2.Value{Sum: &apiv2.Value_Text{Text: counterInstanceId}},
-											Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: counterCid}},
-										},
-									}}}}},
-								},
-							}}},
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{
+					Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  mcmsPkgID,
+							ModuleName: "MCMS.Main",
+							EntityName: "MCMS",
 						},
+						ContractId:     mcmsCid,
+						Choice:         "ExecuteOp",
+						ChoiceArgument: ledger.MapToValue(executeOpArgs),
 					},
 				},
-			},
+			}},
 			ActAs: []string{ccipOwnerParty},
 		},
 	})
@@ -1487,8 +1413,8 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	baseMcmsId := "mcms-daml-test"
 	// Create encoder with placeholder package ID (not used in encoding, just for API consistency)
 	mcmsEncoder := NewMCMSEncoder("test-pkg-id")
-	mcmsInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
-	mcmsId := MakeMcmsId(mcmsInstanceId, MCMSRoleProposer)
+	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
+	mcmsId := MakeMcmsId(mcmsInstanceAddr, MCMSRoleProposer)
 
 	t.Log("")
 	t.Log("-- ===========================================================================")
@@ -1512,7 +1438,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("")
 
 	// Build proposal with one operation
-	// targetInstanceId must match Counter view (instanceId includes @partyId)
+	// targetInstanceAddress must match Counter view (instanceAddress includes @partyId)
 	// In Daml sandbox (daml test), allocateParty "ccip_owner" → partyToText = "ccip_owner-9cefe94d"
 	// The suffix is deterministic in the sandbox based on the hint string.
 	proposal := NewMCMSProposal(chainId, mcmsId, 0, false)
@@ -1539,15 +1465,15 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Logf("testChainId : Int")
 	t.Logf("testChainId = %d", chainId)
 	t.Log("")
-	t.Logf("testMcmsInstanceId : Text")
-	t.Logf("testMcmsInstanceId = \"%s\"", mcmsInstanceId)
+	t.Logf("testMcmsInstanceAddr : Text")
+	t.Logf("testMcmsInstanceAddr = \"%s\"", mcmsInstanceAddr)
 	t.Log("")
 	t.Log("testOp : Op")
 	t.Log("testOp = Op")
 	t.Logf("  { chainId = %d", proposal.Operations[0].ChainId)
 	t.Logf("  , multisigId = \"%s\"", proposal.Operations[0].MultisigId)
 	t.Logf("  , nonce = %d", proposal.Operations[0].Nonce)
-	t.Logf("  , targetInstanceId = \"%s\"", proposal.Operations[0].TargetInstanceId)
+	t.Logf("  , targetInstanceAddress = \"%s\"", proposal.Operations[0].TargetInstanceAddress)
 	t.Logf("  , functionName = \"%s\"", proposal.Operations[0].FunctionName)
 	t.Logf("  , operationData = \"%s\"", proposal.Operations[0].OperationData)
 	t.Log("  }")
@@ -1660,29 +1586,29 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	// ======================================================================
 
 	baseMcmsId = "mcms-daml-test"
-	timelockInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
-	proposerMultisigId := MakeMcmsId(timelockInstanceId, MCMSRoleProposer)
-	bypasserMultisigId := MakeMcmsId(timelockInstanceId, MCMSRoleBypasser)
+	timelockInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
+	proposerMultisigId := MakeMcmsId(timelockInstanceAddr, MCMSRoleProposer)
+	bypasserMultisigId := MakeMcmsId(timelockInstanceAddr, MCMSRoleBypasser)
 
 	// Create inner calls for ScheduleBatch - these are the operations to be timelocked
 	scheduleInnerCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: types.TEXT(timelockInstanceId),
-			FunctionName:     types.TEXT("UpdateMinDelay"),
-			OperationData:    types.TEXT("120"), // new min delay of 120 seconds
+			TargetInstanceAddress: types.TEXT(timelockInstanceAddr),
+			FunctionName:          types.TEXT("UpdateMinDelay"),
+			OperationData:         types.TEXT(EncodeMinDelay(120)), // 120 seconds
 		},
 	}
 	scheduleParams := mcms.ScheduleBatchParams{
 		Calls:       scheduleInnerCalls,
-		Predecessor: types.TEXT(ZeroHash), // no predecessor
-		Salt:        types.TEXT("test-schedule-salt-1"),
-		DelaySecs:   types.INT64(0), // use minimum delay
+		Predecessor: types.TEXT(ZeroHash),                      // no predecessor
+		Salt:        types.TEXT(AsciiToHex("schedule-salt-1")), // Human-readable salt hex-encoded
+		DelaySecs:   types.INT64(0),                            // use minimum delay
 	}
 	scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
 	// Proposer root authorizing ScheduleBatch (self)
 	scheduleProposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
-		AddOperation(timelockInstanceId, scheduleChoice.Choice, scheduleChoice.OperationData).
+		AddOperation(timelockInstanceAddr, scheduleChoice.Choice, scheduleChoice.OperationData).
 		Build()
 	scheduleRoot := scheduleProposal.GetRoot()
 	scheduleMetadataProof, err := scheduleProposal.GetMetadataProof()
@@ -1771,7 +1697,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", scheduleProposal.Operations[0].ChainId)
 	t.Logf("  , multisigId = \"%s\"", scheduleProposal.Operations[0].MultisigId)
 	t.Logf("  , nonce = %d", scheduleProposal.Operations[0].Nonce)
-	t.Logf("  , targetInstanceId = \"%s\"", scheduleProposal.Operations[0].TargetInstanceId)
+	t.Logf("  , targetInstanceAddress = \"%s\"", scheduleProposal.Operations[0].TargetInstanceAddress)
 	t.Logf("  , functionName = \"%s\"", scheduleProposal.Operations[0].FunctionName)
 	t.Logf("  , operationData = \"%s\"", scheduleProposal.Operations[0].OperationData)
 	t.Log("  }")
@@ -1799,9 +1725,9 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	// Create inner calls for BypasserExecuteBatch - operations to execute immediately
 	bypasserInnerCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: types.TEXT(timelockInstanceId),
-			FunctionName:     types.TEXT("UpdateMinDelay"),
-			OperationData:    types.TEXT("300"), // new min delay of 300 seconds
+			TargetInstanceAddress: types.TEXT(timelockInstanceAddr),
+			FunctionName:          types.TEXT("UpdateMinDelay"),
+			OperationData:         types.TEXT(EncodeMinDelay(300)), // 300 seconds
 		},
 	}
 	bypasserParams := mcms.BypasserExecuteBatchParams{
@@ -1811,7 +1737,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 
 	// Bypasser root authorizing BypasserExecuteBatch (self)
 	bypasserProposal := NewMCMSProposal(chainId, bypasserMultisigId, 0, false).
-		AddOperation(timelockInstanceId, bypasserChoice.Choice, bypasserChoice.OperationData).
+		AddOperation(timelockInstanceAddr, bypasserChoice.Choice, bypasserChoice.OperationData).
 		Build()
 	bypasserRoot := bypasserProposal.GetRoot()
 	bypasserMetadataProof, err := bypasserProposal.GetMetadataProof()
@@ -1900,7 +1826,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", bypasserProposal.Operations[0].ChainId)
 	t.Logf("  , multisigId = \"%s\"", bypasserProposal.Operations[0].MultisigId)
 	t.Logf("  , nonce = %d", bypasserProposal.Operations[0].Nonce)
-	t.Logf("  , targetInstanceId = \"%s\"", bypasserProposal.Operations[0].TargetInstanceId)
+	t.Logf("  , targetInstanceAddress = \"%s\"", bypasserProposal.Operations[0].TargetInstanceAddress)
 	t.Logf("  , functionName = \"%s\"", bypasserProposal.Operations[0].FunctionName)
 	t.Logf("  , operationData = \"%s\"", bypasserProposal.Operations[0].OperationData)
 	t.Log("  }")
@@ -1929,14 +1855,14 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	// Additional vectors for External Call Tests (Bypasser calls Counter)
 	// ======================================================================
 
-	counterInstanceId := "counter@ccip_owner-9cefe94d"
+	counterInstanceAddr := "counter@ccip_owner-9cefe94d"
 
 	// Bypasser op with external call to Counter (Increment)
 	externalBypasserCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: types.TEXT(counterInstanceId),
-			FunctionName:     types.TEXT("Increment"),
-			OperationData:    types.TEXT(""),
+			TargetInstanceAddress: types.TEXT(counterInstanceAddr),
+			FunctionName:          types.TEXT("Increment"),
+			OperationData:         types.TEXT(""),
 		},
 	}
 	externalBypasserParams := mcms.BypasserExecuteBatchParams{
@@ -1945,7 +1871,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	externalBypasserChoice := MustEncodeBypasserExecuteBatch(t, mcmsEncoder, externalBypasserParams)
 
 	externalBypasserProposal := NewMCMSProposal(chainId, bypasserMultisigId, 0, false).
-		AddOperation(timelockInstanceId, externalBypasserChoice.Choice, externalBypasserChoice.OperationData).
+		AddOperation(timelockInstanceAddr, externalBypasserChoice.Choice, externalBypasserChoice.OperationData).
 		Build()
 	externalBypasserRoot := externalBypasserProposal.GetRoot()
 	externalBypasserMetadataProof, err := externalBypasserProposal.GetMetadataProof()
@@ -1965,7 +1891,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", externalBypasserProposal.Operations[0].ChainId)
 	t.Logf("  , multisigId = \"%s\"", externalBypasserProposal.Operations[0].MultisigId)
 	t.Logf("  , nonce = %d", externalBypasserProposal.Operations[0].Nonce)
-	t.Logf("  , targetInstanceId = \"%s\"", externalBypasserProposal.Operations[0].TargetInstanceId)
+	t.Logf("  , targetInstanceAddress = \"%s\"", externalBypasserProposal.Operations[0].TargetInstanceAddress)
 	t.Logf("  , functionName = \"%s\"", externalBypasserProposal.Operations[0].FunctionName)
 	t.Logf("  , operationData = \"%s\"", externalBypasserProposal.Operations[0].OperationData)
 	t.Log("  }")
@@ -2043,21 +1969,21 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	// Scheduled external call vectors (Proposer -> ScheduleBatch -> Counter)
 	externalScheduleCalls := []mcms.TimelockCall{
 		{
-			TargetInstanceId: types.TEXT(counterInstanceId),
-			FunctionName:     types.TEXT("Increment"),
-			OperationData:    types.TEXT(""),
+			TargetInstanceAddress: types.TEXT(counterInstanceAddr),
+			FunctionName:          types.TEXT("Increment"),
+			OperationData:         types.TEXT(""),
 		},
 	}
 	externalScheduleParams := mcms.ScheduleBatchParams{
 		Calls:       externalScheduleCalls,
 		Predecessor: types.TEXT(ZeroHash),
-		Salt:        types.TEXT("test-external-schedule-salt-1"),
+		Salt:        types.TEXT(AsciiToHex("external-salt-1")), // Human-readable salt hex-encoded
 		DelaySecs:   types.INT64(0),
 	}
 	externalScheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, externalScheduleParams)
 
 	externalScheduleProposal := NewMCMSProposal(chainId, proposerMultisigId, 0, false).
-		AddOperation(timelockInstanceId, externalScheduleChoice.Choice, externalScheduleChoice.OperationData).
+		AddOperation(timelockInstanceAddr, externalScheduleChoice.Choice, externalScheduleChoice.OperationData).
 		Build()
 	externalScheduleRoot := externalScheduleProposal.GetRoot()
 	externalScheduleMetadataProof, err := externalScheduleProposal.GetMetadataProof()
@@ -2077,7 +2003,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", externalScheduleProposal.Operations[0].ChainId)
 	t.Logf("  , multisigId = \"%s\"", externalScheduleProposal.Operations[0].MultisigId)
 	t.Logf("  , nonce = %d", externalScheduleProposal.Operations[0].Nonce)
-	t.Logf("  , targetInstanceId = \"%s\"", externalScheduleProposal.Operations[0].TargetInstanceId)
+	t.Logf("  , targetInstanceAddress = \"%s\"", externalScheduleProposal.Operations[0].TargetInstanceAddress)
 	t.Logf("  , functionName = \"%s\"", externalScheduleProposal.Operations[0].FunctionName)
 	t.Logf("  , operationData = \"%s\"", externalScheduleProposal.Operations[0].OperationData)
 	t.Log("  }")
@@ -2194,19 +2120,15 @@ func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 	newQuorums[0] = 1 // Changed from 2 to 1
 	newParents := make([]int, NumGroups)
 
-	// Encode SetConfigParams into operationData (like Aptos BCS)
-	setConfigParams := SetConfigParams{
-		Signers:      config.Signers,
-		GroupQuorums: newQuorums,
-		GroupParents: newParents,
-		ClearRoot:    false,
-	}
-	encodedParams := EncodeSetConfigParams(setConfigParams)
+	// Encode SetConfigParams using the encoder (dummy package ID for test value generation)
+	encoder := NewMCMSEncoder("test-package-id")
+	setConfigParams := ToBindingSetConfigParams(config.Signers, newQuorums, newParents, false)
+	encoded := MustEncodeSetConfigParams(t, encoder, setConfigParams)
 
-	// Build proposal with MCMS operation targeting instanceId
+	// Build proposal with MCMS operation targeting instanceAddress
 	// operationData contains the encoded params
 	proposal := NewMCMSProposal(chainId, mcmsId, 0, false)
-	proposal.AddOperation(mcmsOpInstanceId, "SetConfig", encodedParams)
+	proposal.AddOperation(mcmsOpInstanceId, encoded.Choice, encoded.OperationData)
 	proposal.Build()
 
 	root := proposal.GetRoot()
@@ -2264,7 +2186,7 @@ func TestMCMS_GenerateMcmsOpTestValues(t *testing.T) {
 	t.Logf("  { chainId = %d", op.ChainId)
 	t.Logf("  , multisigId = \"%s\"", op.MultisigId)
 	t.Logf("  , nonce = %d", op.Nonce)
-	t.Logf("  , targetInstanceId = \"%s\"", op.TargetInstanceId)
+	t.Logf("  , targetInstanceAddress = \"%s\"", op.TargetInstanceAddress)
 	t.Logf("  , functionName = \"%s\"", op.FunctionName)
 	t.Logf("  , operationData = \"%s\"", op.OperationData)
 	t.Log("  }")
@@ -2385,7 +2307,7 @@ func TestMCMS_GenerateTimelockTestValues(t *testing.T) {
 
 	chainId := 1
 	baseMcmsId := "mcms-daml-test"
-	timelockInstanceId := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
+	timelockInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsId, "ccip_owner-9cefe94d")
 	validUntil := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	// Print signer config
@@ -2429,7 +2351,7 @@ func TestMCMS_GenerateTimelockTestValues(t *testing.T) {
 		t.Logf("  { chainId = %d", op.ChainId)
 		t.Logf("  , multisigId = \"%s\"", op.MultisigId)
 		t.Logf("  , nonce = %d", op.Nonce)
-		t.Logf("  , targetInstanceId = \"%s\"", op.TargetInstanceId)
+		t.Logf("  , targetInstanceAddress = \"%s\"", op.TargetInstanceAddress)
 		t.Logf("  , functionName = \"%s\"", op.FunctionName)
 		t.Logf("  , operationData = \"%s\"", op.OperationData)
 		t.Log("  }")
@@ -2500,9 +2422,9 @@ func TestMCMS_GenerateTimelockTestValues(t *testing.T) {
 	t.Log("-- PROPOSER SCHEDULE_BATCH VECTORS")
 	t.Log("-- ===========================================================================")
 	t.Log("")
-	proposerMsId := MakeMcmsId(timelockInstanceId, MCMSRoleProposer)
+	proposerMsId := MakeMcmsId(timelockInstanceAddr, MCMSRoleProposer)
 	scheduleProposal := NewMCMSProposal(chainId, proposerMsId, 0, false).
-		AddOperation(timelockInstanceId, "ScheduleBatch", "").
+		AddOperation(timelockInstanceAddr, "ScheduleBatch", "").
 		Build()
 	printProposal("timelockSchedule", scheduleProposal)
 
@@ -2511,9 +2433,9 @@ func TestMCMS_GenerateTimelockTestValues(t *testing.T) {
 	t.Log("-- BYPASSER EXECUTE_BATCH VECTORS")
 	t.Log("-- ===========================================================================")
 	t.Log("")
-	bypasserMsId := MakeMcmsId(timelockInstanceId, MCMSRoleBypasser)
+	bypasserMsId := MakeMcmsId(timelockInstanceAddr, MCMSRoleBypasser)
 	bypasserProposal := NewMCMSProposal(chainId, bypasserMsId, 0, false).
-		AddOperation(timelockInstanceId, "BypasserExecuteBatch", "").
+		AddOperation(timelockInstanceAddr, "BypasserExecuteBatch", "").
 		Build()
 	printProposal("timelockBypasser", bypasserProposal)
 

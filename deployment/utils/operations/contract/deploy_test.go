@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/coin"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
@@ -48,6 +49,18 @@ func Test_setInstanceID(t *testing.T) {
 			},
 			want: &coin.CoinRegistry{
 				InstanceId: types.TEXT("testID"),
+			},
+			wantErr: false,
+		}, {
+			name: "sets InstanceId field (MCMS template)",
+			args: args{
+				template: mcms.MCMS{
+					InstanceId: types.TEXT("old"),
+				},
+				instanceID: contracts.InstanceID("mcms-001"),
+			},
+			want: mcms.MCMS{
+				InstanceId: types.TEXT("mcms-001"),
 			},
 			wantErr: false,
 		}, {

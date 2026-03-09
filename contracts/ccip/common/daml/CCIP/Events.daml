@@ -1,0 +1,48 @@
+module CCIP.Events where
+
+import DA.Crypto.Text (BytesHex)
+import DA.List (dedup)
+
+import qualified CCIP.Internal
+import qualified CCIP.Tickets
+
+template CCIPMessageSent
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        sender : Party
+        observers : [Party]
+        event : CCIPMessageSentEvent
+    where
+        signatory dedup (ccipOwner :: ccvOwners)
+        observer sender, observers
+
+data CCIPMessageSentEvent = CCIPMessageSentEvent
+    with
+        destChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        encodedMessage : BytesHex
+        verifierBlobs : [BytesHex]
+        receipts : [CCIP.Tickets.Receipt]
+    deriving (Eq, Show)
+
+template ExecutionStateChanged
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        receiver : Party
+        event : ExecutionStateChangedEvent
+    where
+        signatory dedup (ccipOwner :: ccvOwners)
+        observer receiver
+
+data ExecutionStateChangedEvent = ExecutionStateChangedEvent
+    with
+        sourceChainSelector : Numeric 0
+        sequenceNumber : Numeric 0
+        messageId : BytesHex
+        state : CCIP.Internal.MessageExecutionState
+        returnData : BytesHex
+    deriving (Eq, Show)
+

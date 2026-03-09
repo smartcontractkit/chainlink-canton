@@ -1,0 +1,20 @@
+-- | Types module for TokenAdminRegistry
+-- Separate module to avoid circular dependencies between TokenAdminRegistry and TokenAdminRegistryCodec
+module CCIP.TokenAdminRegistryTypes
+  ( PoolRegistration(..)
+  , TokenConfig(..)
+  ) where
+
+-- | Registered pool identity for a token instrument.
+data PoolRegistration = PoolRegistration
+    with
+        poolOwner : Party
+        poolInstanceId : Text
+    deriving (Eq, Show)
+
+data TokenConfig = TokenConfig
+    with
+        admin : Optional Party
+        pendingAdmin : Optional Party
+        tokenPool : Optional PoolRegistration
+    deriving (Eq, Show)
