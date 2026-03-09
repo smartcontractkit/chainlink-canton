@@ -31,9 +31,9 @@ type NodeConfig struct {
 type AuthConfig struct {
 	Type         string `toml:"type" validate:"required,oneof=static clientCredentials authorizationCode"`
 	UserID       string `toml:"user_id" validate:"required"`
-	JWT          string `toml:"jwt,omitempty" validate:"required_if=Type static,excluded_unless=Type static,omitempty,jwt"`
-	AuthURL      string `toml:"auth_url,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode,omitempty,url"`
-	ClientID     string `toml:"client_id,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode,omitempty"`
+	JWT          string `toml:"jwt,omitempty" validate:"required_if=Type static,excluded_unless=Type static,jwt"`
+	AuthURL      string `toml:"auth_url,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode,url"`
+	ClientID     string `toml:"client_id,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode"`
 	ClientSecret string `toml:"client_secret,omitempty" validate:"required_if=Type clientCredentials,excluded_unless=Type clientCredentials"`
 }
 
