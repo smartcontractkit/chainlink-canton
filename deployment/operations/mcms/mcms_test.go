@@ -106,7 +106,7 @@ func TestMCMSOps(t *testing.T) {
 			ActAs:         []string{primaryParty},
 			Template: mcms.MCMS{
 				Owner:              types.PARTY(primaryParty),
-				InstanceId:         types.TEXT(mcmsID + "@" + primaryParty),
+				InstanceId:         types.TEXT(mcmsID),
 				ChainId:            types.INT64(chainID),
 				Proposer:           roleState,
 				Canceller:          roleState,

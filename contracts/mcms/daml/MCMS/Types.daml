@@ -79,12 +79,12 @@ emptyConfig = MultisigConfig
 -- | A single operation to execute
 data Op = Op
   with
-    chainId : Int              -- Target chain ID
-    multisigId : Text          -- MCMS instance identifier
-    nonce : Int                -- Must match current opCount (enforces order)
-    targetInstanceId : Text    -- Target contract identifier (instanceId)
-    functionName : Text        -- Function to call
-    operationData : Text       -- Serialized parameters (hex)
+    chainId : Int                 -- Target chain ID
+    multisigId : Text             -- MCMS instance identifier
+    nonce : Int                   -- Must match current opCount (enforces order)
+    targetInstanceAddress : Text  -- Target contract address (format: instanceId@partyId)
+    functionName : Text           -- Function to call
+    operationData : BytesHex      -- Serialized parameters (hex) - uses uint16 length prefix
   deriving (Show, Eq)
 
 -- | Metadata about a merkle root
@@ -157,7 +157,7 @@ hashOpLeaf op =
   show op.chainId <> ":" <>
   op.multisigId <> ":" <>
   show op.nonce <> ":" <>
-  op.targetInstanceId <> ":" <>
+  op.targetInstanceAddress <> ":" <>
   op.functionName <> ":" <>
   op.operationData
 
@@ -197,14 +197,14 @@ data AdminParams
 -- Represents one operation in a scheduled batch
 data TimelockCall = TimelockCall
   with
-    targetInstanceId : Text    -- Target contract's stable identifier (MCMS instanceId for self-dispatch)
-    functionName : Text        -- Function to call on target
-    operationData : Text       -- Hex-encoded parameters
+    targetInstanceAddress : Text  -- Target contract's address (format: instanceId@partyId)
+    functionName : Text           -- Function to call on target
+    operationData : BytesHex      -- Hex-encoded parameters - uses uint16 length prefix
   deriving (Show, Eq, Ord)
 
 data BlockedFunction = BlockedFunction
   with
-    targetInstanceId : Text
+    targetInstanceAddress : Text  -- Target contract's address (format: instanceId@partyId)
     functionName : Text
   deriving (Show, Eq, Ord)
 

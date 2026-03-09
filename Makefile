@@ -27,7 +27,7 @@ gomodtidy: ## Run go mod tidy on all modules.
 .PHONY: test-daml-contracts
 test-daml-contracts:
 	cd contracts && dpm build --all
-	go run ./contracts/cmd/test --root ./contracts --color
+	go run ./contracts/cmd/test --root ./contracts
 
 # GolangCI-Lint targets
 
@@ -57,6 +57,10 @@ fix-all: contracts go-generate gomodtidy golangci-lint-fix-all
 .PHONY: build-committeeverifier
 build-committeeverifier:
 	docker build -t committeeverifier-canton:latest -f ccip/committee_verifier.Dockerfile .
+
+.PHONY: build-eds
+build-eds:
+	docker build -t canton-eds:latest -f eds/eds.Dockerfile .
 
 ## Assuming chainlink-ccv is checked out in ../chainlink-ccv.
 .PHONY: build-ccv-images

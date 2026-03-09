@@ -286,14 +286,14 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					{
 						Qualifier: ccvQualifier,
 						Template: ccvs.CommitteeVerifier{
-							Owner:                    types.PARTY(partyCCIP),
-							CcipOwner:                types.PARTY(partyCCIP),
-							VersionTag:               types.TEXT(versionTag),
-							MessageSentObserver:      types.PARTY(partyCCIP),
-							StorageLocation:          "ipfs://test-receive",
-							SignerConfigs:            nil,                         // Will be configured later during lane setup
-							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
-							RemoteChainFeeConfigs:    nil,
+							Owner:                 types.PARTY(partyCCIP),
+							CcipOwner:             types.PARTY(partyCCIP),
+							VersionTag:            types.TEXT(versionTag),
+							MessageSentObserver:   types.PARTY(partyCCIP),
+							StorageLocation:       "ipfs://test-receive",
+							SignerConfigs:         nil,                          // Will be configured later during lane setup
+							Deps:                  ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							RemoteChainFeeConfigs: nil,
 						},
 					},
 				},
@@ -351,7 +351,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	go func() {
 		log.Info().Msg("Running EDS...")
 		err := service.RunEDS(t.Context(), log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel), &config.Config{
-			ChainSelector: env.Chain.ChainSelector(),
+			ChainSelector: strconv.FormatUint(env.Chain.ChainSelector(), 10),
 			Server: config.ServerConfig{
 				Host: "0.0.0.0",
 				Port: uint16(edsPort), //nolint:gosec // this is a port number
@@ -389,6 +389,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				RMNRemote: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+				},
+				FeeQuoter: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
 				CCVs: []config.ContractIdentifier{
 					config.ContractIdentifier{
@@ -567,6 +571,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvContractIDs[0]}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
+								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
 						}}}}},
 						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},

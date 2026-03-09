@@ -150,7 +150,7 @@ execution_interval = 15_000_000_000
 ## Default Verifier Setup
 [[verifier]]
   image = "verifier:latest"
-  container_name = "default-verifier-1"
+  container_name = "canton-default-verifier-1"
   nop_alias = "canton-default-verifier-1"
   port = 8100
   # path is relative from "devenv" dir
@@ -165,7 +165,7 @@ execution_interval = 15_000_000_000
   [verifier.canton_configs]
     [verifier.canton_configs.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
-      ccip_message_sent_template_id = "#json-tests:Main:CCIPMessageSent"
+      ccip_message_sent_template_id = "#ccip-common:CCIP.Events:CCIPMessageSent"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
@@ -175,7 +175,7 @@ execution_interval = 15_000_000_000
 
 [[verifier]]
   image = "verifier:latest"
-  container_name = "default-verifier-2"
+  container_name = "canton-default-verifier-2"
   nop_alias = "canton-default-verifier-2"
   port = 8200
   committee_name = "default"
@@ -189,12 +189,23 @@ execution_interval = 15_000_000_000
   [verifier.canton_configs]
     [verifier.canton_configs.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
-      ccip_message_sent_template_id = "#json-tests:Main:CCIPMessageSent"
+      ccip_message_sent_template_id = "#ccip-common:CCIP.Events:CCIPMessageSent"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
       grpc_ledger_api_url = "TODO:fillin"
       jwt = "TODO:fillin"
+
+####################
+# Generic Services #
+####################
+
+## EDS generic service for Canton
+[generic_services.8706591216959472610]
+  chain_selector = 8706591216959472610
+[generic_services.8706591216959472610.input.eds_server_config]
+  host = "0.0.0.0"
+  port = 8100
 
 [[token_verifier]]
   mode = "standalone"
@@ -317,6 +328,18 @@ URI = "postgresql://indexer:indexer@indexer-db:5432/indexer?sslmode=disable"
   [[aggregator.api_clients]]
   client_id = "default-verifier-2"
   description = "Development default verifier 2"
+  enabled = true
+  groups = ["verifiers"]
+
+  [[aggregator.api_clients]]
+  client_id = "canton-default-verifier-1"
+  description = "Development canton verifier 1"
+  enabled = true
+  groups = ["verifiers"]
+
+  [[aggregator.api_clients]]
+  client_id = "canton-default-verifier-2"
+  description = "Development canton verifier 2"
   enabled = true
   groups = ["verifiers"]
 

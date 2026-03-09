@@ -64,7 +64,7 @@ type HoldingView struct {
 	Owner        types.PARTY                           `json:"owner"`
 	InstrumentId InstrumentId                          `json:"instrumentId"`
 	Amount       types.NUMERIC                         `json:"amount"`
-	Lock         *Lock                                 `json:"lock"`
+	Lock         *Lock                                 `json:"lock" hex:"optional"`
 	Meta         splice_api_token_metadata_v1.Metadata `json:"meta"`
 }
 
@@ -170,9 +170,9 @@ func (t *InstrumentId) UnmarshalHex(data string) error {
 // Lock is a Record type
 type Lock struct {
 	Holders      []types.PARTY    `json:"holders"`
-	ExpiresAt    *types.TIMESTAMP `json:"expiresAt"`
-	ExpiresAfter *types.RELTIME   `json:"expiresAfter"`
-	Context      *types.TEXT      `json:"context"`
+	ExpiresAt    *types.TIMESTAMP `json:"expiresAt" hex:"optional"`
+	ExpiresAfter *types.RELTIME   `json:"expiresAfter" hex:"optional"`
+	Context      *types.TEXT      `json:"context" hex:"optional"`
 }
 
 // ToMap converts Lock to a map for DAML arguments

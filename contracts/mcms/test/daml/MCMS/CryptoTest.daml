@@ -113,7 +113,7 @@ testCryptoHashOpLeaf = script do
   -- op[0].chainId = 1
   -- op[0].multisigId = "test-mcms-proposer"
   -- op[0].nonce = 0
-  -- op[0].targetInstanceId = "counter"
+  -- op[0].targetInstanceAddress = "counter"
   -- op[0].functionName = "Increment"
   -- op[0].operationData = ""
   -- op[0].leaf = "f91f525af385e7112e20ef75cf34dbbb74ed2d2f46cf9b5d6e9457b85e050c22"
@@ -121,7 +121,7 @@ testCryptoHashOpLeaf = script do
         { chainId = 1
         , multisigId = "test-mcms-proposer"
         , nonce = 0
-        , targetInstanceId = "counter"
+        , targetInstanceAddress = "counter"
         , functionName = "Increment"
         , operationData = ""
         }

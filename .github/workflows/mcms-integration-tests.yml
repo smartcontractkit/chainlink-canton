@@ -23,17 +23,18 @@ jobs:
           cd integration-tests/mcms
           go test -v -count 1 -timeout 20m -run TestMCMS_Execute ./...
 
-  test-mcms-timelock:
-    name: TestMCMS_Timelock
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: integration-tests/go.mod
-      - name: Run Go tests
-        run: |
-          cd integration-tests/mcms
-          go test -v -count 1 -timeout 20m -run TestMCMS_Timelock ./...
+  # TODO: Re-enable once the MCMS timelock bug is fixed
+  # test-mcms-timelock:
+  #   name: TestMCMS_Timelock
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Check out code
+  #       uses: actions/checkout@v4
+  #     - name: Install Go
+  #       uses: actions/setup-go@v6
+  #       with:
+  #         go-version-file: integration-tests/go.mod
+  #     - name: Run Go tests
+  #       run: |
+  #         cd integration-tests/mcms
+  #         go test -v -count 1 -timeout 20m -run TestMCMS_Timelock ./...

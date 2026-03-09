@@ -6,12 +6,20 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
+import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
+
+tokenAdminRegistryKey : Text
+tokenAdminRegistryKey = "token-admin-registry"
+
+lookupTokenAdminRegistryCid : CCIP.Context.CCIPContext -> Update (ContractId TokenAdminRegistry)
+lookupTokenAdminRegistryCid ctx =
+    CCIP.Context.getFromContextU ctx tokenAdminRegistryKey
 
 template TokenAdminRegistry
     with
@@ -143,31 +151,6 @@ template TokenAdminRegistry
                                     updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
                                 create this with tokenConfigs = updatedMap
 
-        -- | Issue a token receive ticket for inbound token transfer.
-        -- Called by OffRamp after successful message verification.
-        -- Only the registry owner (ccipOwner) can call this.
-        nonconsuming choice TokenAdminRegistry_IssueReceiveTicket : ContractId CCIP.Tickets.TokenReceiveTicket
-            with
-                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-                poolOwner : Party
-                receiver : Party
-                tokenReceiver : Party
-                amount : Numeric 0
-                messageHash : BytesHex
-                sourceChainSelector : Numeric 0
-            controller owner
-            do
-                create CCIP.Tickets.TokenReceiveTicket with
-                    ccipOwner = owner
-                    tokenAdminRegistryInstanceId = instanceId
-                    poolOwner = poolOwner
-                    receiver = receiver
-                    tokenReceiver = tokenReceiver
-                    instrumentId = instrumentId
-                    amount = amount
-                    messageHash = messageHash
-                    sourceChainSelector = sourceChainSelector
-
         -- | Consume a token receive ticket to authorize token release.
         -- Validates caller is the registered pool owner, ticket was issued by this TAR,
         -- then archives the ticket. Callers should fetch the ticket beforehand to read
@@ -210,9 +193,18 @@ template TokenAdminRegistry
             do
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
+                -- Trust model: TAR is currently a concrete trusted internal
+                -- dependency chosen by `owner`/`ccipOwner`, not an adversarial
+                -- extension point. That is why this code relies on TAR's own
+                -- tokenConfigs plus the message-carried TAR snapshot before
+                -- mutating SendingMessageV1 under TAR's authority.
+                -- TODO: investigate whether we can/should ever have a TAR
+                -- interface with this code here. If TAR becomes interface-backed,
+                -- re-check whether these mapping reads and snapshot checks are
+                -- still the right trust boundary.
                 assertMsg "TAR outbound: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
-                    instanceId owner sm.tokenAdminRegistryInstanceAddress
+                    instanceId owner sm.deps.tokenAdminRegistry
 
                 instrumentId <- case sm.expectedTokenInstrumentId of
                     None -> abort "TAR outbound: missing expected token instrument"
@@ -244,9 +236,13 @@ template TokenAdminRegistry
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+                -- Same trust model as outbound: this is written for concrete TAR
+                -- implementations today, and assumes the TAR selected by
+                -- `owner`/`ccipOwner` is honest about its mappings and preserves
+                -- the snapshot-checking invariants before updating the message.
                 assertMsg "TAR: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
                 CCIP.RawInstanceAddress.assertEqual "TAR: instance address mismatch"
-                    instanceId owner execMsg.tokenAdminRegistryInstanceAddress
+                    instanceId owner execMsg.deps.tokenAdminRegistry
 
                 let tt = fromSomeNote
                         "TokenAdminRegistry_SetInboundPoolCCVs: no token transfer in message"
@@ -264,6 +260,49 @@ template TokenAdminRegistry
                     (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
                 exercise executingMessageCid CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
                     poolCCVs
+
+        -- | Resolve token-side finalization data for an inbound token transfer and
+        -- exercise ExecutingMessageV1.FinalizeExecute under TAR's signatory context.
+        -- OffRamp remains the authority that decides execution is valid and complete.
+        nonconsuming choice TokenAdminRegistry_FinalizeExecute : CCIP.ExecutingMessageV1.FinalizeExecuteResult
+            with
+                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+                ticketReceiver : Party
+                returnData : BytesHex
+                caller : Party
+            controller caller
+            do
+                execMsg <- fetch executingMessageCid
+                assertMsg "TAR finalize: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
+                CCIP.RawInstanceAddress.assertEqual "TAR finalize: instance address mismatch"
+                    instanceId owner execMsg.deps.tokenAdminRegistry
+
+                resolvedTokenReceiver <- case execMsg.tokenReceiver of
+                    None -> abort "TAR finalize: expected token transfer"
+                    Some p -> pure p
+
+                let tt = fromSomeNote
+                        "TAR finalize: tokenReceiver set but no tokenTransfer in message"
+                        execMsg.message.tokenTransfer
+                let instrumentId = fromSomeNote
+                        "TAR finalize: cannot decode destTokenAddress"
+                        (CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress)
+
+                config <- case Map.lookup instrumentId tokenConfigs of
+                    None -> abort "TAR finalize: no config for instrument"
+                    Some c -> pure c
+                pool <- case config.tokenPool of
+                    None -> abort "TAR finalize: no pool registered for instrument"
+                    Some p -> pure p
+
+                exercise executingMessageCid CCIP.ExecutingMessageV1.FinalizeExecute with
+                    tokenAdminRegistryInstanceId = instanceId
+                    maybePoolOwner = Some pool.poolOwner
+                    maybeTicketReceiver = Some ticketReceiver
+                    maybeTokenReceiver = Some resolvedTokenReceiver
+                    maybeInstrumentId = Some instrumentId
+                    maybeAmount = Some tt.amount
+                    returnData = returnData
 
 
 -- | Registered pool identity for a token instrument.

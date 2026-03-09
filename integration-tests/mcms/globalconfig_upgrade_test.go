@@ -28,7 +28,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 	participant := env.Chain.Participants[0]
 	ccipOwner := participant.PartyID
-	configInstanceID := "globalconfig-" + uuid.New().String()[:8] + "@" + ccipOwner
+	configInstanceID := "globalconfig-" + uuid.New().String()[:8]
 
 	// ===================================================================
 	// Phase 1: Deploy initial contracts (mcms + globalconfig v1.0.0)
@@ -56,18 +56,19 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	v1Cid := createGlobalConfigV1(t, participant, gcV1PkgID, ccipOwner, configInstanceID)
 	t.Logf("Created GlobalConfigV1: %s", v1Cid)
 
-	instID := queryGlobalConfigInstanceID(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
-	require.Equal(t, configInstanceID, instID, "V1 instanceId should match")
+	instId := queryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	require.Equal(t, configInstanceID, instId, "V1 instanceId should match")
 
 	// Exercise UpdateDestChainConfig via MCMSReceiver_Entrypoint to prove V1 works
+	instanceAddr := configInstanceID + "@" + ccipOwner
 	v1Cid = exerciseMCMSReceiverEntrypoint(
 		t, participant, mcmsPkgID, ccipOwner, v1Cid,
-		"UpdateDestChainConfig", "", nil,
+		"UpdateDestChainConfig", "", map[string]string{instanceAddr: v1Cid},
 	)
 	t.Logf("V1 after UpdateDestChainConfig: %s", v1Cid)
 
-	instID = queryGlobalConfigInstanceID(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
-	require.Equal(t, configInstanceID, instID, "V1 instanceId should still match after update")
+	instId = queryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	require.Equal(t, configInstanceID, instId, "V1 instanceId should still match after update")
 
 	// ===================================================================
 	// Phase 3: SCU Upgrade — upload globalconfig v2.0.0
@@ -93,17 +94,17 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 
 	v2Cid := exerciseMCMSReceiverEntrypoint(
 		t, participant, mcmsPkgID, ccipOwner, v1Cid,
-		"MigrateToV2", "", nil,
+		"MigrateToV2", "", map[string]string{instanceAddr: v1Cid},
 	)
 	t.Logf("MigrateToV2 created V2: %s", v2Cid)
 
 	// V2 should have the same instanceId as V1
-	instIDv2 := queryGlobalConfigInstanceID(t, participant, gcV2PkgID, ccipOwner, v2Cid, "V2")
-	require.Equal(t, configInstanceID, instIDv2, "V2 instanceId should match V1's")
+	instIdV2 := queryGlobalConfigInstanceId(t, participant, gcV2PkgID, ccipOwner, v2Cid, "V2")
+	require.Equal(t, configInstanceID, instIdV2, "V2 instanceId should match V1's")
 
 	// V1 should still be alive (non-consuming migration)
-	instIDv1 := queryGlobalConfigInstanceID(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
-	require.Equal(t, configInstanceID, instIDv1, "V1 should still be queryable after non-consuming migrate")
+	instIdV1 := queryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	require.Equal(t, configInstanceID, instIdV1, "V1 should still be queryable after non-consuming migrate")
 	t.Log("Confirmed V1 and V2 coexist")
 
 	// ===================================================================
@@ -112,7 +113,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 
 	v2Cid = exerciseMCMSReceiverEntrypoint(
 		t, participant, mcmsPkgID, ccipOwner, v2Cid,
-		"SetNewFeature", "true", nil,
+		"SetNewFeature", "true", map[string]string{instanceAddr: v2Cid},
 	)
 	t.Logf("V2 after SetNewFeature: %s", v2Cid)
 
@@ -127,15 +128,15 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	t.Log("Archived GlobalConfigV1")
 
 	// V1 should no longer be queryable
-	_, err = tryQueryGlobalConfigInstanceID(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
+	_, err = tryQueryGlobalConfigInstanceId(t, participant, gcV1PkgID, ccipOwner, v1Cid, "V1")
 	require.Error(t, err)
 	// Error message is CONTRACT_NOT_FOUND(11,e5da79f1): Contract could not be found with id <id>
 	require.Contains(t, err.Error(), "CONTRACT_NOT_FOUND")
 	t.Logf("Confirmed V1 is archived (error: %s)", err)
 
 	// V2 should still be fully operational
-	instIDv2 = queryGlobalConfigInstanceID(t, participant, gcV2PkgID, ccipOwner, v2Cid, "V2")
-	require.Equal(t, configInstanceID, instIDv2, "V2 should still be operational after V1 archival")
+	instIdV2 = queryGlobalConfigInstanceId(t, participant, gcV2PkgID, ccipOwner, v2Cid, "V2")
+	require.Equal(t, configInstanceID, instIdV2, "V2 should still be operational after V1 archival")
 	t.Log("SCU upgrade test complete: V1 archived, V2 operational")
 }
 
@@ -199,16 +200,15 @@ func exerciseMCMSReceiverEntrypoint(
 	t.Helper()
 
 	cidEntries := make([]*apiv2.GenMap_Entry, 0, len(contractIds))
-	for instID, cid := range contractIds {
+	for instAddr, cid := range contractIds {
 		cidEntries = append(cidEntries, &apiv2.GenMap_Entry{
-			Key:   &apiv2.Value{Sum: &apiv2.Value_Text{Text: instID}},
+			Key:   &apiv2.Value{Sum: &apiv2.Value_Text{Text: instAddr}},
 			Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: cid}},
 		})
 	}
 
 	choiceArg := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{
 		Fields: []*apiv2.RecordField{
-			{Label: "caller", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: owner}}},
 			{Label: "functionName", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: functionName}}},
 			{Label: "operationData", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: operationData}}},
 			{Label: "contractIds", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: cidEntries}}}},
@@ -251,7 +251,7 @@ func exerciseMCMSReceiverEntrypoint(
 	return ""
 }
 
-func queryGlobalConfigInstanceID(
+func queryGlobalConfigInstanceId(
 	t *testing.T,
 	participant canton.Participant,
 	pkgID, owner, contractID string,
@@ -259,15 +259,15 @@ func queryGlobalConfigInstanceID(
 ) string {
 	t.Helper()
 
-	result, err := tryQueryGlobalConfigInstanceID(t, participant, pkgID, owner, contractID, version)
+	result, err := tryQueryGlobalConfigInstanceId(t, participant, pkgID, owner, contractID, version)
 	require.NoError(t, err)
 
 	return result
 }
 
-// tryQueryGlobalConfigInstanceID is the error-returning variant of queryGlobalConfigInstanceID.
+// tryQueryGlobalConfigInstanceId is the error-returning variant of queryGlobalConfigInstanceId.
 // Used to verify that an archived contract can no longer be exercised.
-func tryQueryGlobalConfigInstanceID(
+func tryQueryGlobalConfigInstanceId(
 	t *testing.T,
 	participant canton.Participant,
 	pkgID, owner, contractID string,

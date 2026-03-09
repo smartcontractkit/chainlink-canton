@@ -1,50 +1,127 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
+	"github.com/fatih/color"
+
 	"github.com/schollz/progressbar/v3"
+	"golang.org/x/exp/maps"
+	"gopkg.in/yaml.v3"
 )
+
+type packageDaml struct {
+	Name       string `yaml:"name"`
+	Version    string `yaml:"version"`
+	SdkVersion string `yaml:"sdk-version"`
+}
 
 func main() {
 	ctx := context.Background()
 
 	rootDir := flag.String("root", "", "Path to the contracts root directory, must contain multi-package.yaml file, defaults to current working directory")
-	color := flag.Bool("color", false, "Whether or not to use color output")
+	noColor := flag.Bool("no-color", false, "Disables color output")
 	plain := flag.Bool("plain", false, "Whether or not to use plain output")
 	summaryOutput := flag.String("output", "", "Path to output summary file")
 
 	flag.Parse()
 
-	fmt.Println("Testing packages:")
-	var packages []string
-	err := filepath.WalkDir(*rootDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		// Skip .daml directories
-		if d.IsDir() && d.Name() == ".daml" {
-			return filepath.SkipDir
-		}
-		if d.Name() == "daml.yaml" {
-			fmt.Println(path)
-			packages = append(packages, path)
-		}
-
-		return nil
-	})
-	if err != nil {
-		panic(err)
+	if *noColor {
+		color.NoColor = true
 	}
+
+	// Parse multi-package.yaml to get all packages to-be-compiled
+	content, err := os.ReadFile(filepath.Join(*rootDir, "multi-package.yaml"))
+	if err != nil {
+		log.Fatalf("failed to read multi-package.yaml: %v", err)
+	}
+	var multiPackage struct {
+		Packages []string `yaml:"packages"`
+	}
+	err = yaml.Unmarshal(content, &multiPackage)
+	if err != nil {
+		log.Fatalf("failed to parse multi-package.yaml: %v", err)
+	}
+
+	// Collect all required SDK versions and package paths
+	packages := make([]string, len(multiPackage.Packages))
+	sdkVersions := make(map[string]struct{})
+	for i, pkg := range multiPackage.Packages {
+		// Read daml.yaml for package name and version
+		damlYamlPath := filepath.Join(*rootDir, pkg, "daml.yaml")
+		content, err := os.ReadFile(damlYamlPath)
+		if err != nil {
+			log.Fatalf("failed to read daml.yaml for package %q: %v", pkg, err)
+		}
+		var config packageDaml
+		err = yaml.Unmarshal(content, &config)
+		if err != nil {
+			log.Fatalf("failed to parse daml.yaml for package %q: %v", pkg, err)
+		}
+		sdkVersions[config.SdkVersion] = struct{}{}
+		packages[i] = damlYamlPath
+	}
+
+	log.Println("Testing packages:")
+	slices.Sort(packages)
+	for _, p := range packages {
+		log.Println(color.YellowString("- %s", p))
+	}
+
+	// Install required SDK versions
+	versions := maps.Keys(sdkVersions)
+	slices.Sort(versions)
+	log.Printf("Installing required DAML SDK versions: %v...", versions)
+	for _, version := range versions {
+		cmd := exec.CommandContext(ctx, "dpm", "install", version)
+		if *rootDir != "" {
+			cmd.Dir = *rootDir
+		}
+		stdOut := &bytes.Buffer{}
+		stdErr := &bytes.Buffer{}
+		cmd.Stdout = stdOut
+		cmd.Stderr = stdErr
+		err := cmd.Run()
+		if err != nil {
+			log.Println("dpm install command failed:")
+			log.Println(stdErr.String())
+			log.Println(stdOut.String())
+			log.Fatalf("failed to run dpm install command for version %q: %v", version, err)
+		}
+		log.Printf("DAML SDK version %q installed successfully", version)
+	}
+
+	// Compile contracts using dpm
+	log.Printf("Compiling contracts using dpm...")
+	cmd := exec.CommandContext(ctx, "dpm", "build", "--all")
+	if *rootDir != "" {
+		cmd.Dir = *rootDir
+	}
+	stdOut := &bytes.Buffer{}
+	stdErr := &bytes.Buffer{}
+	cmd.Stdout = stdOut
+	cmd.Stderr = stdErr
+	err = cmd.Run()
+	if err != nil {
+		log.Println("dpm build command failed:")
+		log.Println(stdErr.String())
+		log.Println(stdOut.String())
+		log.Fatalf("failed to run dpm build command: %v", err)
+	}
+
+	log.Println("Contracts compiled successfully")
 
 	wg := sync.WaitGroup{}
 	var progress *progressbar.ProgressBar
@@ -53,18 +130,18 @@ func main() {
 			progressbar.OptionSetDescription("Testing packages..."),
 			progressbar.OptionSetRenderBlankState(true),
 			progressbar.OptionShowCount(),
-			progressbar.OptionEnableColorCodes(*color),
+			progressbar.OptionEnableColorCodes(!*noColor),
 			progressbar.OptionSetPredictTime(false),
 		)
 	} else {
-		fmt.Println("Running tests...")
+		log.Println("Running tests...")
 	}
 	results := make([]packageResult, len(packages))
 	for i, s := range packages {
 		wg.Go(func() {
 			directory, _ := filepath.Split(s)
 			cmd := exec.CommandContext(ctx, "dpm", "test")
-			if *color {
+			if !*noColor {
 				cmd.Args = append(cmd.Args, "--color")
 			}
 			cmd.Dir = directory
@@ -86,37 +163,39 @@ func main() {
 			if !*plain {
 				_ = progress.Add(1)
 			} else {
-				fmt.Println("✓ Done: ", directory)
+				log.Println("✓ Done: ", directory)
 			}
 		})
 	}
 	wg.Wait()
 
 	var summaries []string //nolint:prealloc
-	fmt.Println("Raw Outputs:")
+	log.Println("Raw Outputs:")
 	for _, r := range results {
-		fmt.Println("==============================")
-		fmt.Printf("Package: %s\n", r.path)
-		fmt.Printf("Exit Code: %d\n\n", r.exitCode)
-		fmt.Println(r.output)
+		log.Println("==============================")
+		log.Printf("Package: %s\n", r.path)
+		log.Printf("Exit Code: %d\n\n", r.exitCode)
+		log.Println(r.output)
 
 		// Collect summary
 		for _, summary := range collectSummaries(r.output) {
 			summaries = append(summaries, r.path+summary)
 		}
 	}
-	fmt.Println("==============================")
-	fmt.Println("Test Summary:")
+	log.Println("==============================")
+	log.Println("Test Summary:")
 	failedTests := 0
 	for _, summary := range summaries {
-		fmt.Println(summary)
+		log.Println(summary)
 		if strings.Contains(stripAnsi(summary), ": failed") {
 			failedTests++
 		}
 	}
-	fmt.Println()
+
 	if failedTests > 0 {
-		fmt.Println("Failed Tests:", failedTests)
+		log.Println(color.RedString("Failed Tests:", failedTests))
+	} else {
+		log.Println(color.GreenString("All tests passed."))
 	}
 
 	if *summaryOutput != "" {

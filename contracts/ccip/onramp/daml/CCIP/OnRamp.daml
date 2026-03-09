@@ -6,9 +6,11 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Optional (fromOptional, isSome)
 
+import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.Context
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -17,15 +19,29 @@ import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
 
+onRampKey : Text
+onRampKey = "on-ramp"
+
+lookupOnRampCid : CCIP.Context.CCIPContext -> Update (ContractId OnRamp)
+lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
+
+rawInstanceAddress : OnRamp -> CCIP.RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress onRamp = CCIP.RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner
+
+data OnRampDeps = OnRampDeps
+    with
+        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
 
 template OnRamp
     with
         instanceId : Text
         ccipOwner : Party
-        globalConfigInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemoteInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
-        ccvRegistryInstanceAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        deps : OnRampDeps
     where
         signatory ccipOwner
 
@@ -37,6 +53,10 @@ template OnRamp
                 destChainSelector : Numeric 0
             controller ccipOwner
             do
+                globalConfig <- fetch globalConfigCid
+                CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetDestChainConfig with
                         destChainSelector = destChainSelector
@@ -66,20 +86,27 @@ template OnRamp
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
                 tokenReceiver : Optional BytesHex
+                tokenArgs : BytesHex
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller ccipOwner
             do
                 globalConfig <- fetch globalConfigCid
                 CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
-                    globalConfig.instanceId globalConfig.ccipOwner globalConfigInstanceAddress
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "onramp: rmn instance address mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
+                    caller = ccipOwner
+                CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
+                    rmnInstanceId rmnOwner deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner tokenAdminRegistryInstanceAddress
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+
+                feeQuoter <- fetch feeQuoterCid
+                CCIP.RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
@@ -127,9 +154,13 @@ template OnRamp
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
                     sender = routerPartyOwner
-                    routerInstanceAddress = CCIP.RawInstanceAddress.make routerInstanceId routerPartyOwner
-                    onRampInstanceAddress = CCIP.RawInstanceAddress.make instanceId ccipOwner
-                    tokenAdminRegistryInstanceAddress = tokenAdminRegistryInstanceAddress
+                    deps = CCIP.SendingMessageV1.SendingMessageDeps with
+                        router = CCIP.RawInstanceAddress.make routerInstanceId routerPartyOwner
+                        onRamp = rawInstanceAddress this
+                        globalConfig = deps.globalConfig
+                        rmnRemote = deps.rmnRemote
+                        tokenAdminRegistry = deps.tokenAdminRegistry
+                        feeQuoter = deps.feeQuoter
                     destChainSelector
                     sequenceNumber = newSequenceNumber
                     requiredCCVs = resolvedCCVs
@@ -143,6 +174,7 @@ template OnRamp
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
                     tokenReceiver = resolvedTokenReceiver
+                    tokenArgs = tokenArgs
                     message = None
                     encodedMessage = ""
                     messageId = ""
@@ -156,13 +188,14 @@ template OnRamp
                     executorFeeTokenAmount = 0.0
                     ccvFees = []
                     tokenSendFee = None
-                    feesFinalized = False
                     ccvFeeTokenAmounts = []
                     tokenSendFeeTokenAmount = 0.0
                     networkFeeTokenAmount = 0.0
                     verifierData = []
+                    ccvOwners = []
                     tokenSendData = None
                     observingParties = [routerPartyOwner]
+                    state = CCIP.SendingMessageV1.SendingMessageState_Prepared
 
         -- | Validate and finalize a CCIP send.
         -- Reads accumulated data from SendingMessageV1. Fee collection happens
@@ -184,13 +217,24 @@ template OnRamp
                 assertMsg "sendingMessage sender mismatch"
                     (sendingMsg.sender == routerPartyOwner)
                 CCIP.RawInstanceAddress.assertEqual "router instance mismatch"
-                    routerInstanceId routerPartyOwner sendingMsg.routerInstanceAddress
+                    routerInstanceId routerPartyOwner sendingMsg.deps.router
+                CCIP.RawInstanceAddress.assertEqual "onramp instance mismatch"
+                    instanceId ccipOwner sendingMsg.deps.onRamp
+                assertMsg "sendingMessage globalConfig mismatch"
+                    (sendingMsg.deps.globalConfig == deps.globalConfig)
+                assertMsg "sendingMessage rmnRemote mismatch"
+                    (sendingMsg.deps.rmnRemote == deps.rmnRemote)
+                assertMsg "sendingMessage tokenAdminRegistry mismatch"
+                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "sendingMessage feeQuoter mismatch"
+                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
 
                 theMessage <- case sendingMsg.message of
                     None -> abort "message not yet constructed"
                     Some m -> pure m
 
-                assertMsg "fees not finalized" sendingMsg.feesFinalized
+                assertMsg "sendingMessage not fee-finalized"
+                    (sendingMsg.state == CCIP.SendingMessageV1.SendingMessageState_FeeFinalized)
 
                 assertMsg "sequence number mismatch"
                     (sendingMsg.sequenceNumber == currentSequenceNumber + 1.0)
@@ -198,16 +242,18 @@ template OnRamp
                 globalConfig <- fetch globalConfigCid
                 CCIP.RawInstanceAddress.assertEqual "globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner
-                    globalConfigInstanceAddress
+                    sendingMsg.deps.globalConfig
 
-                rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "rmn mismatch"
-                    rmnRemote.instanceId rmnRemote.rmnOwner rmnRemoteInstanceAddress
+                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
+                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
+                    caller = ccipOwner
+                CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
+                    rmnInstanceId rmnOwner sendingMsg.deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "tar mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner
-                    tokenAdminRegistryInstanceAddress
+                    sendingMsg.deps.tokenAdminRegistry
 
                 -- Authoritative RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
@@ -274,61 +320,23 @@ template OnRamp
                     _ -> abort "token transfer / token send data mismatch"
 
                 let receipts = assembleReceipts sendingMsg
-                archive sendingMessageCid
+                finalizeResult <- exercise sendingMessageCid CCIP.SendingMessageV1.FinalizeSend with
+                    messageSender = routerPartyOwner
+                    messageSentObservers = concatMap (.messageSentObservers) sendingMsg.verifierData
+                    verifierBlobs = map (.verifierBlob) sendingMsg.verifierData
+                    receipts = receipts
 
                 pure CCIPSendFromRouterResult with
+                    ccipMessageSent = finalizeResult.ccipMessageSent
                     verifierBlobs =
                         map (.verifierBlob) sendingMsg.verifierData
                     messageSentObservers =
                         concatMap (.messageSentObservers) sendingMsg.verifierData
                     receipts
 
-        -- Cancel an in-progress send and issue a refund ticket for locked tokens.
-        -- Validates router, OnRamp, and TAR identity before archiving SendingMessageV1.
-        -- sourceChainSelector = 0 avoids false-positive RMN curse checks.
-        nonconsuming choice CancelSendFromRouter : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
-            with
-                routerPartyOwner : Party
-                routerInstanceId : Text
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-            controller ccipOwner
-            do
-                sendingMsg <- fetch sendingMessageCid
-                assertMsg "cancelSend: ccipOwner mismatch"
-                    (sendingMsg.ccipOwner == ccipOwner)
-                assertMsg "cancelSend: sender mismatch"
-                    (sendingMsg.sender == routerPartyOwner)
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: router instance mismatch"
-                    routerInstanceId routerPartyOwner sendingMsg.routerInstanceAddress
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: onramp instance mismatch"
-                    instanceId ccipOwner sendingMsg.onRampInstanceAddress
-
-                tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: tar mismatch (onramp)"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner tokenAdminRegistryInstanceAddress
-                CCIP.RawInstanceAddress.assertEqual "cancelSend: tar mismatch (sendingMsg)"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner sendingMsg.tokenAdminRegistryInstanceAddress
-
-                archive sendingMessageCid
-
-                case sendingMsg.tokenSendData of
-                    None -> pure None
-                    Some tsd -> do
-                        ticketCid <- exercise tokenAdminRegistryCid
-                            CCIP.TokenAdminRegistry.TokenAdminRegistry_IssueReceiveTicket with
-                                instrumentId = tsd.instrumentId
-                                poolOwner = tsd.poolOwner
-                                receiver = sendingMsg.sender
-                                tokenReceiver = sendingMsg.sender
-                                amount = tsd.amount
-                                messageHash = sendingMsg.messageId
-                                sourceChainSelector = 0.0
-                        pure (Some ticketCid)
-
-
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
     with
+        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
         verifierBlobs : [BytesHex]
         messageSentObservers : [Party]
         receipts : [CCIP.Tickets.Receipt]

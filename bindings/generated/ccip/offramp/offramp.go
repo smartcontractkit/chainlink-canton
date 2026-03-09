@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "af9f181324f67c47ab575ed33f2ed6dcee838afcbcd5c9c0121df628be439ca7"
+	PackageID   = "e93e471ed5c1f1d94cd91209b6a295f42f69e271f28db46f87439bdf78a2a774"
 	SDKVersion  = "3.4.10"
 )
 
@@ -140,11 +140,12 @@ func (t *ExecuteFromRouter) UnmarshalHex(data string) error {
 
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
-	MessageId           types.TEXT         `json:"messageId"`
-	Message             common.MessageV1   `json:"message"`
-	SourceChainSelector types.NUMERIC      `json:"sourceChainSelector"`
-	SequenceNumber      types.NUMERIC      `json:"sequenceNumber"`
-	TokenReceiveTicket  *types.CONTRACT_ID `json:"tokenReceiveTicket"`
+	MessageId             types.TEXT         `json:"messageId"`
+	Message               common.MessageV1   `json:"message"`
+	SourceChainSelector   types.NUMERIC      `json:"sourceChainSelector"`
+	SequenceNumber        types.NUMERIC      `json:"sequenceNumber"`
+	TokenReceiveTicket    *types.CONTRACT_ID `json:"tokenReceiveTicket" hex:"optional"`
+	ExecutionStateChanged types.CONTRACT_ID  `json:"executionStateChanged"`
 }
 
 // ToMap converts ExecuteFromRouterResult to a map for DAML arguments
@@ -175,6 +176,14 @@ func (t ExecuteFromRouterResult) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["executionStateChanged"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutionStateChanged).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutionStateChanged
+	}()
 
 	return m
 }
@@ -262,11 +271,9 @@ func (t *GetRequiredCCVsForExecute) UnmarshalHex(data string) error {
 
 // OffRamp is a Template type
 type OffRamp struct {
-	InstanceId                        types.TEXT                `json:"instanceId"`
-	CcipOwner                         types.PARTY               `json:"ccipOwner"`
-	GlobalConfigInstanceAddress       common.RawInstanceAddress `json:"globalConfigInstanceAddress"`
-	RmnRemoteInstanceAddress          common.RawInstanceAddress `json:"rmnRemoteInstanceAddress"`
-	TokenAdminRegistryInstanceAddress common.RawInstanceAddress `json:"tokenAdminRegistryInstanceAddress"`
+	InstanceId types.TEXT  `json:"instanceId"`
+	CcipOwner  types.PARTY `json:"ccipOwner"`
+	Deps       OffRampDeps `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -290,30 +297,12 @@ func (t OffRamp) CreateCommand() *model.CreateCommand {
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["globalConfigInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.GlobalConfigInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.GlobalConfigInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rmnRemoteInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	return &model.CreateCommand{
@@ -333,30 +322,12 @@ func (t OffRamp) CreateCommandWithPackageID(packageID string) *model.CreateComma
 	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["globalConfigInstanceAddress"] = func() any {
+	args["deps"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.GlobalConfigInstanceAddress).(mapper); ok {
+		if m, ok := any(t.Deps).(mapper); ok {
 			return m.toMap()
 		}
-		return t.GlobalConfigInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["rmnRemoteInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.RmnRemoteInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.RmnRemoteInstanceAddress
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["tokenAdminRegistryInstanceAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.TokenAdminRegistryInstanceAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.TokenAdminRegistryInstanceAddress
+		return t.Deps
 	}()
 
 	return &model.CreateCommand{
@@ -389,27 +360,6 @@ func (t *OffRamp) UnmarshalHex(data string) error {
 
 // Choice methods for OffRamp
 
-// GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this OffRamp contract
-// This method uses the package name in the template ID
-func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVsForExecuteWithPackageID exercises the GetRequiredCCVsForExecute choice using the provided package ID instead of package name
-func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // PrepareExecute exercises the PrepareExecute choice on this OffRamp contract
 // This method uses the package name in the template ID
 func (t OffRamp) PrepareExecute(contractID string, args PrepareExecute) *model.ExerciseCommand {
@@ -427,6 +377,27 @@ func (t OffRamp) PrepareExecuteWithPackageID(contractID string, packageID string
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
 		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetRequiredCCVsForExecute exercises the GetRequiredCCVsForExecute choice on this OffRamp contract
+// This method uses the package name in the template ID
+func (t OffRamp) GetRequiredCCVsForExecute(contractID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetRequiredCCVsForExecuteWithPackageID exercises the GetRequiredCCVsForExecute choice using the provided package ID instead of package name
+func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args GetRequiredCCVsForExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForExecute",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -473,12 +444,72 @@ func (t OffRamp) ExecuteFromRouterWithPackageID(contractID string, packageID str
 	}
 }
 
+// OffRampDeps is a Record type
+type OffRampDeps struct {
+	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+}
+
+// ToMap converts OffRampDeps to a map for DAML arguments
+func (t OffRampDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["globalConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfig
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	return m
+}
+
+func (t OffRampDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *OffRampDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes OffRampDeps to hex string (Canton MCMS format)
+func (t OffRampDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes OffRampDeps from hex string (Canton MCMS format)
+func (t *OffRampDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // PrepareExecute is a Record type
 type PrepareExecute struct {
 	EncodedMessage     types.TEXT        `json:"encodedMessage"`
 	RmnRemoteCid       types.CONTRACT_ID `json:"rmnRemoteCid"`
 	ReceiverParty      types.PARTY       `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty"`
+	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty" hex:"optional"`
 	Caller             types.PARTY       `json:"caller"`
 }
 
@@ -536,12 +567,34 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type PrepareExecuteMCMSParams struct {
+	EncodedMessage     types.TEXT        `json:"encodedMessage"`
+	RmnRemoteCid       types.CONTRACT_ID `json:"rmnRemoteCid"`
+	ReceiverParty      types.PARTY       `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty" hex:"optional"`
+}
+
+// MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.
+func (t PrepareExecuteMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PrepareExecuteMCMSParams from hex string.
+func (t *PrepareExecuteMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ExecuteFromRouter(args ExecuteFromRouter) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error)
 	PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error)
+	PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -583,6 +636,11 @@ func (e *encoder) GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bi
 
 // PrepareExecute encodes parameters for the PrepareExecute choice.
 func (e *encoder) PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("PrepareExecute", args)
+}
+
+// PrepareExecuteMCMSParams encodes MCMS parameters (without Caller) for the PrepareExecute choice.
+func (e *encoder) PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareExecute", args)
 }
 

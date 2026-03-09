@@ -1,7 +1,7 @@
 name: CCIP E2E Tests
 on:
   push:
-    branches: [develop, main]
+    branches: [ develop, main ]
   pull_request:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,13 +34,13 @@ jobs:
           repository: smartcontractkit/chainlink-ccv
           path: chainlink-ccv
           ref: a321c061748a578742b98ff4bdcb869c3b01976c
-    
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
 
       - name: Install Just
         uses: extractions/setup-just@e33e0265a09d6d736e2ee1e0eb685ef1de4669ff # v3
-      
+
       - name: Authenticate to AWS ECR (JD)
         uses: ./chainlink-canton/.github/actions/aws-ecr-auth
         with:
@@ -48,7 +48,7 @@ jobs:
           aws-region: us-west-2
           registry-type: private
           registries: ${{ secrets.JD_REGISTRY }}
-      
+
       - name: Install Go
         uses: actions/setup-go@v6
         with:
@@ -68,13 +68,14 @@ jobs:
           just build-docker
         env:
           DOCKER_BUILDKIT: 1
-      
+
       - name: Build canton committee verifier docker image
         working-directory: chainlink-canton
-        run: |
-          docker build -t committeeverifier-canton -f ccip/committee_verifier.Dockerfile .
-        env:
-          DOCKER_BUILDKIT: 1
+        run: make build-committeeverifier
+
+      - name: Build EDS docker image
+        working-directory: chainlink-canton
+        run: make build-eds
 
       - name: Spin up CCIP environment
         working-directory: chainlink-canton/ccip/devenv
@@ -90,12 +91,12 @@ jobs:
         continue-on-error: true
         id: test_run_evm2canton_basic
 
-      - name: Run CCIP TestCantonSourceReader test
+      - name: Run CCIP TestCanton2EVM_Basic test
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
-          go test -timeout 5m -v -count 1 -run TestCantonSourceReader
+          go test -timeout 8m -v -count 1 -run TestCanton2EVM_Basic
         continue-on-error: true
-        id: test_run_canton_source_reader
+        id: test_run_canton2evm_basic
 
       - name: Dump logs if they're not already dumped
         if: always()
@@ -117,7 +118,7 @@ jobs:
           retention-days: 1
 
       - name: Check test results
-        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton_source_reader.outcome == 'failure')
+        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure')
         run: |
           echo "CCIP E2E tests failed."
           exit 1

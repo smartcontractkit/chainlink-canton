@@ -113,8 +113,8 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 
 		// Get the full party ID (name + hex id) from the canton participant.
 		// TODO: how to support multiple participants?
-		grpcURL := output.NetworkSpecificData.CantonEndpoints.Participants[0].GRPCLedgerAPIURL
-		jwt := output.NetworkSpecificData.CantonEndpoints.Participants[0].JWT
+		grpcURL := output.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].GRPCLedgerAPIURL
+		jwt := output.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].JWT
 		if grpcURL == "" || jwt == "" {
 			return nil, fmt.Errorf("GRPC ledger API URL or JWT is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
@@ -122,7 +122,7 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
 			// TODO: we should get the port number programmatically somehow.
 			// This is the default nginx port for the canton ledger API.
-			GRPCLedgerAPIURL: fmt.Sprintf("%s:8080", output.ContainerName),
+			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
 			JWT:              jwt,
 		}
 

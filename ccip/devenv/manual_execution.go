@@ -134,12 +134,12 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 	c.logger.Debug().Str("ReceiverAddress", receiverAddress.String()).Msg("Deployed CCIPReceiver")
 
-	// Get disclosures for execution // TODO replace with EDS
+	// Get disclosures for execution using EDS
 	ccvs := make([]contracts.InstanceAddress, len(verifiers))
 	for i, verifier := range verifiers {
 		ccvs[i] = contracts.HexToInstanceAddress(verifier.String())
 	}
-	disclosures, err := c.GetDisclosuresForExecution(ctx, ccvs)
+	disclosedContracts, choiceContext, ccvContractIDs, err := c.GetDisclosuresForExecution(ctx, ccvs)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
@@ -168,48 +168,18 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		Str("Receiver", hex.EncodeToString(message.Receiver)).
 		Msg("Executing message...")
 
-	disclosedContracts := []*apiv2.DisclosedContract{
-		disclosures.OffRamp,
-		disclosures.GlobalConfig,
-		disclosures.TokenAdminRegistry,
-		disclosures.RMNRemote,
-	}
-
+	emptyCCIPCtx := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+		{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
+	}}}}
 	ccvElements := make([]*apiv2.Value, len(verifiers))
-	for i, verifier := range disclosures.Verifiers {
+	for i, ccvCid := range ccvContractIDs {
 		ccvElements[i] = &apiv2.Value{
 			Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-				{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: verifier.GetContractId()}}},
+				{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvCid}},
 				{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(verifierResults[i])}}},
+				{Label: "ccvExtraContext", Value: emptyCCIPCtx},
 			}}},
 		}
-		disclosedContracts = append(disclosedContracts, verifier)
-	}
-
-	// Create context - replace with EDS
-	choiceContext := map[string]any{
-		"values": map[string]any{
-			"off-ramp": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.OffRamp.ContractId,
-			},
-			"global-config": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.GlobalConfig.ContractId,
-			},
-			"token-admin-registry": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.TokenAdminRegistry.ContractId,
-			},
-			"rmn-remote": map[string]any{
-				"tag":   "AV_ContractId",
-				"value": disclosures.RMNRemote.ContractId,
-			},
-		},
-	}
-	choiceContextValue, err := ChoiceContextFromData(choiceContext)
-	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to create choice context: %w", err)
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
@@ -221,7 +191,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					ContractId: receiverCid,
 					Choice:     "Execute",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "context", Value: choiceContextValue},
+						{Label: "context", Value: choiceContext},
 						{Label: "routerCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: routerCid}}},
 						{Label: "encodedMessage", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(encodedMessage)}}},
 						{Label: "tokenTransfer", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
@@ -269,7 +239,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Get ExecutionStateChangedEvent from events
-	expectedTemplateID := perpartyrouter.ExecutionStateChanged{}.GetTemplateID()
+	expectedTemplateID := common.ExecutionStateChanged{}.GetTemplateID()
 	for _, event := range updateRes.GetTransaction().GetEvents() {
 		//nolint:nestif // need to check if all of these are nil
 		if createdEvent := event.GetCreated(); createdEvent != nil {
@@ -293,9 +263,9 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no ExecutionStateChanged event found in update %s", res.GetTransaction().GetUpdateId())
 }
 
-// parseExecutionStateChangedEvent parses a perpartyrouter.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
+// parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
 func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	executionStateChanged, err := bindings.UnmarshalCreatedEvent[perpartyrouter.ExecutionStateChanged](event)
+	executionStateChanged, err := bindings.UnmarshalCreatedEvent[common.ExecutionStateChanged](event)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to unmarshal ExecutionStateChanged event: %w", err)
 	}

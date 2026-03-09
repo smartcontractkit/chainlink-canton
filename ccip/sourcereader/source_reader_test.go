@@ -25,26 +25,16 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 	t.Run("returns latest and finalized headers", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
-		jwt := "token"
 		offset := int64(42)
 
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(
-			mock.MatchedBy(func(ctx context.Context) bool {
-				md, ok := metadata.FromOutgoingContext(ctx)
-				if !ok {
-					return false
-				}
-				values := md.Get("authorization")
-
-				return len(values) == 1 && values[0] == "Bearer "+jwt
-			}),
+			mock.Anything,
 			mock.Anything,
 		).Return(&ledgerv2.GetLedgerEndResponse{Offset: offset}, nil)
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                jwt,
 		}
 
 		latest, finalized, err := reader.LatestAndFinalizedBlock(ctx)
@@ -71,7 +61,6 @@ func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                "token",
 		}
 
 		latest, finalized, err := reader.LatestAndFinalizedBlock(ctx)
@@ -95,7 +84,6 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                "token",
 		}
 
 		blockZero := big.NewInt(0)
@@ -123,7 +111,6 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 
 		reader := &sourceReader{
 			stateServiceClient: stateClient,
-			jwt:                "token",
 		}
 
 		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(4)})
@@ -251,7 +238,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -369,7 +355,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -398,7 +383,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -433,7 +417,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -461,7 +444,8 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			// First receipt - has corresponding verifier blob
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: ccipMessageSentEventReceiptIssuerLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(ccvIssuer[:])}}},
+					{Label: ccipMessageSentEventReceiptIssuerTypeLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "ccv"}}},
+					{Label: ccipMessageSentEventReceiptIssuerAddressLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(ccvIssuer[:])}}},
 					{Label: ccipMessageSentEventReceiptDestGasLimitLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 100000}}},
 					{Label: ccipMessageSentEventReceiptDestBytesOverheadLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 500}}},
 					{Label: ccipMessageSentEventReceiptFeeTokenAmountLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "1000000."}}},
@@ -471,7 +455,8 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			// Second receipt - executor receipt
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: ccipMessageSentEventReceiptIssuerLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(execIssuer[:])}}},
+					{Label: ccipMessageSentEventReceiptIssuerTypeLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "executor"}}},
+					{Label: ccipMessageSentEventReceiptIssuerAddressLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(execIssuer[:])}}},
 					{Label: ccipMessageSentEventReceiptDestGasLimitLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptDestBytesOverheadLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptFeeTokenAmountLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "500000."}}},
@@ -481,7 +466,8 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			// Second receipt - no verifier blob (e.g., network fee receipt)
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: ccipMessageSentEventReceiptIssuerLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(networkIssuer[:])}}},
+					{Label: ccipMessageSentEventReceiptIssuerTypeLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "network"}}},
+					{Label: ccipMessageSentEventReceiptIssuerAddressLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: hex.EncodeToString(networkIssuer[:])}}},
 					{Label: ccipMessageSentEventReceiptDestGasLimitLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptDestBytesOverheadLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 					{Label: ccipMessageSentEventReceiptFeeTokenAmountLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "500000."}}},
@@ -601,7 +587,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -755,7 +740,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
@@ -878,7 +862,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		reader := &sourceReader{
 			updateServiceClient: updateClient,
-			jwt:                 "token",
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
