@@ -59,10 +59,6 @@ type ReaderConfig struct {
 	// Authority is the authority to use for the gRPC connection.
 	// Connecting to the gRPC API via nginx usually requires this to be set.
 	Authority string `toml:"authority"`
-	// DefaultExecutorAddress is the default executor address for the source chain.
-	// This is optional for source reader operation itself, but included so verifier
-	// config hydration can preserve executor-aware settings end-to-end.
-	DefaultExecutorAddress string `toml:"default_executor_address"`
 }
 
 // GetTemplateID returns a ledgerv2.Identifier from the CCIPMessageSentTemplateID.
