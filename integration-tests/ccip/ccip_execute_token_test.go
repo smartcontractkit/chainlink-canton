@@ -144,6 +144,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-rmn-receive"}}},
 						{Label: "rmnOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "customObservers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "cursedSubjects", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}},
 				}},
@@ -183,7 +184,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 								}}}}},
 							}}}},
 						}}}}}},
-						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						}}}}},
 						{Label: "remoteChainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
 				}},
@@ -262,9 +265,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-offramp-receive"}}},
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "globalConfigInstanceAddress", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
-						{Label: "rmnRemoteInstanceAddress", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
-						{Label: "tokenAdminRegistryInstanceAddress", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "globalConfig", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+							{Label: "tokenAdminRegistry", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+						}}}}},
 					}},
 				}},
 			}},
@@ -285,6 +290,14 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-factory-receive"}}},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "onRamp", Value: rawInstanceAddress("placeholder-onramp@" + partyCCIP)},
+							{Label: "offRamp", Value: rawInstanceAddress("test-offramp-receive@" + partyCCIP)},
+							{Label: "globalConfig", Value: rawInstanceAddress("test-globalconfig-receive@" + partyCCIP)},
+							{Label: "tokenAdminRegistry", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+							{Label: "feeQuoter", Value: rawInstanceAddress("placeholder-feequoter@" + partyCCIP)},
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+						}}}}},
 						{Label: "registeredRouters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
 				}},
@@ -347,7 +360,16 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 6}}},
-						{Label: "chainCCVRequirements", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "chainPoolConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
+							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
+							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte(partyTokenPoolOwner))}},
+								}}}}},
+							}}}},
+						}}}}}},
 						{Label: "chainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "remoteTokens", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -646,11 +668,13 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 								}}}}},
 								{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: poolHoldingCids}}}},
 							}}}}},
+							{Label: "poolExtraContext", Value: emptyCCIPContext},
 						}}}}}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "ccvCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: disclosedCCV.ContractId}}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
+								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
 						}}}}},
 						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
@@ -781,6 +805,13 @@ func buildTokenTransferV1(amount *big.Int, sourcePoolOwner, destTokenAddressHex,
 }
 
 var emptyMetadata = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+	{
+		Label: "values",
+		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},
+	},
+}}}}
+
+var emptyCCIPContext = &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 	{
 		Label: "values",
 		Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}},

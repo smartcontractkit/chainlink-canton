@@ -286,14 +286,14 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					{
 						Qualifier: ccvQualifier,
 						Template: ccvs.CommitteeVerifier{
-							Owner:                    types.PARTY(partyCCIP),
-							CcipOwner:                types.PARTY(partyCCIP),
-							VersionTag:               types.TEXT(versionTag),
-							MessageSentObserver:      types.PARTY(partyCCIP),
-							StorageLocation:          "ipfs://test-receive",
-							SignerConfigs:            nil,                         // Will be configured later during lane setup
-							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
-							RemoteChainFeeConfigs:    nil,
+							Owner:                 types.PARTY(partyCCIP),
+							CcipOwner:             types.PARTY(partyCCIP),
+							VersionTag:            types.TEXT(versionTag),
+							MessageSentObserver:   types.PARTY(partyCCIP),
+							StorageLocation:       "ipfs://test-receive",
+							SignerConfigs:         nil,                          // Will be configured later during lane setup
+							Deps:                  ccvs.CommitteeVerifierDeps{}, // Set by sequence
+							RemoteChainFeeConfigs: nil,
 						},
 					},
 				},
@@ -571,6 +571,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "ccvCid", Value: &apiv2.Value{Sum: ccvContractIDs[0]}},
 								{Label: "verifierResults", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: verifierResultsHex}}},
+								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
 						}}}}},
 						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},

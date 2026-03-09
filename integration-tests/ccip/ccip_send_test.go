@@ -129,12 +129,12 @@ func TestCCIPSend(t *testing.T) {
 					{
 						Qualifier: ccvQualifier,
 						Template: ccvs.CommitteeVerifier{
-							Owner:                    types.PARTY(partyCCIP),
-							CcipOwner:                types.PARTY(partyCCIP),
-							VersionTag:               types.TEXT(versionTag),
-							MessageSentObserver:      types.PARTY(partyCCIP),
-							StorageLocation:          "ipfs://test-send",
-							RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
+							Owner:               types.PARTY(partyCCIP),
+							CcipOwner:           types.PARTY(partyCCIP),
+							VersionTag:          types.TEXT(versionTag),
+							MessageSentObserver: types.PARTY(partyCCIP),
+							StorageLocation:     "ipfs://test-send",
+							Deps:                ccvs.CommitteeVerifierDeps{}, // Set by sequence
 							// MUST be a real GENMAP, not a Go map.
 							RemoteChainFeeConfigs: types.GENMAP{
 								strconv.FormatUint(remoteSelector, 10): ccvs.CCVFeeConfig{
@@ -560,11 +560,6 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}
 
-	ccvSendInput := ccipsender.CCVSendInput{
-		CcvCid:       types.CONTRACT_ID(disclosedCCV.ContractId),
-		VerifierArgs: types.TEXT(""),
-	}
-
 	extraArgs := splice_api_token_metadata_v1.ExtraArgs{
 		Context: splice_api_token_metadata_v1.ChoiceContext{
 			Values: transferFactoryContextValues,
@@ -586,30 +581,40 @@ func TestCCIPSend(t *testing.T) {
 	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
 	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
 	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
-	sendContext := splice_api_token_metadata_v1.ChoiceContext{
+	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
-			"on-ramp":              splice_api_token_metadata_v1.AnyValue{AVContractId: &onRampCid},
-			"global-config":        splice_api_token_metadata_v1.AnyValue{AVContractId: &globalConfigCid},
-			"token-admin-registry": splice_api_token_metadata_v1.AnyValue{AVContractId: &tarCid},
-			"fee-quoter":           splice_api_token_metadata_v1.AnyValue{AVContractId: &feeQuoterCid},
-			"rmn-remote":           splice_api_token_metadata_v1.AnyValue{AVContractId: &rmnRemoteCid},
+			"on-ramp":              common.AnyValue{AVContractId: &onRampCid},
+			"global-config":        common.AnyValue{AVContractId: &globalConfigCid},
+			"token-admin-registry": common.AnyValue{AVContractId: &tarCid},
+			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCid},
+			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCid},
 		},
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:             sendContext,
-		RouterCid:           types.CONTRACT_ID(routerCid),
-		ExecutorCid:         types.CONTRACT_ID(executorCid),
-		DestChainSelector:   types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:            types.TEXT(receiverHex),
-		Payload:             types.TEXT(testPayloadHex),
-		CcipReceiveGasLimit: types.INT64(100000),
-		SenderRequiredCCVs:  []common.RawInstanceAddress{},
+		Context:           sendContext,
+		RouterCid:         types.CONTRACT_ID(routerCid),
+		DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Receiver:          types.TEXT(receiverHex),
+		Payload:           types.TEXT(testPayloadHex),
+		ExtraArgs: ccipsender.CantonExtraArgsV1{
+			GasLimit:           types.INT64(100000),
+			BlockConfirmations: nil,
+			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
+			ExecutorCid:        types.CONTRACT_ID(executorCid),
+			ExecutorArgs:       nil,
+			TokenReceiver:      nil,
+			TokenArgs:          types.TEXT(""),
+		},
 		FeeToken:            feeTokenInstrumentId,
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer:       nil,
-		CcvSendInputs:       []ccipsender.CCVSendInput{ccvSendInput},
+		CcvSendInputs: []ccipsender.CCVSendInput{{
+			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+			VerifierArgs:    types.TEXT(""),
+			CcvExtraContext: common.CCIPContext{},
+		}},
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)
@@ -652,9 +657,10 @@ func TestCCIPSend(t *testing.T) {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
 				fields := e.Created.GetCreateArguments().GetFields()
-				if len(fields) >= 4 {
-					// fields[3] is the "event" field (CCIPMessageSentEvent)
-					eventField := fields[3].GetValue().GetRecord()
+				if len(fields) >= 5 {
+					// fields[4] is the "event" field (CCIPMessageSentEvent)
+					// (ccipOwner, ccvOwners, sender, observers, event)
+					eventField := fields[4].GetValue().GetRecord()
 					if eventField != nil && len(eventField.Fields) >= 4 {
 						// eventField.Fields[2] is messageId, eventField.Fields[3] is encodedMessage
 						returnedMessageId = eventField.Fields[2].GetValue().GetText()

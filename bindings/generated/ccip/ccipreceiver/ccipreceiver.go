@@ -8,7 +8,6 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "1031f0fd11fc718740c8aa40c691d9d7aa36c5211e62a5758f3040f3fac20fa6"
+	PackageID   = "66968ca167ec6f8bc45909985756648d24127c141501baf4a45bb99743cd425c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -395,8 +394,9 @@ func (t CCIPReceiver) UpdateRequiredCCVsWithPackageID(contractID string, package
 
 // CCVInput is a Record type
 type CCVInput struct {
-	CcvCid          types.CONTRACT_ID `json:"ccvCid"`
-	VerifierResults types.TEXT        `json:"verifierResults"`
+	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
+	VerifierResults types.TEXT         `json:"verifierResults"`
+	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVInput to a map for DAML arguments
@@ -412,6 +412,14 @@ func (t CCVInput) ToMap() map[string]any {
 	}()
 
 	m["verifierResults"] = string(t.VerifierResults)
+
+	m["ccvExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.CcvExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.CcvExtraContext
+	}()
 
 	return m
 }
@@ -440,12 +448,12 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context                splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	RouterCid              types.CONTRACT_ID                          `json:"routerCid"`
-	EncodedMessage         types.TEXT                                 `json:"encodedMessage"`
-	TokenTransfer          *TokenTransferInput                        `json:"tokenTransfer" hex:"optional"`
-	CcvInputs              []CCVInput                                 `json:"ccvInputs"`
-	AdditionalRequiredCCVs []common.RawInstanceAddress                `json:"additionalRequiredCCVs"`
+	Context                common.CCIPContext          `json:"context"`
+	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
+	EncodedMessage         types.TEXT                  `json:"encodedMessage"`
+	TokenTransfer          *TokenTransferInput         `json:"tokenTransfer" hex:"optional"`
+	CcvInputs              []CCVInput                  `json:"ccvInputs"`
+	AdditionalRequiredCCVs []common.RawInstanceAddress `json:"additionalRequiredCCVs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -590,6 +598,7 @@ type TokenTransferInput struct {
 	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
 	TokenReceiverParty types.PARTY           `json:"tokenReceiverParty"`
 	TokenInput         interfaces.TokenInput `json:"tokenInput"`
+	PoolExtraContext   common.CCIPContext    `json:"poolExtraContext"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -612,6 +621,14 @@ func (t TokenTransferInput) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.TokenInput
+	}()
+
+	m["poolExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.PoolExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.PoolExtraContext
 	}()
 
 	return m

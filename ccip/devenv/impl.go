@@ -336,12 +336,12 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		cv := sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
 			Template: ccvs.CommitteeVerifier{
-				Owner:                    types.PARTY(participant.PartyID), // TODO: use different ccv owner?
-				CcipOwner:                types.PARTY(participant.PartyID),
-				VersionTag:               types.TEXT("49ff34ed"),
-				MessageSentObserver:      types.PARTY(participant.PartyID),
-				StorageLocation:          storageLocation,
-				RmnRemoteInstanceAddress: common.RawInstanceAddress{}, // Set by sequence
+				Owner:               types.PARTY(participant.PartyID), // TODO: use different ccv owner?
+				CcipOwner:           types.PARTY(participant.PartyID),
+				VersionTag:          types.TEXT("49ff34ed"),
+				MessageSentObserver: types.PARTY(participant.PartyID),
+				StorageLocation:     storageLocation,
+				Deps:                ccvs.CommitteeVerifierDeps{}, // Set by sequence
 				// MUST be a real GENMAP, not a Go map.
 				RemoteChainFeeConfigs: remoteChainFeeConfigs,
 			},
@@ -1034,8 +1034,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	senderRequiredCCVs := make([]common.RawInstanceAddress, 0, len(opts.CCVs))
+	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1074,20 +1074,17 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse committee verifier raw address label: %w", err)
 			}
 		} else {
-			// Fallback to deriving from active contract payload.
 			rawAddr, err = contracts.RawInstanceAddressFromString(fmt.Sprintf("%s@%s", parsedVerifier.InstanceId, parsedVerifier.Owner))
 			if err != nil {
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
-			CcvCid:       types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
-			VerifierArgs: types.TEXT(hex.EncodeToString(ccvItem.Args)),
-		})
-		if ccvSendInputs[len(ccvSendInputs)-1].CcvCid == "" {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("empty ccv contract ID for verifier address %s", verifierAddress.String())
-		}
 		senderRequiredCCVs = append(senderRequiredCCVs, rawAddr.Binding())
+		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
+			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
+			CcvExtraContext: common.CCIPContext{},
+		})
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
 		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
 		if len(fallbackVerifierDestAddress) == 0 {
@@ -1105,26 +1102,32 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 	receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(contracts.HexToInstanceAddress(onRampRef.Address).Bytes()))
 
-	sendContext := splice_api_token_metadata_v1.ChoiceContext{
+	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
-			"on-ramp":              splice_api_token_metadata_v1.AnyValue{AVContractId: &onRampCID},
-			"global-config":        splice_api_token_metadata_v1.AnyValue{AVContractId: &globalConfigCID},
-			"token-admin-registry": splice_api_token_metadata_v1.AnyValue{AVContractId: &tokenAdminRegistryCID},
-			"fee-quoter":           splice_api_token_metadata_v1.AnyValue{AVContractId: &feeQuoterCID},
-			"rmn-remote":           splice_api_token_metadata_v1.AnyValue{AVContractId: &rmnRemoteCID},
+			"on-ramp":              common.AnyValue{AVContractId: &onRampCID},
+			"global-config":        common.AnyValue{AVContractId: &globalConfigCID},
+			"token-admin-registry": common.AnyValue{AVContractId: &tokenAdminRegistryCID},
+			"fee-quoter":           common.AnyValue{AVContractId: &feeQuoterCID},
+			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCID},
 		},
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:             sendContext,
-		RouterCid:           routerCID,
-		ExecutorCid:         executorCID,
-		DestChainSelector:   types.NUMERIC(fmt.Sprintf("%d", dest)),
-		Receiver:            types.TEXT(hex.EncodeToString(fields.Receiver)),
-		Payload:             types.TEXT(hex.EncodeToString(fields.Data)),
-		CcipReceiveGasLimit: types.INT64(opts.ExecutionGasLimit),
-		SenderRequiredCCVs:  senderRequiredCCVs,
-		FeeToken:            feeTokenInstrument,
+		Context:           sendContext,
+		RouterCid:         routerCID,
+		DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+		Receiver:          types.TEXT(hex.EncodeToString(fields.Receiver)),
+		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
+		ExtraArgs: ccipsender.CantonExtraArgsV1{
+			GasLimit:           types.INT64(opts.ExecutionGasLimit),
+			BlockConfirmations: nil,
+			SenderRequiredCCVs: senderRequiredCCVs,
+			ExecutorCid:        executorCID,
+			ExecutorArgs:       nil,
+			TokenReceiver:      nil,
+			TokenArgs:          types.TEXT(""),
+		},
+		FeeToken: feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
 			TransferFactory: routerCID,
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
@@ -1138,16 +1141,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		CcvSendInputs:       ccvSendInputs,
 	}
 	sendArgsMap := sendArgs.ToMap()
-	// Some environments still run a legacy CCIPSender schema without ccvRawAddress in CCVSendInput.
-	// Build this field explicitly without ccvRawAddress for compatibility across schema versions.
-	ccvSendInputsArg := make([]any, 0, len(ccvSendInputs))
-	for _, input := range ccvSendInputs {
-		ccvSendInputsArg = append(ccvSendInputsArg, map[string]any{
-			"ccvCid":       input.CcvCid,
-			"verifierArgs": string(input.VerifierArgs),
-		})
-	}
-	sendArgsMap["ccvSendInputs"] = ccvSendInputsArg
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
 			"empty contract ID before send: ccipSender=%q router=%q executor=%q onRamp=%q globalConfig=%q tokenAdminRegistry=%q feeQuoter=%q rmnRemote=%q",

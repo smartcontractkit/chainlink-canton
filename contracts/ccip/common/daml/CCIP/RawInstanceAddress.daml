@@ -30,6 +30,16 @@ assertEqual msg instanceId owner expected =
     let computed = make instanceId owner
     in assertMsg msg (computed == expected)
 
+-- | Extract the owner party from a raw instance address.
+-- The address format is "instanceId@partyId"; this returns the party after "@".
+ownerParty : RawInstanceAddress -> Party
+ownerParty (RawInstanceAddress raw) =
+    case Text.splitOn "@" raw of
+        [_, partyText] -> case partyFromText partyText of
+            Some p -> p
+            None -> error ("RawInstanceAddress: invalid party in address: " <> raw)
+        _ -> error ("RawInstanceAddress: malformed address: " <> raw)
+
 -- | Convert to 32-byte hashed instance address for message encoding.
 toInstanceAddress : RawInstanceAddress -> BytesHex
 toInstanceAddress (RawInstanceAddress raw) =
