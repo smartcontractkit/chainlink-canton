@@ -68,7 +68,7 @@ build-ccv-images:
 	cd ../chainlink-ccv/build/devenv && just build-docker
 
 .PHONY: start-devenv
-start-devenv: build-ccv-images build-committeeverifier
+start-devenv: build-ccv-images build-committeeverifier build-eds
 	cd ccip/devenv && go run cmd/ccv/main.go down && go run cmd/ccv/main.go up env-canton-evm.toml
 
 .PHONY: run-e2e-tests

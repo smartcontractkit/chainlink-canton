@@ -175,9 +175,8 @@ execution_interval = 15_000_000_000
       # the full URLs and JWT token.
       grpc_ledger_api_url = "TODO:fillin"
       [verifier.canton_configs.blockchain_infos.8706591216959472610.auth]
-        type = "static"
+        type = "insecureStatic"
         jwt = "TODO:fillin"
-        insecure_transport = true
 
 
 [[verifier]]
@@ -206,9 +205,8 @@ execution_interval = 15_000_000_000
       # the full URLs and JWT token.
       grpc_ledger_api_url = "TODO:fillin"
       [verifier.canton_configs.blockchain_infos.8706591216959472610.auth]
-        type = "static"
+        type = "insecureStatic"
         jwt = "TODO:fillin"
-        insecure_transport = true
 
 ####################
 # Generic Services #
