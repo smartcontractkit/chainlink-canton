@@ -30,11 +30,11 @@ type AuthConfig struct {
 
 	// JWT is a pre-obtained token. Required when Type is "static" or empty.
 	// optional_jwt is a custom validator registered in Validate(); revive's struct-tag only knows built-in validator options.
-	JWT string `toml:"jwt,omitempty" validate:"required_if=Type static,excluded_unless=Type static,optional_jwt"` //nolint:struct-tag // optional_jwt
+	JWT string `toml:"jwt,omitempty" validate:"required_if=Type static,excluded_unless=Type static,optional_jwt"` //nolint:revive // optional_jwt
 
 	// AuthURL is the OIDC authorization server base URL. Required for clientCredentials and authorizationCode.
 	// optional_url is a custom validator registered in Validate(); revive's struct-tag only knows built-in validator options.
-	AuthURL string `toml:"auth_url,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode,optional_url"` //nolint:struct-tag // optional_url
+	AuthURL string `toml:"auth_url,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode,optional_url"` //nolint:revive // optional_url
 
 	// ClientID is the OAuth2 client identifier. Required for clientCredentials and authorizationCode.
 	ClientID string `toml:"client_id,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode"`
