@@ -169,7 +169,7 @@ func main() {
 	}
 	wg.Wait()
 
-	var summaries []string
+	var summaries []string //nolint:prealloc
 	log.Println("Raw Outputs:")
 	for _, r := range results {
 		log.Println("==============================")

@@ -67,7 +67,7 @@ func (c *Chain) GetDisclosuresForExecution(ctx context.Context, verifiers []cont
 		return nil, nil, nil, fmt.Errorf("failed to get disclosures from EDS: %s", resp.Status())
 	}
 
-	var disclosedContracts []*apiv2.DisclosedContract //nolint:prealloc
+	var disclosedContracts []*apiv2.DisclosedContract
 	for _, contract := range resp.JSON200.ChoiceContext.DisclosedContracts {
 		disclosedContract, err := disclosedContractToProto(contract)
 		if err != nil {
