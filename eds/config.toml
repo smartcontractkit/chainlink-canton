@@ -5,33 +5,59 @@ host = "0.0.0.0"
 port = 8088
 
 [contracts]
-[contracts.per_party_router_factory]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0x6adcd1eec11ab4dde5255c2413b1852f88b9906f6b1c6df03cdf8a9e0b8cc079"
-[contracts.on_ramp]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0xc96bf91ad7cfb8b34d3f1a3e51d29c2a9a9ff593c7016c5f1280f5176a17d8fc"
-[contracts.off_ramp]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0x184dd2ba044fe7131c457d7e02fef230f2e2dc650bf1f01a44a80f4871114bd4"
-[contracts.global_config]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0xde3fc748df63e4af95135fe608f3def0dcb09ed6046523f9f2bca94f908abe07"
-[contracts.token_admin_registry]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0x043087e4f6160f4f517ed460bccce49e524c53b59570b43ef4aeeae529fdf147"
-[contracts.rmn_remote]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0x64b2c33063a3f7934d17417cc1556f2f920329122a940977729824516343f4ba"
 [[contracts.ccvs]]
-party_id = "participant1-localparty-1::12208e2b1c27f3b64736a604899ff6ce7ad36fd6027888ff36590146c744269f596a"
-instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
+instance_address = '0x9607f3b5856f8a522658c341ffff5a33d6feaec1dcc6ab81eb33e7d54053abb1'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.fee_quoter]
+instance_address = '0x80b5666a8c377bfd0a4794a7c0a56a49f48fc406c8889e48a3b458c99c2ed883'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.global_config]
+instance_address = '0x398e34b14c87f829f7003488cd04c17c4afad8915081a25ec73c7695f15990bb'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.off_ramp]
+instance_address = '0xa6537c3e7c3d7c54d64d0a00dd756cc0653602cb12b9524be2be063f4816f944'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.on_ramp]
+instance_address = '0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.per_party_router_factory]
+instance_address = '0x29ae752fb185acd3ce1b4176c85d7a45b0beb1278df0ca18441270d8f21fa905'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.rmn_remote]
+instance_address = '0xdb69b15a27f2cbac83aa667ce7ec77342bceb93290193139e9808725d627c802'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
+[contracts.token_admin_registry]
+instance_address = '0xa6d983a8ae33181d42fcb46eea8d4fe0bc51b8bcc7ec15efd3e221c71d04679f'
+party_id = 'participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2'
+
 
 [node]
-url = "participant1.grpc-ledger-api.localhost:8080"
+url = "participant1.grpc-ledger-api.localhost:8575"
 max_retries = 10
 
 [node.auth]
-type = "static"
-user_id = "ledger-api-user"
-jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsZWRnZXItYXBpLXVzZXIiLCJhdWQiOlsiaHR0cHM6Ly9jYW50b24ubmV0d29yay5nbG9iYWwiXSwiZXhwIjoyMDg0Nzg5NTkyLCJuYmYiOjE3Njk0Mjk1OTIsImlhdCI6MTc2OTQyOTU5Mn0.Ko98O1CvVKnwIdrYWgnVn7ooeRcmJrD5HaXG6sZjbJ0"
+jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLXBhcnRpY2lwYW50MSIsImF1ZCI6WyJodHRwczovL2NoYWluLmxpbmsiXSwiZXhwIjoyMDg4NDQyMzQzLCJuYmYiOjE3NzMwODIzNDMsImlhdCI6MTc3MzA4MjM0M30.IPFC1soD4Mc1M-NdOm-F6J5nbEd4JnBNgpdzqxptRH8'
+type = 'insecureStatic'
+user_id = 'user-participant1'
+
+[monitoring]
+enabled = true
+type = ''
+
+[monitoring.beholder]
+insecure_connection = true
+ca_cert_file = ''
+otel_exporter_grpc_endpoint = ''
+otel_exporter_http_endpoint = 'otel-collector:4318'
+log_streaming_enabled = true
+metric_reader_interval = 5
+trace_sample_ratio = 1.0
+trace_batch_timeout = 10
+

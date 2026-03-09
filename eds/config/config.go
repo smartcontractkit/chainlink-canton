@@ -12,10 +12,11 @@ import (
 )
 
 type Config struct {
-	ChainSelector string       `toml:"chain_selector" validate:"required"`
-	Server        ServerConfig `toml:"server" validate:"required"`
-	Node          NodeConfig   `toml:"node" validate:"required"`
-	Contracts     Contracts    `toml:"contracts" validate:"required"`
+	ChainSelector string           `toml:"chain_selector" validate:"required"`
+	Server        ServerConfig     `toml:"server" validate:"required"`
+	Node          NodeConfig       `toml:"node" validate:"required"`
+	Contracts     Contracts        `toml:"contracts" validate:"required"`
+	Monitoring    MonitoringConfig `toml:"monitoring"`
 }
 
 type ServerConfig struct {

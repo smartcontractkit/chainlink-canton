@@ -32,6 +32,8 @@ type UpdateStore struct {
 	updateService apiv2.UpdateServiceClient
 	stateService  apiv2.StateServiceClient
 
+	metrics StoreMetrics
+
 	// The filters to apply when backfilling/subscribing to updates
 	filtersByParty map[string]*apiv2.Filters
 
@@ -80,6 +82,7 @@ type UpdateStoreConfig struct {
 func NewUpdateStore(
 	ctx context.Context,
 	config UpdateStoreConfig,
+	metrics StoreMetrics,
 	registeredTemplates ...RegisteredTemplate,
 ) (*UpdateStore, error) {
 	filtersByParty := make(map[string]*apiv2.Filters) // Assemble filters
@@ -105,6 +108,7 @@ func NewUpdateStore(
 		logger:         config.Logger.With().Str("component", "UpdateStore").Logger(),
 		updateService:  config.UpdateService,
 		stateService:   config.StateService,
+		metrics:        metrics,
 		mux:            sync.RWMutex{},
 		ledgerEnd:      0,
 		filtersByParty: filtersByParty,
@@ -138,6 +142,12 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 	s.mux.Unlock()
 	s.logger.Debug().Int("activeContracts", len(activeContracts)).Msg("Backfill complete")
 
+	// Create uptime ticker
+	// Ticking once a second to increase the uptime counter metric
+	// Checking if the metric is increasing can be used to verify that the UpdateStore is still subscribed and ready to process updates
+	uptimeTicker := time.NewTicker(time.Second)
+	defer uptimeTicker.Stop()
+
 	// Subscribe to updates
 	for {
 		// Start streaming from s.ledgerEnd (exclusive)
@@ -147,54 +157,66 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 			return fmt.Errorf("failed to create update stream: %w", err)
 		}
 
+		// Start receiving from stream
 		s.logger.Debug().Int64("offset", s.ledgerEnd).Msg("Update stream created, listening for updates")
+		updateChan, errChan := s.receiveFromStream(ctx, stream)
+	reconnect:
 		for {
-			resp, err := stream.Recv()
-			if errors.Is(err, io.EOF) {
-				s.logger.Debug().Msg("Update stream closed by server, reconnecting")
-				break
-			}
-			if err != nil {
-				s.logger.Warn().Err(err).Msg("Update stream closed by server, reconnecting")
-				break
-			}
-			if transaction, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
-				s.logger.Trace().Str("updateID", transaction.Transaction.GetUpdateId()).Int("events", len(transaction.Transaction.GetEvents())).Msg("Update received")
-				for _, event := range transaction.Transaction.GetEvents() {
-					if createdEvent, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-						s.logger.Trace().
-							Str("contractID", createdEvent.Created.GetContractId()).
-							Str("packageName", createdEvent.Created.GetPackageName()).
-							Str("packageID", createdEvent.Created.GetTemplateId().GetPackageId()).
-							Str("moduleName", createdEvent.Created.GetTemplateId().GetModuleName()).
-							Str("entityName", createdEvent.Created.GetTemplateId().GetEntityName()).
-							Msg("Received CreatedEvent")
-						instanceAddresses, err := getInstanceAddresses(createdEvent.Created)
-						if err != nil {
-							s.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get instance addresses for created contract, skipping")
-							continue
-						}
-						for _, address := range instanceAddresses {
-							s.logger.Trace().Stringer("instanceAddress", address).Msg("Updating active contract")
-							s.mux.Lock()
-							s.contracts[address] = &apiv2.ActiveContract{
-								CreatedEvent:        createdEvent.Created,
-								SynchronizerId:      transaction.Transaction.GetSynchronizerId(),
-								ReassignmentCounter: 0,
+			select {
+			case err := <-errChan:
+				if errors.Is(err, io.EOF) {
+					s.logger.Debug().Msg("Update stream closed by server, reconnecting")
+					break reconnect
+				}
+				if err != nil {
+					s.logger.Warn().Err(err).Msg("Update stream closed by server, reconnecting")
+					break reconnect
+				}
+			case <-ctx.Done():
+				s.logger.Debug().Msg("Context cancelled, stopping UpdateStore")
+				_ = stream.CloseSend()
+
+				return ctx.Err()
+			case <-uptimeTicker.C:
+				// Increment uptime metric on every tick
+				s.metrics.IncrementStoreSubscriptionUptime(ctx)
+			case resp := <-updateChan:
+				if transaction, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
+					s.logger.Trace().Str("updateID", transaction.Transaction.GetUpdateId()).Int("events", len(transaction.Transaction.GetEvents())).Msg("Update received")
+					for _, event := range transaction.Transaction.GetEvents() {
+						if createdEvent, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+							s.logger.Trace().
+								Str("contractID", createdEvent.Created.GetContractId()).
+								Str("packageName", createdEvent.Created.GetPackageName()).
+								Str("packageID", createdEvent.Created.GetTemplateId().GetPackageId()).
+								Str("moduleName", createdEvent.Created.GetTemplateId().GetModuleName()).
+								Str("entityName", createdEvent.Created.GetTemplateId().GetEntityName()).
+								Msg("Received CreatedEvent")
+							instanceAddresses, err := getInstanceAddresses(createdEvent.Created)
+							if err != nil {
+								s.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get instance addresses for created contract, skipping")
+								continue
 							}
-							// Increment ledgerEnd
-							s.ledgerEnd = transaction.Transaction.GetOffset()
-							s.mux.Unlock()
+							// Increment updates metric
+							s.metrics.IncrementStoreUpdatesCounter(ctx)
+							for _, address := range instanceAddresses {
+								s.logger.Trace().Stringer("instanceAddress", address).Msg("Updating active contract")
+								s.mux.Lock()
+								s.contracts[address] = &apiv2.ActiveContract{
+									CreatedEvent:        createdEvent.Created,
+									SynchronizerId:      transaction.Transaction.GetSynchronizerId(),
+									ReassignmentCounter: 0,
+								}
+								// Update ledgerEnd
+								s.ledgerEnd = transaction.Transaction.GetOffset()
+								s.mux.Unlock()
+								// Record latest ledger end
+								s.metrics.RecordStoreLedgerEndGauge(ctx, transaction.Transaction.GetOffset())
+							}
 						}
 					}
 				}
 			}
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
 		}
 	}
 }
@@ -299,6 +321,33 @@ func (s *UpdateStore) getUpdateStream(ctx context.Context, offset int64) (grpc.S
 			// continue with next retry
 		}
 	}
+}
+
+func (s *UpdateStore) receiveFromStream(ctx context.Context, stream grpc.ServerStreamingClient[apiv2.GetUpdatesResponse]) (<-chan *apiv2.GetUpdatesResponse, <-chan error) {
+	responseChan := make(chan *apiv2.GetUpdatesResponse)
+	errorChan := make(chan error)
+
+	go func() {
+		defer close(responseChan)
+		defer close(errorChan)
+
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				errorChan <- err
+				return
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case responseChan <- resp:
+				// continue receiving from stream
+			}
+		}
+	}()
+
+	return responseChan, errorChan
 }
 
 // getInstanceAddresses returns all possible InstanceAddresses for a given active contract.
