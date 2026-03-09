@@ -69,13 +69,22 @@ func optionalJWT(fl validator.FieldLevel) bool {
 	return validator.New().Var(s, "jwt") == nil
 }
 
-func (a *AuthConfig) Validate() error {
-	v := validator.New(validator.WithRequiredStructEnabled())
+// RegisterAuthValidators registers the custom auth validators (optional_url, optional_jwt) on v.
+// Use this when validating a struct that embeds or contains AuthConfig so the validate tags work.
+func RegisterAuthValidators(v *validator.Validate) error {
 	if err := v.RegisterValidation("optional_url", optionalURL); err != nil {
 		return fmt.Errorf("register optional_url: %w", err)
 	}
 	if err := v.RegisterValidation("optional_jwt", optionalJWT); err != nil {
 		return fmt.Errorf("register optional_jwt: %w", err)
+	}
+	return nil
+}
+
+func (a *AuthConfig) Validate() error {
+	v := validator.New(validator.WithRequiredStructEnabled())
+	if err := RegisterAuthValidators(v); err != nil {
+		return err
 	}
 	if err := v.Struct(a); err != nil {
 		return fmt.Errorf("auth config: %w", err)
@@ -85,7 +94,11 @@ func (a *AuthConfig) Validate() error {
 }
 
 // NewProvider builds an authentication.Provider from this config.
+// It validates the config (including JWT/URL format) before building the provider.
 func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, error) {
+	if err := a.Validate(); err != nil {
+		return nil, err
+	}
 	authType := a.Type
 	if authType == "" {
 		authType = AuthTypeStatic

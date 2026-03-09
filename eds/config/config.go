@@ -47,6 +47,9 @@ type ContractIdentifier struct {
 
 func (cfg *Config) Validate() error {
 	validate := validator.New(validator.WithRequiredStructEnabled())
+	if err := commonconfig.RegisterAuthValidators(validate); err != nil {
+		return fmt.Errorf("register auth validators: %w", err)
+	}
 	if err := validate.Struct(cfg); err != nil {
 		return fmt.Errorf("failed to validate config: %w", err)
 	}
