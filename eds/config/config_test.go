@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -60,6 +61,7 @@ max_retries = 10
 type = "static"
 user_id = "local-user"
 jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+insecure_transport = true
 	`,
 			want: &Config{
 				ChainSelector: "8706591216959472610",
@@ -104,10 +106,11 @@ jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",
-					AuthConfig: AuthConfig{
-						Type:   "static",
-						UserID: "local-user",
-						JWT:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+					AuthConfig: commonconfig.AuthConfig{
+						Type:              "static",
+						UserID:            "local-user",
+						JWT:               "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+						InsecureTransport: true,
 					},
 					MaxRetries: 10,
 				},

@@ -7,6 +7,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/go-playground/validator/v10"
 
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -23,18 +24,9 @@ type ServerConfig struct {
 }
 
 type NodeConfig struct {
-	URL        string     `toml:"url" validate:"required,url"`
-	AuthConfig AuthConfig `toml:"auth" validate:"required"`
-	MaxRetries int        `toml:"max_retries"`
-}
-
-type AuthConfig struct {
-	Type         string `toml:"type" validate:"required,oneof=static clientCredentials authorizationCode"`
-	UserID       string `toml:"user_id" validate:"required"`
-	JWT          string `toml:"jwt,omitempty" validate:"required_if=Type static,excluded_unless=Type static,jwt"`
-	AuthURL      string `toml:"auth_url,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode,url"`
-	ClientID     string `toml:"client_id,omitempty" validate:"required_if=Type clientCredentials,required_if=Type authorizationCode"`
-	ClientSecret string `toml:"client_secret,omitempty" validate:"required_if=Type clientCredentials,excluded_unless=Type clientCredentials"`
+	URL        string                  `toml:"url" validate:"required,url"`
+	AuthConfig commonconfig.AuthConfig `toml:"auth" validate:"required"`
+	MaxRetries int                     `toml:"max_retries"`
 }
 
 type Contracts struct {

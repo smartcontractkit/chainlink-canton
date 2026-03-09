@@ -14,7 +14,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -25,8 +24,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/authorizationcode"
-	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/clientcredentials"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
@@ -49,22 +46,9 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		return fmt.Errorf("failed to get chain details: %w", err)
 	}
 
-	var authProvider authentication.Provider
-	switch cfg.Node.AuthConfig.Type {
-	case "static":
-		authProvider = authentication.NewInsecureStaticProvider(cfg.Node.AuthConfig.JWT)
-	case "clientCredentials":
-		authProvider, err = clientcredentials.NewDiscoveryProvider(ctx, cfg.Node.AuthConfig.AuthURL, cfg.Node.AuthConfig.ClientID, cfg.Node.AuthConfig.ClientSecret)
-		if err != nil {
-			return fmt.Errorf("failed to create client credentials provider: %w", err)
-		}
-	case "authorizationCode":
-		authProvider, err = authorizationcode.NewDiscoveryProvider(ctx, cfg.Node.AuthConfig.AuthURL, cfg.Node.AuthConfig.ClientID)
-		if err != nil {
-			return fmt.Errorf("failed to create authorization code provider: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported authentication type: %s", cfg.Node.AuthConfig.Type)
+	authProvider, err := cfg.Node.AuthConfig.NewProvider(ctx)
+	if err != nil {
+		return fmt.Errorf("auth config: %w", err)
 	}
 	chain, err := provider.NewRPCChainProvider(chainDetails.ChainSelector, provider.RPCChainProviderConfig{
 		Participants: []provider.ParticipantConfig{

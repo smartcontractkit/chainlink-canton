@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -102,20 +103,22 @@ var BuildConfig = operations.NewOperation(
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: edsConfig.AuthConfig{
-					Type:   "static",
-					UserID: participant.UserID,
-					JWT:    jwt.AccessToken,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:              "static",
+					UserID:            participant.UserID,
+					JWT:               jwt.AccessToken,
+					InsecureTransport: true, // TODO: this should get pulled from input somehow
 				},
 				MaxRetries: 0,
 			}
 		} else {
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
-				AuthConfig: edsConfig.AuthConfig{
-					Type:   "static",
-					UserID: participant.UserID,
-					JWT:    jwt.AccessToken,
+				AuthConfig: commonconfig.AuthConfig{
+					Type:              "static",
+					UserID:            participant.UserID,
+					JWT:               jwt.AccessToken,
+					InsecureTransport: true, // TODO: this should get pulled from input somehow
 				},
 				MaxRetries: 0,
 			}
