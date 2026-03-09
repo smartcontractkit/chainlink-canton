@@ -174,7 +174,10 @@ execution_interval = 15_000_000_000
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
       grpc_ledger_api_url = "TODO:fillin"
-      jwt = "TODO:fillin"
+      [verifier.canton_configs.blockchain_infos.8706591216959472610.auth]
+        type = "static"
+        jwt = "TODO:fillin"
+        insecure_transport = true
 
 
 [[verifier]]
@@ -202,7 +205,10 @@ execution_interval = 15_000_000_000
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
       grpc_ledger_api_url = "TODO:fillin"
-      jwt = "TODO:fillin"
+      [verifier.canton_configs.blockchain_infos.8706591216959472610.auth]
+        type = "static"
+        jwt = "TODO:fillin"
+        insecure_transport = true
 
 ####################
 # Generic Services #
