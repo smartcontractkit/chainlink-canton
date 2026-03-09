@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"math/big"
 	"testing"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 )
 
@@ -124,12 +124,11 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	const ccipOwner = "owner-party"
 	const nopParty = "node-operator-party"
 	var (
-		templateID = &ledgerv2.Identifier{
-			PackageId:  "pkg",
+		templateID = contracts.TemplateID{
+			PackageID:  "pkg",
 			ModuleName: "CCIP",
 			EntityName: "CCIPMessageSent",
 		}
-		templateIDStr = fmt.Sprintf("%s:%s:%s", templateID.PackageId, templateID.ModuleName, templateID.EntityName)
 	)
 
 	t.Run("ignores event when ccipOwner does not match", func(t *testing.T) {
@@ -161,7 +160,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		encodedMsgHex := hex.EncodeToString(encodedMsg)
 
 		created := &ledgerv2.CreatedEvent{
-			TemplateId: templateID,
+			TemplateId: templateID.ToLedgerIdentifier(),
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
 					{
@@ -241,7 +240,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 
@@ -280,7 +279,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		// Event has correct ccipOwner in CreateArguments but signatories do not include ccipOwnerParty.
 		created := &ledgerv2.CreatedEvent{
-			TemplateId:  templateID,
+			TemplateId:  templateID.ToLedgerIdentifier(),
 			Signatories: []string{"other-party"}, // ccipOwner not in signatories - should be skipped
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
@@ -358,7 +357,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 
@@ -386,7 +385,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 
@@ -420,7 +419,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 
@@ -510,7 +509,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		encodedMsgHex := hex.EncodeToString(encodedMsg)
 
 		created := &ledgerv2.CreatedEvent{
-			TemplateId:  templateID,
+			TemplateId:  templateID.ToLedgerIdentifier(),
 			Signatories: []string{ccipOwner},
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
@@ -590,7 +589,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 
@@ -662,7 +661,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		// Two verifier blobs but zero receipts - should fail
 		created := &ledgerv2.CreatedEvent{
-			TemplateId:  templateID,
+			TemplateId:  templateID.ToLedgerIdentifier(),
 			Signatories: []string{ccipOwner},
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
@@ -743,7 +742,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 
@@ -781,7 +780,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		encodedMsgHex := hex.EncodeToString(encodedMsg)
 
 		created := &ledgerv2.CreatedEvent{
-			TemplateId:  templateID,
+			TemplateId:  templateID.ToLedgerIdentifier(),
 			Signatories: []string{ccipOwner},
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
@@ -865,7 +864,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			config: ReaderConfig{
 				NodeOperatorParty:         nopParty,
 				CCIPOwnerParty:            ccipOwner,
-				CCIPMessageSentTemplateID: templateIDStr,
+				CCIPMessageSentTemplateID: templateID,
 			},
 		}
 

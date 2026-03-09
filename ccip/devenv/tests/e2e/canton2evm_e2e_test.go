@@ -178,8 +178,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NotNil(t, result.AggregatedResult)
 		require.Len(t, result.IndexedVerifications.Results, 1)
 		t.Logf(
-			"Message assertion succeeded: aggregated=true indexerResults=%d",
-			len(result.IndexedVerifications.Results),
+			"Message assertion succeeded: aggregated=true indexerResults=%+v",
+			result.IndexedVerifications.Results,
 		)
 
 		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
