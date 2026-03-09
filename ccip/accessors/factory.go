@@ -101,6 +101,7 @@ func newAuthProvider(ctx context.Context, info ccip.BlockchainInfo) (authenticat
 			// Backward-compatible default for local Canton setups using plaintext gRPC endpoints.
 			return authentication.NewInsecureStaticProvider(jwt), nil
 		}
+
 		return authentication.NewStaticProvider(jwt), nil
 
 	case ccip.AuthTypeClientCredentials:
