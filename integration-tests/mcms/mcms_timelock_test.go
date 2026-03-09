@@ -201,8 +201,9 @@ func TestMCMS_Timelock(t *testing.T) {
 	})
 }
 
-func createSigners(t *testing.T, count int) []*MCMSSigner {
+func createSigners(t *testing.T) []*MCMSSigner {
 	t.Helper()
+	const count = 3
 	signers := make([]*MCMSSigner, count)
 	for i := range count {
 		signer, err := NewMCMSSigner()

@@ -7,6 +7,10 @@ import DA.Crypto.Text (BytesHex)
 import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.TokenAdminRegistryCodec (decodeSetPoolParams, decodeProposeAdminParams, decodeTransferAdminParams, decodeAcceptAdminParams)
+import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
+
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
@@ -32,6 +36,59 @@ template TokenAdminRegistry
         tokenConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenConfig
     where
         signatory owner
+
+        interface instance MCMSReceiver for TokenAdminRegistry where
+          view = MCMSReceiverView with
+            owner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText owner
+            selfTarCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId TokenAdminRegistry)
+
+            case functionName of
+              "SetPool" -> do
+                case decodeSetPoolParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetPool"
+                  Some (instrumentId, optPool) -> do
+                    newCid <- exercise selfTarCid TokenAdminRegistry_SetPool with
+                      instrumentId
+                      tokenPool = optPool
+                      caller = owner
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "ProposeAdministrator" -> do
+                case decodeProposeAdminParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ProposeAdministrator"
+                  Some (instrumentId, newAdmin) -> do
+                    newCid <- exercise selfTarCid TokenAdminRegistry_ProposeAdministrator with
+                      instrumentId
+                      newAdmin
+                      caller = owner
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "TransferAdminRole" -> do
+                case decodeTransferAdminParams operationData of
+                  None -> abort "E_INVALID_PARAMS: TransferAdminRole"
+                  Some (instrumentId, newAdmin) -> do
+                    newCid <- exercise selfTarCid TokenAdminRegistry_TransferAdminRole with
+                      instrumentId
+                      newAdmin
+                      caller = owner
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "AcceptAdminRole" -> do
+                case decodeAcceptAdminParams operationData of
+                  None -> abort "E_INVALID_PARAMS: AcceptAdminRole"
+                  Some instrumentId -> do
+                    newCid <- exercise selfTarCid TokenAdminRegistry_AcceptAdminRole with
+                      instrumentId
+                      caller = owner
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
         nonconsuming choice TokenAdminRegistry_GetTokenConfig : Optional TokenConfig
             with
@@ -303,18 +360,3 @@ template TokenAdminRegistry
                     maybeInstrumentId = Some instrumentId
                     maybeAmount = Some tt.amount
                     returnData = returnData
-
-
--- | Registered pool identity for a token instrument.
-data PoolRegistration = PoolRegistration
-    with
-        poolOwner : Party
-        poolInstanceId : Text
-    deriving (Eq, Show)
-
-data TokenConfig = TokenConfig
-    with
-        admin : Optional Party
-        pendingAdmin : Optional Party
-        tokenPool : Optional PoolRegistration
-    deriving (Eq, Show)
