@@ -73,7 +73,7 @@ start-devenv: build-ccv-images build-committeeverifier
 
 .PHONY: run-e2e-tests
 run-e2e-tests:
-	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCantonSourceReader
+	cd ccip/devenv/tests/e2e && go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic && go test -timeout 5m -v -count 1 -run TestCanton2EVM_Basic
 
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests

@@ -150,7 +150,8 @@ execution_interval = 15_000_000_000
 ## Default Verifier Setup
 [[verifier]]
   image = "verifier:latest"
-  container_name = "canton-default-verifier-1"
+  # Will get prefixed appropriately by the modifier.
+  container_name = "default-verifier-1"
   nop_alias = "canton-default-verifier-1"
   port = 8100
   # path is relative from "devenv" dir
@@ -165,7 +166,10 @@ execution_interval = 15_000_000_000
   [verifier.canton_configs]
     [verifier.canton_configs.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
-      ccip_message_sent_template_id = "#ccip-common:CCIP.Events:CCIPMessageSent"
+      [verifier.canton_configs.reader_configs.8706591216959472610.ccip_message_sent_template_id]
+        package_id = "#ccip-common"
+        module_name = "CCIP.Events"
+        entity_name = "CCIPMessageSent"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
@@ -175,7 +179,8 @@ execution_interval = 15_000_000_000
 
 [[verifier]]
   image = "verifier:latest"
-  container_name = "canton-default-verifier-2"
+  # Will get prefixed appropriately by the modifier.
+  container_name = "default-verifier-2"
   nop_alias = "canton-default-verifier-2"
   port = 8200
   committee_name = "default"
@@ -189,7 +194,10 @@ execution_interval = 15_000_000_000
   [verifier.canton_configs]
     [verifier.canton_configs.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
-      ccip_message_sent_template_id = "#ccip-common:CCIP.Events:CCIPMessageSent"
+      [verifier.canton_configs.reader_configs.8706591216959472610.ccip_message_sent_template_id]
+        package_id = "#ccip-common"
+        module_name = "CCIP.Events"
+        entity_name = "CCIPMessageSent"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.

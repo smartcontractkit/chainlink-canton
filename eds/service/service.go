@@ -87,39 +87,39 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	cantonChain := chain.(*canton.Chain)
 
 	templates := []store.RegisteredTemplate{
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(perpartyrouter.PerPartyRouterFactory{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(perpartyrouter.PerPartyRouterFactory{}),
 			PartyID:    cfg.Contracts.OnRamp.PartyID,
 		},
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(onramp.OnRamp{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(onramp.OnRamp{}),
 			PartyID:    cfg.Contracts.OnRamp.PartyID,
 		},
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(offramp.OffRamp{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(offramp.OffRamp{}),
 			PartyID:    cfg.Contracts.OffRamp.PartyID,
 		},
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(common.GlobalConfig{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(common.GlobalConfig{}),
 			PartyID:    cfg.Contracts.GlobalConfig.PartyID,
 		},
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(tokenadminregistry.TokenAdminRegistry{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(tokenadminregistry.TokenAdminRegistry{}),
 			PartyID:    cfg.Contracts.TokenAdminRegistry.PartyID,
 		},
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(rmn.RMNRemote{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(rmn.RMNRemote{}),
 			PartyID:    cfg.Contracts.RMNRemote.PartyID,
 		},
-		store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(feequoter.FeeQuoter{}),
+		{
+			TemplateID: contracts.TemplateIDFromBinding(feequoter.FeeQuoter{}),
 			PartyID:    cfg.Contracts.FeeQuoter.PartyID,
 		},
 	}
 	ccvCids := make([]contracts.InstanceAddress, len(cfg.Contracts.CCVs))
 	for i, ccv := range cfg.Contracts.CCVs {
 		templates = append(templates, store.RegisteredTemplate{
-			TemplateID: store.TemplateIDFromBinding(ccvs.CommitteeVerifier{}),
+			TemplateID: contracts.TemplateIDFromBinding(ccvs.CommitteeVerifier{}),
 			PartyID:    ccv.PartyID,
 		})
 		ccvCids[i] = ccv.InstanceAddress

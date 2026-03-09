@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 const (
@@ -107,7 +108,7 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		if readerConfig.CCIPOwnerParty == "" {
 			return nil, fmt.Errorf("CCIPOwnerParty is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
-		if readerConfig.CCIPMessageSentTemplateID == "" {
+		if readerConfig.CCIPMessageSentTemplateID == (contracts.TemplateID{}) {
 			return nil, fmt.Errorf("CCIPMessageSentTemplateID is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
 
