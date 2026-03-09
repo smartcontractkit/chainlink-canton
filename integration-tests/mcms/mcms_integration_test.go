@@ -171,7 +171,7 @@ func TestMCMS_Execute(t *testing.T) {
 	ccipOwner := participant.PartyID
 	randomUser := randomUserParticipant.PartyID
 
-	signers := createSigners(t, 3)
+	signers := createSigners(t)
 	config := New2of3Config(signers)
 	sortedSigners := SortSignersByAddress(signers)
 	chainId := int64(1)

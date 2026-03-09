@@ -399,7 +399,7 @@ testVerifyInboundMessage = script do
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
             instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = "test-lock-release-pool-verify"
             caller = poolOwner
@@ -526,7 +526,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
             instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = "test-pool-verify-invalid"
             caller = poolOwner
@@ -644,7 +644,7 @@ testVerifyInboundMessageMissingChainConfig = script do
     tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
         exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
             instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistry.PoolRegistration with
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = "test-pool-verify-nochain"
             caller = poolOwner
