@@ -360,10 +360,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			Node: config.NodeConfig{
 				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
-					Type:              "static",
-					UserID:            edsParticipant.UserID,
-					JWT:               edsToken.AccessToken,
-					InsecureTransport: true,
+					Type:   commonconfig.AuthTypeInsecureStatic,
+					UserID: edsParticipant.UserID,
+					JWT:    edsToken.AccessToken,
 				},
 				MaxRetries: 0,
 			},

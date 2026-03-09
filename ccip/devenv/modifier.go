@@ -129,9 +129,8 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 			// This is the default nginx port for the canton ledger API.
 			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
 			Auth: commonconfig.AuthConfig{
-				Type:              commonconfig.AuthTypeStatic,
-				JWT:               jwt,
-				InsecureTransport: true,
+				Type: commonconfig.AuthTypeInsecureStatic,
+				JWT:  jwt,
 			},
 		}
 

@@ -49,6 +49,39 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 
+		// --- insecureStatic auth: same as static (Type + JWT required), but uses insecure transport ---
+		{
+			name: "insecureStatic_valid",
+			config: AuthConfig{
+				Type: AuthTypeInsecureStatic,
+				JWT:  validJWT,
+			},
+			wantErr: false,
+		},
+		{
+			name: "insecureStatic_missing_jwt",
+			config: AuthConfig{
+				Type: AuthTypeInsecureStatic,
+			},
+			wantErr: true,
+		},
+		{
+			name: "insecureStatic_invalid_jwt_format",
+			config: AuthConfig{
+				Type: AuthTypeInsecureStatic,
+				JWT:  "not-a-valid-jwt",
+			},
+			wantErr: true,
+		},
+		{
+			name: "insecureStatic_jwt_only_two_parts",
+			config: AuthConfig{
+				Type: AuthTypeInsecureStatic,
+				JWT:  "part1.part2",
+			},
+			wantErr: true,
+		},
+
 		// --- clientCredentials: Type, UserID, AuthURL, ClientID, ClientSecret required; AuthURL must be valid URL ---
 		{
 			name: "clientCredentials_valid",

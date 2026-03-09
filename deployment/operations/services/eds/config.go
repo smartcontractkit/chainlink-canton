@@ -99,16 +99,19 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
+		authType := commonconfig.AuthTypeStatic
+		if input.InsecureTransport {
+			authType = commonconfig.AuthTypeInsecureStatic
+		}
 		var nodeConfig edsConfig.NodeConfig
 		if participant.InternalEndpoints == nil {
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
-					Type:              "static",
-					UserID:            participant.UserID,
-					JWT:               jwt.AccessToken,
-					InsecureTransport: input.InsecureTransport,
+					Type:   authType,
+					UserID: participant.UserID,
+					JWT:    jwt.AccessToken,
 				},
 				MaxRetries: 0,
 			}
@@ -116,10 +119,9 @@ var BuildConfig = operations.NewOperation(
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
-					Type:              "static",
-					UserID:            participant.UserID,
-					JWT:               jwt.AccessToken,
-					InsecureTransport: input.InsecureTransport,
+					Type:   authType,
+					UserID: participant.UserID,
+					JWT:    jwt.AccessToken,
 				},
 				MaxRetries: 0,
 			}
