@@ -476,7 +476,6 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		committeeVerifierRawAddr = contracts.RawInstanceAddress(ccvRef.Labels.List()[0])
 	}
 
-	sourceSelector := c.chainDetails.ChainSelector
 	for _, remoteSelector := range remoteSelectors {
 		// TODO: should be moved to the ChainFamily interface.
 		var addressBytesLength uint8
@@ -512,14 +511,14 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		}
 		localExecutorRef, err := env.DataStore.Addresses().Get(
 			datastore.NewAddressRefKey(
-				sourceSelector,
+				selector,
 				datastore.ContractType(executor.ProxyType),
 				executor.Version,
 				devenvcommon.DefaultExecutorQualifier,
 			),
 		)
 		if err != nil {
-			return fmt.Errorf("failed to get default executor for source chain %d: %w", sourceSelector, err)
+			return fmt.Errorf("failed to get default executor for source chain %d: %w", selector, err)
 		}
 		// Normalize executor to 32 bytes (left-padded) for Canton config encoding.
 		normalizedSourceExecutor := contracts.HexToInstanceAddress(localExecutorRef.Address).Hex()
