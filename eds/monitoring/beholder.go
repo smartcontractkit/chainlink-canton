@@ -5,15 +5,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
 	"github.com/smartcontractkit/chainlink-common/pkg/metrics"
-
-	"github.com/smartcontractkit/chainlink-canton/eds/common"
 )
 
-type EDSBeholderMonitoring struct {
-	metrics common.EDSMetricLabeler
-}
-
-func InitMonitoring(config beholder.Config) (common.EDSMonitoring, error) {
+// InitBeholderMonitoring initialized a labeler using the given Beholder config.
+func InitBeholderMonitoring(config beholder.Config) (*EDSMetricLabeler, error) {
+	// All histogram buckets must be defined at time of creation.
 	config.MetricViews = MetricViews()
 
 	client, err := beholder.NewClient(config)
@@ -29,11 +25,5 @@ func InitMonitoring(config beholder.Config) (common.EDSMonitoring, error) {
 		return nil, fmt.Errorf("failed to initialize EDS metrics: %w", err)
 	}
 
-	return &EDSBeholderMonitoring{
-		metrics: NewEDSMetricLabeler(metrics.NewLabeler(), edsMetrics),
-	}, nil
-}
-
-func (m *EDSBeholderMonitoring) Metrics() common.EDSMetricLabeler {
-	return m.metrics
+	return NewEDSMetricLabeler(metrics.NewLabeler(), edsMetrics), nil
 }

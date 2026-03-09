@@ -2,8 +2,7 @@ package config
 
 type MonitoringConfig struct {
 	Enabled  bool           `toml:"enabled"`
-	Type     string         `toml:"type"` // TODO not needed?
-	Beholder BeholderConfig `toml:"beholder"`
+	Beholder BeholderConfig `toml:"beholder" validate:"required_if=Enabled true"`
 }
 
 type BeholderConfig struct {

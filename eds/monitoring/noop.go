@@ -9,6 +9,7 @@ import (
 
 var _ common.EDSMetricLabeler = &NoopEDSMetricLabeler{}
 
+// NoopEDSMetricLabeler is a no-op implementation of common.EDSMetricLabeler that can be used when monitoring is disabled or otherwise unavailable.
 type NoopEDSMetricLabeler struct{}
 
 func (n NoopEDSMetricLabeler) With(keyValues ...string) common.EDSMetricLabeler { return n }

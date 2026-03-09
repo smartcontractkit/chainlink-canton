@@ -13,10 +13,11 @@ func TestRead(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		config  string
-		want    *Config
-		wantErr bool
+		name              string
+		config            string
+		want              *Config
+		wantErr           bool
+		wantValidationErr bool
 	}{
 		{
 			name: "valid config",
@@ -46,6 +47,9 @@ instance_address = "0x7d27bb6077ef84ed2c4fce13a1a7bb1f7cf48c2b76a3e6773eb6240382
 [contracts.rmn_remote]
 party_id = "ccipOwner"
 instance_address = "0x7f2ebf216e26051335a9e132d6c013a771d8406378011ca057a6222d3fea1ee5"
+[contracts.fee_quoter]
+party_id = "ccipOwner"
+instance_address = "0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"
 [[contracts.ccvs]]
 party_id = "ccvOwner"
 instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
@@ -61,6 +65,18 @@ max_retries = 10
 type = "insecureStatic"
 user_id = "local-user"
 jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+
+[monitoring]
+enabled = true
+
+[monitoring.beholder]
+insecure_connection = true
+otel_exporter_grpc_endpoint = "beholder:4317"
+otel_exporter_http_endpoint = "http://beholder:4318/v1/traces"
+log_streaming_enabled = true
+metric_reader_interval = 15
+trace_sample_ratio = 0.1
+trace_batch_timeout = 5
 	`,
 			want: &Config{
 				ChainSelector: "8706591216959472610",
@@ -93,6 +109,10 @@ jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6
 						PartyID:         "ccipOwner",
 						InstanceAddress: contracts.HexToInstanceAddress("0x7f2ebf216e26051335a9e132d6c013a771d8406378011ca057a6222d3fea1ee5"),
 					},
+					FeeQuoter: ContractIdentifier{
+						PartyID:         "ccipOwner",
+						InstanceAddress: contracts.HexToInstanceAddress("0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"),
+					},
 					CCVs: []ContractIdentifier{
 						{
 							PartyID:         "ccvOwner",
@@ -112,6 +132,18 @@ jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6
 					},
 					MaxRetries: 10,
 				},
+				Monitoring: MonitoringConfig{
+					Enabled: true,
+					Beholder: BeholderConfig{
+						InsecureConnection:       true,
+						OtelExporterGRPCEndpoint: "beholder:4317",
+						OtelExporterHTTPEndpoint: "http://beholder:4318/v1/traces",
+						LogStreamingEnabled:      true,
+						MetricReaderInterval:     15,
+						TraceSampleRatio:         0.1,
+						TraceBatchTimeout:        5,
+					},
+				},
 			},
 		},
 	}
@@ -125,6 +157,10 @@ jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Read() got = %v, want %v", got, tt.want)
+			}
+			// Validate
+			if err := got.Validate(); (err != nil) != tt.wantValidationErr {
+				t.Errorf("Validate() error = %v, wantValidationErr %v", err, tt.wantValidationErr)
 			}
 		})
 	}

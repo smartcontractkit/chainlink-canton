@@ -54,7 +54,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	// Set up monitoring
 	var metrics edsCommon.EDSMetricLabeler
 	if cfg.Monitoring.Enabled {
-		m, err := monitoring.InitMonitoring(beholder.Config{
+		metrics, err = monitoring.InitBeholderMonitoring(beholder.Config{
 			InsecureConnection:       cfg.Monitoring.Beholder.InsecureConnection,
 			CACertFile:               cfg.Monitoring.Beholder.CACertFile,
 			OtelExporterGRPCEndpoint: cfg.Monitoring.Beholder.OtelExporterGRPCEndpoint,
@@ -67,7 +67,6 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		if err != nil {
 			return fmt.Errorf("failed to initialize Beholder monitoring: %w", err)
 		}
-		metrics = m.Metrics()
 	} else {
 		metrics = monitoring.NoopEDSMetricLabeler{}
 	}

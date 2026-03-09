@@ -32,7 +32,7 @@ type UpdateStore struct {
 	updateService apiv2.UpdateServiceClient
 	stateService  apiv2.StateServiceClient
 
-	metrics StoreMetrics
+	metrics Metrics
 
 	// The filters to apply when backfilling/subscribing to updates
 	filtersByParty map[string]*apiv2.Filters
@@ -82,7 +82,7 @@ type UpdateStoreConfig struct {
 func NewUpdateStore(
 	ctx context.Context,
 	config UpdateStoreConfig,
-	metrics StoreMetrics,
+	metrics Metrics,
 	registeredTemplates ...RegisteredTemplate,
 ) (*UpdateStore, error) {
 	filtersByParty := make(map[string]*apiv2.Filters) // Assemble filters

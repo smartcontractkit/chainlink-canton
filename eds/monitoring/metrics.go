@@ -16,9 +16,11 @@ import (
 )
 
 type EDSMetrics struct {
+	// HTTP API Metrics
 	activeRequestsUpDownCounter metric.Int64UpDownCounter
 	requestDurationSeconds      metric.Float64Histogram
 
+	// ContractStore metrics
 	storeSubscriptionUptime metric.Int64Counter
 	storeUpdatesCounter     metric.Int64Counter
 	storeLedgerEndGauge     metric.Int64Gauge
@@ -63,7 +65,7 @@ func InitMetrics() (*EDSMetrics, error) {
 
 	m.storeLedgerEndGauge, err = beholder.GetMeter().Int64Gauge(
 		"eds_store_ledger_end",
-		metric.WithDescription("The current ledger end that the EDS has processed. Should not be used for liveness checks as it will only increase if there are contract updates to be processed."),
+		metric.WithDescription("The current ledger end that the EDS has processed - should not be used for liveness checks as it will only increase if there are contract updates to be processed."),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create eds_store_ledger_end: %w", err)
