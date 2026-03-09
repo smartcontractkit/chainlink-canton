@@ -217,6 +217,9 @@ execution_interval = 15_000_000_000
 ## EDS generic service for Canton
 [generic_services.8706591216959472610]
   chain_selector = 8706591216959472610
+[generic_services.8706591216959472610.input]
+  # Use insecure gRPC transport for local Canton (no TLS). Set to false for production.
+  insecure_transport = true
 [generic_services.8706591216959472610.input.eds_server_config]
   host = "0.0.0.0"
   port = 8100

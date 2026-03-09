@@ -23,9 +23,10 @@ import (
 )
 
 type GenerateEDSConfigInput struct {
-	ChainSelector uint64 `json:"chain_selector"`
-	Participant   int    `json:"participant"`
-	ServerConfig  edsConfig.ServerConfig
+	ChainSelector     uint64 `json:"chain_selector"`
+	Participant       int    `json:"participant"`
+	ServerConfig      edsConfig.ServerConfig
+	InsecureTransport bool `json:"insecure_transport"`
 }
 
 type GenerateEDSConfigOutput struct {
@@ -107,7 +108,7 @@ var BuildConfig = operations.NewOperation(
 					Type:              "static",
 					UserID:            participant.UserID,
 					JWT:               jwt.AccessToken,
-					InsecureTransport: true, // TODO: this should get pulled from input somehow
+					InsecureTransport: input.InsecureTransport,
 				},
 				MaxRetries: 0,
 			}
@@ -118,7 +119,7 @@ var BuildConfig = operations.NewOperation(
 					Type:              "static",
 					UserID:            participant.UserID,
 					JWT:               jwt.AccessToken,
-					InsecureTransport: true, // TODO: this should get pulled from input somehow
+					InsecureTransport: input.InsecureTransport,
 				},
 				MaxRetries: 0,
 			}
