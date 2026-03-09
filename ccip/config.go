@@ -41,5 +41,5 @@ type BlockchainInfo struct {
 	// JWT is kept for backward compatibility. When Auth.Type is empty or "static",
 	// this field is used as the bearer token.
 	JWT  string     `toml:"jwt,omitempty"`
-	Auth AuthConfig `toml:"auth"`
+	Auth AuthConfig `toml:"auth,omitempty"`
 }

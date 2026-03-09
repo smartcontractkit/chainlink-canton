@@ -112,10 +112,19 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			datastore.ContractType(executor.ProxyType),
 			executor.DeployProxy.Version(),
 			devenvcommon.DefaultExecutorQualifier,
-			"executor",
+			"source executor",
 		)
 		require.NoError(t, err)
+		t.Logf(
+			"Resolved contracts: receiver=%x cantonCCV=%x cantonExecutor=%x srcSelector=%d dstSelector=%d",
+			receiver,
+			ccvAddr,
+			executorAddr,
+			cantonChain.ChainSelector(),
+			evmChain.ChainSelector(),
+		)
 
+		t.Logf("Sending Canton -> EVM message")
 		sendMessageResult, err := cantonChain.SendMessage(
 			subtestCtx,
 			evmChain.ChainSelector(),
@@ -141,15 +150,23 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NotNil(t, sendMessageResult.Message)
 		require.NotEmpty(t, sendMessageResult.ReceiptIssuers)
 		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
+		t.Logf(
+			"SendMessage accepted: seqNo=%d receipts=%d",
+			seqNo,
+			len(sendMessageResult.ReceiptIssuers),
+		)
+
+		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
 		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
 		require.NoError(t, err)
 
-		t.Logf("CCIP Message sent event: %+v", sentEvent)
+		t.Logf("CCIPMessageSent event: %+v", sentEvent)
 
 		chainMap, err := harness.Lib.ChainsMap(subtestCtx)
 		require.NoError(t, err)
 		testCtx, cleanupFn := tcapi.NewTestingContext(subtestCtx, chainMap, harness.AggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier], harness.IndexerMonitor)
 		defer cleanupFn()
+		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID)
 		result, err := testCtx.AssertMessage(sentEvent.MessageID, tcapi.AssertMessageOptions{
 			TickInterval:            1 * time.Second,
 			ExpectedVerifierResults: 1,
@@ -160,7 +177,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result.AggregatedResult)
 		require.Len(t, result.IndexedVerifications.Results, 1)
+		t.Logf(
+			"Message assertion succeeded: aggregated=true indexerResults=%d",
+			len(result.IndexedVerifications.Results),
+		)
 
+		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
 		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
