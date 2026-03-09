@@ -154,13 +154,13 @@ hashMetadataLeafNative meta =
 -- ===========================================================================
 
 -- opId = keccak256(abi.encode(calls, predecessor, salt))
-hashTimelockOpId : [TimelockCall] -> Text -> Text -> BytesHex
+hashTimelockOpId : [TimelockCall] -> BytesHex -> BytesHex -> BytesHex
 hashTimelockOpId calls predecessor salt =
   let
     -- Encode each call
     encodedCalls = foldl (<>) "" (map encodeTimelockCall calls)
-    -- Combine with predecessor and salt
-    encoded = encodedCalls <> asciiToHex predecessor <> asciiToHex salt
+    -- Combine with predecessor and salt (already BytesHex, no conversion needed)
+    encoded = encodedCalls <> predecessor <> salt
   in
     keccak256 encoded
 
@@ -169,14 +169,7 @@ encodeTimelockCall : TimelockCall -> BytesHex
 encodeTimelockCall call =
   asciiToHex call.targetInstanceAddress
   <> asciiToHex call.functionName
-  <> encodeOperationData call.operationData
-
--- | Encode operationData for hashing.
--- If it's valid hex (even length, hex digits only), treat it as raw bytes (already hex).
--- Otherwise, treat it as ASCII text and hex-encode it.
-encodeOperationData : Text -> BytesHex
-encodeOperationData t =
-  if isValidHex t then t else asciiToHex t
+  <> call.operationData  -- operationData is already BytesHex
 
 isValidHex : Text -> Bool
 isValidHex t =

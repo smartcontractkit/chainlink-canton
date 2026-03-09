@@ -17,5 +17,6 @@ dependencies:
   - ../interfaces/.daml/dist/ccip-tokenpool-interfaces-0.0.1.dar
   - ../../feequoter/.daml/dist/ccip-feequoter-0.0.1.dar
   - ../../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-0.0.1.dar
+  - ../../../mcms/.daml/dist/mcms-0.0.1.dar
   - ../../offramp/.daml/dist/ccip-offramp-0.0.1.dar
   - ../../onramp/.daml/dist/ccip-onramp-0.0.1.dar

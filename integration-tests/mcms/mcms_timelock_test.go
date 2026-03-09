@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
@@ -15,33 +16,20 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
 func TestMCMS_Timelock(t *testing.T) {
 	t.Parallel()
 
-	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
-	participant := env.Chain.Participants[0]
-
-	// Upload DAR
-	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
-	require.NoError(t, err)
-	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-	require.NotEmpty(t, packageIDs)
-	mcmsPkgID := packageIDs[0]
-
-	// Create MCMS encoder for this package
-	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
-
-	ccipOwner := participant.PartyID
-
-	// Shared signer set for all roles (tests can diverge later)
-	signers := createSigners(t, 3)
-	cfg := New2of3Config(signers)
-	sortedSigners := SortSignersByAddress(signers)
+	// Use shared environment for participant, package, signers
+	sharedEnv := GetSharedEnvironment(t)
+	participant := sharedEnv.Participant
+	mcmsPkgID := sharedEnv.McmsPkgID
+	mcmsEncoder := sharedEnv.McmsEncoder
+	ccipOwner := sharedEnv.CcipOwner
+	cfg := sharedEnv.Config
+	sortedSigners := sharedEnv.SortedSigners
 
 	chainID := int64(1)
 	baseMcmsID := "mcms-timelock-" + uuid.New().String()[:8]
@@ -90,7 +78,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, signatures)
 
 		// 2) Schedule a batch to increment counter (immediate, delay=0)
-		opID := HashTimelockOpId(FromMCMSTimelockCalls(calls), ZeroHash, salt)
+		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
@@ -120,7 +108,7 @@ func TestMCMS_Timelock(t *testing.T) {
 			OperationData:         types.TEXT(""),
 		}}
 		salt := uuid.New().String()[:8]
-		opID := HashTimelockOpId(FromMCMSTimelockCalls(calls), ZeroHash, salt)
+		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 
 		// Encode schedule params using encoder pattern
 		scheduleParams := mcms.ScheduleBatchParams{
@@ -173,8 +161,8 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		base := "mcms-timelock-blocked-" + uuid.New().String()[:8]
 		mcmsInstanceAddr := fmt.Sprintf("%s@%s", base, ccipOwner)
-		mcmsCid3 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, []BlockedFunction{
-			{TargetInstanceAddress: counterTargetInstanceAddr, FunctionName: "dangerous_function"},
+		mcmsCid3 := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, []mcms.BlockedFunction{
+			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("dangerous_function")},
 		})
 
 		// Define calls and salt first so we can encode them
@@ -267,7 +255,7 @@ func createMCMSMultiRole(
 	baseMcmsID string,
 	config MCMSConfig,
 	minDelayMicros int64,
-	blockedFunctions []BlockedFunction,
+	blockedFunctions []mcms.BlockedFunction,
 ) string {
 	t.Helper()
 	// Use bindings to create MCMS - provides type safety and tests bindings work correctly
@@ -315,15 +303,6 @@ func createMCMSMultiRole(
 		},
 	}
 
-	// Convert local BlockedFunction to binding BlockedFunction
-	blockedFuncs := make([]mcms.BlockedFunction, len(blockedFunctions))
-	for i, bf := range blockedFunctions {
-		blockedFuncs[i] = mcms.BlockedFunction{
-			TargetInstanceAddress: types.TEXT(bf.TargetInstanceAddress),
-			FunctionName:          types.TEXT(bf.FunctionName),
-		}
-	}
-
 	// Build MCMS contract using bindings
 	mcmsContract := mcms.MCMS{
 		Owner:              types.PARTY(owner),
@@ -333,7 +312,7 @@ func createMCMSMultiRole(
 		Canceller:          roleState,
 		Bypasser:           roleState,
 		MinDelay:           types.RELTIME(time.Duration(minDelayMicros) * time.Microsecond),
-		BlockedFunctions:   blockedFuncs,
+		BlockedFunctions:   blockedFunctions,
 		TimelockTimestamps: types.GENMAP{},
 	}
 
@@ -922,24 +901,14 @@ func queryBlockedFunctionsCount(
 func TestMCMS_SelfDispatch(t *testing.T) {
 	t.Parallel()
 
-	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
-	participant := env.Chain.Participants[0]
-
-	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
-	require.NoError(t, err)
-	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-	require.NotEmpty(t, packageIDs)
-	mcmsPkgID := packageIDs[0]
-
-	// Create MCMS encoder for this package
-	mcmsEncoder := NewMCMSEncoder(mcmsPkgID)
-
-	ccipOwner := participant.PartyID
-
-	signers := createSigners(t, 3)
-	cfg := New2of3Config(signers)
-	sortedSigners := SortSignersByAddress(signers)
+	// Use shared environment for participant, package, signers
+	sharedEnv := GetSharedEnvironment(t)
+	participant := sharedEnv.Participant
+	mcmsPkgID := sharedEnv.McmsPkgID
+	mcmsEncoder := sharedEnv.McmsEncoder
+	ccipOwner := sharedEnv.CcipOwner
+	cfg := sharedEnv.Config
+	sortedSigners := sharedEnv.SortedSigners
 	chainID := int64(1)
 
 	t.Run("SelfDispatchUpdateMinDelay", func(t *testing.T) {
@@ -950,10 +919,11 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
+		// Define calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
 			FunctionName:          types.TEXT("UpdateMinDelay"),
-			OperationData:         types.TEXT("1"),
+			OperationData:         types.TEXT(EncodeMinDelay(1)), // 1 second
 		}}
 		salt := uuid.New().String()[:8]
 		delaySecs := 1
@@ -978,7 +948,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
 		// 2) Schedule batch: self-dispatch update_min_delay to 1s
-		opID := HashTimelockOpId(FromMCMSTimelockCalls(calls), ZeroHash, salt)
+		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
@@ -1002,11 +972,11 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 1_000_000, nil)
 
 		// Define calls and salt first so we can encode them
-		bf := BlockedFunction{TargetInstanceAddress: "some-target@owner", FunctionName: "dangerous_op"}
+		bf := mcms.BlockedFunction{TargetInstanceAddress: "some-target@owner", FunctionName: "dangerous_op"}
 		calls := []mcms.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
 			FunctionName:          types.TEXT("BlockFunction"),
-			OperationData:         types.TEXT(EncodeBlockedFunction(bf)),
+			OperationData:         types.TEXT(MustEncodeBlockedFunction(t, bf)),
 		}}
 		salt := uuid.New().String()[:8]
 		delaySecs := 1
@@ -1029,7 +999,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		require.NoError(t, err)
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
-		opID := HashTimelockOpId(FromMCMSTimelockCalls(calls), ZeroHash, salt)
+		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
@@ -1049,10 +1019,11 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
 		// Define calls first so we can encode them
+		// Define calls first so we can encode them
 		calls := []mcms.TimelockCall{{
 			TargetInstanceAddress: types.TEXT(mcmsInstanceAddr),
 			FunctionName:          types.TEXT("UpdateMinDelay"),
-			OperationData:         types.TEXT("2"),
+			OperationData:         types.TEXT(EncodeMinDelay(2)), // 2 seconds
 		}}
 
 		// Encode bypasser execute params using encoder pattern
@@ -1091,7 +1062,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 
 		// Define mixed calls and salt first so we can encode them
 		calls := []mcms.TimelockCall{
-			{TargetInstanceAddress: types.TEXT(mcmsInstanceAddr), FunctionName: types.TEXT("UpdateMinDelay"), OperationData: types.TEXT("1")},
+			{TargetInstanceAddress: types.TEXT(mcmsInstanceAddr), FunctionName: types.TEXT("UpdateMinDelay"), OperationData: types.TEXT(EncodeMinDelay(1))},
 			{TargetInstanceAddress: types.TEXT(counterTargetInstanceAddr), FunctionName: types.TEXT("Increment"), OperationData: types.TEXT("")},
 		}
 		salt := uuid.New().String()[:8]
@@ -1115,7 +1086,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		require.NoError(t, err)
 		mcmsCid = setRootWithRole(t, participant, mcmsPkgID, ccipOwner, mcmsCid, "Proposer", proposal, validUntil, sigs)
 
-		opID := HashTimelockOpId(FromMCMSTimelockCalls(calls), ZeroHash, salt)
+		opID := HashTimelockOpId(UnwrapTimelockCalls(calls), ZeroHash, salt)
 		opProof, err := proposal.GetOpProof(0)
 		require.NoError(t, err)
 		mcmsCid = scheduleBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, proposal.Operations[0], opProof)

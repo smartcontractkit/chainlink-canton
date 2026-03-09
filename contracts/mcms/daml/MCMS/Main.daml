@@ -294,8 +294,8 @@ template MCMS
         submitter : Party                                         -- Anyone can execute
         opId : Text                                               -- Operation ID to execute
         calls : [TimelockCall]                                    -- Caller provides (for execution)
-        predecessor : Text                                        -- For validation
-        salt : Text                                               -- For opId verification
+        predecessor : BytesHex                                    -- For validation (hex hash)
+        salt : BytesHex                                           -- For opId verification (hex value)
         targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
@@ -568,7 +568,7 @@ executeSelfDispatch mcms call =
 
 -- | Schedule a batch of operations (called by ExecuteOp for Proposer role)
 -- Does NOT verify merkle proof - ExecuteOp already did that
-scheduleBatchInternal : Time -> MCMS -> RoleState -> [TimelockCall] -> Text -> Text -> RelTime -> Update (ContractId MCMS)
+scheduleBatchInternal : Time -> MCMS -> RoleState -> [TimelockCall] -> BytesHex -> BytesHex -> RelTime -> Update (ContractId MCMS)
 scheduleBatchInternal now mcms rs calls predecessor salt delay = do
   -- 1. Validate delay meets minimum
   assertMsg "E_DELAY_TOO_SHORT" $ delay >= mcms.minDelay

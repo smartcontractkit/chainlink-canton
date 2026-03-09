@@ -13,13 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
 // ===========================================================================
@@ -37,47 +36,22 @@ func TestMCMS_SetRootWithRealSignatures(t *testing.T) {
 
 	t.Parallel()
 
-	env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
+	// Use shared environment
+	sharedEnv := GetSharedEnvironment(t)
+	participant := sharedEnv.Participant
+	signers := sharedEnv.Signers
 
-	participant := env.Chain.Participants[0]
-
-	// ========================
-	// |   Setup: Upload DAR  |
-	// ========================
-
-	t.Log("Uploading MCMS DAR...")
-
-	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
-	require.NoError(t, err)
-
-	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
-	require.NoError(t, err)
-	t.Logf("Uploaded MCMS DAR, package IDs: %v", packageIDs)
-
-	// ========================
-	// |   Setup: Parties     |
-	// ========================
-
-	mcmsOwner := participant.PartyID
+	mcmsOwner := sharedEnv.CcipOwner
 	t.Logf("Using party: %s", mcmsOwner)
 
 	// ===========================================================================
-	// Step 1: Generate Signers
+	// Step 1: Signers from shared environment
 	// ===========================================================================
-	fmt.Println("\n=== Step 1: Generate Signers ===")
+	fmt.Println("\n=== Step 1: Using Signers from Shared Environment ===")
 
-	signer1, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer2, err := NewMCMSSigner()
-	require.NoError(t, err)
-	signer3, err := NewMCMSSigner()
-	require.NoError(t, err)
-
-	signers := []*MCMSSigner{signer1, signer2, signer3}
-
-	fmt.Printf("Signer 1: %s\n", FormatSignerInfo(signer1))
-	fmt.Printf("Signer 2: %s\n", FormatSignerInfo(signer2))
-	fmt.Printf("Signer 3: %s\n", FormatSignerInfo(signer3))
+	fmt.Printf("Signer 1: %s\n", FormatSignerInfo(signers[0]))
+	fmt.Printf("Signer 2: %s\n", FormatSignerInfo(signers[1]))
+	fmt.Printf("Signer 3: %s\n", FormatSignerInfo(signers[2]))
 
 	// ===========================================================================
 	// Step 2: Create MCMS Contract
@@ -828,69 +802,69 @@ func makeInt64List(count int, value int64) []*apiv2.Value {
 // ===========================================================================
 
 // TestMCMSCodec_SetConfigParams_Roundtrip tests that encoding and decoding
-// SetConfigParams produces the same result (like CCIP message codec tests)
+// SetConfigParams produces the same result using binding's MarshalHex/UnmarshalHex
 func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
 		name   string
-		params SetConfigParams
+		params mcms.SetConfigParams
 	}{
 		{
 			name: "empty config",
-			params: SetConfigParams{
-				Signers:      []SignerInfo{},
-				GroupQuorums: []int{},
-				GroupParents: []int{},
+			params: mcms.SetConfigParams{
+				Signers:      []mcms.SignerInfo{},
+				GroupQuorums: []types.INT64{},
+				GroupParents: []types.INT64{},
 				ClearRoot:    false,
 			},
 		},
 		{
 			name: "single signer",
-			params: SetConfigParams{
-				Signers: []SignerInfo{
+			params: mcms.SetConfigParams{
+				Signers: []mcms.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 				},
-				GroupQuorums: []int{1},
-				GroupParents: []int{0},
+				GroupQuorums: []types.INT64{1},
+				GroupParents: []types.INT64{0},
 				ClearRoot:    false,
 			},
 		},
 		{
 			name: "2-of-3 multisig",
-			params: SetConfigParams{
-				Signers: []SignerInfo{
+			params: mcms.SetConfigParams{
+				Signers: []mcms.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 					{SignerAddress: "a4b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f80123", SignerIndex: 1, SignerGroup: 0},
 					{SignerAddress: "b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a87654", SignerIndex: 2, SignerGroup: 0},
 				},
-				GroupQuorums: []int{2},
-				GroupParents: []int{0},
+				GroupQuorums: []types.INT64{2},
+				GroupParents: []types.INT64{0},
 				ClearRoot:    true,
 			},
 		},
 		{
 			name: "full 32-group config",
-			params: SetConfigParams{
-				Signers: []SignerInfo{
+			params: mcms.SetConfigParams{
+				Signers: []mcms.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 					{SignerAddress: "a4b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f80123", SignerIndex: 1, SignerGroup: 1},
 				},
-				GroupQuorums: make([]int, NumGroups), // 32 zeros
-				GroupParents: make([]int, NumGroups), // 32 zeros
+				GroupQuorums: make([]types.INT64, NumGroups), // 32 zeros
+				GroupParents: make([]types.INT64, NumGroups), // 32 zeros
 				ClearRoot:    false,
 			},
 		},
 		{
 			name: "hierarchical groups",
-			params: SetConfigParams{
-				Signers: []SignerInfo{
+			params: mcms.SetConfigParams{
+				Signers: []mcms.SignerInfo{
 					{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 1},
 					{SignerAddress: "a4b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f80123", SignerIndex: 1, SignerGroup: 1},
 					{SignerAddress: "b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a87654", SignerIndex: 2, SignerGroup: 2},
 				},
-				GroupQuorums: []int{1, 2, 1}, // Group 0 needs 1, Group 1 needs 2, Group 2 needs 1
-				GroupParents: []int{0, 0, 1}, // Group 0 is root, Group 1 -> Group 0, Group 2 -> Group 1
+				GroupQuorums: []types.INT64{1, 2, 1}, // Group 0 needs 1, Group 1 needs 2, Group 2 needs 1
+				GroupParents: []types.INT64{0, 0, 1}, // Group 0 is root, Group 1 -> Group 0, Group 2 -> Group 1
 				ClearRoot:    true,
 			},
 		},
@@ -900,13 +874,15 @@ func TestMCMSCodec_SetConfigParams_Roundtrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Encode
-			encoded := EncodeSetConfigParams(tc.params)
+			// Encode using binding's MarshalHex
+			encoded, err := tc.params.MarshalHex()
+			require.NoError(t, err, "failed to encode")
 			t.Logf("Encoded %s: %s (%d hex chars = %d bytes)",
 				tc.name, truncateString(encoded, 60), len(encoded), len(encoded)/2)
 
-			// Decode
-			decoded, err := DecodeSetConfigParams(encoded)
+			// Decode using binding's UnmarshalHex
+			var decoded mcms.SetConfigParams
+			err = decoded.UnmarshalHex(encoded)
 			require.NoError(t, err, "failed to decode")
 
 			// Verify roundtrip
@@ -934,32 +910,26 @@ func TestMCMSCodec_SetConfigParams_DecodeErrors(t *testing.T) {
 	testCases := []struct {
 		name    string
 		hexData string
-		errMsg  string
 	}{
 		{
 			name:    "empty data",
 			hexData: "",
-			errMsg:  "need at least 1 byte",
 		},
 		{
 			name:    "truncated signer address",
 			hexData: "0114", // 1 signer, address length 20, but no address data
-			errMsg:  "truncated at signer 0 address",
 		},
 		{
 			name:    "truncated signer index",
 			hexData: "01141375dc8a4c1476e6628b03216545e5cdcbff3f84", // address but no index
-			errMsg:  "truncated at signer 0 index",
 		},
 		{
 			name:    "truncated quorums",
 			hexData: "00", // 0 signers, but no quorum count
-			errMsg:  "truncated at quorums count",
 		},
 		{
 			name:    "invalid hex",
 			hexData: "zzzz",
-			errMsg:  "failed to decode hex",
 		},
 	}
 
@@ -967,29 +937,30 @@ func TestMCMSCodec_SetConfigParams_DecodeErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := DecodeSetConfigParams(tc.hexData)
+			var decoded mcms.SetConfigParams
+			err := decoded.UnmarshalHex(tc.hexData)
 			require.Error(t, err, "should have failed to decode")
-			require.Contains(t, err.Error(), tc.errMsg)
 		})
 	}
 }
 
 // TestMCMSCodec_SetConfigParams_KnownValues tests encoding against known/expected values
-// This ensures Go and Daml produce identical encodings
+// This ensures Go binding and Daml produce identical encodings
 func TestMCMSCodec_SetConfigParams_KnownValues(t *testing.T) {
 	t.Parallel()
 
 	// Test with a specific config and verify exact hex output
-	params := SetConfigParams{
-		Signers: []SignerInfo{
+	params := mcms.SetConfigParams{
+		Signers: []mcms.SignerInfo{
 			{SignerAddress: "1375dc8a4c1476e6628b03216545e5cdcbff3f84", SignerIndex: 0, SignerGroup: 0},
 		},
-		GroupQuorums: []int{1, 0, 0}, // 3 quorums
-		GroupParents: []int{0, 0, 0}, // 3 parents
+		GroupQuorums: []types.INT64{1, 0, 0}, // 3 quorums
+		GroupParents: []types.INT64{0, 0, 0}, // 3 parents
 		ClearRoot:    false,
 	}
 
-	encoded := EncodeSetConfigParams(params)
+	encoded, err := params.MarshalHex()
+	require.NoError(t, err)
 
 	// Parse and verify structure manually
 	// Format: numSigners(1) + [addrLen(1) + addr(20) + index(4) + group(4)]... + numQuorums(1) + quorums(4*n) + numParents(1) + parents(4*n) + clearRoot(1)
