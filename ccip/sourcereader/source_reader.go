@@ -9,7 +9,6 @@ import (
 	"io"
 	"math/big"
 	"slices"
-	"strings"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"google.golang.org/grpc"
@@ -17,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 const (
@@ -55,25 +56,10 @@ type ReaderConfig struct {
 	CCIPOwnerParty string `toml:"ccip_owner_party"`
 	// CCIPMessageSentTemplateID is the template ID of the CCIPMessageSent contract.
 	// Formatted as packageId:moduleName:entityName
-	CCIPMessageSentTemplateID string `toml:"ccip_message_sent_template_id"`
+	CCIPMessageSentTemplateID contracts.TemplateID `toml:"ccip_message_sent_template_id"`
 	// Authority is the authority to use for the gRPC connection.
 	// Connecting to the gRPC API via nginx usually requires this to be set.
 	Authority string `toml:"authority"`
-}
-
-// GetTemplateID returns a ledgerv2.Identifier from the CCIPMessageSentTemplateID.
-// It expects the format to be packageId:moduleName:entityName.
-func (c *ReaderConfig) GetTemplateID() (*ledgerv2.Identifier, error) {
-	parts := strings.Split(c.CCIPMessageSentTemplateID, ":")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("invalid template ID format, expected packageId:moduleName:entityName, got: %s", c.CCIPMessageSentTemplateID)
-	}
-
-	return &ledgerv2.Identifier{
-		PackageId:  parts[0],
-		ModuleName: parts[1],
-		EntityName: parts[2],
-	}, nil
 }
 
 type sourceReader struct {
@@ -113,11 +99,6 @@ func NewSourceReader(
 
 // FetchMessageSentEvents implements chainaccess.SourceReader.
 func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, toBlock *big.Int) ([]protocol.MessageSentEvent, error) {
-	templateID, err := c.config.GetTemplateID()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get template ID: %w", err)
-	}
-
 	// since begin is exclusive we need to subtract 1 from fromBlock
 	begin := new(big.Int).Sub(fromBlock, big.NewInt(1))
 	// check that begin is not negative
@@ -140,6 +121,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		end = &e
 	}
 
+	ccipMessageSentIdentifier := c.config.CCIPMessageSentTemplateID.ToLedgerIdentifier()
 	updates, err := c.updateServiceClient.GetUpdates(ctx, &ledgerv2.GetUpdatesRequest{
 		BeginExclusive: begin.Int64(),
 		EndInclusive:   end,
@@ -153,7 +135,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 								{
 									IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
 										TemplateFilter: &ledgerv2.TemplateFilter{
-											TemplateId:              templateID,
+											TemplateId:              ccipMessageSentIdentifier,
 											IncludeCreatedEventBlob: true,
 										},
 									},
@@ -183,7 +165,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 		transactions = append(transactions, update.GetTransaction())
 	}
 
-	events, err := extractEvents(transactions, c.config.CCIPOwnerParty, templateID)
+	events, err := extractEvents(transactions, c.config.CCIPOwnerParty, ccipMessageSentIdentifier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract events: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -22,9 +23,10 @@ import (
 )
 
 type GenerateEDSConfigInput struct {
-	ChainSelector uint64 `json:"chain_selector"`
-	Participant   int    `json:"participant"`
-	ServerConfig  edsConfig.ServerConfig
+	ChainSelector     uint64 `json:"chain_selector"`
+	Participant       int    `json:"participant"`
+	ServerConfig      edsConfig.ServerConfig
+	InsecureTransport bool `json:"insecure_transport"`
 }
 
 type GenerateEDSConfigOutput struct {
@@ -97,13 +99,17 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
+		authType := commonconfig.AuthTypeStatic
+		if input.InsecureTransport {
+			authType = commonconfig.AuthTypeInsecureStatic
+		}
 		var nodeConfig edsConfig.NodeConfig
 		if participant.InternalEndpoints == nil {
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: edsConfig.AuthConfig{
-					Type:   "static",
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   authType,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -112,8 +118,8 @@ var BuildConfig = operations.NewOperation(
 		} else {
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
-				AuthConfig: edsConfig.AuthConfig{
-					Type:   "static",
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   authType,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},

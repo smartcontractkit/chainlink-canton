@@ -13,11 +13,18 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/services/eds"
 )
 
+// GenerateEDSConfigConfig is the config type for the GenerateEDSConfig changeset.
+// It extends ServerConfig with auth/transport options used when building the EDS config.
+type GenerateEDSConfigConfig struct {
+	edsConfig.ServerConfig
+	InsecureTransport bool `json:"insecure_transport" toml:"insecure_transport"`
+}
+
 type GenerateEDSConfig struct{}
 
-var _ cldf.ChangeSetV2[CantonCSDeps[edsConfig.ServerConfig]] = GenerateEDSConfig{}
+var _ cldf.ChangeSetV2[CantonCSDeps[GenerateEDSConfigConfig]] = GenerateEDSConfig{}
 
-func (c GenerateEDSConfig) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[edsConfig.ServerConfig]) error {
+func (c GenerateEDSConfig) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[GenerateEDSConfigConfig]) error {
 	chain, ok := e.BlockChains.CantonChains()[config.ChainSelector]
 	if !ok {
 		return fmt.Errorf("canton chain %v not found", config.ChainSelector)
@@ -29,15 +36,16 @@ func (c GenerateEDSConfig) VerifyPreconditions(e cldf.Environment, config Canton
 	return nil
 }
 
-func (c GenerateEDSConfig) Apply(e cldf.Environment, config CantonCSDeps[edsConfig.ServerConfig]) (cldf.ChangesetOutput, error) {
+func (c GenerateEDSConfig) Apply(e cldf.Environment, config CantonCSDeps[GenerateEDSConfigConfig]) (cldf.ChangesetOutput, error) {
 	deps := eds.BuildConfigDeps{
 		Env: e,
 	}
 
 	out, err := cld_ops.ExecuteOperation(e.OperationsBundle, eds.BuildConfig, deps, eds.GenerateEDSConfigInput{
-		ChainSelector: config.ChainSelector,
-		Participant:   config.Participant,
-		ServerConfig:  config.Config,
+		ChainSelector:     config.ChainSelector,
+		Participant:       config.Participant,
+		ServerConfig:      config.Config.ServerConfig,
+		InsecureTransport: config.Config.InsecureTransport,
 	})
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to execute BuildConfig operation: %w", err)

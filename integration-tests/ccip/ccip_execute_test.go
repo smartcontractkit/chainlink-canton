@@ -57,6 +57,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
@@ -358,8 +359,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			},
 			Node: config.NodeConfig{
 				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: config.AuthConfig{
-					Type:   "static",
+				AuthConfig: commonconfig.AuthConfig{
+					Type:   commonconfig.AuthTypeInsecureStatic,
 					UserID: edsParticipant.UserID,
 					JWT:    edsToken.AccessToken,
 				},
