@@ -222,7 +222,6 @@ execution_interval = 15_000_000_000
   port = 8100
 [generic_services.8706591216959472610.input.eds_config.monitoring]
   enabled = true
-  type = "beholder"
 [generic_services.8706591216959472610.input.eds_config.monitoring.beholder]
   insecure_connection = true
   ca_cert_file = ''
