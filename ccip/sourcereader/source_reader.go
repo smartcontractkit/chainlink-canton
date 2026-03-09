@@ -22,6 +22,7 @@ import (
 const (
 	// labels for the CCIPMessageSent template.
 	ccipMessageSentCCIPOwnerLabel = "ccipOwner"
+	ccipMessageSentCCVOwnersLabel = "ccvOwners"
 	ccipMessageSentSenderLabel    = "sender"
 	ccipMessageSentObserversLabel = "observers"
 	ccipMessageSentEventLabel     = "event"
@@ -247,7 +248,7 @@ func processCreatedEvent(
 
 	for _, field := range created.GetCreateArguments().GetFields() {
 		switch field.GetLabel() {
-		case ccipMessageSentSenderLabel, ccipMessageSentObserversLabel:
+		case ccipMessageSentSenderLabel, ccipMessageSentObserversLabel, ccipMessageSentCCVOwnersLabel:
 			// known fields, ignore
 		case ccipMessageSentCCIPOwnerLabel:
 			ccipOwnerParty = field.GetValue().GetParty()

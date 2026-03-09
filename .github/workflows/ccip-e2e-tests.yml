@@ -118,7 +118,7 @@ jobs:
           retention-days: 1
 
       - name: Check test results
-        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton_source_reader.outcome == 'failure')
+        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure')
         run: |
           echo "CCIP E2E tests failed."
           exit 1

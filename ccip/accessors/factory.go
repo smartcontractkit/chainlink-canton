@@ -82,7 +82,8 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 // The returned Provider supplies TransportCredentials (TLS), PerRPCCredentials (Bearer token), and TokenSource.
 // When Auth.Type is empty or "static", it falls back to the top-level JWT field for backward compatibility.
 func newAuthProvider(ctx context.Context, info ccip.BlockchainInfo) (authentication.Provider, error) {
-	authType := info.Auth.Type
+	rawAuthType := info.Auth.Type
+	authType := rawAuthType
 	if authType == "" {
 		authType = ccip.AuthTypeStatic
 	}
@@ -95,6 +96,10 @@ func newAuthProvider(ctx context.Context, info ccip.BlockchainInfo) (authenticat
 		}
 		if jwt == "" {
 			return nil, fmt.Errorf("static auth requires a JWT token (set auth.jwt or top-level jwt)")
+		}
+		if rawAuthType == "" {
+			// Backward-compatible default for local Canton setups using plaintext gRPC endpoints.
+			return authentication.NewInsecureStaticProvider(jwt), nil
 		}
 
 		return authentication.NewStaticProvider(jwt), nil
