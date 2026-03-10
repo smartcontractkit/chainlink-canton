@@ -25,7 +25,7 @@ template DummyCommitteeVerifier
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
                 ccipOwner = ccipOwner
-                storageLocation = "ipfs://dummy"
+                storageLocations = ["ipfs://dummy"]
 
             crossChainVerifier_verifyMessageImpl self arg = do
                 case arg.verifierResults of

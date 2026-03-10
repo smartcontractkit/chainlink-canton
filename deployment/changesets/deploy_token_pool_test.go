@@ -126,7 +126,7 @@ func TestDeployTokenPool(t *testing.T) {
 		if !ok {
 			continue
 		}
-		// Unmarshaled form may wrap fields in "data"
+		// Unmarshalled form may wrap fields in "data"
 		m := configMap
 		if data, ok := configMap["data"].(map[string]any); ok {
 			m = data
@@ -148,7 +148,7 @@ func TestDeployTokenPool(t *testing.T) {
 		if tokenPoolMap == nil {
 			continue
 		}
-		// poolOwner may be under tokenPool.data when unmarshaled
+		// poolOwner may be under tokenPool.data when unmarshalled
 		tokenPoolData := tokenPoolMap
 		if data, ok := tokenPoolMap["data"].(map[string]any); ok {
 			tokenPoolData = data

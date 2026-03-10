@@ -327,21 +327,21 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 
 	// Get committees
 	for qualifier, committeeConfig := range topology.NOPTopology.Committees {
-		var storageLocation types.TEXT // TODO, multiple storage locations
-		if len(committeeConfig.StorageLocations) > 0 {
-			storageLocation = types.TEXT(committeeConfig.StorageLocations[0])
-		} else {
-			storageLocation = types.TEXT("dummy-location") // TODO contracts don't allow an empty location for now
+		storageLocations := make([]types.TEXT, len(committeeConfig.StorageLocations))
+		for i, location := range committeeConfig.StorageLocations {
+			storageLocations[i] = types.TEXT(location)
 		}
 		cv := sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
 			Template: ccvs.CommitteeVerifier{
-				Owner:               types.PARTY(participant.PartyID), // TODO: use different ccv owner?
-				CcipOwner:           types.PARTY(participant.PartyID),
-				VersionTag:          types.TEXT("49ff34ed"),
-				MessageSentObserver: types.PARTY(participant.PartyID),
-				StorageLocation:     storageLocation,
-				Deps:                ccvs.CommitteeVerifierDeps{}, // Set by sequence
+				Owner:                        types.PARTY(participant.PartyID), // TODO: use different ccv owner?
+				CcipOwner:                    types.PARTY(participant.PartyID),
+				VersionTag:                   types.TEXT("49ff34ed"),
+				MessageSentObserver:          types.PARTY(participant.PartyID),
+				StorageLocations:             storageLocations,
+				StorageLocationsAdmin:        types.PARTY(participant.PartyID),
+				PendingStorageLocationsAdmin: types.PARTY(participant.PartyID),
+				Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
 				// MUST be a real GENMAP, not a Go map.
 				RemoteChainFeeConfigs: remoteChainFeeConfigs,
 			},
