@@ -1,4 +1,7 @@
-module CCIP.FeeQuoter where
+module CCIP.FeeQuoter
+  ( module CCIP.FeeQuoter
+  , module CCIP.FeeQuoterTypes
+  ) where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
@@ -11,6 +14,9 @@ import CCIP.Common qualified as Common
 import qualified CCIP.Context
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.FeeQuoterCodec (decodeApplyFeeTokenUpdatesParams, decodeApplyDestChainConfigUpdatesParams)
+import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
 
 feeQuoterKey : Text
 feeQuoterKey = "fee-quoter"
@@ -40,6 +46,37 @@ template FeeQuoter
     where
         signatory owner
         observer priceUpdaters
+
+        interface instance MCMSReceiver for FeeQuoter where
+          view = MCMSReceiverView with
+            owner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText owner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId FeeQuoter)
+
+            case functionName of
+              "ApplyFeeTokenUpdates" -> do
+                case decodeApplyFeeTokenUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
+                  Some (feeTokensToRemove, feeTokensToAdd) -> do
+                    newCid <- exercise selfCid ApplyFeeTokenUpdates with
+                      feeTokensToRemove
+                      feeTokensToAdd
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "ApplyDestChainConfigUpdates" -> do
+                case decodeApplyDestChainConfigUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
+                  Some destChainConfigArgs -> do
+                    newCid <- exercise selfCid ApplyDestChainConfigUpdates with
+                      destChainConfigArgs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
         -- ================================================================
         -- │                          Prices                              │
@@ -147,8 +184,7 @@ template FeeQuoter
             with
                 feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId]
                 feeTokensToAdd : [FeeTokenArgs]
-                caller : Party
-            controller caller
+            controller owner
             do
                 let newFeeTokens = foldl (\acc ft -> Map.insert ft.instrumentId ft.premiumMultiplier acc) (foldl (\acc tk -> Map.delete tk acc) feeTokens feeTokensToRemove) feeTokensToAdd
                 create this with feeTokens = newFeeTokens
@@ -185,26 +221,7 @@ template FeeQuoter
 
 
 
-data DestChainConfigArgs = DestChainConfigArgs
-    with
-        destChainSelector : Numeric 0
-        destChainConfig : DestChainConfig
-    deriving (Eq, Show)
-
-data DestChainConfig = DestChainConfig
-    with
-        isEnabled : Bool -- ────────────────────╮ Whether this destination chain is enabled.
-        maxDataBytes : Int --                   │ Maximum data payload size in bytes.
-        maxPerMsgGasLimit : Int --              │ Maximum gas limit.
-        destGasOverhead : Int --                │ Gas charged on top of the gasLimit to cover destionation chain costs.
-        destGasPerPayloadByteBase : Int --      │ Default dest-chain gas charged for each byte of `data` payload.
-        chainFamilySelector : BytesHex --       │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
-        defaultTxGasLimit : Int --              │ Default gas limit for a tx.
-        networkFeeUSD : Decimal --              │ Flat network fee to charge for messages.
-        -- | The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
-        defaultTokenFeeUSD : Decimal --         │ Default token fee charged per token transfer.
-        defaultTokenDestGasOverhead : Int --  ──╯ Default gas charged to execute a token transfer on the destination chain.
-    deriving (Eq, Show)
+-- DestChainConfigArgs and DestChainConfig are imported from CCIP.FeeQuoterTypes
 
 data TokenTransferFeeConfig = TokenTransferFeeConfig
     with
@@ -239,8 +256,4 @@ data GasPriceUpdate = GasPriceUpdate
     deriving (Eq, Show)
 
 
-data FeeTokenArgs = FeeTokenArgs
-    with
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        premiumMultiplier : Decimal
-    deriving (Eq, Show)
+-- FeeTokenArgs is imported from CCIP.FeeQuoterTypes

@@ -969,7 +969,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								PremiumMultiplier: types.NUMERIC("1.0"),
 							},
 						},
-						Caller: types.PARTY(party),
 					}),
 				}},
 			}},

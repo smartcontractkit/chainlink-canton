@@ -5,7 +5,10 @@
 -- uses "transfer-preapproval" key). The pool stores a poolReceiveContext that gets
 -- merged into extraArgs for inbound transfers, enabling direct transfers without
 -- pending state when the pool has preapproval.
-module CCIP.LockReleaseTokenPool where
+module CCIP.LockReleaseTokenPool
+  ( module CCIP.LockReleaseTokenPool
+  , module CCIP.LockReleaseTokenPoolTypes
+  ) where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
@@ -15,6 +18,10 @@ import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
 import DA.Time (time, addRelTime, hours)
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.LockReleaseTokenPoolCodec (decodeUpdateChainPoolConfigsParams)
+import CCIP.LockReleaseTokenPoolTypes (ChainPoolConfig(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -45,15 +52,7 @@ data TransferTimeout
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
 
--- | Per-chain pool configuration combining CCV requirements and allowed remote pools.
--- Matches the EVM pattern where RemoteChainConfig holds both remote pools and CCV config:
--- https://github.com/smartcontractkit/chainlink-ccip/blob/afc2e9e58c953fbdeee724ac5fae021155ca6325/chains/evm/contracts/pools/AdvancedPoolHooks.sol#L235
-data ChainPoolConfig = ChainPoolConfig
-    with
-        inboundCCVs : [RawInstanceAddress]   -- Required CCVs for incoming transfers
-        outboundCCVs : [RawInstanceAddress]  -- Required CCVs for outgoing transfers
-        remotePools : [BytesHex]             -- Allowed remote pool addresses for this chain
-    deriving (Eq, Show)
+-- ChainPoolConfig is imported from CCIP.LockReleaseTokenPoolTypes
 
 -- | Per-chain fee config for outbound pool fee calculation.
 data PoolFeeConfig = PoolFeeConfig
@@ -109,6 +108,28 @@ template LockReleaseTokenPool
         transferTimeout : TransferTimeout
     where
         signatory poolOwner
+
+        interface instance MCMSReceiver for LockReleaseTokenPool where
+          view = MCMSReceiverView with
+            owner = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText poolOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
+
+            case functionName of
+              "UpdateChainPoolConfigs" -> do
+                case decodeUpdateChainPoolConfigsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UpdateChainPoolConfigs"
+                  Some newChainPoolConfigs -> do
+                    newCid <- exercise selfCid LockReleaseTokenPool_UpdateChainPoolConfigs with
+                      newChainPoolConfigs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with

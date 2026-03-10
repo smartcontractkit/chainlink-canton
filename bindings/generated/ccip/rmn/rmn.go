@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -23,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "0182784b1c77df1525d49a70b7a43a3466c46d19e243148a10625f0d716a71eb"
+	PackageID   = "b1e4eb8074213ef8b2725a224835626628430598e57b9509b13093ecbbd35077"
 	SDKVersion  = "3.4.10"
 )
 
@@ -572,48 +573,6 @@ func (t *RMNRemote) UnmarshalHex(data string) error {
 
 // Choice methods for RMNRemote
 
-// UncurseGlobal exercises the UncurseGlobal choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) UncurseGlobal(contractID string, args UncurseGlobal) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "UncurseGlobal",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UncurseGlobalWithPackageID exercises the UncurseGlobal choice using the provided package ID instead of package name
-func (t RMNRemote) UncurseGlobalWithPackageID(contractID string, packageID string, args UncurseGlobal) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "UncurseGlobal",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CurseGlobal exercises the CurseGlobal choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) CurseGlobal(contractID string, args CurseGlobal) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "CurseGlobal",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CurseGlobalWithPackageID exercises the CurseGlobal choice using the provided package ID instead of package name
-func (t RMNRemote) CurseGlobalWithPackageID(contractID string, packageID string, args CurseGlobal) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "CurseGlobal",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // IsCursedForChain exercises the IsCursedForChain choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) IsCursedForChain(contractID string, args IsCursedForChain) *model.ExerciseCommand {
@@ -631,27 +590,6 @@ func (t RMNRemote) IsCursedForChainWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "IsCursedForChain",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsCursed exercises the IsCursed choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) IsCursed(contractID string, args IsCursed) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "IsCursed",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// IsCursedWithPackageID exercises the IsCursed choice using the provided package ID instead of package name
-func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, args IsCursed) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "IsCursed",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -698,86 +636,44 @@ func (t RMNRemote) CurseChainWithPackageID(contractID string, packageID string, 
 	}
 }
 
-// AddCustomObservers exercises the AddCustomObservers choice on this RMNRemote contract
+// UncurseGlobal exercises the UncurseGlobal choice on this RMNRemote contract
 // This method uses the package name in the template ID
-func (t RMNRemote) AddCustomObservers(contractID string, args AddCustomObservers) *model.ExerciseCommand {
+func (t RMNRemote) UncurseGlobal(contractID string, args UncurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "AddCustomObservers",
+		Choice:     "UncurseGlobal",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// AddCustomObserversWithPackageID exercises the AddCustomObservers choice using the provided package ID instead of package name
-func (t RMNRemote) AddCustomObserversWithPackageID(contractID string, packageID string, args AddCustomObservers) *model.ExerciseCommand {
+// UncurseGlobalWithPackageID exercises the UncurseGlobal choice using the provided package ID instead of package name
+func (t RMNRemote) UncurseGlobalWithPackageID(contractID string, packageID string, args UncurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "AddCustomObservers",
+		Choice:     "UncurseGlobal",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// RemoveCustomObservers exercises the RemoveCustomObservers choice on this RMNRemote contract
+// CurseGlobal exercises the CurseGlobal choice on this RMNRemote contract
 // This method uses the package name in the template ID
-func (t RMNRemote) RemoveCustomObservers(contractID string, args RemoveCustomObservers) *model.ExerciseCommand {
+func (t RMNRemote) CurseGlobal(contractID string, args CurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "RemoveCustomObservers",
+		Choice:     "CurseGlobal",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// RemoveCustomObserversWithPackageID exercises the RemoveCustomObservers choice using the provided package ID instead of package name
-func (t RMNRemote) RemoveCustomObserversWithPackageID(contractID string, packageID string, args RemoveCustomObservers) *model.ExerciseCommand {
+// CurseGlobalWithPackageID exercises the CurseGlobal choice using the provided package ID instead of package name
+func (t RMNRemote) CurseGlobalWithPackageID(contractID string, packageID string, args CurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "RemoveCustomObservers",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FetchRawInstanceAddress exercises the FetchRawInstanceAddress choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) FetchRawInstanceAddress(contractID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "FetchRawInstanceAddress",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FetchRawInstanceAddressWithPackageID exercises the FetchRawInstanceAddress choice using the provided package ID instead of package name
-func (t RMNRemote) FetchRawInstanceAddressWithPackageID(contractID string, packageID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "FetchRawInstanceAddress",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetCursedSubjects exercises the GetCursedSubjects choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) GetCursedSubjects(contractID string, args GetCursedSubjects) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "GetCursedSubjects",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetCursedSubjectsWithPackageID exercises the GetCursedSubjects choice using the provided package ID instead of package name
-func (t RMNRemote) GetCursedSubjectsWithPackageID(contractID string, packageID string, args GetCursedSubjects) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "GetCursedSubjects",
+		Choice:     "CurseGlobal",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -824,44 +720,23 @@ func (t RMNRemote) UncurseWithPackageID(contractID string, packageID string, arg
 	}
 }
 
-// CurseMultiple exercises the CurseMultiple choice on this RMNRemote contract
+// IsCursed exercises the IsCursed choice on this RMNRemote contract
 // This method uses the package name in the template ID
-func (t RMNRemote) CurseMultiple(contractID string, args CurseMultiple) *model.ExerciseCommand {
+func (t RMNRemote) IsCursed(contractID string, args IsCursed) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "CurseMultiple",
+		Choice:     "IsCursed",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CurseMultipleWithPackageID exercises the CurseMultiple choice using the provided package ID instead of package name
-func (t RMNRemote) CurseMultipleWithPackageID(contractID string, packageID string, args CurseMultiple) *model.ExerciseCommand {
+// IsCursedWithPackageID exercises the IsCursed choice using the provided package ID instead of package name
+func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, args IsCursed) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "CurseMultiple",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UncurseMultiple exercises the UncurseMultiple choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) UncurseMultiple(contractID string, args UncurseMultiple) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "UncurseMultiple",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UncurseMultipleWithPackageID exercises the UncurseMultiple choice using the provided package ID instead of package name
-func (t RMNRemote) UncurseMultipleWithPackageID(contractID string, packageID string, args UncurseMultiple) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "UncurseMultiple",
+		Choice:     "IsCursed",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -887,6 +762,132 @@ func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *mo
 	}
 }
 
+// FetchRawInstanceAddress exercises the FetchRawInstanceAddress choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) FetchRawInstanceAddress(contractID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "FetchRawInstanceAddress",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FetchRawInstanceAddressWithPackageID exercises the FetchRawInstanceAddress choice using the provided package ID instead of package name
+func (t RMNRemote) FetchRawInstanceAddressWithPackageID(contractID string, packageID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "FetchRawInstanceAddress",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetCursedSubjects exercises the GetCursedSubjects choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) GetCursedSubjects(contractID string, args GetCursedSubjects) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "GetCursedSubjects",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetCursedSubjectsWithPackageID exercises the GetCursedSubjects choice using the provided package ID instead of package name
+func (t RMNRemote) GetCursedSubjectsWithPackageID(contractID string, packageID string, args GetCursedSubjects) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "GetCursedSubjects",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// UncurseMultiple exercises the UncurseMultiple choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) UncurseMultiple(contractID string, args UncurseMultiple) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "UncurseMultiple",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// UncurseMultipleWithPackageID exercises the UncurseMultiple choice using the provided package ID instead of package name
+func (t RMNRemote) UncurseMultipleWithPackageID(contractID string, packageID string, args UncurseMultiple) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "UncurseMultiple",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddCustomObservers exercises the AddCustomObservers choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) AddCustomObservers(contractID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddCustomObserversWithPackageID exercises the AddCustomObservers choice using the provided package ID instead of package name
+func (t RMNRemote) AddCustomObserversWithPackageID(contractID string, packageID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObservers exercises the RemoveCustomObservers choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) RemoveCustomObservers(contractID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObserversWithPackageID exercises the RemoveCustomObservers choice using the provided package ID instead of package name
+func (t RMNRemote) RemoveCustomObserversWithPackageID(contractID string, packageID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CurseMultiple exercises the CurseMultiple choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) CurseMultiple(contractID string, args CurseMultiple) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "CurseMultiple",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CurseMultipleWithPackageID exercises the CurseMultiple choice using the provided package ID instead of package name
+func (t RMNRemote) CurseMultipleWithPackageID(contractID string, packageID string, args CurseMultiple) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "CurseMultiple",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // UpdateCCIPOwner exercises the UpdateCCIPOwner choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) UpdateCCIPOwner(contractID string, args UpdateCCIPOwner) *model.ExerciseCommand {
@@ -907,6 +908,52 @@ func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID str
 		Arguments:  argsToMap(args),
 	}
 }
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this RMNRemote contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t RMNRemote) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t RMNRemote) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this RMNRemote contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for RMNRemote
+
+var _ mcms.IMCMSReceiver = (*RMNRemote)(nil)
 
 // RemoveCustomObservers is a Record type
 type RemoveCustomObservers struct {
