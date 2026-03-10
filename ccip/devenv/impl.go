@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -625,7 +627,136 @@ func (c *Chain) FundNodes(ctx context.Context, cls []*simple_node_set.Input, bc 
 
 // Curse implements cciptestinterfaces.CCIP17.
 func (c *Chain) Curse(ctx context.Context, subjects [][16]byte) error {
-	return nil // TODO: implement
+	participant := c.chain.Participants[0]
+	party := participant.PartyID
+
+	// fetch the rmn remote address on canton
+	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	if err != nil {
+		return fmt.Errorf("get rmn remote address: %w", err)
+	}
+
+	c.logger.Info().
+		Uint64("chainSelector", c.chainDetails.ChainSelector).
+		Int("numSubjects", len(subjects)).
+		Msg("Cursing subjects on chain")
+	for _, subject := range subjects {
+		// TODO: can we just use the Exercise operation in deployment/utils/operations/contract/exercise.go?
+		// it basically does all the boilerplate we're doing here.
+		// NOTE: we need to re-fetch the contract ID on every iteration because the choice will consume and archive
+		// the existing contract.
+		rmnRemoteContractID, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, rmn.RMNRemote{}.GetTemplateID(), contracts.HexToInstanceAddress(rmnRemoteRef.Address))
+		if err != nil {
+			return fmt.Errorf("find active contract ID by instance address: %w", err)
+		}
+		exerciseCmd := rmn.RMNRemote{}.Curse(rmnRemoteContractID, rmn.Curse{
+			Subject: types.TEXT(hex.EncodeToString(subject[:])),
+		})
+		packageID, moduleName, entityName, err := contracts.ParseTemplateIDFromString(exerciseCmd.TemplateID)
+		if err != nil {
+			return fmt.Errorf("parse template ID: %w", err)
+		}
+		// execute the exercise command
+		_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+			Commands: &apiv2.Commands{
+				CommandId: uuid.New().String(),
+				ActAs:     []string{party},
+				Commands: []*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  packageID,
+							ModuleName: moduleName,
+							EntityName: entityName,
+						},
+						ContractId:     rmnRemoteContractID,
+						Choice:         exerciseCmd.Choice,
+						ChoiceArgument: ledger.MapToValue(exerciseCmd.Arguments),
+					}}},
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("submit and wait for transaction: %w", err)
+		}
+
+		c.logger.Info().
+			Uint64("chainSelector", c.chainDetails.ChainSelector).
+			Str("templateID", exerciseCmd.TemplateID).
+			Str("contractID", rmnRemoteContractID).
+			Str("choice", exerciseCmd.Choice).
+			Msg("Cursed chain")
+	}
+
+	return nil
+}
+
+// Uncurse implements cciptestinterfaces.CCIP17.
+func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
+	participant := c.chain.Participants[0]
+	party := participant.PartyID
+
+	// fetch the rmn remote address on canton
+	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	if err != nil {
+		return fmt.Errorf("get rmn remote address: %w", err)
+	}
+
+	c.logger.Info().
+		Uint64("chainSelector", c.chainDetails.ChainSelector).
+		Int("numSubjects", len(subjects)).
+		Msg("Uncursing subjects on chain")
+	for _, subject := range subjects {
+		// TODO: can we just use the Exercise operation in deployment/utils/operations/contract/exercise.go?
+		// it basically does all the boilerplate we're doing here.
+		// NOTE: we need to re-fetch the contract ID on every iteration because the choice will consume and archive
+		// the existing contract.
+		rmnRemoteContractID, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, party, rmn.RMNRemote{}.GetTemplateID(), contracts.HexToInstanceAddress(rmnRemoteRef.Address))
+		if err != nil {
+			return fmt.Errorf("find active contract ID by instance address: %w", err)
+		}
+		exerciseCmd := rmn.RMNRemote{}.Uncurse(rmnRemoteContractID, rmn.Uncurse{
+			Subject: types.TEXT(hex.EncodeToString(subject[:])),
+		})
+		packageID, moduleName, entityName, err := contracts.ParseTemplateIDFromString(exerciseCmd.TemplateID)
+		if err != nil {
+			return fmt.Errorf("parse template ID: %w", err)
+		}
+		// execute the exercise command
+		_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+			Commands: &apiv2.Commands{
+				CommandId: uuid.New().String(),
+				ActAs:     []string{party},
+				Commands: []*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{
+							PackageId:  packageID,
+							ModuleName: moduleName,
+							EntityName: entityName,
+						},
+						ContractId:     rmnRemoteContractID,
+						Choice:         exerciseCmd.Choice,
+						ChoiceArgument: ledger.MapToValue(exerciseCmd.Arguments),
+					}}},
+				},
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("submit and wait for transaction: %w", err)
+		}
+
+		c.logger.Info().
+			Uint64("chainSelector", c.chainDetails.ChainSelector).
+			Str("templateID", exerciseCmd.TemplateID).
+			Str("contractID", rmnRemoteContractID).
+			Str("choice", exerciseCmd.Choice).
+			Msg("Uncursed chain")
+	}
+
+	return nil
+}
+
+func subjectToChainSelector(subject [16]byte) uint64 {
+	return binary.BigEndian.Uint64(subject[8:])
 }
 
 // ExposeMetrics implements cciptestinterfaces.CCIP17.
@@ -1273,11 +1404,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 // SendMessageWithNonce implements cciptestinterfaces.CCIP17.
 func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
 	return c.SendMessage(ctx, dest, fields, opts)
-}
-
-// Uncurse implements cciptestinterfaces.CCIP17.
-func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
-	return nil // TODO: implement
 }
 
 // WaitOneExecEventBySeqNo implements cciptestinterfaces.CCIP17.

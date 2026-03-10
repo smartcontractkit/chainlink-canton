@@ -21,38 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 )
-
-// TODO: move this helper into ccv.Lib.
-func getChain(t *testing.T, chainType string, cfg *ccv.Cfg, harness tcapi.TestHarness) cciptestinterfaces.CCIP17 {
-	var chain *blockchain.Input
-	for _, bc := range cfg.Blockchains {
-		if bc.Type == chainType {
-			chain = bc
-			break
-		}
-	}
-	require.NotNil(t, chain, "need at least one chain for this test")
-
-	var family string
-	switch chainType {
-	case blockchain.TypeCanton:
-		family = chainsel.FamilyCanton
-	case blockchain.TypeAnvil:
-		family = chainsel.FamilyEVM
-	default:
-		t.Fatalf("unsupported chain type %q", chainType)
-	}
-
-	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chain.ChainID, family)
-	require.NoError(t, err)
-
-	chainMap, err := harness.Lib.ChainsMap(t.Context())
-	require.NoError(t, err)
-
-	return chainMap[chainDetails.ChainSelector]
-}
 
 //nolint:paralleltest // we won't run this in parallel.
 func TestCanton2EVM_Basic(t *testing.T) {
@@ -66,8 +37,9 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
+	ctx := ccv.Plog.WithContext(t.Context())
 	harness, err := tcapi.NewTestHarness(
-		t.Context(),
+		ctx,
 		configPath,
 		in,
 		chainsel.FamilyEVM,
@@ -75,8 +47,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	evmChain := getChain(t, blockchain.TypeAnvil, in, harness)
-	cantonChain := getChain(t, blockchain.TypeCanton, in, harness)
+	evmChain := devenvtests.GetChain(t, blockchain.TypeAnvil, in, harness)
+	cantonChain := devenvtests.GetChain(t, blockchain.TypeCanton, in, harness)
 
 	for _, client := range harness.AggregatorClients {
 		t.Cleanup(func() {

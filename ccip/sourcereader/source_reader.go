@@ -384,6 +384,7 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 					},
 				},
 			},
+			Verbose: true,
 		},
 	})
 	if err != nil {
