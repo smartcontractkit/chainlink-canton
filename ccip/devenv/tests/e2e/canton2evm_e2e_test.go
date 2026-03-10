@@ -136,8 +136,15 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
 		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
 		require.NoError(t, err)
-
-		t.Logf("CCIPMessageSent event: %+v", sentEvent)
+		require.NotNil(t, sentEvent.Message)
+		require.Equal(t, seqNo, uint64(sentEvent.Message.SequenceNumber), "sent event sequence number should match send result")
+		require.Nil(t, sentEvent.Message.TokenTransfer, "basic message should not include token transfer")
+		t.Logf(
+			"CCIPMessageSent observed (basic): messageID=%x seqNo=%d tokenTransferPresent=%t",
+			sentEvent.MessageID,
+			sentEvent.Message.SequenceNumber,
+			sentEvent.Message.TokenTransfer != nil,
+		)
 
 		chainMap, err := harness.Lib.ChainsMap(subtestCtx)
 		require.NoError(t, err)
@@ -234,9 +241,35 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer, "sent event should include token transfer")
+		require.Equal(t, seqNo, uint64(sentEvent.Message.SequenceNumber), "token transfer sent event sequence number should match send result")
+		t.Logf(
+			"CCIPMessageSent observed (token transfer): messageID=%x seqNo=%d tokenTransferPresent=%t",
+			sentEvent.MessageID,
+			sentEvent.Message.SequenceNumber,
+			sentEvent.Message.TokenTransfer != nil,
+		)
+		t.Logf("Waiting for execution event on EVM for token transfer: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
+		executionObserved := false
+		ev, execErr := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, 90*time.Second)
+		if execErr != nil {
+			// This execution lane is known to be flaky in local devenv; keep this as a best-effort
+			// execution signal without failing the subtest when the event is not observed in time.
+			t.Logf("Execution event not observed within timeout for token transfer: seqNo=%d err=%v", seqNo, execErr)
+		} else {
+			assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+			executionObserved = true
+			t.Logf(
+				"Execution event observed (token transfer): sourceSelector=%d seqNo=%d state=%s",
+				ev.SourceChainSelector,
+				ev.MessageNumber,
+				ev.State,
+			)
+		}
 
-		// Local devenv execution/aggregation for this token-transfer lane is currently flaky;
-		// validate stable sender-side and sent-event token-transfer surfaces here.
-		t.Logf("Token transfer sent successfully with sequence %d", seqNo)
+		if executionObserved {
+			t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
+		} else {
+			t.Logf("Token transfer sent successfully; execution not observed within timeout (seq=%d)", seqNo)
+		}
 	})
 }
