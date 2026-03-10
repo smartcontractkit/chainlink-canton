@@ -59,12 +59,7 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 	sourceReader, err := sourcereader.NewSourceReader(
 		logger.Named(f.lggr, fmt.Sprintf("CantonSourceReader.%d", chainSelector)),
 		blockchainInfo.GRPCLedgerAPIURL,
-		sourcereader.ReaderConfig{
-			NodeOperatorParty:         readerConfig.NodeOperatorParty,
-			CCIPOwnerParty:            readerConfig.CCIPOwnerParty,
-			CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
-			Authority:                 readerConfig.Authority,
-		},
+		readerConfig,
 		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
 		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
 	)

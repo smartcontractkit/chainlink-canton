@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"slices"
+	"strings"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
@@ -27,12 +29,17 @@ type ReaderConfig struct {
 	// NodeOperatorParty is the observer party that node operators will use to observe CCIPMessageSent events.
 	// This is used to filter out events that are not observed by the node operator.
 	NodeOperatorParty string `toml:"node_operator_party"`
+
 	// CCIPOwnerParty is the party that we expect to be present in the CCIPMessageSent.ccipOwner field.
 	// This proves that the ccipOwner is a signatory on the CCIPMessageSent contract(event).
 	CCIPOwnerParty string `toml:"ccip_owner_party"`
+
 	// CCIPMessageSentTemplateID is the template ID of the CCIPMessageSent contract.
-	// Formatted as packageId:moduleName:entityName
 	CCIPMessageSentTemplateID contracts.TemplateID `toml:"ccip_message_sent_template_id"`
+
+	// RMNRemoteTemplateID is the template ID of the RMNRemote contract.
+	RMNRemoteTemplateID contracts.TemplateID `toml:"rmn_remote_template_id"`
+
 	// Authority is the authority to use for the gRPC connection.
 	// Connecting to the gRPC API via nginx usually requires this to be set.
 	Authority string `toml:"authority"`
@@ -354,8 +361,73 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 
 // GetRMNCursedSubjects implements chainaccess.SourceReader.
 func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Bytes16, error) {
-	// TODO: implement this.
-	return nil, nil
+	latest, _, err := c.LatestAndFinalizedBlock(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+	if latest == nil {
+		return nil, fmt.Errorf("latest block is nil")
+	}
+
+	updates, err := c.stateServiceClient.GetActiveContracts(ctx, &ledgerv2.GetActiveContractsRequest{
+		ActiveAtOffset: int64(latest.Number), //nolint:gosec // offset is always non-negative
+		EventFormat: &ledgerv2.EventFormat{
+			FiltersByParty: map[string]*ledgerv2.Filters{
+				c.config.NodeOperatorParty: {
+					Cumulative: []*ledgerv2.CumulativeFilter{
+						{
+							IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{TemplateFilter: &ledgerv2.TemplateFilter{
+								TemplateId:              c.config.RMNRemoteTemplateID.ToLedgerIdentifier(),
+								IncludeCreatedEventBlob: true,
+							}},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active contracts: %w", err)
+	}
+	defer updates.CloseSend()
+
+	for {
+		activeContract, err := updates.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, fmt.Errorf("failed to receive active contract: %w", err)
+		}
+		if c, ok := activeContract.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract); ok {
+			// TODO: should we check that the instance address is the one we expect?
+			// Get the subjects from the created event blob.
+			createdEvent := c.ActiveContract.GetCreatedEvent()
+			if createdEvent == nil {
+				continue
+			}
+			rmnRemote, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](createdEvent)
+			if err != nil {
+				return nil, fmt.Errorf("failed to unmarshal RMNRemote created event: %w", err)
+			}
+			var cursedSubjects []protocol.Bytes16
+			for _, subject := range rmnRemote.CursedSubjects {
+				subjectStr := string(subject)
+				if !strings.HasPrefix(subjectStr, "0x") {
+					subjectStr = "0x" + subjectStr
+				}
+				subjectBytes16, err := protocol.NewBytes16FromString(subjectStr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to decode subject from BytesHex: %w, input: %s", err, subject)
+				}
+				cursedSubjects = append(cursedSubjects, subjectBytes16)
+			}
+			// there shouldn't be more than one active RMNRemote at a given offset, so we can return after the first one.
+			return cursedSubjects, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no active RMNRemote found at offset %d, is it deployed?", latest.Number)
 }
 
 // LatestAndFinalizedBlock returns the latest offset of the canton validator we are connected to.

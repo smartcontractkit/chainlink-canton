@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 )
@@ -141,14 +142,239 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 	})
 }
 
+func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
+	t.Parallel()
+	const nopParty = "node-operator-party"
+	ctx := context.Background()
+
+	rmnRemoteTemplateID := contracts.TemplateID{
+		PackageID:  rmn.PackageName,
+		ModuleName: "CCIP.RMNRemote",
+		EntityName: "RMNRemote",
+	}
+
+	t.Run("returns cursed subjects from first active RMNRemote", func(t *testing.T) {
+		t.Parallel()
+		// Two subjects: with and without 0x prefix (code adds 0x if missing).
+		subject1Hex := "0102030405060708090a0b0c0d0e0f10"
+		subject2Hex := "0x1112131415161718191a1b1c1d1e1f20"
+
+		createdEvent := &ledgerv2.CreatedEvent{
+			TemplateId: rmnRemoteTemplateID.ToLedgerIdentifier(),
+			CreateArguments: &ledgerv2.Record{
+				Fields: []*ledgerv2.RecordField{
+					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "rmn-1"}}},
+					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "owner"}}},
+					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "ccip-owner"}}},
+					{Label: "customObservers", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
+					{Label: "cursedSubjects", Value: &ledgerv2.Value{
+						Sum: &ledgerv2.Value_List{
+							List: &ledgerv2.List{Elements: []*ledgerv2.Value{
+								{Sum: &ledgerv2.Value_Text{Text: subject1Hex}},
+								{Sum: &ledgerv2.Value_Text{Text: subject2Hex}},
+							}},
+						},
+					}},
+				},
+			},
+		}
+
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.MatchedBy(func(req *ledgerv2.GetActiveContractsRequest) bool {
+			return req.ActiveAtOffset == 5 &&
+				req.EventFormat != nil &&
+				req.EventFormat.FiltersByParty[nopParty] != nil
+		}), mock.Anything).
+			Return(&fakeActiveContractsStream{
+				ctx: ctx,
+				responses: []*ledgerv2.GetActiveContractsResponse{
+					{
+						ContractEntry: &ledgerv2.GetActiveContractsResponse_ActiveContract{
+							ActiveContract: &ledgerv2.ActiveContract{
+								CreatedEvent: createdEvent,
+							},
+						},
+					},
+				},
+			}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config: ReaderConfig{
+				NodeOperatorParty:   nopParty,
+				RMNRemoteTemplateID: rmnRemoteTemplateID,
+			},
+		}
+
+		subjects, err := reader.GetRMNCursedSubjects(ctx)
+		require.NoError(t, err)
+		require.Len(t, subjects, 2)
+
+		expected1, err := protocol.NewBytes16FromString("0x" + subject1Hex)
+		require.NoError(t, err)
+		expected2, err := protocol.NewBytes16FromString(subject2Hex)
+		require.NoError(t, err)
+		require.Equal(t, expected1, subjects[0])
+		require.Equal(t, expected2, subjects[1])
+	})
+
+	t.Run("returns empty list when RMNRemote has no cursed subjects", func(t *testing.T) {
+		t.Parallel()
+		createdEvent := &ledgerv2.CreatedEvent{
+			TemplateId: rmnRemoteTemplateID.ToLedgerIdentifier(),
+			CreateArguments: &ledgerv2.Record{
+				Fields: []*ledgerv2.RecordField{
+					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "rmn-1"}}},
+					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "owner"}}},
+					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "ccip-owner"}}},
+					{Label: "customObservers", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
+					{Label: "cursedSubjects", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
+				},
+			},
+		}
+
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeActiveContractsStream{ctx: ctx, responses: []*ledgerv2.GetActiveContractsResponse{
+				{ContractEntry: &ledgerv2.GetActiveContractsResponse_ActiveContract{
+					ActiveContract: &ledgerv2.ActiveContract{CreatedEvent: createdEvent},
+				}},
+			}}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+		}
+
+		subjects, err := reader.GetRMNCursedSubjects(ctx)
+		require.NoError(t, err)
+		require.Empty(t, subjects)
+	})
+
+	t.Run("returns error when no active RMNRemote found", func(t *testing.T) {
+		t.Parallel()
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeActiveContractsStream{ctx: ctx}, nil) // no responses, EOF immediately
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+		}
+
+		_, err := reader.GetRMNCursedSubjects(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "no active RMNRemote found")
+	})
+
+	t.Run("surfaces LatestAndFinalizedBlock error", func(t *testing.T) {
+		t.Parallel()
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return((*ledgerv2.GetLedgerEndResponse)(nil), errors.New("ledger end failed"))
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config:             ReaderConfig{RMNRemoteTemplateID: rmnRemoteTemplateID},
+		}
+
+		_, err := reader.GetRMNCursedSubjects(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to get latest block")
+	})
+
+	t.Run("surfaces GetActiveContracts error", func(t *testing.T) {
+		t.Parallel()
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
+			Return((grpc.ServerStreamingClient[ledgerv2.GetActiveContractsResponse])(nil), errors.New("get active contracts failed"))
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+		}
+
+		_, err := reader.GetRMNCursedSubjects(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to get active contracts")
+	})
+
+	t.Run("surfaces Recv error", func(t *testing.T) {
+		t.Parallel()
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeActiveContractsStream{ctx: ctx, err: errors.New("recv failed")}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+		}
+
+		_, err := reader.GetRMNCursedSubjects(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to receive active contract")
+	})
+
+	t.Run("returns error when subject is not valid hex", func(t *testing.T) {
+		t.Parallel()
+		createdEvent := &ledgerv2.CreatedEvent{
+			TemplateId: rmnRemoteTemplateID.ToLedgerIdentifier(),
+			CreateArguments: &ledgerv2.Record{
+				Fields: []*ledgerv2.RecordField{
+					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "rmn-1"}}},
+					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "owner"}}},
+					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "ccip-owner"}}},
+					{Label: "customObservers", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
+					{Label: "cursedSubjects", Value: &ledgerv2.Value{
+						Sum: &ledgerv2.Value_List{
+							List: &ledgerv2.List{Elements: []*ledgerv2.Value{
+								{Sum: &ledgerv2.Value_Text{Text: "not-valid-hex!!"}},
+							}},
+						},
+					}},
+				},
+			},
+		}
+
+		stateClient := mocks.NewMockStateServiceClient(t)
+		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
+			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
+		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeActiveContractsStream{ctx: ctx, responses: []*ledgerv2.GetActiveContractsResponse{
+				{ContractEntry: &ledgerv2.GetActiveContractsResponse_ActiveContract{
+					ActiveContract: &ledgerv2.ActiveContract{CreatedEvent: createdEvent},
+				}},
+			}}, nil)
+
+		reader := &sourceReader{
+			stateServiceClient: stateClient,
+			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+		}
+
+		_, err := reader.GetRMNCursedSubjects(ctx)
+		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to decode subject")
+	})
+}
+
 func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 	t.Parallel()
 	const ccipOwner = "owner-party"
 	const nopParty = "node-operator-party"
 	var (
 		templateID = contracts.TemplateID{
-			PackageID:  "pkg",
-			ModuleName: "CCIP",
+			PackageID:  common.PackageName,
+			ModuleName: "CCIP.Events",
 			EntityName: "CCIPMessageSent",
 		}
 	)
@@ -952,3 +1178,52 @@ func (s *fakeUpdateStream) RecvMsg(any) error {
 }
 
 var _ grpc.ServerStreamingClient[ledgerv2.GetUpdatesResponse] = (*fakeUpdateStream)(nil)
+
+// fakeActiveContractsStream implements grpc.ServerStreamingClient[ledgerv2.GetActiveContractsResponse] for tests.
+type fakeActiveContractsStream struct {
+	ctx       context.Context //nolint:containedctx
+	responses []*ledgerv2.GetActiveContractsResponse
+	err       error
+	idx       int
+}
+
+func (s *fakeActiveContractsStream) Recv() (*ledgerv2.GetActiveContractsResponse, error) {
+	if s.idx < len(s.responses) {
+		resp := s.responses[s.idx]
+		s.idx++
+		return resp, nil
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	return nil, io.EOF
+}
+
+func (s *fakeActiveContractsStream) Header() (metadata.MD, error) {
+	return metadata.MD{}, nil
+}
+
+func (s *fakeActiveContractsStream) Trailer() metadata.MD {
+	return metadata.MD{}
+}
+
+func (s *fakeActiveContractsStream) CloseSend() error {
+	return nil
+}
+
+func (s *fakeActiveContractsStream) Context() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return context.Background()
+}
+
+func (s *fakeActiveContractsStream) SendMsg(any) error {
+	return nil
+}
+
+func (s *fakeActiveContractsStream) RecvMsg(any) error {
+	return nil
+}
+
+var _ grpc.ServerStreamingClient[ledgerv2.GetActiveContractsResponse] = (*fakeActiveContractsStream)(nil)
