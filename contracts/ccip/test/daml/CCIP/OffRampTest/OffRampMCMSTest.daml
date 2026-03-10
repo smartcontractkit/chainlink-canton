@@ -1,0 +1,226 @@
+-- | MCMS entrypoint tests for OffRamp
+-- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+module CCIP.OffRampTest.OffRampMCMSTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import CCIP.OffRamp
+import CCIP.OffRampCodec
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - SET DEPS
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for SetDeps function
+testOffRampMCMSEntrypoint_SetDeps : Script ()
+testOffRampMCMSEntrypoint_SetDeps = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "offramp-test"
+      initialDeps = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc-old@owner"
+        rmnRemote = RawInstanceAddress "rmn-old@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar-old@owner"
+
+  -- Create OffRamp with initial deps
+  offRampCid <- submit ccipOwner do
+    createCmd OffRamp with
+      instanceId
+      ccipOwner
+      deps = initialDeps
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
+
+  -- Create new deps to set
+  let newDeps = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc-new@owner"
+        rmnRemote = RawInstanceAddress "rmn-new@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar-new@owner"
+
+      encoded = encodeSetDepsParams newDeps
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
+
+  -- Verify deps were updated
+  contracts <- query @OffRamp ccipOwner
+  case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts of
+    [(_, offRamp)] -> do
+      offRamp.deps.globalConfig === newDeps.globalConfig
+      offRamp.deps.rmnRemote === newDeps.rmnRemote
+      offRamp.deps.tokenAdminRegistry === newDeps.tokenAdminRegistry
+    _ -> abort "Expected exactly one OffRamp contract"
+
+  pure ()
+
+-- | Test replacing existing deps
+testOffRampMCMSEntrypoint_SetDeps_Replace : Script ()
+testOffRampMCMSEntrypoint_SetDeps_Replace = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "offramp-replace-test"
+      initialDeps = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc1@owner"
+        rmnRemote = RawInstanceAddress "rmn1@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar1@owner"
+
+  -- Create OffRamp
+  offRampCid <- submit ccipOwner do
+    createCmd OffRamp with
+      instanceId
+      ccipOwner
+      deps = initialDeps
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
+
+  -- First update
+  let deps2 = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc2@owner"
+        rmnRemote = RawInstanceAddress "rmn2@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar2@owner"
+      encoded1 = encodeSetDepsParams deps2
+
+  newContractIds1 <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = encoded1
+      contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
+
+  -- Get updated contract ID from map
+  contracts1 <- query @OffRamp ccipOwner
+  case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts1 of
+    [(newCid, offRamp1)] -> do
+      offRamp1.deps.globalConfig === deps2.globalConfig
+
+      -- Second update using new CID
+      let targetAsMcmsReceiver2 = toInterfaceContractId @MCMSReceiver newCid
+      let deps3 = OffRampDeps with
+            globalConfig = RawInstanceAddress "gc3@owner"
+            rmnRemote = RawInstanceAddress "rmn3@owner"
+            tokenAdminRegistry = RawInstanceAddress "tar3@owner"
+          encoded2 = encodeSetDepsParams deps3
+
+      newContractIds2 <- submit ccipOwner do
+        exerciseCmd targetAsMcmsReceiver2 MCMSReceiver_Entrypoint with
+          functionName = "SetDeps"
+          operationData = encoded2
+          contractIds = Map.fromList [(instAddr, toAnyContractId newCid)]
+
+      -- Verify final state
+      contracts2 <- query @OffRamp ccipOwner
+      case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts2 of
+        [(_, offRamp2)] -> do
+          offRamp2.deps.globalConfig === deps3.globalConfig
+          offRamp2.deps.rmnRemote === deps3.rmnRemote
+        _ -> abort "Expected exactly one OffRamp contract after second update"
+
+    _ -> abort "Expected exactly one OffRamp contract after first update"
+
+  pure ()
+
+-- ===========================================================================
+-- ERROR CASE TESTS
+-- ===========================================================================
+
+-- | Test that unknown function name returns E_UNKNOWN_FUNCTION
+testOffRampMCMSEntrypoint_UnknownFunction : Script ()
+testOffRampMCMSEntrypoint_UnknownFunction = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "offramp-error-test"
+      deps = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+
+  offRampCid <- submit ccipOwner do
+    createCmd OffRamp with
+      instanceId
+      ccipOwner
+      deps
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
+
+  -- Call with unknown function name - should fail
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
+
+  pure ()
+
+-- | Test that invalid params returns E_INVALID_PARAMS
+testOffRampMCMSEntrypoint_InvalidParams : Script ()
+testOffRampMCMSEntrypoint_InvalidParams = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "offramp-invalid-test"
+      deps = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+
+  offRampCid <- submit ccipOwner do
+    createCmd OffRamp with
+      instanceId
+      ccipOwner
+      deps
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
+
+  -- Call with invalid operationData - should fail
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = "00"  -- Too short to decode
+      contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
+
+  pure ()
+
+-- | Test that missing self CID returns E_SELF_CID_NOT_IN_MAP
+testOffRampMCMSEntrypoint_MissingSelfCid : Script ()
+testOffRampMCMSEntrypoint_MissingSelfCid = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "offramp-missing-cid-test"
+      deps = OffRampDeps with
+        globalConfig = RawInstanceAddress "gc@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+
+  offRampCid <- submit ccipOwner do
+    createCmd OffRamp with
+      instanceId
+      ccipOwner
+      deps
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
+
+  -- Encode valid params
+  let encoded = encodeSetDepsParams deps
+
+  -- Call with empty contractIds map - should fail
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = encoded
+      contractIds = Map.empty  -- Missing self CID
+
+  pure ()
+
+-- Helper to convert ContractId to AnyContractId for the map
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId

@@ -1,0 +1,11 @@
+-- | Types for OffRamp (separated for codec compatibility)
+module CCIP.OffRampTypes where
+
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+
+data OffRampDeps = OffRampDeps
+    with
+        globalConfig : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress
+    deriving (Eq, Show)

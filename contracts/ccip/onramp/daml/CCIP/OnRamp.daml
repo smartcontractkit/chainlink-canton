@@ -1,9 +1,13 @@
 -- | OnRamp for CCIP message sending, called by PerPartyRouter.
-module CCIP.OnRamp where
+module CCIP.OnRamp
+  ( module CCIP.OnRamp
+  , module CCIP.OnRampTypes
+  ) where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
+import DA.Map qualified as Map
 import DA.Optional (fromOptional, isSome)
 
 import qualified CCIP.Events
@@ -16,6 +20,9 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
+import CCIP.OnRampCodec (decodeSetDepsParams)
+import CCIP.OnRampTypes (OnRampDeps(..))
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -28,15 +35,6 @@ lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
 rawInstanceAddress : OnRamp -> CCIP.RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress onRamp = CCIP.RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner
 
-data OnRampDeps = OnRampDeps
-    with
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
-        ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-    deriving (Eq, Show)
-
 template OnRamp
     with
         instanceId : Text
@@ -44,6 +42,34 @@ template OnRamp
         deps : OnRampDeps
     where
         signatory ccipOwner
+
+        interface instance MCMSReceiver for OnRamp where
+          view = MCMSReceiverView with
+            owner = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId OnRamp)
+
+            case functionName of
+              "SetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid SetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        choice SetDeps : ContractId OnRamp
+            with
+                newDeps : OnRampDeps
+            controller ccipOwner
+            do
+                create this with deps = newDeps
 
         -- | Get required CCV raw instance addresses for outbound message.
         -- TODO: this should not concat default and lane mandated CCVs and return

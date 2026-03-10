@@ -1,5 +1,8 @@
 -- | Per-party router for CCIP message sending and receiving.
-module CCIP.PerPartyRouter where
+module CCIP.PerPartyRouter
+  ( module CCIP.PerPartyRouter
+  , module CCIP.PerPartyRouterTypes
+  ) where
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256)
@@ -22,20 +25,13 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
 import qualified CCIP.Context
+import CCIP.PerPartyRouterCodec (decodeSetDepsParams)
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..))
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
-
-data PerPartyRouterDeps = PerPartyRouterDeps
-    with
-        onRamp : RawInstanceAddress
-        offRamp : RawInstanceAddress
-        globalConfig : RawInstanceAddress
-        tokenAdminRegistry : RawInstanceAddress
-        feeQuoter : RawInstanceAddress
-        rmnRemote : RawInstanceAddress
-    deriving (Eq, Show)
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
@@ -47,6 +43,34 @@ template PerPartyRouterFactory
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
+
+        interface instance MCMSReceiver for PerPartyRouterFactory where
+          view = MCMSReceiverView with
+            owner = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId PerPartyRouterFactory)
+
+            case functionName of
+              "FactorySetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: FactorySetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid FactorySetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        choice FactorySetDeps : ContractId PerPartyRouterFactory
+            with
+                newDeps : PerPartyRouterDeps
+            controller ccipOwner
+            do
+                create this with deps = newDeps
 
         choice CreateRouter : CreateRouterResult
             with
@@ -105,6 +129,34 @@ template PerPartyRouter
     where
         signatory ccipOwner
         observer partyOwner
+
+        interface instance MCMSReceiver for PerPartyRouter where
+          view = MCMSReceiverView with
+            owner = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId PerPartyRouter)
+
+            case functionName of
+              "SetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid SetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        choice SetDeps : ContractId PerPartyRouter
+            with
+                newDeps : PerPartyRouterDeps
+            controller ccipOwner
+            do
+                create this with deps = newDeps
 
         -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1

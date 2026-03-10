@@ -18,3 +18,4 @@ data-dependencies:
 dependencies:
   - daml-prim
   - daml-stdlib
+  - ../../mcms/.daml/dist/mcms-0.0.1.dar

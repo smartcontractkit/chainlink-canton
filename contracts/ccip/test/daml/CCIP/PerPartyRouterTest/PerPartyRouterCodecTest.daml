@@ -1,0 +1,126 @@
+-- | Round-trip tests for PerPartyRouter codec functions
+module CCIP.PerPartyRouterTest.PerPartyRouterCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import CCIP.PerPartyRouterCodec
+import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..))
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- PERPARTYROUTER DEPS ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testPerPartyRouterDepsRoundtrip : Script ()
+testPerPartyRouterDepsRoundtrip = do
+  let deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@ccip_owner"
+        offRamp = RawInstanceAddress "offramp@ccip_owner"
+        globalConfig = RawInstanceAddress "globalconfig@ccip_owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
+        feeQuoter = RawInstanceAddress "feequoter@ccip_owner"
+        rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
+
+      encoded = encodeSetDepsParams deps
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode PerPartyRouterDeps"
+    Some decoded -> do
+      decoded.onRamp === deps.onRamp
+      decoded.offRamp === deps.offRamp
+      decoded.globalConfig === deps.globalConfig
+      decoded.tokenAdminRegistry === deps.tokenAdminRegistry
+      decoded.feeQuoter === deps.feeQuoter
+      decoded.rmnRemote === deps.rmnRemote
+
+  pure ()
+
+testPerPartyRouterDepsEmptyAddresses : Script ()
+testPerPartyRouterDepsEmptyAddresses = do
+  let deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress ""
+        offRamp = RawInstanceAddress ""
+        globalConfig = RawInstanceAddress ""
+        tokenAdminRegistry = RawInstanceAddress ""
+        feeQuoter = RawInstanceAddress ""
+        rmnRemote = RawInstanceAddress ""
+
+      encoded = encodeSetDepsParams deps
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode PerPartyRouterDeps with empty addresses"
+    Some decoded -> do
+      decoded.onRamp === RawInstanceAddress ""
+      decoded.offRamp === RawInstanceAddress ""
+      decoded.globalConfig === RawInstanceAddress ""
+      decoded.tokenAdminRegistry === RawInstanceAddress ""
+      decoded.feeQuoter === RawInstanceAddress ""
+      decoded.rmnRemote === RawInstanceAddress ""
+
+  pure ()
+
+testSetDepsParamsRoundtrip : Script ()
+testSetDepsParamsRoundtrip = do
+  let deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-instance@party::namespace"
+        offRamp = RawInstanceAddress "offramp-instance@another-party"
+        globalConfig = RawInstanceAddress "gc-instance@yet-another"
+        tokenAdminRegistry = RawInstanceAddress "tar-instance@tar-owner"
+        feeQuoter = RawInstanceAddress "fq-instance@fee-owner"
+        rmnRemote = RawInstanceAddress "rmn-instance@rmn-owner"
+
+      encoded = encodeSetDepsParams deps
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams"
+    Some decoded -> do
+      decoded === deps
+
+  pure ()
+
+-- ===========================================================================
+-- RAW INSTANCE ADDRESS SPECIAL CHARACTERS TESTS
+-- ===========================================================================
+
+testPerPartyRouterDepsSpecialCharacters : Script ()
+testPerPartyRouterDepsSpecialCharacters = do
+  let deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-with-dashes@party1::namespace1"
+        offRamp = RawInstanceAddress "offramp_with_underscores@party2::namespace2"
+        globalConfig = RawInstanceAddress "gc.with.dots@party3"
+        tokenAdminRegistry = RawInstanceAddress "tar/with/slashes@party4"
+        feeQuoter = RawInstanceAddress "fq:with:colons@party5"
+        rmnRemote = RawInstanceAddress "rmn+with+plus@party6"
+
+      encoded = encodeSetDepsParams deps
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode PerPartyRouterDeps with special characters"
+    Some decoded -> do
+      decoded.onRamp === deps.onRamp
+      decoded.offRamp === deps.offRamp
+      decoded.globalConfig === deps.globalConfig
+      decoded.tokenAdminRegistry === deps.tokenAdminRegistry
+      decoded.feeQuoter === deps.feeQuoter
+      decoded.rmnRemote === deps.rmnRemote
+
+  pure ()
+
+-- ===========================================================================
+-- INVALID DATA REJECTION TESTS
+-- ===========================================================================
+
+testInvalidDataRejection : Script ()
+testInvalidDataRejection = do
+  -- Empty data should fail
+  case decodeSetDepsParams "" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeSetDepsParams to fail on empty data"
+
+  -- Truncated data should fail (only partial encoding)
+  case decodeSetDepsParams "0000" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeSetDepsParams to fail on truncated data"
+
+  pure ()

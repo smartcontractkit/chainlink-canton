@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "176a6eaf97199413db994b46e1dd005c119bd5e0600c6ea12a70a0e78a8ffa9e"
+	PackageID   = "e6c910162786b455d4438cc55bf343e29170180d0a37f16a4fe9ee8f5504282e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -425,6 +426,73 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 	}
 }
 
+// SetDeps exercises the SetDeps choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t OnRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this OnRamp contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t OnRamp) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t OnRamp) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this OnRamp contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t OnRamp) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t OnRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for OnRamp
+
+var _ mcms.IMCMSReceiver = (*OnRamp)(nil)
+
 // OnRampDeps is a Record type
 type OnRampDeps struct {
 	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
@@ -655,12 +723,55 @@ func (t *PrepareSendFromRouter) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDeps is a Record type
+type SetDeps struct {
+	NewDeps OnRampDeps `json:"newDeps"`
+}
+
+// ToMap converts SetDeps to a map for DAML arguments
+func (t SetDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newDeps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewDeps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewDeps
+	}()
+
+	return m
+}
+
+func (t SetDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDeps to hex string (Canton MCMS format)
+func (t SetDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDeps from hex string (Canton MCMS format)
+func (t *SetDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
 	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
+	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -703,6 +814,11 @@ func (e *encoder) GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.Enc
 // PrepareSendFromRouter encodes parameters for the PrepareSendFromRouter choice.
 func (e *encoder) PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareSendFromRouter", args)
+}
+
+// SetDeps encodes parameters for the SetDeps choice.
+func (e *encoder) SetDeps(args SetDeps) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
 }
 
 // Verify MCMSEncoder interface implementation
