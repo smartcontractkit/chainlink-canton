@@ -175,6 +175,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							{Sum: &apiv2.Value_Text{Text: "ipfs://test-receive"}},
 						}}}}},
 						{Label: "storageLocationsAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "pendingStorageLocationsAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
 						{Label: "signerConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
 							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
 							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
