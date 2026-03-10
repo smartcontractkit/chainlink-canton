@@ -58,6 +58,37 @@ func main() {
 	}
 	log.Debug().Int("count", len(externalPackages.Packages)).Msg("Collected external package information")
 
+	// Field hints declare which field names in the generated MCMS/CCIP contracts
+	// require non-default hex encoding tags. The Daml compiler erases type synonyms
+	// (e.g. BytesHex → Text), so these cannot be inferred from the compiled .dalf.
+	fieldHints := model.FieldHints{
+		// hex:"bytes" — fixed-size hex fields ≤255 bytes
+		BytesFields: map[string]bool{
+			"signerAddress":       true, // EVM signer address (20 bytes)
+			"chainFamilySelector": true, // Chain family selector (4 bytes)
+			"root":                true, // Merkle root hash (32 bytes)
+			"newRoot":             true, // New merkle root hash (32 bytes)
+		},
+		// hex:"bytes16" — fields that may exceed 255 bytes (uint16 length prefix)
+		BytesHexFields: map[string]bool{
+			"operationData": true, // Serialized choice parameters in TimelockCall
+			"predecessor":   true, // Hex hash in ScheduleBatchParams
+			"salt":          true, // Hex value in ScheduleBatchParams
+		},
+		// hex:"uint32" — INT64 fields encoded as 4-byte uint32
+		Uint32Fields: map[string]bool{
+			"signerIndex": true, // encodeUint32 in encodeSignerInfo
+			"signerGroup": true, // encodeUint32 in encodeSignerInfo
+		},
+		// hex:"[]uint32" — []INT64 fields where each element is a 4-byte uint32
+		Uint32ListFields: map[string]bool{
+			"groupQuorums":   true, // encodeUint32 list in encodeMultisigConfig
+			"groupParents":   true, // encodeUint32 list in encodeMultisigConfig
+			"apGroupQuorums": true, // used in AdminParams.AP_SetConfig
+			"apGroupParents": true, // used in AdminParams.AP_SetConfig
+		},
+	}
+
 	// Generate bindings for each package
 	for p, s := range contracts.OutputDirs {
 		dar, err := contracts.GetDar(p, contracts.Versions[p][len(contracts.Versions[p])-1])
@@ -65,7 +96,7 @@ func main() {
 			log.Fatal().Err(err).Str("package", string(p)).Msg("Failed to get DAR for package")
 		}
 		log.Info().Str("package", string(p)).Msg("Generating bindings for package...")
-		output, err := generatePackage(dar, s[len(s)-1], externalPackages)
+		output, err := generatePackage(dar, s[len(s)-1], externalPackages, fieldHints)
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("package", string(p)).Msg("Failed to generate bindings for package")
 		}
@@ -100,7 +131,7 @@ func getMainPackageId(dar []byte) (string, error) {
 }
 
 // Generated a single package's code and returns the generated code.
-func generatePackage(dar []byte, pkgFile string, externalPackages model.ExternalPackages) ([]byte, error) {
+func generatePackage(dar []byte, pkgFile string, externalPackages model.ExternalPackages, fieldHints model.FieldHints) ([]byte, error) {
 	reader, err := zip.NewReader(bytes.NewReader(dar), int64(len(dar)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to created zip reader: %w", err)
@@ -126,7 +157,7 @@ func generatePackage(dar []byte, pkgFile string, externalPackages model.External
 		dalfs = append(dalfs, dalf)
 	}
 
-	result, err := codegen.CodegenDalfs(dalfs, reader, pkgFile, manifest, true, externalPackages)
+	result, err := codegen.CodegenDalfs(dalfs, reader, pkgFile, manifest, true, externalPackages, fieldHints)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate code: %w", err)
 	}
