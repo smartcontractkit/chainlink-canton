@@ -305,6 +305,7 @@ func receiptsBindingToProtocol(receipts []common.Receipt) ([]protocol.ReceiptWit
 			ExtraArgs:         protocol.ByteSlice(extraArgs),
 		})
 	}
+
 	return protoReceipts, nil
 }
 
