@@ -57,15 +57,8 @@ getFromContext context k = do
     None -> fail $ "Missing context entry for: " <> k
     Some v -> pure v
 
-lookupFromContextU : FromAnyValue a => CCIPContext -> Text -> Update (Optional a)
-lookupFromContextU context k = either fail pure $ lookupFromContext context k
-
 getFromContextU : FromAnyValue a => CCIPContext -> Text -> Update a
 getFromContextU context k = either fail pure $ getFromContext context k
-
-addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
-addOptionalAnyValue _k None m = m
-addOptionalAnyValue k (Some value) m = TextMap.insert k (toAnyValue value) m
 
 -- ToAnyValue instances
 instance ToAnyValue Text where

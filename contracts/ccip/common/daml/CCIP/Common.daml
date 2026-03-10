@@ -1,11 +1,5 @@
 module CCIP.Common
-    ( chainFamilySelectorEVM
-    , chainFamilySelectorSVM
-    , chainFamilySelectorAPTOS
-    , chainFamilySelectorSUI
-    , chainFamilySelectorTVM
-    , knownChainFamilySelectors
-    , isKnownChainFamilySelector
+    ( isKnownChainFamilySelector
     ) where
 
 import DA.Crypto.Text (BytesHex)

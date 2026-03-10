@@ -18,9 +18,6 @@ feeQuoterKey = "fee-quoter"
 lookupFeeQuoterCid : CCIP.Context.CCIPContext -> Update (ContractId FeeQuoter)
 lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 
-rawInstanceAddress : FeeQuoter -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress feeQuoter = CCIP.RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
-
 -- TODO: double check and readd fee/price quoting
 template FeeQuoter
     with

@@ -8,17 +8,9 @@ module CCIP.MCMSCodecUtils
     extractBytes
   , encodeUint8
   , decodeUint8
-  , encodeUint16
-  , decodeUint16
-  , encodeUint32
-  , decodeUint32
   , encodeText
   , decodeText
   , decodeTextAt
-  , encodeBool
-  , decodeBool
-  , encodeList
-  , decodeList
   -- CCIP-specific type helpers
   , encodeParty
   , decodePartyAt
@@ -31,16 +23,8 @@ import MCMS.Codec
   ( extractBytes
   , encodeUint8
   , decodeUint8
-  , encodeUint16
-  , decodeUint16
-  , encodeUint32
-  , decodeUint32
   , encodeText
   , decodeText
-  , encodeBool
-  , decodeBool
-  , encodeList
-  , decodeList
   )
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)

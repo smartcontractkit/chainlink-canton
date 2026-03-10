@@ -6,10 +6,6 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
 
--- | Dummy version tag for testing
-dummyVersionTag : BytesHex
-dummyVersionTag = "deadbeef"
-
 template DummyCommitteeVerifier
     with
         instanceId : Text
