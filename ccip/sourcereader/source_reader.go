@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 // ReaderConfig is the configuration required to create a canton source reader.
@@ -46,9 +47,10 @@ type ReaderConfig struct {
 }
 
 type sourceReader struct {
-	lggr                logger.Logger
-	stateServiceClient  ledgerv2.StateServiceClient
-	updateServiceClient ledgerv2.UpdateServiceClient
+	lggr                     logger.Logger
+	stateServiceClient       ledgerv2.StateServiceClient
+	updateServiceClient      ledgerv2.UpdateServiceClient
+	rmnRemoteInstanceAddress contracts.InstanceAddress
 
 	config ReaderConfig
 }
@@ -59,6 +61,7 @@ func NewSourceReader(
 	lggr logger.Logger,
 	grpcEndpoint string,
 	config ReaderConfig,
+	rmnRemoteInstanceAddress contracts.InstanceAddress,
 	opts ...grpc.DialOption,
 ) (chainaccess.SourceReader, error) {
 	lggr.Infow("creating gRPC connection to canton node", "grpcEndpoint", grpcEndpoint, "config", config)
@@ -73,10 +76,11 @@ func NewSourceReader(
 	}
 
 	return &sourceReader{
-		lggr:                lggr,
-		stateServiceClient:  ledgerv2.NewStateServiceClient(conn),
-		updateServiceClient: ledgerv2.NewUpdateServiceClient(conn),
-		config:              config,
+		lggr:                     lggr,
+		stateServiceClient:       ledgerv2.NewStateServiceClient(conn),
+		updateServiceClient:      ledgerv2.NewUpdateServiceClient(conn),
+		config:                   config,
+		rmnRemoteInstanceAddress: rmnRemoteInstanceAddress,
 	}, nil
 }
 
@@ -369,66 +373,41 @@ func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Byt
 		return nil, fmt.Errorf("latest block is nil")
 	}
 
-	updates, err := c.stateServiceClient.GetActiveContracts(ctx, &ledgerv2.GetActiveContractsRequest{
-		ActiveAtOffset: int64(latest.Number), //nolint:gosec // offset is always non-negative
-		EventFormat: &ledgerv2.EventFormat{
-			FiltersByParty: map[string]*ledgerv2.Filters{
-				c.config.NodeOperatorParty: {
-					Cumulative: []*ledgerv2.CumulativeFilter{
-						{
-							IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{TemplateFilter: &ledgerv2.TemplateFilter{
-								TemplateId:              c.config.RMNRemoteTemplateID.ToLedgerIdentifier(),
-								IncludeCreatedEventBlob: true,
-							}},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
+	activeContract, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		c.stateServiceClient,
+		c.config.NodeOperatorParty,
+		c.config.RMNRemoteTemplateID.String(),
+		c.rmnRemoteInstanceAddress,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get active contracts: %w", err)
+		return nil, fmt.Errorf("failed to find active contract: %w", err)
 	}
-	defer updates.CloseSend()
 
-	for {
-		activeContract, err := updates.Recv()
+	createdEvent := activeContract.GetCreatedEvent()
+	if createdEvent == nil {
+		return nil, fmt.Errorf("created event is nil")
+	}
+
+	rmnRemote, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](createdEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RMNRemote created event: %w", err)
+	}
+
+	var cursedSubjects []protocol.Bytes16
+	for _, subject := range rmnRemote.CursedSubjects {
+		subjectStr := string(subject)
+		if !strings.HasPrefix(subjectStr, "0x") {
+			subjectStr = "0x" + subjectStr
+		}
+		subjectBytes16, err := protocol.NewBytes16FromString(subjectStr)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, fmt.Errorf("failed to receive active contract: %w", err)
+			return nil, fmt.Errorf("failed to decode subject from BytesHex: %w, input: %s", err, subject)
 		}
-		if c, ok := activeContract.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract); ok {
-			// TODO: should we check that the instance address is the one we expect?
-			// Get the subjects from the created event blob.
-			createdEvent := c.ActiveContract.GetCreatedEvent()
-			if createdEvent == nil {
-				continue
-			}
-			rmnRemote, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](createdEvent)
-			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal RMNRemote created event: %w", err)
-			}
-			var cursedSubjects []protocol.Bytes16
-			for _, subject := range rmnRemote.CursedSubjects {
-				subjectStr := string(subject)
-				if !strings.HasPrefix(subjectStr, "0x") {
-					subjectStr = "0x" + subjectStr
-				}
-				subjectBytes16, err := protocol.NewBytes16FromString(subjectStr)
-				if err != nil {
-					return nil, fmt.Errorf("failed to decode subject from BytesHex: %w, input: %s", err, subject)
-				}
-				cursedSubjects = append(cursedSubjects, subjectBytes16)
-			}
-			// there shouldn't be more than one active RMNRemote at a given offset, so we can return after the first one.
-			return cursedSubjects, nil
-		}
+		cursedSubjects = append(cursedSubjects, subjectBytes16)
 	}
 
-	return nil, fmt.Errorf("no active RMNRemote found at offset %d, is it deployed?", latest.Number)
+	return cursedSubjects, nil
 }
 
 // LatestAndFinalizedBlock returns the latest offset of the canton validator we are connected to.

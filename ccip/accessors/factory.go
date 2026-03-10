@@ -14,12 +14,14 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 type factory struct {
-	lggr          logger.Logger
-	helper        map[string]ccip.BlockchainInfo
-	readerConfigs map[string]sourcereader.ReaderConfig
+	lggr               logger.Logger
+	helper             map[string]ccip.BlockchainInfo
+	readerConfigs      map[string]sourcereader.ReaderConfig
+	rmnRemoteAddresses map[string]string
 }
 
 // GetAccessor implements chainaccess.AccessorFactory.
@@ -51,6 +53,11 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 		return nil, fmt.Errorf("canton reader config not found for chain %d", chainSelector)
 	}
 
+	rmnRemoteAddressStr, ok := f.rmnRemoteAddresses[strSelector]
+	if !ok {
+		return nil, fmt.Errorf("RMN instance address not found for chain %d", chainSelector)
+	}
+
 	authProvider, err := blockchainInfo.Auth.NewProvider(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auth provider for chain %d: %w", chainSelector, err)
@@ -60,6 +67,7 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 		logger.Named(f.lggr, fmt.Sprintf("CantonSourceReader.%d", chainSelector)),
 		blockchainInfo.GRPCLedgerAPIURL,
 		readerConfig,
+		contracts.HexToInstanceAddress(rmnRemoteAddressStr),
 		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
 		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
 	)
@@ -70,11 +78,17 @@ func (f *factory) GetAccessor(ctx context.Context, chainSelector protocol.ChainS
 	return newAccessor(sourceReader), nil
 }
 
-func NewFactory(lggr logger.Logger, helper map[string]ccip.BlockchainInfo, readerConfigs map[string]sourcereader.ReaderConfig) chainaccess.AccessorFactory {
+func NewFactory(
+	lggr logger.Logger,
+	helper map[string]ccip.BlockchainInfo,
+	readerConfigs map[string]sourcereader.ReaderConfig,
+	rmnRemoteAddresses map[string]string,
+) chainaccess.AccessorFactory {
 	return &factory{
-		lggr:          lggr,
-		helper:        helper,
-		readerConfigs: readerConfigs,
+		lggr:               lggr,
+		helper:             helper,
+		readerConfigs:      readerConfigs,
+		rmnRemoteAddresses: rmnRemoteAddresses,
 	}
 }
 

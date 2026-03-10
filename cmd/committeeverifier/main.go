@@ -56,7 +56,7 @@ func main() {
 
 				lggr.Infow("loaded canton config", "config", cantonConfig)
 
-				return accessors.NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs), nil
+				return accessors.NewFactory(lggr, cantonConfig.BlockchainInfos, cantonConfig.ReaderConfigs, cfg.RMNRemoteAddresses), nil
 			}),
 		bootstrap.WithLogLevel[commit.JobSpec](zapcore.InfoLevel),
 	); err != nil {

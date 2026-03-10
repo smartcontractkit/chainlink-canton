@@ -59,6 +59,10 @@ func (t *TemplateID) ToLedgerIdentifier() *ledgerv2.Identifier {
 	}
 }
 
+func (t *TemplateID) String() string {
+	return fmt.Sprintf("%s:%s:%s", t.PackageID, t.ModuleName, t.EntityName)
+}
+
 // ParseTemplateIDFromString parses a template ID string like "#package:Module:Entity" into its components
 func ParseTemplateIDFromString(templateID string) (packageID, moduleName, entityName string, err error) {
 	if !strings.HasPrefix(templateID, "#") {

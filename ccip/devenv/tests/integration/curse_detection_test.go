@@ -10,11 +10,14 @@ import (
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -77,6 +80,9 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 
 	lggr := logger.Test(t)
 
+	rmnRemoteRef, err := in.CLDF.DataStore.Addresses().Get(datastore.NewAddressRefKey(cantonImpl.ChainSelector(), datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	require.NoError(t, err)
+
 	cantonSelectorStr := strconv.FormatUint(cantonChain.ChainSelector(), 10)
 	cantonConfig := getCantonConfig(t, in, cantonSelectorStr)
 	readerConfig := cantonConfig.ReaderConfigs[cantonSelectorStr]
@@ -90,6 +96,7 @@ func TestIntegration_SourceReader_CurseDetection(t *testing.T) {
 		lggr,
 		grpcURL,
 		readerConfig,
+		contracts.HexToInstanceAddress(rmnRemoteRef.Address),
 		grpc.WithTransportCredentials(authProvider.TransportCredentials()),
 		grpc.WithPerRPCCredentials(authProvider.PerRPCCredentials()),
 	)
