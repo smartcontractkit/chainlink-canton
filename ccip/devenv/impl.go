@@ -334,13 +334,14 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		cv := sequences.CommitteeVerifierParams{
 			Qualifier: qualifier,
 			Template: ccvs.CommitteeVerifier{
-				Owner:                 types.PARTY(participant.PartyID), // TODO: use different ccv owner?
-				CcipOwner:             types.PARTY(participant.PartyID),
-				VersionTag:            types.TEXT("49ff34ed"),
-				MessageSentObserver:   types.PARTY(participant.PartyID),
-				StorageLocations:      storageLocations,
-				StorageLocationsAdmin: types.PARTY(participant.PartyID),
-				Deps:                  ccvs.CommitteeVerifierDeps{}, // Set by sequence
+				Owner:                        types.PARTY(participant.PartyID), // TODO: use different ccv owner?
+				CcipOwner:                    types.PARTY(participant.PartyID),
+				VersionTag:                   types.TEXT("49ff34ed"),
+				MessageSentObserver:          types.PARTY(participant.PartyID),
+				StorageLocations:             storageLocations,
+				StorageLocationsAdmin:        types.PARTY(participant.PartyID),
+				PendingStorageLocationsAdmin: types.PARTY(participant.PartyID),
+				Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
 				// MUST be a real GENMAP, not a Go map.
 				RemoteChainFeeConfigs: remoteChainFeeConfigs,
 			},
