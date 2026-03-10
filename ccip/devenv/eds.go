@@ -192,8 +192,7 @@ func NewLauncher() *launcher {
 }
 
 type input struct {
-	EDSServerConfig   edsConfig.ServerConfig `toml:"eds_server_config"`
-	InsecureTransport bool                   `toml:"insecure_transport"`
+	EDSConfig edsConfig.Config `toml:"eds_config"`
 }
 
 type output struct {
@@ -227,13 +226,10 @@ func (l *launcher) Launch(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse input: %w", err)
 	}
-	out, err := cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[cantonChangesets.GenerateEDSConfigConfig]{
+	out, err := cantonChangesets.GenerateEDSConfig{}.Apply(*env, cantonChangesets.CantonCSDeps[edsConfig.Config]{
 		ChainSelector: chainDetails.ChainSelector,
 		Participant:   0,
-		Config: cantonChangesets.GenerateEDSConfigConfig{
-			ServerConfig:      in.EDSServerConfig,
-			InsecureTransport: in.InsecureTransport,
-		},
+		Config:        in.EDSConfig,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate EDS config for selector %d: %w", chainDetails.ChainSelector, err)
@@ -253,7 +249,7 @@ func (l *launcher) Launch(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get EDS container host: %w", err)
 	}
-	edsMappedPort, err := edsContainer.MappedPort(ctx, nat.Port(fmt.Sprintf("%d/tcp", in.EDSServerConfig.Port)))
+	edsMappedPort, err := edsContainer.MappedPort(ctx, nat.Port(fmt.Sprintf("%d/tcp", edsCfg.Server.Port)))
 	if err != nil {
 		pm, _ := edsContainer.Ports(ctx) // Add all existing ports to error
 		return nil, fmt.Errorf("failed to get EDS container mapped port (ports: %v): %w", maps.Keys(pm), err)

@@ -9,6 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-common/pkg/beholder"
+
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
@@ -24,10 +27,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	edsCommon "github.com/smartcontractkit/chainlink-canton/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
+	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
 )
 
@@ -44,6 +49,26 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	chainDetails, err := chainsel.GetChainDetails(chainSelector)
 	if err != nil {
 		return fmt.Errorf("failed to get chain details: %w", err)
+	}
+
+	// Set up monitoring
+	var metrics edsCommon.EDSMetricLabeler
+	if cfg.Monitoring.Enabled {
+		metrics, err = monitoring.InitBeholderMonitoring(beholder.Config{
+			InsecureConnection:       cfg.Monitoring.Beholder.InsecureConnection,
+			CACertFile:               cfg.Monitoring.Beholder.CACertFile,
+			OtelExporterGRPCEndpoint: cfg.Monitoring.Beholder.OtelExporterGRPCEndpoint,
+			OtelExporterHTTPEndpoint: cfg.Monitoring.Beholder.OtelExporterHTTPEndpoint,
+			LogStreamingEnabled:      cfg.Monitoring.Beholder.LogStreamingEnabled,
+			MetricReaderInterval:     time.Second * time.Duration(cfg.Monitoring.Beholder.MetricReaderInterval),
+			TraceSampleRatio:         cfg.Monitoring.Beholder.TraceSampleRatio,
+			TraceBatchTimeout:        time.Second * time.Duration(cfg.Monitoring.Beholder.TraceBatchTimeout),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to initialize Beholder monitoring: %w", err)
+		}
+	} else {
+		metrics = monitoring.NoopEDSMetricLabeler{}
 	}
 
 	authProvider, err := cfg.Node.AuthConfig.NewProvider(ctx)
@@ -115,6 +140,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		StateService:  cantonChain.Participants[0].LedgerServices.State,
 		MaxRetries:    cfg.Node.MaxRetries,
 	},
+		metrics,
 		templates...,
 	)
 	if err != nil {
@@ -146,6 +172,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	server := api.NewServer(logger, disclosureSvc)
 
 	r := gin.Default()
+	r.Use(middleware.RequestMonitoringMiddleware(metrics))
 
 	edsv1.RegisterHandlers(r, server)
 

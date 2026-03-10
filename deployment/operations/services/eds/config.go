@@ -2,7 +2,6 @@ package eds
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -23,14 +22,13 @@ import (
 )
 
 type GenerateEDSConfigInput struct {
-	ChainSelector     uint64 `json:"chain_selector"`
-	Participant       int    `json:"participant"`
-	ServerConfig      edsConfig.ServerConfig
-	InsecureTransport bool `json:"insecure_transport"`
+	ChainSelector uint64 `json:"chain_selector"`
+	Participant   int    `json:"participant"`
 }
 
 type GenerateEDSConfigOutput struct {
-	Config *edsConfig.Config
+	NodeConfig edsConfig.NodeConfig
+	Contracts  edsConfig.Contracts
 }
 
 type BuildConfigDeps struct {
@@ -40,7 +38,7 @@ type BuildConfigDeps struct {
 var BuildConfig = operations.NewOperation(
 	"build-eds-config",
 	semver.MustParse("1.0.0"),
-	"Builds the EDS config from datastore contract addresses",
+	"Builds the EDS node + contracts config from datastore contract addresses and participants in the environment",
 	func(b operations.Bundle, deps BuildConfigDeps, input GenerateEDSConfigInput) (output GenerateEDSConfigOutput, err error) {
 		env := deps.Env
 		chain, ok := env.BlockChains.CantonChains()[input.ChainSelector]
@@ -99,17 +97,13 @@ var BuildConfig = operations.NewOperation(
 			}
 		}
 
-		authType := commonconfig.AuthTypeStatic
-		if input.InsecureTransport {
-			authType = commonconfig.AuthTypeInsecureStatic
-		}
 		var nodeConfig edsConfig.NodeConfig
 		if participant.InternalEndpoints == nil {
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
-					Type:   authType,
+					Type:   commonconfig.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -119,7 +113,7 @@ var BuildConfig = operations.NewOperation(
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
 				AuthConfig: commonconfig.AuthConfig{
-					Type:   authType,
+					Type:   commonconfig.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -128,41 +122,37 @@ var BuildConfig = operations.NewOperation(
 		}
 
 		return GenerateEDSConfigOutput{
-			Config: &edsConfig.Config{
-				ChainSelector: strconv.FormatUint(input.ChainSelector, 10),
-				Server:        input.ServerConfig,
-				Node:          nodeConfig,
-				Contracts: edsConfig.Contracts{
-					PerPartyRouterFactory: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
-					},
-					OnRamp: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
-					},
-					OffRamp: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
-					},
-					GlobalConfig: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
-					},
-					TokenAdminRegistry: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
-					},
-					RMNRemote: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
-					},
-					FeeQuoter: edsConfig.ContractIdentifier{
-						PartyID:         participant.PartyID,
-						InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
-					},
-					CCVs: ccvs,
+			NodeConfig: nodeConfig,
+			Contracts: edsConfig.Contracts{
+				PerPartyRouterFactory: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
 				},
+				OnRamp: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(onRamp.Address),
+				},
+				OffRamp: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(offRamp.Address),
+				},
+				GlobalConfig: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(globalConfig.Address),
+				},
+				TokenAdminRegistry: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistry.Address),
+				},
+				RMNRemote: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(rmnRemote.Address),
+				},
+				FeeQuoter: edsConfig.ContractIdentifier{
+					PartyID:         participant.PartyID,
+					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
+				},
+				CCVs: ccvs,
 			},
 		}, nil
 	},
