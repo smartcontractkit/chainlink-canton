@@ -30,3 +30,33 @@ var Deploy = contract.NewDeploy(contract.DeployParams[rmn.RMNRemote]{
 	PackageName: string(contracts.CCIPRMN),
 	Prefix:      "rmn_remote",
 })
+
+var Curse = contract.NewExercise(contract.ExerciseParams[rmn.Curse]{
+	Name:         "canton/ccip/rmn_remote/curse",
+	Version:      Version,
+	Description:  "Curses a subject on the RMNRemote contract",
+	ContractType: ContractType,
+	Validate: func(input rmn.Curse) error {
+		if input.Subject == "" {
+			return errors.New("Subject cannot be empty")
+		}
+		return nil
+	},
+	Template: rmn.RMNRemote{},
+	Method:   rmn.RMNRemote{}.Curse,
+})
+
+var Uncurse = contract.NewExercise(contract.ExerciseParams[rmn.Uncurse]{
+	Name:         "canton/ccip/rmn_remote/uncurse",
+	Version:      Version,
+	Description:  "Uncurses a subject on the RMNRemote contract",
+	ContractType: ContractType,
+	Validate: func(input rmn.Uncurse) error {
+		if input.Subject == "" {
+			return errors.New("Subject cannot be empty")
+		}
+		return nil
+	},
+	Template: rmn.RMNRemote{},
+	Method:   rmn.RMNRemote{}.Uncurse,
+})
