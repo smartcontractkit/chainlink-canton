@@ -15,9 +15,31 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
+)
+
+// Ledger field labels used when building CreatedEvent / receipt records in tests.
+const (
+	ccipMessageSentCCIPOwnerLabel = "ccipOwner"
+	ccipMessageSentEventLabel     = "event"
+
+	ccipMessageSentEventDestChainSelectorLabel = "destChainSelector"
+	ccipMessageSentEventSequenceNumberLabel    = "sequenceNumber"
+	ccipMessageSentEventMessageIDLabel         = "messageId"
+	ccipMessageSentEventEncodedMessageLabel    = "encodedMessage"
+	ccipMessageSentEventVerifierBlobsLabel     = "verifierBlobs"
+	ccipMessageSentEventReceiptsLabel          = "receipts"
+
+	ccipMessageSentEventReceiptIssuerTypeLabel        = "issuerType"
+	ccipMessageSentEventReceiptIssuerAddressLabel     = "issuerAddress"
+	ccipMessageSentEventReceiptDestGasLimitLabel      = "destGasLimit"
+	ccipMessageSentEventReceiptDestBytesOverheadLabel = "destBytesOverhead"
+	ccipMessageSentEventReceiptFeeTokenAmountLabel    = "feeTokenAmount"
+	ccipMessageSentEventReceiptExtraArgsLabel         = "extraArgs"
 )
 
 func TestSourceReader_LatestAndFinalizedBlock(t *testing.T) {
@@ -439,8 +461,17 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		execIssuer := protocol.Keccak256([]byte("executor"))
 		networkIssuer := protocol.Keccak256([]byte("network"))
 
-		receipts := &ledgerv2.List{Elements: []*ledgerv2.Value{
-			// First receipt - has corresponding verifier blob
+		bindingReceipts := []common.Receipt{
+			{IssuerAddress: types.TEXT(hex.EncodeToString(ccvIssuer[:])), DestGasLimit: 100000, DestBytesOverhead: 500, FeeTokenAmount: types.NUMERIC("1000000."), ExtraArgs: types.TEXT(extraArgsHex)},
+			{IssuerAddress: types.TEXT(hex.EncodeToString(execIssuer[:])), DestGasLimit: 0, DestBytesOverhead: 0, FeeTokenAmount: types.NUMERIC("500000."), ExtraArgs: types.TEXT("")},
+			{IssuerAddress: types.TEXT(hex.EncodeToString(networkIssuer[:])), DestGasLimit: 0, DestBytesOverhead: 0, FeeTokenAmount: types.NUMERIC("500000."), ExtraArgs: types.TEXT("")},
+		}
+		receiptsWithBlobs, err := receiptsBindingToProtocol(bindingReceipts)
+		require.NoError(t, err)
+		require.Len(t, receiptsWithBlobs, 3) // 1 verifier blob, 1 executor receipt, 1 network fee receipt
+
+		// Ledger-style receipts list for the CreatedEvent (so UnmarshalCreatedEvent can populate Event.Receipts).
+		receiptsList := &ledgerv2.List{Elements: []*ledgerv2.Value{
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
 					{Label: ccipMessageSentEventReceiptIssuerTypeLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "ccv"}}},
@@ -451,7 +482,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 					{Label: ccipMessageSentEventReceiptExtraArgsLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: extraArgsHex}}},
 				},
 			}}},
-			// Second receipt - executor receipt
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
 					{Label: ccipMessageSentEventReceiptIssuerTypeLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "executor"}}},
@@ -462,7 +492,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 					{Label: ccipMessageSentEventReceiptExtraArgsLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: ""}}},
 				},
 			}}},
-			// Second receipt - no verifier blob (e.g., network fee receipt)
 			{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
 					{Label: ccipMessageSentEventReceiptIssuerTypeLabel, Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "network"}}},
@@ -474,9 +503,6 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 				},
 			}}},
 		}}
-		receiptsWithBlobs, err := processReceipts(&ledgerv2.RecordField{Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: receipts}}})
-		require.NoError(t, err)
-		require.Len(t, receiptsWithBlobs, 3) // 1 verifier blob, 1 executor receipt, 1 network fee receipt
 
 		structure, err := protocol.ParseReceiptStructure(receiptsWithBlobs, 1, 0)
 		require.NoError(t, err)
@@ -553,7 +579,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 											Label: ccipMessageSentEventReceiptsLabel,
 											Value: &ledgerv2.Value{
 												Sum: &ledgerv2.Value_List{
-													List: receipts,
+													List: receiptsList,
 												},
 											},
 										},
@@ -870,7 +896,9 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 
 		_, err = reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
 		require.Error(t, err)
-		require.ErrorContains(t, err, "unknown receipt field")
+		// With UnmarshalCreatedEvent, receipts are unmarshaled into binding structs; a receipt
+		// with only unknown fields has zero-valued required fields, so we fail on parse (e.g. fee token amount).
+		require.ErrorContains(t, err, "failed to process receipts")
 	})
 }
 
