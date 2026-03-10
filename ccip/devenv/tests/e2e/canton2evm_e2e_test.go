@@ -107,7 +107,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			},
 			cciptestinterfaces.MessageOptions{
 				Version:           3,
-				ExecutionGasLimit: 200_000,
+				// Token transfer execution on EVM is materially more expensive than a data-only message.
+				ExecutionGasLimit: 500_000,
 				FinalityConfig:    1,
 				Executor:          executorAddr,
 				CCVs: []protocol.CCV{
