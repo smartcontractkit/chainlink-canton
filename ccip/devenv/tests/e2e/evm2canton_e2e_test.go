@@ -2,6 +2,7 @@ package canton
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -139,6 +140,15 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to send message from EVM chain")
 	require.Lenf(t, sendMessageResult.ReceiptIssuers, 3, "expected 3 receipt issuers for the message")
+	require.NotNil(t, sendMessageResult.Message, "expected send message result to include message payload")
+	t.Logf(
+		"SendMessage accepted (basic): srcSelector=%d dstSelector=%d seqNo=%d receipts=%d issuers=%x",
+		srcSelector,
+		dstSelector,
+		sendMessageResult.Message.SequenceNumber,
+		len(sendMessageResult.ReceiptIssuers),
+		sendMessageResult.ReceiptIssuers,
+	)
 	sentEvent, err := srcChain.WaitOneSentEventBySeqNo(ctx, dstSelector, seqNo, time.Second*10)
 	require.NoError(t, err)
 	messageID := sentEvent.MessageID
@@ -166,6 +176,89 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		})
 	}
 	defaultAggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
+
+	t.Run("token transfer", func(t *testing.T) {
+		// Matches the default BurnMint pool pair configured by devenv.
+		const tokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [] to BurnMintTokenPool 1.7.0 [])"
+		tokenRef, err := in.CLDF.DataStore.Addresses().Get(
+			datastore.NewAddressRefKey(
+				srcSelector,
+				datastore.ContractType("BurnMintERC20WithDrip"),
+				semver.MustParse("1.5.0"),
+				tokenQualifier,
+			),
+		)
+		require.NoError(t, err, "failed to resolve source token address for token transfer e2e")
+		srcToken := protocol.UnknownAddress(gethcommon.HexToAddress(tokenRef.Address).Bytes())
+
+		seqNo, err := srcChain.GetExpectedNextSequenceNumber(ctx, dstSelector)
+		require.NoError(t, err)
+		sendMessageResult, err := srcChain.SendMessage(
+			ctx,
+			dstSelector,
+			cciptestinterfaces.MessageFields{
+				Receiver: receiver.Bytes(),
+				Data:     []byte("Hello token transfer from EVM!"),
+				TokenAmount: cciptestinterfaces.TokenAmount{
+					Amount:       big.NewInt(1000),
+					TokenAddress: srcToken,
+				},
+			},
+			cciptestinterfaces.MessageOptions{
+				Version:             3,
+				ExecutionGasLimit:   200_000,
+				OutOfOrderExecution: false,
+				CCVs: []protocol.CCV{
+					{
+						CCVAddress: defaultCCVAddress,
+						Args:       []byte{},
+						ArgsLen:    0,
+					},
+				},
+				FinalityConfig: 0,
+				Executor:       executorAddress,
+				ExecutorArgs:   nil,
+				TokenArgs:      nil,
+			},
+		)
+		require.NoError(t, err, "failed to send token transfer message from EVM chain")
+		require.NotNil(t, sendMessageResult.Message)
+		require.NotNil(t, sendMessageResult.Message.TokenTransfer, "token transfer should be populated in sent message")
+		require.Lenf(t, sendMessageResult.ReceiptIssuers, 4, "expected 4 receipt issuers for token transfer message")
+		t.Logf(
+			"SendMessage accepted (token transfer): srcSelector=%d dstSelector=%d seqNo=%d receipts=%d issuers=%x tokenTransferPresent=%t",
+			srcSelector,
+			dstSelector,
+			sendMessageResult.Message.SequenceNumber,
+			len(sendMessageResult.ReceiptIssuers),
+			sendMessageResult.ReceiptIssuers,
+			sendMessageResult.Message.TokenTransfer != nil,
+		)
+
+		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(ctx, dstSelector, seqNo, time.Second*15)
+		require.NoError(t, err)
+		require.NotNil(t, sentEvent.Message)
+		require.NotNil(t, sentEvent.Message.TokenTransfer, "token transfer should be present in sent event")
+
+		testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)
+		res, err := testCtx.AssertMessage(sentEvent.MessageID, e2e.AssertMessageOptions{
+			TickInterval:            time.Second,
+			Timeout:                 tests.WaitTimeout(t),
+			ExpectedVerifierResults: 1,
+			AssertVerifierLogs:      false,
+			AssertExecutorLogs:      false,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, res.AggregatedResult)
+		require.Len(t, res.IndexedVerifications.Results, 1)
+
+		message := res.IndexedVerifications.Results[0].VerifierResult.Message
+		require.NotNil(t, message.TokenTransfer, "indexed message should include token transfer")
+
+		// Token-transfer manual execution path is exercised separately; this e2e subtest
+		// validates send + verification surfaces include token transfer data.
+		t.Log("Skipping manual execute assertion for token transfer")
+	})
 
 	testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)
 	result, err := testCtx.AssertMessage(messageID, e2e.AssertMessageOptions{

@@ -3,8 +3,11 @@ package devenv
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"strings"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -145,13 +148,82 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Resolve all necessary contracts
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	resolveActiveContractIDByAddress := func(templateID string, address contracts.InstanceAddress) (string, error) {
+		cid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, templateID, address)
+		if err == nil {
+			return cid, nil
+		}
+		if !strings.Contains(err.Error(), "multiple active contracts found") {
+			return "", err
+		}
+
+		parts := strings.Split(templateID, ":")
+		if len(parts) != 3 {
+			return "", fmt.Errorf("invalid template ID %q", templateID)
+		}
+		ledgerEnd, endErr := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+		if endErr != nil {
+			return "", fmt.Errorf("get ledger end for duplicate contract fallback: %w", endErr)
+		}
+		stream, streamErr := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+			ActiveAtOffset: ledgerEnd.GetOffset(),
+			EventFormat: &apiv2.EventFormat{
+				FiltersByParty: map[string]*apiv2.Filters{
+					participant.PartyID: {
+						Cumulative: []*apiv2.CumulativeFilter{
+							{
+								IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+									TemplateFilter: &apiv2.TemplateFilter{
+										TemplateId: &apiv2.Identifier{
+											PackageId:  parts[0],
+											ModuleName: parts[1],
+											EntityName: parts[2],
+										},
+										IncludeCreatedEventBlob: true,
+									},
+								},
+							},
+						},
+					},
+				},
+				Verbose: true,
+			},
+		})
+		if streamErr != nil {
+			return "", fmt.Errorf("get active contracts for duplicate contract fallback: %w", streamErr)
+		}
+		defer stream.CloseSend()
+		var latest *apiv2.ActiveContract
+		for {
+			resp, recvErr := stream.Recv()
+			if recvErr != nil {
+				if errors.Is(recvErr, io.EOF) {
+					break
+				}
+				return "", fmt.Errorf("receive active contracts for duplicate contract fallback: %w", recvErr)
+			}
+			entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
+			if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
+				continue
+			}
+			if latest == nil || entry.ActiveContract.GetCreatedEvent().GetOffset() > latest.GetCreatedEvent().GetOffset() {
+				latest = entry.ActiveContract
+			}
+		}
+		if latest == nil || latest.GetCreatedEvent() == nil || latest.GetCreatedEvent().GetContractId() == "" {
+			return "", fmt.Errorf("no active contracts found for duplicate fallback")
+		}
+
+		return latest.GetCreatedEvent().GetContractId(), nil
+	}
+
+	routerCid, err := resolveActiveContractIDByAddress(perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
 	c.logger.Debug().Str("InstanceAddress", routerAddress.String()).Str("ContractId", routerCid).Msg("Resolved PerPartyRouter contract")
 
-	receiverCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, ccipreceiver.CCIPReceiver{}.GetTemplateID(), receiverAddress)
+	receiverCid, err := resolveActiveContractIDByAddress(ccipreceiver.CCIPReceiver{}.GetTemplateID(), receiverAddress)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get receiver contract ID: %w", err)
 	}
