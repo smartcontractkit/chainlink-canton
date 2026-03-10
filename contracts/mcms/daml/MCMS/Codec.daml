@@ -31,10 +31,18 @@ module MCMS.Codec
   , decodeCancelBatchParams
   , encodeTimelockCall
   , decodeTimelockCall
+  -- Numeric 0 (uint64 chain selector) encoding
+  , encodeNumeric0
+  , decodeNumeric0At
+  -- Int64 encoding (8 bytes)
+  , encodeInt64
+  , decodeInt64
+  , decodeInt64At
   ) where
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import qualified DA.Text as Text
+import DA.Text qualified as DA.Text
 import DA.Optional (fromSome)
 import DA.Foldable ()
 import MCMS.Types (SignerInfo(..), Role(..), BlockedFunction(..), TimelockCall(..), intToRole)
@@ -208,6 +216,13 @@ decodeInt64 : BytesHex -> Optional Int
 decodeInt64 hex =
   if byteCount hex /= 8 then None
   else fromHex hex
+
+-- | Decode int64 at offset, returns (value, newOffset)
+decodeInt64At : BytesHex -> Int -> Optional (Int, Int)
+decodeInt64At encoded offset = do
+  hex <- extractBytes encoded offset 8
+  value <- decodeInt64 hex
+  return (value, offset + 8)
 
 -- | Encode text as length-prefixed bytes
 encodeText : Text -> BytesHex
@@ -440,4 +455,53 @@ decodeCancelBatchParams : BytesHex -> Optional CancelBatchParams
 decodeCancelBatchParams encoded = do
   (opId, _) <- decodeText encoded 0
   Some CancelBatchParams { opId = opId }
+
+-- ===========================================================================
+-- NUMERIC 0 (UINT64 CHAIN SELECTOR) ENCODING/DECODING
+-- Encodes Numeric 0 as length-prefixed decimal string (matches Go HexCodec)
+-- ===========================================================================
+
+-- | Encode Numeric 0 as text (length-prefixed decimal string)
+-- Matches Go HexCodec's encoding: encodeText(string(v))
+encodeNumeric0 : Numeric 0 -> BytesHex
+encodeNumeric0 n = encodeText (numeric0ToDecimalString n)
+
+-- | Decode Numeric 0 from text encoding
+decodeNumeric0At : BytesHex -> Int -> Optional (Numeric 0, Int)
+decodeNumeric0At encoded offset = do
+  (text, newOffset) <- decodeText encoded offset
+  numeric <- parseNumeric0 text
+  Some (numeric, newOffset)
+
+-- | Convert Numeric 0 to decimal string (removes .0 suffix)
+numeric0ToDecimalString : Numeric 0 -> Text
+numeric0ToDecimalString n =
+  let str = show n
+  in if DA.Text.isSuffixOf ".0" str
+     then DA.Text.take (DA.Text.length str - 2) str
+     else str
+
+-- | Parse decimal string to Numeric 0
+-- Multiplies accumulated value by 10 and adds each digit
+parseNumeric0 : Text -> Optional (Numeric 0)
+parseNumeric0 text =
+  if DA.Text.length text == 0 then None
+  else parseNumeric0Helper text 0.0
+
+parseNumeric0Helper : Text -> Numeric 0 -> Optional (Numeric 0)
+parseNumeric0Helper text acc =
+  if DA.Text.length text == 0 then Some acc
+  else
+    let firstChar = DA.Text.take 1 text
+        rest = DA.Text.drop 1 text
+        digitOpt = charToDigit firstChar
+    in case digitOpt of
+      None -> None
+      Some digit -> parseNumeric0Helper rest (acc * 10.0 + digit)
+
+charToDigit : Text -> Optional (Numeric 0)
+charToDigit c = case c of
+  "0" -> Some 0.0; "1" -> Some 1.0; "2" -> Some 2.0; "3" -> Some 3.0; "4" -> Some 4.0
+  "5" -> Some 5.0; "6" -> Some 6.0; "7" -> Some 7.0; "8" -> Some 8.0; "9" -> Some 9.0
+  _ -> None
 

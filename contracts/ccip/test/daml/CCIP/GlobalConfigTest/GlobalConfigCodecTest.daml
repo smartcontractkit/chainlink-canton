@@ -1,0 +1,207 @@
+-- | Round-trip tests for GlobalConfig codec functions
+module CCIP.GlobalConfigTest.GlobalConfigCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import CCIP.GlobalConfigCodec
+import CCIP.GlobalConfigTypes (DestChainConfig(..), SourceChainConfig(..))
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- DEST CHAIN CONFIG ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testUpdateDestChainConfigParamsRoundtrip : Script ()
+testUpdateDestChainConfigParamsRoundtrip = do
+  let destChainSelector : Numeric 0 = 1.0
+      config = DestChainConfig with
+        isEnabled = True
+        offRampAddress = "1234567890abcdef"
+        laneMandatedCCVs = [RawInstanceAddress "ccv1@party1", RawInstanceAddress "ccv2@party2"]
+        defaultCCVs = [RawInstanceAddress "default-ccv@party3"]
+        messageNetworkFeeUSDCents = 10.5
+        tokenNetworkFeeUSDCents = 5.25
+
+      encoded = encodeUpdateDestChainConfigParams destChainSelector config
+
+  case decodeUpdateDestChainConfigParams encoded of
+    None -> abort "Failed to decode UpdateDestChainConfig params"
+    Some (decodedSelector, decodedConfig) -> do
+      decodedSelector === destChainSelector
+      decodedConfig.isEnabled === True
+      decodedConfig.offRampAddress === "1234567890abcdef"
+      length decodedConfig.laneMandatedCCVs === 2
+      length decodedConfig.defaultCCVs === 1
+      decodedConfig.messageNetworkFeeUSDCents === 10.5
+      decodedConfig.tokenNetworkFeeUSDCents === 5.25
+
+  pure ()
+
+testUpdateDestChainConfigParamsDisabled : Script ()
+testUpdateDestChainConfigParamsDisabled = do
+  let destChainSelector : Numeric 0 = 137.0
+      config = DestChainConfig with
+        isEnabled = False
+        offRampAddress = "deadbeef"
+        laneMandatedCCVs = []
+        defaultCCVs = []
+        messageNetworkFeeUSDCents = 0.0
+        tokenNetworkFeeUSDCents = 0.0
+
+      encoded = encodeUpdateDestChainConfigParams destChainSelector config
+
+  case decodeUpdateDestChainConfigParams encoded of
+    None -> abort "Failed to decode disabled UpdateDestChainConfig params"
+    Some (decodedSelector, decodedConfig) -> do
+      decodedSelector === 137.0
+      decodedConfig.isEnabled === False
+      decodedConfig.offRampAddress === "deadbeef"
+      decodedConfig.laneMandatedCCVs === []
+      decodedConfig.defaultCCVs === []
+
+  pure ()
+
+testUpdateDestChainConfigParamsLargeSelector : Script ()
+testUpdateDestChainConfigParamsLargeSelector = do
+  -- Test with large chain selector like CCIP uses
+  let destChainSelector : Numeric 0 = 16015286601757825753.0
+      config = DestChainConfig with
+        isEnabled = True
+        offRampAddress = "abcd"
+        laneMandatedCCVs = []
+        defaultCCVs = []
+        messageNetworkFeeUSDCents = 1.0
+        tokenNetworkFeeUSDCents = 2.0
+
+      encoded = encodeUpdateDestChainConfigParams destChainSelector config
+
+  case decodeUpdateDestChainConfigParams encoded of
+    None -> abort "Failed to decode large selector UpdateDestChainConfig params"
+    Some (decodedSelector, _) ->
+      decodedSelector === destChainSelector
+
+  pure ()
+
+testUpdateDestChainConfigParamsEdgeCases : Script ()
+testUpdateDestChainConfigParamsEdgeCases = do
+  let mkConfig selector = (selector, DestChainConfig True "ab" [] [] 0.0 0.0)
+
+  -- Test zero selector
+  let (zeroSelector, zeroConfig) = mkConfig 0.0
+      encodedZero = encodeUpdateDestChainConfigParams zeroSelector zeroConfig
+  case decodeUpdateDestChainConfigParams encodedZero of
+    None -> abort "Failed to decode zero selector"
+    Some (decoded, _) -> decoded === 0.0
+
+  -- Test max uint64 selector
+  let maxUint64 : Numeric 0 = 18446744073709551615.0
+      (_, maxConfig) = mkConfig maxUint64
+      encodedMax = encodeUpdateDestChainConfigParams maxUint64 maxConfig
+  case decodeUpdateDestChainConfigParams encodedMax of
+    None -> abort "Failed to decode max uint64 selector"
+    Some (decoded, _) -> decoded === maxUint64
+
+  pure ()
+
+-- ===========================================================================
+-- SOURCE CHAIN CONFIG ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testUpdateSourceChainConfigParamsRoundtrip : Script ()
+testUpdateSourceChainConfigParamsRoundtrip = do
+  let sourceChainSelector : Numeric 0 = 42161.0  -- Arbitrum
+      config = SourceChainConfig with
+        isEnabled = True
+        onRampAddress = "fedcba9876543210"
+        laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
+        defaultCCVs = [RawInstanceAddress "src-default@party2", RawInstanceAddress "src-default2@party3"]
+
+      encoded = encodeUpdateSourceChainConfigParams sourceChainSelector config
+
+  case decodeUpdateSourceChainConfigParams encoded of
+    None -> abort "Failed to decode UpdateSourceChainConfig params"
+    Some (decodedSelector, decodedConfig) -> do
+      decodedSelector === sourceChainSelector
+      decodedConfig.isEnabled === True
+      decodedConfig.onRampAddress === "fedcba9876543210"
+      length decodedConfig.laneMandatedCCVs === 1
+      length decodedConfig.defaultCCVs === 2
+
+  pure ()
+
+testUpdateSourceChainConfigParamsDisabled : Script ()
+testUpdateSourceChainConfigParamsDisabled = do
+  let sourceChainSelector : Numeric 0 = 10.0
+      config = SourceChainConfig with
+        isEnabled = False
+        onRampAddress = ""
+        laneMandatedCCVs = []
+        defaultCCVs = []
+
+      encoded = encodeUpdateSourceChainConfigParams sourceChainSelector config
+
+  case decodeUpdateSourceChainConfigParams encoded of
+    None -> abort "Failed to decode disabled UpdateSourceChainConfig params"
+    Some (decodedSelector, decodedConfig) -> do
+      decodedSelector === 10.0
+      decodedConfig.isEnabled === False
+      decodedConfig.onRampAddress === ""
+      decodedConfig.laneMandatedCCVs === []
+      decodedConfig.defaultCCVs === []
+
+  pure ()
+
+-- ===========================================================================
+-- RAW INSTANCE ADDRESS ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testRawInstanceAddressListRoundtrip : Script ()
+testRawInstanceAddressListRoundtrip = do
+  let config = DestChainConfig with
+        isEnabled = True
+        offRampAddress = "00"
+        laneMandatedCCVs = [
+          RawInstanceAddress "ccv-verifier@party::namespace",
+          RawInstanceAddress "another-ccv@different-party"
+          ]
+        defaultCCVs = [
+          RawInstanceAddress "default@party1"
+          ]
+        messageNetworkFeeUSDCents = 0.0
+        tokenNetworkFeeUSDCents = 0.0
+
+      encoded = encodeUpdateDestChainConfigParams 1.0 config
+
+  case decodeUpdateDestChainConfigParams encoded of
+    None -> abort "Failed to decode config with RawInstanceAddresses"
+    Some (_, decodedConfig) -> do
+      case decodedConfig.laneMandatedCCVs of
+        [RawInstanceAddress addr1, RawInstanceAddress addr2] -> do
+          addr1 === "ccv-verifier@party::namespace"
+          addr2 === "another-ccv@different-party"
+        _ -> abort "Expected 2 laneMandatedCCVs"
+
+      case decodedConfig.defaultCCVs of
+        [RawInstanceAddress addr] -> addr === "default@party1"
+        _ -> abort "Expected 1 defaultCCV"
+
+  pure ()
+
+-- ===========================================================================
+-- INVALID DATA REJECTION TESTS
+-- ===========================================================================
+
+testInvalidDataRejection : Script ()
+testInvalidDataRejection = do
+  -- Empty data should fail
+  case decodeUpdateDestChainConfigParams "" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeUpdateDestChainConfigParams to fail on empty data"
+
+  -- Truncated data should fail
+  case decodeUpdateSourceChainConfigParams "0000" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeUpdateSourceChainConfigParams to fail on truncated data"
+
+  pure ()

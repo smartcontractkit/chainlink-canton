@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "5e70003ac97e55078baca8000557fc5b7c59c761916a75ee0b7b97dd052ffe7e"
+	PackageID   = "7088e07117e14bdd9bb903dac2db96700776642524f14a5e4f84bdcb78143ef9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -867,7 +867,7 @@ func (t *ExecuteScheduledBatch) UnmarshalHex(data string) error {
 
 // ExpiringRoot is a Record type
 type ExpiringRoot struct {
-	Root       types.TEXT      `json:"root"`
+	Root       types.TEXT      `json:"root" hex:"bytes"`
 	ValidUntil types.TIMESTAMP `json:"validUntil"`
 	OpCount    types.INT64     `json:"opCount"`
 }
@@ -2647,7 +2647,7 @@ func (t *SetConfigParams) UnmarshalHex(data string) error {
 type SetRoot struct {
 	TargetRole    Role            `json:"targetRole"`
 	Submitter     types.PARTY     `json:"submitter"`
-	NewRoot       types.TEXT      `json:"newRoot"`
+	NewRoot       types.TEXT      `json:"newRoot" hex:"bytes"`
 	ValidUntil    types.TIMESTAMP `json:"validUntil"`
 	Metadata      RootMetadata    `json:"metadata"`
 	MetadataProof []types.TEXT    `json:"metadataProof"`
@@ -2764,7 +2764,7 @@ func (t *SetValue) UnmarshalHex(data string) error {
 
 // SignerInfo is a Record type
 type SignerInfo struct {
-	SignerAddress types.TEXT  `json:"signerAddress"`
+	SignerAddress types.TEXT  `json:"signerAddress" hex:"bytes"`
 	SignerIndex   types.INT64 `json:"signerIndex" hex:"uint32"`
 	SignerGroup   types.INT64 `json:"signerGroup" hex:"uint32"`
 }

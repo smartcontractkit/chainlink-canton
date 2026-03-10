@@ -1,5 +1,5 @@
 -- | Round-trip tests for TokenAdminRegistry codec functions
-module CCIP.TokenAdminRegistryCodecTest where
+module CCIP.TokenAdminRegistryTest.TokenAdminRegistryCodecTest where
 
 import Daml.Script
 import DA.Assert ((===))

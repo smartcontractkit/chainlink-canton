@@ -1,0 +1,80 @@
+-- | Codec module for LockReleaseTokenPool MCMS parameter encoding/decoding
+-- Used by the MCMSReceiver interface implementation to decode operationData
+module CCIP.LockReleaseTokenPoolCodec
+  ( decodeUpdateChainPoolConfigsParams
+  , encodeUpdateChainPoolConfigsParams
+  ) where
+
+import CCIP.MCMSCodecUtils
+  ( extractBytes
+  , encodeUint8
+  , decodeUint8
+  , encodeNumeric0
+  , decodeNumeric0At
+  , encodeBytesHex
+  , decodeBytesHexAt
+  , encodeBytesHexList
+  , decodeBytesHexList
+  , encodeRawInstanceAddressList
+  , decodeRawInstanceAddressList
+  )
+
+import DA.Crypto.Text (BytesHex)
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+import CCIP.LockReleaseTokenPoolTypes (ChainPoolConfig(..))
+
+-- ===========================================================================
+-- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
+-- ===========================================================================
+
+-- | Decode UpdateChainPoolConfigs params
+-- Format: [uint8 count][(numeric0 chainSelector, chainPoolConfig)...]
+decodeUpdateChainPoolConfigsParams : BytesHex -> Optional (Map.Map (Numeric 0) ChainPoolConfig)
+decodeUpdateChainPoolConfigsParams encoded = do
+  (entries, _) <- decodeChainPoolConfigMapEntries encoded 0
+  Some (Map.fromList entries)
+
+-- ===========================================================================
+-- ENCODE FUNCTIONS (for tests and Go integration)
+-- ===========================================================================
+
+-- | Encode UpdateChainPoolConfigs params
+encodeUpdateChainPoolConfigsParams : Map.Map (Numeric 0) ChainPoolConfig -> BytesHex
+encodeUpdateChainPoolConfigsParams configs =
+  let entries = Map.toList configs
+      count = length entries
+  in fromSome (encodeUint8 count) <> foldl (\acc (k, v) -> acc <> encodeNumeric0 k <> encodeChainPoolConfig v) "" entries
+
+-- ===========================================================================
+-- CHAIN POOL CONFIG ENCODING/DECODING
+-- Format: [rawInstanceAddressList inboundCCVs][rawInstanceAddressList outboundCCVs]
+--         [bytesHexList remotePools]
+-- ===========================================================================
+
+encodeChainPoolConfig : ChainPoolConfig -> BytesHex
+encodeChainPoolConfig cpc =
+  encodeRawInstanceAddressList cpc.inboundCCVs <>
+  encodeRawInstanceAddressList cpc.outboundCCVs <>
+  encodeBytesHexList cpc.remotePools
+
+decodeChainPoolConfigAt : BytesHex -> Int -> Optional (ChainPoolConfig, Int)
+decodeChainPoolConfigAt encoded offset = do
+  (inboundCCVs, offset1) <- decodeRawInstanceAddressList encoded offset
+  (outboundCCVs, offset2) <- decodeRawInstanceAddressList encoded offset1
+  (remotePools, offset3) <- decodeBytesHexList encoded offset2
+  Some (ChainPoolConfig inboundCCVs outboundCCVs remotePools, offset3)
+
+decodeChainPoolConfigMapEntries : BytesHex -> Int -> Optional ([(Numeric 0, ChainPoolConfig)], Int)
+decodeChainPoolConfigMapEntries encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeChainPoolConfigMapEntriesHelper encoded (offset + 1) count []
+
+decodeChainPoolConfigMapEntriesHelper : BytesHex -> Int -> Int -> [(Numeric 0, ChainPoolConfig)] -> Optional ([(Numeric 0, ChainPoolConfig)], Int)
+decodeChainPoolConfigMapEntriesHelper encoded offset 0 acc = Some (reverse acc, offset)
+decodeChainPoolConfigMapEntriesHelper encoded offset remaining acc = do
+  (chainSelector, offset1) <- decodeNumeric0At encoded offset
+  (config, offset2) <- decodeChainPoolConfigAt encoded offset1
+  decodeChainPoolConfigMapEntriesHelper encoded offset2 (remaining - 1) ((chainSelector, config) :: acc)
+

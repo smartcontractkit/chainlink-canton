@@ -1,0 +1,190 @@
+-- | Codec module for RMNRemote MCMS parameter encoding/decoding
+-- Used by the MCMSReceiver interface implementation to decode operationData
+module CCIP.RMNRemoteCodec
+  ( decodeCurseParams
+  , encodeCurseParams
+  , decodeUncurseParams
+  , encodeUncurseParams
+  , decodeCurseChainParams
+  , encodeCurseChainParams
+  , decodeUncurseChainParams
+  , encodeUncurseChainParams
+  , decodeCurseMultipleParams
+  , encodeCurseMultipleParams
+  , decodeUncurseMultipleParams
+  , encodeUncurseMultipleParams
+  , decodeAddCustomObserversParams
+  , encodeAddCustomObserversParams
+  , decodeRemoveCustomObserversParams
+  , encodeRemoveCustomObserversParams
+  ) where
+
+import MCMS.Codec
+  ( extractBytes
+  , encodeUint8
+  , decodeUint8
+  , encodeNumeric0
+  , decodeNumeric0At
+  )
+
+import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
+import DA.Optional (fromSome)
+
+-- ===========================================================================
+-- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
+-- ===========================================================================
+
+-- | Decode Curse params (single subject)
+-- Format: [uint8 len][bytesHex subject]
+decodeCurseParams : BytesHex -> Optional BytesHex
+decodeCurseParams encoded = do
+  (subject, _) <- decodeBytesHexAt encoded 0
+  Some subject
+
+-- | Decode Uncurse params (same as Curse)
+decodeUncurseParams : BytesHex -> Optional BytesHex
+decodeUncurseParams = decodeCurseParams
+
+-- | Decode CurseChain params (chain selector)
+-- Format: [8 bytes Numeric 0]
+decodeCurseChainParams : BytesHex -> Optional (Numeric 0)
+decodeCurseChainParams encoded = do
+  (chainSelector, _) <- decodeNumeric0At encoded 0
+  Some chainSelector
+
+-- | Decode UncurseChain params (same as CurseChain)
+decodeUncurseChainParams : BytesHex -> Optional (Numeric 0)
+decodeUncurseChainParams = decodeCurseChainParams
+
+-- | Decode CurseMultiple params (list of subjects)
+-- Format: [uint8 count][bytesHex...]
+decodeCurseMultipleParams : BytesHex -> Optional [BytesHex]
+decodeCurseMultipleParams encoded = do
+  (subjects, _) <- decodeBytesHexList encoded 0
+  Some subjects
+
+-- | Decode UncurseMultiple params (same as CurseMultiple)
+decodeUncurseMultipleParams : BytesHex -> Optional [BytesHex]
+decodeUncurseMultipleParams = decodeCurseMultipleParams
+
+-- | Decode AddCustomObservers params (list of parties)
+-- Format: [uint8 count][party...]
+decodeAddCustomObserversParams : BytesHex -> Optional [Party]
+decodeAddCustomObserversParams encoded = do
+  (parties, _) <- decodePartyList encoded 0
+  Some parties
+
+-- | Decode RemoveCustomObservers params (same as AddCustomObservers)
+decodeRemoveCustomObserversParams : BytesHex -> Optional [Party]
+decodeRemoveCustomObserversParams = decodeAddCustomObserversParams
+
+-- ===========================================================================
+-- ENCODE FUNCTIONS (for tests and Go integration)
+-- ===========================================================================
+
+-- | Encode Curse params
+encodeCurseParams : BytesHex -> BytesHex
+encodeCurseParams = encodeBytesHex
+
+-- | Encode Uncurse params
+encodeUncurseParams : BytesHex -> BytesHex
+encodeUncurseParams = encodeBytesHex
+
+-- | Encode CurseChain params
+encodeCurseChainParams : Numeric 0 -> BytesHex
+encodeCurseChainParams = encodeNumeric0
+
+-- | Encode UncurseChain params
+encodeUncurseChainParams : Numeric 0 -> BytesHex
+encodeUncurseChainParams = encodeNumeric0
+
+-- | Encode CurseMultiple params
+encodeCurseMultipleParams : [BytesHex] -> BytesHex
+encodeCurseMultipleParams = encodeBytesHexList
+
+-- | Encode UncurseMultiple params
+encodeUncurseMultipleParams : [BytesHex] -> BytesHex
+encodeUncurseMultipleParams = encodeBytesHexList
+
+-- | Encode AddCustomObservers params
+encodeAddCustomObserversParams : [Party] -> BytesHex
+encodeAddCustomObserversParams = encodePartyList
+
+-- | Encode RemoveCustomObservers params
+encodeRemoveCustomObserversParams : [Party] -> BytesHex
+encodeRemoveCustomObserversParams = encodePartyList
+
+-- ===========================================================================
+-- PRIMITIVE TYPE HELPERS
+-- Note: These are duplicated here to avoid circular dependency with ccip-common
+-- ===========================================================================
+
+-- | Encode BytesHex with uint8 length prefix
+encodeBytesHex : BytesHex -> BytesHex
+encodeBytesHex bh =
+  let len = byteCount bh
+  in fromSome (encodeUint8 len) <> bh
+
+-- | Decode BytesHex with uint8 length prefix
+decodeBytesHexAt : BytesHex -> Int -> Optional (BytesHex, Int)
+decodeBytesHexAt encoded offset = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  bytes <- extractBytes encoded (offset + 1) len
+  Some (bytes, offset + 1 + len)
+
+-- | Encode list of BytesHex
+encodeBytesHexList : [BytesHex] -> BytesHex
+encodeBytesHexList items =
+  let count = length items
+  in fromSome (encodeUint8 count) <> foldl (\acc bh -> acc <> encodeBytesHex bh) "" items
+
+-- | Decode list of BytesHex
+decodeBytesHexList : BytesHex -> Int -> Optional ([BytesHex], Int)
+decodeBytesHexList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeBytesHexListHelper encoded (offset + 1) count []
+
+decodeBytesHexListHelper : BytesHex -> Int -> Int -> [BytesHex] -> Optional ([BytesHex], Int)
+decodeBytesHexListHelper encoded offset 0 acc = Some (reverse acc, offset)
+decodeBytesHexListHelper encoded offset remaining acc = do
+  (bh, newOffset) <- decodeBytesHexAt encoded offset
+  decodeBytesHexListHelper encoded newOffset (remaining - 1) (bh :: acc)
+
+-- | Encode Party with uint8 length prefix
+encodeParty : Party -> BytesHex
+encodeParty party =
+  let partyHex = toHex (partyToText party)
+      len = byteCount partyHex
+  in fromSome (encodeUint8 len) <> partyHex
+
+-- | Decode Party with uint8 length prefix
+decodePartyAt : BytesHex -> Int -> Optional (Party, Int)
+decodePartyAt encoded offset = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  partyHex <- extractBytes encoded (offset + 1) len
+  partyText <- fromHex partyHex
+  party <- partyFromText partyText
+  Some (party, offset + 1 + len)
+
+-- | Encode list of parties
+encodePartyList : [Party] -> BytesHex
+encodePartyList parties =
+  let count = length parties
+  in fromSome (encodeUint8 count) <> foldl (\acc p -> acc <> encodeParty p) "" parties
+
+-- | Decode list of parties
+decodePartyList : BytesHex -> Int -> Optional ([Party], Int)
+decodePartyList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodePartyListHelper encoded (offset + 1) count []
+
+decodePartyListHelper : BytesHex -> Int -> Int -> [Party] -> Optional ([Party], Int)
+decodePartyListHelper encoded offset 0 acc = Some (reverse acc, offset)
+decodePartyListHelper encoded offset remaining acc = do
+  (party, newOffset) <- decodePartyAt encoded offset
+  decodePartyListHelper encoded newOffset (remaining - 1) (party :: acc)
+

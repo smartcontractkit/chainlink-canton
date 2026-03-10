@@ -1,0 +1,206 @@
+-- | Codec module for FeeQuoter MCMS parameter encoding/decoding
+-- Used by the MCMSReceiver interface implementation to decode operationData
+module CCIP.FeeQuoterCodec
+  ( decodeApplyFeeTokenUpdatesParams
+  , encodeApplyFeeTokenUpdatesParams
+  , decodeApplyDestChainConfigUpdatesParams
+  , encodeApplyDestChainConfigUpdatesParams
+  , encodeFeeTokenArgs
+  , decodeFeeTokenArgsAt
+  , encodeDestChainConfigArgs
+  , decodeDestChainConfigArgsAt
+  ) where
+
+import CCIP.MCMSCodecUtils
+  ( encodeUint8
+  , decodeUint8
+  , extractBytes
+  , encodeInstrumentId
+  , decodeInstrumentId
+  , decodeBoolAt
+  , encodeBool
+  , encodeNumeric0
+  , decodeNumeric0At
+  , encodeInt64
+  , decodeInt64At
+  , encodeBytesHex
+  , decodeBytesHexAt
+  , encodeDecimal
+  , decodeDecimalAt
+  , encodeText
+  )
+
+import DA.Crypto.Text (BytesHex)
+import DA.Optional (fromSome)
+import qualified Splice.Api.Token.HoldingV1
+import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
+
+-- ===========================================================================
+-- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
+-- ===========================================================================
+
+-- | Decode ApplyFeeTokenUpdates params
+-- Format: [uint8 numRemove][instrumentId...][uint8 numAdd][feeTokenArgs...]
+decodeApplyFeeTokenUpdatesParams : BytesHex -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs])
+decodeApplyFeeTokenUpdatesParams encoded = do
+  -- Decode list of instrumentIds to remove
+  (toRemove, offset1) <- decodeInstrumentIdList encoded 0
+  -- Decode list of FeeTokenArgs to add
+  (toAdd, _) <- decodeFeeTokenArgsList encoded offset1
+  Some (toRemove, toAdd)
+
+-- | Decode ApplyDestChainConfigUpdates params
+-- Format: [uint8 numConfigs][destChainConfigArgs...]
+decodeApplyDestChainConfigUpdatesParams : BytesHex -> Optional [DestChainConfigArgs]
+decodeApplyDestChainConfigUpdatesParams encoded = do
+  (configs, _) <- decodeDestChainConfigArgsList encoded 0
+  Some configs
+
+-- ===========================================================================
+-- ENCODE FUNCTIONS (for tests and Go integration)
+-- ===========================================================================
+
+-- | Encode ApplyFeeTokenUpdates params
+encodeApplyFeeTokenUpdatesParams : [Splice.Api.Token.HoldingV1.InstrumentId] -> [FeeTokenArgs] -> BytesHex
+encodeApplyFeeTokenUpdatesParams toRemove toAdd =
+  encodeInstrumentIdList toRemove <> encodeFeeTokenArgsList toAdd
+
+-- | Encode ApplyDestChainConfigUpdates params
+encodeApplyDestChainConfigUpdatesParams : [DestChainConfigArgs] -> BytesHex
+encodeApplyDestChainConfigUpdatesParams configs =
+  encodeDestChainConfigArgsList configs
+
+-- ===========================================================================
+-- INSTRUMENT ID LIST ENCODING/DECODING
+-- Format: [uint8 count][instrumentId...]
+-- ===========================================================================
+
+encodeInstrumentIdList : [Splice.Api.Token.HoldingV1.InstrumentId] -> BytesHex
+encodeInstrumentIdList ids =
+  let count = length ids
+  in fromSome (encodeUint8 count) <> foldl (\acc iid -> acc <> encodeInstrumentId iid) "" ids
+
+decodeInstrumentIdList : BytesHex -> Int -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], Int)
+decodeInstrumentIdList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeInstrumentIdListHelper encoded (offset + 1) count []
+
+decodeInstrumentIdListHelper : BytesHex -> Int -> Int -> [Splice.Api.Token.HoldingV1.InstrumentId] -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], Int)
+decodeInstrumentIdListHelper encoded offset 0 acc = Some (reverse acc, offset)
+decodeInstrumentIdListHelper encoded offset remaining acc = do
+  (iid, newOffset) <- decodeInstrumentId encoded offset
+  decodeInstrumentIdListHelper encoded newOffset (remaining - 1) (iid :: acc)
+
+-- ===========================================================================
+-- FEE TOKEN ARGS ENCODING/DECODING
+-- Format: [uint8 count][feeTokenArgs...]
+-- FeeTokenArgs: [instrumentId][decimal premiumMultiplier]
+-- ===========================================================================
+
+encodeFeeTokenArgsList : [FeeTokenArgs] -> BytesHex
+encodeFeeTokenArgsList args =
+  let count = length args
+  in fromSome (encodeUint8 count) <> foldl (\acc fta -> acc <> encodeFeeTokenArgs fta) "" args
+
+encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
+encodeFeeTokenArgs fta =
+  encodeInstrumentId fta.instrumentId <> encodeDecimal fta.premiumMultiplier
+
+decodeFeeTokenArgsList : BytesHex -> Int -> Optional ([FeeTokenArgs], Int)
+decodeFeeTokenArgsList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeFeeTokenArgsListHelper encoded (offset + 1) count []
+
+decodeFeeTokenArgsListHelper : BytesHex -> Int -> Int -> [FeeTokenArgs] -> Optional ([FeeTokenArgs], Int)
+decodeFeeTokenArgsListHelper encoded offset 0 acc = Some (reverse acc, offset)
+decodeFeeTokenArgsListHelper encoded offset remaining acc = do
+  (fta, newOffset) <- decodeFeeTokenArgsAt encoded offset
+  decodeFeeTokenArgsListHelper encoded newOffset (remaining - 1) (fta :: acc)
+
+decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
+decodeFeeTokenArgsAt encoded offset = do
+  (instrumentId, offset1) <- decodeInstrumentId encoded offset
+  (premiumMultiplier, offset2) <- decodeDecimalAt encoded offset1
+  Some (FeeTokenArgs instrumentId premiumMultiplier, offset2)
+
+-- ===========================================================================
+-- DEST CHAIN CONFIG ARGS ENCODING/DECODING
+-- Format: [uint8 count][destChainConfigArgs...]
+-- DestChainConfigArgs: [numeric0 destChainSelector][destChainConfig]
+-- DestChainConfig: [bool isEnabled][int maxDataBytes][int maxPerMsgGasLimit]
+--                  [int destGasOverhead][int destGasPerPayloadByteBase]
+--                  [bytesHex chainFamilySelector][int defaultTxGasLimit]
+--                  [decimal networkFeeUSD][decimal defaultTokenFeeUSD]
+--                  [int defaultTokenDestGasOverhead]
+-- ===========================================================================
+
+encodeDestChainConfigArgsList : [DestChainConfigArgs] -> BytesHex
+encodeDestChainConfigArgsList args =
+  let count = length args
+  in fromSome (encodeUint8 count) <> foldl (\acc dcca -> acc <> encodeDestChainConfigArgs dcca) "" args
+
+encodeDestChainConfigArgs : DestChainConfigArgs -> BytesHex
+encodeDestChainConfigArgs dcca =
+  encodeNumeric0 dcca.destChainSelector <> encodeDestChainConfig dcca.destChainConfig
+
+encodeDestChainConfig : DestChainConfig -> BytesHex
+encodeDestChainConfig dcc =
+  encodeBool dcc.isEnabled <>
+  encodeInt dcc.maxDataBytes <>
+  encodeInt dcc.maxPerMsgGasLimit <>
+  encodeInt dcc.destGasOverhead <>
+  encodeInt dcc.destGasPerPayloadByteBase <>
+  encodeBytesHex dcc.chainFamilySelector <>
+  encodeInt dcc.defaultTxGasLimit <>
+  encodeDecimal dcc.networkFeeUSD <>
+  encodeDecimal dcc.defaultTokenFeeUSD <>
+  encodeInt dcc.defaultTokenDestGasOverhead
+
+decodeDestChainConfigArgsList : BytesHex -> Int -> Optional ([DestChainConfigArgs], Int)
+decodeDestChainConfigArgsList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeDestChainConfigArgsListHelper encoded (offset + 1) count []
+
+decodeDestChainConfigArgsListHelper : BytesHex -> Int -> Int -> [DestChainConfigArgs] -> Optional ([DestChainConfigArgs], Int)
+decodeDestChainConfigArgsListHelper encoded offset 0 acc = Some (reverse acc, offset)
+decodeDestChainConfigArgsListHelper encoded offset remaining acc = do
+  (dcca, newOffset) <- decodeDestChainConfigArgsAt encoded offset
+  decodeDestChainConfigArgsListHelper encoded newOffset (remaining - 1) (dcca :: acc)
+
+decodeDestChainConfigArgsAt : BytesHex -> Int -> Optional (DestChainConfigArgs, Int)
+decodeDestChainConfigArgsAt encoded offset = do
+  (destChainSelector, offset1) <- decodeNumeric0At encoded offset
+  (destChainConfig, offset2) <- decodeDestChainConfigAt encoded offset1
+  Some (DestChainConfigArgs destChainSelector destChainConfig, offset2)
+
+decodeDestChainConfigAt : BytesHex -> Int -> Optional (DestChainConfig, Int)
+decodeDestChainConfigAt encoded offset = do
+  (isEnabled, offset1) <- decodeBoolAt encoded offset
+  (maxDataBytes, offset2) <- decodeIntAt encoded offset1
+  (maxPerMsgGasLimit, offset3) <- decodeIntAt encoded offset2
+  (destGasOverhead, offset4) <- decodeIntAt encoded offset3
+  (destGasPerPayloadByteBase, offset5) <- decodeIntAt encoded offset4
+  (chainFamilySelector, offset6) <- decodeBytesHexAt encoded offset5
+  (defaultTxGasLimit, offset7) <- decodeIntAt encoded offset6
+  (networkFeeUSD, offset8) <- decodeDecimalAt encoded offset7
+  (defaultTokenFeeUSD, offset9) <- decodeDecimalAt encoded offset8
+  (defaultTokenDestGasOverhead, offset10) <- decodeIntAt encoded offset9
+  Some (DestChainConfig isEnabled maxDataBytes maxPerMsgGasLimit destGasOverhead
+                        destGasPerPayloadByteBase chainFamilySelector defaultTxGasLimit
+                        networkFeeUSD defaultTokenFeeUSD defaultTokenDestGasOverhead, offset10)
+
+-- ===========================================================================
+-- PRIMITIVE TYPE HELPERS
+-- ===========================================================================
+
+-- | Encode Int as 8 bytes big-endian (matches Go INT64 encoding)
+encodeInt : Int -> BytesHex
+encodeInt n = fromSome (encodeInt64 n)
+
+-- | Decode Int from 8 bytes big-endian (matches Go INT64 encoding)
+decodeIntAt : BytesHex -> Int -> Optional (Int, Int)
+decodeIntAt = decodeInt64At
+

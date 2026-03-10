@@ -1,0 +1,264 @@
+-- | Round-trip tests for FeeQuoter codec functions
+module CCIP.FeeQuoterTest.FeeQuoterCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import qualified Splice.Api.Token.HoldingV1
+import CCIP.FeeQuoterCodec
+import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
+
+-- ===========================================================================
+-- FEE TOKEN ARGS ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testFeeTokenArgsRoundtrip : Script ()
+testFeeTokenArgsRoundtrip = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      feeTokenArgs = FeeTokenArgs with
+        instrumentId
+        premiumMultiplier = 1.5
+
+      encoded = encodeFeeTokenArgs feeTokenArgs
+
+  case decodeFeeTokenArgsAt encoded 0 of
+    None -> abort "Failed to decode FeeTokenArgs"
+    Some (decoded, _) -> do
+      decoded.instrumentId === feeTokenArgs.instrumentId
+      decoded.premiumMultiplier === feeTokenArgs.premiumMultiplier
+
+  pure ()
+
+-- ===========================================================================
+-- APPLY FEE TOKEN UPDATES PARAMS TESTS
+-- ===========================================================================
+
+testApplyFeeTokenUpdatesParamsRoundtrip : Script ()
+testApplyFeeTokenUpdatesParamsRoundtrip = do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instrumentId1 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      instrumentId2 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+
+      feeTokensToRemove = [instrumentId1]
+      feeTokensToAdd = [
+        FeeTokenArgs instrumentId2 1.25,
+        FeeTokenArgs instrumentId1 2.0
+        ]
+
+      encoded = encodeApplyFeeTokenUpdatesParams feeTokensToRemove feeTokensToAdd
+
+  case decodeApplyFeeTokenUpdatesParams encoded of
+    None -> abort "Failed to decode ApplyFeeTokenUpdates params"
+    Some (decodedToRemove, decodedToAdd) -> do
+      length decodedToRemove === length feeTokensToRemove
+      length decodedToAdd === length feeTokensToAdd
+
+      -- Verify first token to remove
+      case (decodedToRemove, feeTokensToRemove) of
+        ([r1], [e1]) -> r1 === e1
+        _ -> abort "Mismatch in toRemove list"
+
+      -- Verify tokens to add
+      case decodedToAdd of
+        [a1, a2] -> do
+          a1.instrumentId === instrumentId2
+          a1.premiumMultiplier === 1.25
+          a2.instrumentId === instrumentId1
+          a2.premiumMultiplier === 2.0
+        _ -> abort "Expected 2 tokens to add"
+
+  pure ()
+
+testApplyFeeTokenUpdatesEmptyLists : Script ()
+testApplyFeeTokenUpdatesEmptyLists = do
+  let encoded = encodeApplyFeeTokenUpdatesParams [] []
+
+  case decodeApplyFeeTokenUpdatesParams encoded of
+    None -> abort "Failed to decode empty ApplyFeeTokenUpdates params"
+    Some (decodedToRemove, decodedToAdd) -> do
+      decodedToRemove === []
+      decodedToAdd === []
+
+  pure ()
+
+-- ===========================================================================
+-- DEST CHAIN CONFIG ENCODING/DECODING TESTS
+-- ===========================================================================
+
+testDestChainConfigArgsRoundtrip : Script ()
+testDestChainConfigArgsRoundtrip = do
+  let destChainConfig = DestChainConfig with
+        isEnabled = True
+        maxDataBytes = 65535
+        maxPerMsgGasLimit = 3000000
+        destGasOverhead = 100000
+        destGasPerPayloadByteBase = 16
+        chainFamilySelector = "2812d52c"  -- EVM family selector
+        defaultTxGasLimit = 200000
+        networkFeeUSD = 0.01
+        defaultTokenFeeUSD = 0.5
+        defaultTokenDestGasOverhead = 50000
+
+      destChainConfigArgs = DestChainConfigArgs with
+        destChainSelector = 1.0  -- Numeric 0
+        destChainConfig
+
+      encoded = encodeDestChainConfigArgs destChainConfigArgs
+
+  case decodeDestChainConfigArgsAt encoded 0 of
+    None -> abort "Failed to decode DestChainConfigArgs"
+    Some (decoded, _) -> do
+      decoded.destChainSelector === destChainConfigArgs.destChainSelector
+      decoded.destChainConfig.isEnabled === True
+      decoded.destChainConfig.maxDataBytes === 65535
+      decoded.destChainConfig.maxPerMsgGasLimit === 3000000
+      decoded.destChainConfig.destGasOverhead === 100000
+      decoded.destChainConfig.destGasPerPayloadByteBase === 16
+      decoded.destChainConfig.chainFamilySelector === "2812d52c"
+      decoded.destChainConfig.defaultTxGasLimit === 200000
+      decoded.destChainConfig.networkFeeUSD === 0.01
+      decoded.destChainConfig.defaultTokenFeeUSD === 0.5
+      decoded.destChainConfig.defaultTokenDestGasOverhead === 50000
+
+  pure ()
+
+testApplyDestChainConfigUpdatesParamsRoundtrip : Script ()
+testApplyDestChainConfigUpdatesParamsRoundtrip = do
+  let config1 = DestChainConfig with
+        isEnabled = True
+        maxDataBytes = 65535
+        maxPerMsgGasLimit = 3000000
+        destGasOverhead = 100000
+        destGasPerPayloadByteBase = 16
+        chainFamilySelector = "2812d52c"
+        defaultTxGasLimit = 200000
+        networkFeeUSD = 0.01
+        defaultTokenFeeUSD = 0.5
+        defaultTokenDestGasOverhead = 50000
+
+      config2 = DestChainConfig with
+        isEnabled = False
+        maxDataBytes = 32768
+        maxPerMsgGasLimit = 1500000
+        destGasOverhead = 50000
+        destGasPerPayloadByteBase = 8
+        chainFamilySelector = "00000001"
+        defaultTxGasLimit = 100000
+        networkFeeUSD = 0.02
+        defaultTokenFeeUSD = 1.0
+        defaultTokenDestGasOverhead = 25000
+
+      configArgs = [
+        DestChainConfigArgs 1.0 config1,
+        DestChainConfigArgs 137.0 config2
+        ]
+
+      encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+
+  case decodeApplyDestChainConfigUpdatesParams encoded of
+    None -> abort "Failed to decode ApplyDestChainConfigUpdates params"
+    Some decodedConfigs -> do
+      length decodedConfigs === 2
+
+      case decodedConfigs of
+        [d1, d2] -> do
+          d1.destChainSelector === 1.0
+          d1.destChainConfig.isEnabled === True
+          d1.destChainConfig.maxDataBytes === 65535
+
+          d2.destChainSelector === 137.0
+          d2.destChainConfig.isEnabled === False
+          d2.destChainConfig.maxDataBytes === 32768
+        _ -> abort "Expected 2 config args"
+
+  pure ()
+
+testApplyDestChainConfigUpdatesEmptyList : Script ()
+testApplyDestChainConfigUpdatesEmptyList = do
+  let encoded = encodeApplyDestChainConfigUpdatesParams []
+
+  case decodeApplyDestChainConfigUpdatesParams encoded of
+    None -> abort "Failed to decode empty ApplyDestChainConfigUpdates params"
+    Some decodedConfigs ->
+      decodedConfigs === []
+
+  pure ()
+
+-- ===========================================================================
+-- LARGE CHAIN SELECTOR TESTS
+-- ===========================================================================
+
+testDestChainConfigArgsLargeSelector : Script ()
+testDestChainConfigArgsLargeSelector = do
+  -- Test with CCIP-style large chain selector (exceeds Int64 max)
+  let largeSelector : Numeric 0 = 16015286601757825753.0  -- Avalanche Fuji testnet
+
+      destChainConfig = DestChainConfig with
+        isEnabled = True
+        maxDataBytes = 65535
+        maxPerMsgGasLimit = 3000000
+        destGasOverhead = 100000
+        destGasPerPayloadByteBase = 16
+        chainFamilySelector = "2812d52c"
+        defaultTxGasLimit = 200000
+        networkFeeUSD = 0.01
+        defaultTokenFeeUSD = 0.5
+        defaultTokenDestGasOverhead = 50000
+
+      destChainConfigArgs = DestChainConfigArgs largeSelector destChainConfig
+      encoded = encodeDestChainConfigArgs destChainConfigArgs
+
+  case decodeDestChainConfigArgsAt encoded 0 of
+    None -> abort "Failed to decode DestChainConfigArgs with large selector"
+    Some (decoded, _) -> do
+      decoded.destChainSelector === largeSelector
+      decoded.destChainConfig.isEnabled === True
+
+  pure ()
+
+testDestChainConfigArgsEdgeCases : Script ()
+testDestChainConfigArgsEdgeCases = do
+  let mkConfig selector = DestChainConfigArgs selector (DestChainConfig True 1000 1000 1000 16 "00000000" 1000 0.01 0.01 1000)
+
+  -- Test zero selector
+  let zeroEncoded = encodeDestChainConfigArgs (mkConfig 0.0)
+  case decodeDestChainConfigArgsAt zeroEncoded 0 of
+    None -> abort "Failed to decode zero selector"
+    Some (decoded, _) -> decoded.destChainSelector === 0.0
+
+  -- Test max Int64 boundary (9223372036854775807)
+  let maxInt64 : Numeric 0 = 9223372036854775807.0
+      maxInt64Encoded = encodeDestChainConfigArgs (mkConfig maxInt64)
+  case decodeDestChainConfigArgsAt maxInt64Encoded 0 of
+    None -> abort "Failed to decode max Int64 selector"
+    Some (decoded, _) -> decoded.destChainSelector === maxInt64
+
+  -- Test max uint64 (18446744073709551615)
+  let maxUint64 : Numeric 0 = 18446744073709551615.0
+      maxUint64Encoded = encodeDestChainConfigArgs (mkConfig maxUint64)
+  case decodeDestChainConfigArgsAt maxUint64Encoded 0 of
+    None -> abort "Failed to decode max uint64 selector"
+    Some (decoded, _) -> decoded.destChainSelector === maxUint64
+
+  pure ()
+
+-- ===========================================================================
+-- INVALID DATA REJECTION TESTS
+-- ===========================================================================
+
+testInvalidDataRejection : Script ()
+testInvalidDataRejection = do
+  -- Empty data should fail
+  case decodeApplyFeeTokenUpdatesParams "" of
+    None -> pure ()  -- Expected
+    Some _ -> abort "Expected decodeApplyFeeTokenUpdatesParams to fail on empty data"
+
+  -- Truncated data should fail
+  case decodeApplyDestChainConfigUpdatesParams "00" of
+    None -> pure ()  -- Expected - count says 0 items but might be truncated
+    Some configs -> configs === []  -- Also valid - 0 items
+
+  pure ()

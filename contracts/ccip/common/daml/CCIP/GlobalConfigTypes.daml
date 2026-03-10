@@ -1,0 +1,25 @@
+-- | Types for GlobalConfig, extracted to avoid circular dependencies
+module CCIP.GlobalConfigTypes where
+
+import DA.Crypto.Text (BytesHex)
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+
+-- | Configuration for a destination chain.
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool
+        offRampAddress : BytesHex
+        laneMandatedCCVs : [RawInstanceAddress]
+        defaultCCVs : [RawInstanceAddress]
+        messageNetworkFeeUSDCents : Decimal
+        tokenNetworkFeeUSDCents : Decimal
+    deriving (Eq, Show)
+
+-- | Configuration for a source chain.
+data SourceChainConfig = SourceChainConfig
+    with
+        isEnabled : Bool
+        onRampAddress : BytesHex
+        laneMandatedCCVs : [RawInstanceAddress]
+        defaultCCVs : [RawInstanceAddress]
+    deriving (Eq, Show)
