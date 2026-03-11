@@ -1,0 +1,109 @@
+module CCIP.RateLimiter where
+
+import DA.Time (convertRelTimeToMicroseconds, subTime)
+
+import qualified CCIP.Context
+import qualified CCIP.RawInstanceAddress
+
+rateLimiterKey : Text
+rateLimiterKey = "rate-limiter"
+
+lookupRateLimiterCid : CCIP.Context.CCIPContext -> Update (ContractId RateLimiter)
+lookupRateLimiterCid ctx = CCIP.Context.getFromContextU ctx rateLimiterKey
+
+rawInstanceAddress : RateLimiter -> CCIP.RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress rl = CCIP.RawInstanceAddress.make rl.instanceId rl.poolOwner
+
+data RateLimitDirection
+    = RateLimitDirection_Outbound
+    | RateLimitDirection_Inbound
+    deriving (Eq, Show)
+
+data RateLimitMode
+    = RateLimitMode_DefaultFinality
+    | RateLimitMode_CustomFinality
+    deriving (Eq, Show)
+
+data ConsumeCapacityResult = ConsumeCapacityResult
+    with
+        rateLimiterCid : ContractId RateLimiter
+        availableBeforeConsume : Numeric 0
+        consumed : Numeric 0
+    deriving (Eq, Show)
+
+elapsedSeconds : Time -> Time -> Numeric 0
+elapsedSeconds start end =
+    let micros = convertRelTimeToMicroseconds (subTime end start)
+        secs : Int = max 0 (micros / 1000000)
+    in intToNumeric secs
+
+availableTokensAt : Time -> RateLimiter -> Numeric 0
+availableTokensAt now rl =
+    if not rl.isEnabled then
+        rl.capacity
+    else
+        min rl.capacity (rl.tokens + (elapsedSeconds rl.lastUpdated now * rl.rate))
+
+template RateLimiter
+    with
+        instanceId : Text
+        poolInstanceId : Text
+        poolOwner : Party
+        remoteChainSelector : Numeric 0
+        direction : RateLimitDirection
+        mode : RateLimitMode
+        isEnabled : Bool
+        capacity : Numeric 0
+        rate : Numeric 0
+        tokens : Numeric 0
+        lastUpdated : Time
+    where
+        signatory poolOwner
+
+        choice SetConfig : ContractId RateLimiter
+            with
+                newIsEnabled : Bool
+                newCapacity : Numeric 0
+                newRate : Numeric 0
+            controller poolOwner
+            do
+                assertMsg "RateLimiter: enabled config requires rate <= capacity"
+                    (not newIsEnabled || newRate <= newCapacity)
+                assertMsg "RateLimiter: disabled config must have zero capacity and zero rate"
+                    (newIsEnabled || (newCapacity == 0.0 && newRate == 0.0))
+                now <- getTime
+                create this with
+                    isEnabled = newIsEnabled
+                    capacity = newCapacity
+                    rate = newRate
+                    tokens = newCapacity
+                    lastUpdated = now
+
+        nonconsuming choice ConsumeCapacity : ConsumeCapacityResult
+            with
+                requested : Numeric 0
+            controller poolOwner
+            do
+                if not isEnabled || requested == 0.0 then
+                    pure ConsumeCapacityResult with
+                        rateLimiterCid = self
+                        availableBeforeConsume = availableTokensAt lastUpdated this
+                        consumed = requested
+                else do
+                    now <- getTime
+                    let available = availableTokensAt now this
+
+                    assertMsg "RateLimiter: request exceeds capacity"
+                        (requested <= capacity)
+                    assertMsg "RateLimiter: insufficient capacity"
+                        (requested <= available)
+
+                    archive self
+                    newCid <- create this with
+                        tokens = available - requested
+                        lastUpdated = now
+
+                    pure ConsumeCapacityResult with
+                        rateLimiterCid = newCid
+                        availableBeforeConsume = available
+                        consumed = requested
