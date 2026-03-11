@@ -22,7 +22,7 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
 import qualified CCIP.Context
-import CCIP.MCMSCodecUtils
+import CCIP.Codec
   ( encodeRawInstanceAddress
   , decodeRawInstanceAddressAt
   , encodeOptionalRawInstanceAddress
@@ -117,7 +117,7 @@ template PerPartyRouterFactory
 
         interface instance MCMSReceiver for PerPartyRouterFactory where
           view = MCMSReceiverView with
-            owner = ccipOwner
+            mcmsController = ccipOwner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do
@@ -500,7 +500,7 @@ template PerPartyRouter
 
         interface instance MCMSReceiver for PerPartyRouter where
           view = MCMSReceiverView with
-            owner = ccipOwner
+            mcmsController = ccipOwner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do

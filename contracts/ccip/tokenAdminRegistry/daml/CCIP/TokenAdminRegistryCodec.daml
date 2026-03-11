@@ -15,14 +15,16 @@ module CCIP.TokenAdminRegistryCodec
   , decodeTextAt
   ) where
 
-import CCIP.MCMSCodecUtils
+import MCMS.Codec
   ( encodeText
   , decodeTextAt
   , encodeParty
   , decodePartyAt
-  , encodeInstrumentId
-  , decodeInstrumentId
   , decodeBoolAt
+  )
+import CCIP.Codec
+  ( encodeInstrumentId
+  , decodeInstrumentId
   )
 
 import DA.Crypto.Text (BytesHex)

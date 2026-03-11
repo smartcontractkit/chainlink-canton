@@ -53,8 +53,8 @@ data ArgValue
 --
 data MCMSReceiverView = MCMSReceiverView
   with
-    owner : Party       -- The controlling party
-    instanceId : Text   -- Stable identifier (without @partyId suffix)
+    mcmsController : Party  -- Party authorized to invoke MCMSReceiver_Entrypoint
+    instanceId : Text       -- Stable identifier (without @partyId suffix)
   deriving (Show, Eq)
 
 -- | MCMSReceiver interface
@@ -84,15 +84,6 @@ interface MCMSReceiver where
   --          Implementer is responsible for adding their own updated CID to the returned map
   mcmsEntrypoint : Text -> BytesHex -> Map.Map Text (ContractId ()) -> Update (Map.Map Text (ContractId ()))
 
-  -- | Non-consuming choice to get instance id (for validation)
-  nonconsuming choice MCMSReceiver_GetInstanceId : Text
-    with
-      c : Party  -- Controller (anyone can query)
-    controller c
-    do
-      let v = view this
-      pure v.instanceId
-
   -- | Non-consuming choice for MCMS to call with verified operation
   -- Only ccip_owner can call this (MCMS has ccip_owner as signatory)
   -- The implementation dispatches based on functionName by exercising
@@ -103,7 +94,7 @@ interface MCMSReceiver where
       functionName : Text                         -- Function to execute
       operationData : BytesHex                    -- Serialized parameters (hex) - uint16 length prefix
       contractIds : Map.Map Text (ContractId ())  -- Map of instanceAddress → contractId for target to use
-    controller (view this).owner
+    controller (view this).mcmsController
     do
       (((this `mcmsEntrypoint` functionName) operationData) contractIds)
 

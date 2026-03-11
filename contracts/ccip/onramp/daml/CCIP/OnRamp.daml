@@ -17,7 +17,7 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
-import CCIP.MCMSCodecUtils
+import CCIP.Codec
   ( encodeRawInstanceAddress
   , decodeRawInstanceAddressAt
   , encodeOptionalRawInstanceAddress
@@ -366,7 +366,7 @@ template OnRamp
 
         interface instance MCMSReceiver for OnRamp where
           view = MCMSReceiverView with
-            owner = ccipOwner
+            mcmsController = ccipOwner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do

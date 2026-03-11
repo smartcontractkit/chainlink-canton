@@ -511,7 +511,7 @@ template LockReleaseTokenPool
 
         interface instance MCMSReceiver for LockReleaseTokenPool where
           view = MCMSReceiverView with
-            owner = poolOwner
+            mcmsController = poolOwner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do

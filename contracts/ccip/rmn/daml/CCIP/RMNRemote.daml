@@ -264,7 +264,7 @@ template RMNRemote
 
         interface instance MCMSReceiver for RMNRemote where
           view = MCMSReceiverView with
-            owner = rmnOwner
+            mcmsController = rmnOwner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do

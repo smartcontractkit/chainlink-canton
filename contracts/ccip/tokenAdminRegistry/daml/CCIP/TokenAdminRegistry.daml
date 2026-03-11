@@ -310,7 +310,7 @@ template TokenAdminRegistry
 
         interface instance MCMSReceiver for TokenAdminRegistry where
           view = MCMSReceiverView with
-            owner
+            mcmsController = owner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do

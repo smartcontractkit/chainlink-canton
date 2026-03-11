@@ -190,7 +190,7 @@ template FeeQuoter
 
         interface instance MCMSReceiver for FeeQuoter where
           view = MCMSReceiverView with
-            owner
+            mcmsController = owner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do
