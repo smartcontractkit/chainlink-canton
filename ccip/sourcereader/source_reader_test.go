@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"math/big"
 	"testing"
@@ -144,17 +145,24 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 
 func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 	t.Parallel()
-	const nopParty = "node-operator-party"
-	ctx := context.Background()
-
-	rmnRemoteTemplateID := contracts.TemplateID{
-		PackageID:  rmn.PackageName,
-		ModuleName: "CCIP.RMNRemote",
-		EntityName: "RMNRemote",
-	}
+	const (
+		nopParty      = "node-operator-party"
+		rmnOwner      = "owner"
+		ccipOwner     = "ccip-owner"
+		rmnInstanceID = "rmn-1"
+	)
+	var (
+		rmnRemoteTemplateID = contracts.TemplateID{
+			PackageID:  fmt.Sprintf("#%s", rmn.PackageName),
+			ModuleName: "CCIP.RMNRemote",
+			EntityName: "RMNRemote",
+		}
+		rmnInstanceAddress = contracts.InstanceID(rmnInstanceID).RawInstanceAddress(rmnOwner).InstanceAddress()
+	)
 
 	t.Run("returns cursed subjects from first active RMNRemote", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		// Two subjects: with and without 0x prefix (code adds 0x if missing).
 		subject1Hex := "0102030405060708090a0b0c0d0e0f10"
 		subject2Hex := "0x1112131415161718191a1b1c1d1e1f20"
@@ -163,9 +171,9 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 			TemplateId: rmnRemoteTemplateID.ToLedgerIdentifier(),
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "rmn-1"}}},
-					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "owner"}}},
-					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "ccip-owner"}}},
+					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: rmnInstanceID}}},
+					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: rmnOwner}}},
+					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: ccipOwner}}},
 					{Label: "customObservers", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
 					{Label: "cursedSubjects", Value: &ledgerv2.Value{
 						Sum: &ledgerv2.Value_List{
@@ -177,6 +185,7 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 					}},
 				},
 			},
+			Signatories: []string{rmnOwner},
 		}
 
 		stateClient := mocks.NewMockStateServiceClient(t)
@@ -206,6 +215,7 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 				NodeOperatorParty:   nopParty,
 				RMNRemoteTemplateID: rmnRemoteTemplateID,
 			},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		subjects, err := reader.GetRMNCursedSubjects(ctx)
@@ -222,17 +232,19 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 
 	t.Run("returns empty list when RMNRemote has no cursed subjects", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		createdEvent := &ledgerv2.CreatedEvent{
 			TemplateId: rmnRemoteTemplateID.ToLedgerIdentifier(),
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "rmn-1"}}},
-					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "owner"}}},
-					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "ccip-owner"}}},
+					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: rmnInstanceID}}},
+					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: rmnOwner}}},
+					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: ccipOwner}}},
 					{Label: "customObservers", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
 					{Label: "cursedSubjects", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
 				},
 			},
+			Signatories: []string{rmnOwner},
 		}
 
 		stateClient := mocks.NewMockStateServiceClient(t)
@@ -246,8 +258,9 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 			}}, nil)
 
 		reader := &sourceReader{
-			stateServiceClient: stateClient,
-			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			stateServiceClient:       stateClient,
+			config:                   ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		subjects, err := reader.GetRMNCursedSubjects(ctx)
@@ -257,6 +270,7 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 
 	t.Run("returns error when no active RMNRemote found", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
@@ -264,24 +278,27 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 			Return(&fakeActiveContractsStream{ctx: ctx}, nil) // no responses, EOF immediately
 
 		reader := &sourceReader{
-			stateServiceClient: stateClient,
-			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			stateServiceClient:       stateClient,
+			config:                   ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		_, err := reader.GetRMNCursedSubjects(ctx)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "no active RMNRemote found")
+		require.ErrorContains(t, err, "no active contract found for InstanceAddress")
 	})
 
 	t.Run("surfaces LatestAndFinalizedBlock error", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return((*ledgerv2.GetLedgerEndResponse)(nil), errors.New("ledger end failed"))
 
 		reader := &sourceReader{
-			stateServiceClient: stateClient,
-			config:             ReaderConfig{RMNRemoteTemplateID: rmnRemoteTemplateID},
+			stateServiceClient:       stateClient,
+			config:                   ReaderConfig{RMNRemoteTemplateID: rmnRemoteTemplateID},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		_, err := reader.GetRMNCursedSubjects(ctx)
@@ -291,6 +308,7 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 
 	t.Run("surfaces GetActiveContracts error", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
@@ -298,8 +316,9 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 			Return((grpc.ServerStreamingClient[ledgerv2.GetActiveContractsResponse])(nil), errors.New("get active contracts failed"))
 
 		reader := &sourceReader{
-			stateServiceClient: stateClient,
-			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			stateServiceClient:       stateClient,
+			config:                   ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		_, err := reader.GetRMNCursedSubjects(ctx)
@@ -309,6 +328,7 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 
 	t.Run("surfaces Recv error", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&ledgerv2.GetLedgerEndResponse{Offset: 5}, nil)
@@ -316,8 +336,9 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 			Return(&fakeActiveContractsStream{ctx: ctx, err: errors.New("recv failed")}, nil)
 
 		reader := &sourceReader{
-			stateServiceClient: stateClient,
-			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			stateServiceClient:       stateClient,
+			config:                   ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		_, err := reader.GetRMNCursedSubjects(ctx)
@@ -327,13 +348,14 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 
 	t.Run("returns error when subject is not valid hex", func(t *testing.T) {
 		t.Parallel()
+		ctx := t.Context()
 		createdEvent := &ledgerv2.CreatedEvent{
 			TemplateId: rmnRemoteTemplateID.ToLedgerIdentifier(),
 			CreateArguments: &ledgerv2.Record{
 				Fields: []*ledgerv2.RecordField{
-					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: "rmn-1"}}},
-					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "owner"}}},
-					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: "ccip-owner"}}},
+					{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: rmnInstanceID}}},
+					{Label: "rmnOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: rmnOwner}}},
+					{Label: "ccipOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: ccipOwner}}},
 					{Label: "customObservers", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
 					{Label: "cursedSubjects", Value: &ledgerv2.Value{
 						Sum: &ledgerv2.Value_List{
@@ -344,6 +366,7 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 					}},
 				},
 			},
+			Signatories: []string{rmnOwner},
 		}
 
 		stateClient := mocks.NewMockStateServiceClient(t)
@@ -357,8 +380,9 @@ func TestSourceReader_GetRMNCursedSubjects(t *testing.T) {
 			}}, nil)
 
 		reader := &sourceReader{
-			stateServiceClient: stateClient,
-			config:             ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			stateServiceClient:       stateClient,
+			config:                   ReaderConfig{NodeOperatorParty: nopParty, RMNRemoteTemplateID: rmnRemoteTemplateID},
+			rmnRemoteInstanceAddress: rmnInstanceAddress,
 		}
 
 		_, err := reader.GetRMNCursedSubjects(ctx)
