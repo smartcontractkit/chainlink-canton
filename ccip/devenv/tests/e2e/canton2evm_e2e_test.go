@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -178,9 +180,24 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	t.Run("EOA receiver and default committee verifier with token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
+		const destTokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+		const transferAmount = int64(1000)
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
+		destTokenRef, err := in.CLDF.DataStore.Addresses().Get(
+			datastore.NewAddressRefKey(
+				evmChain.ChainSelector(),
+				datastore.ContractType("BurnMintERC20WithDrip"),
+				semver.MustParse("1.5.0"),
+				destTokenQualifier,
+			),
+		)
+		require.NoError(t, err, "failed to resolve destination EVM token address for Canton->EVM token transfer")
+		destTokenAddress := protocol.UnknownAddress(gethcommon.HexToAddress(destTokenRef.Address).Bytes())
+		receiverBalanceBefore, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
+		require.NoError(t, err)
+		require.NotNil(t, receiverBalanceBefore)
 		ccvAddr, err := tcapi.GetContractAddress(
 			in,
 			cantonChain.ChainSelector(),
@@ -208,7 +225,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 				Receiver: receiver,
 				Data:     []byte("canton2evm token transfer tcapi test"),
 				TokenAmount: cciptestinterfaces.TokenAmount{
-					Amount: big.NewInt(1000),
+					Amount: big.NewInt(transferAmount),
 				},
 			},
 			cciptestinterfaces.MessageOptions{
@@ -263,6 +280,11 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			)
 		}
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
+		require.NoError(t, err)
+		require.NotNil(t, receiverBalanceAfter)
+		transferred := new(big.Int).Sub(receiverBalanceAfter, receiverBalanceBefore)
+		require.Equal(t, big.NewInt(transferAmount), transferred, "receiver token balance should increase by transfer amount")
 		t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
 	})
 }

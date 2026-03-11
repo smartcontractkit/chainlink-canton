@@ -178,8 +178,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	defaultAggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
 
 	t.Run("token transfer", func(t *testing.T) {
-		// Matches the default BurnMint pool pair configured by devenv.
-		const tokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [] to BurnMintTokenPool 1.7.0 [])"
+		// Matches the default EVM->Canton lock/release lane configured by devenv.
+		const tokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+		const transferAmount = int64(1000)
 		tokenRef, err := in.CLDF.DataStore.Addresses().Get(
 			datastore.NewAddressRefKey(
 				srcSelector,
@@ -190,6 +191,11 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		)
 		require.NoError(t, err, "failed to resolve source token address for token transfer e2e")
 		srcToken := protocol.UnknownAddress(gethcommon.HexToAddress(tokenRef.Address).Bytes())
+		senderAddress, err := srcChain.GetSenderAddress()
+		require.NoError(t, err)
+		senderBalanceBefore, err := srcChain.GetTokenBalance(ctx, senderAddress, srcToken)
+		require.NoError(t, err)
+		require.NotNil(t, senderBalanceBefore)
 
 		seqNo, err := srcChain.GetExpectedNextSequenceNumber(ctx, dstSelector)
 		require.NoError(t, err)
@@ -200,7 +206,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 				Receiver: receiver.Bytes(),
 				Data:     []byte("Hello token transfer from EVM!"),
 				TokenAmount: cciptestinterfaces.TokenAmount{
-					Amount:       big.NewInt(1000),
+					Amount:       big.NewInt(transferAmount),
 					TokenAddress: srcToken,
 				},
 			},
@@ -254,10 +260,11 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 		message := res.IndexedVerifications.Results[0].VerifierResult.Message
 		require.NotNil(t, message.TokenTransfer, "indexed message should include token transfer")
-
-		// Token-transfer manual execution path is exercised separately; this e2e subtest
-		// validates send + verification surfaces include token transfer data.
-		t.Log("Skipping manual execute assertion for token transfer")
+		senderBalanceAfter, err := srcChain.GetTokenBalance(ctx, senderAddress, srcToken)
+		require.NoError(t, err)
+		require.NotNil(t, senderBalanceAfter)
+		spent := new(big.Int).Sub(senderBalanceBefore, senderBalanceAfter)
+		require.Equal(t, big.NewInt(transferAmount), spent, "sender EVM token balance should decrease by transfer amount")
 	})
 
 	testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)

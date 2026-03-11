@@ -94,7 +94,7 @@ jobs:
       - name: Run CCIP TestCanton2EVM_Basic test
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
-          go test -timeout 8m -v -count 1 -run TestCanton2EVM_Basic
+          go test -timeout 8m -v -count 1 -run 'TestCanton2EVM_Basic/EOA_receiver_and_default_committee_verifier$'
         continue-on-error: true
         id: test_run_canton2evm_basic
       
@@ -112,7 +112,7 @@ jobs:
         continue-on-error: true
         id: test_run_evm2canton_token_transfer
 
-      - name: Run CCIP Canton2EVM token transfer subtest
+      - name: Run CCIP Canton2EVM token transfer 
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
           go test -timeout 8m -v -count 1 -run 'TestCanton2EVM_Basic/EOA_receiver_and_default_committee_verifier_with_token_transfer'
