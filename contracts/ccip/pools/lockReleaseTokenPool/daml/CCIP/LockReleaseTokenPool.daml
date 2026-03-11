@@ -74,7 +74,7 @@ parseSourcePoolDecimals localDecimals sourcePoolData =
             remoteDecimals = truncate decoded
         in
             if decoded < 0.0 || decoded > 255.0
-            then abort "ReleaseFromTicket: invalid source pool decimals"
+            then error "ReleaseFromTicket: invalid source pool decimals"
             else remoteDecimals
 
 calculateLocalAmountDecimal : Decimal -> Int -> Int -> Decimal
