@@ -1,6 +1,7 @@
 package canton
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"testing"
@@ -28,6 +29,47 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
+const (
+	evmToCantonBasicPayload = "Hello from EVM!"
+	evmToCantonTokenPayload = "Hello token transfer from EVM!"
+
+	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+	evmToCantonTransferAmount = int64(1000)
+)
+
+func mustGetBlockchainInputByType(t *testing.T, cfg *ccv.Cfg, chainType string) *blockchain.Input {
+	t.Helper()
+	for _, bc := range cfg.Blockchains {
+		if bc.Type == chainType {
+			return bc
+		}
+	}
+	require.FailNowf(t, "missing chain", "need at least one %s chain for this test", chainType)
+	return nil
+}
+
+func newAggregatorClients(
+	t *testing.T,
+	ctx context.Context,
+	cfg *ccv.Cfg,
+) map[string]*ccv.AggregatorClient {
+	t.Helper()
+	clients := make(map[string]*ccv.AggregatorClient)
+	for qualifier := range cfg.AggregatorEndpoints {
+		client, err := cfg.NewAggregatorClientForCommittee(
+			zerolog.Ctx(ctx).With().Str("component", fmt.Sprintf("aggregator-client-%s", qualifier)).Logger(),
+			qualifier,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		clients[qualifier] = client
+		t.Cleanup(func() {
+			client.Close()
+		})
+	}
+	return clients
+}
+
 //nolint:paralleltest // we won't run this in parallel.
 func TestEVM2Canton_Basic(t *testing.T) {
 	if testing.Short() {
@@ -44,23 +86,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
-	var cantonChain *blockchain.Input
-	for _, bc := range in.Blockchains {
-		if bc.Type == blockchain.TypeCanton {
-			cantonChain = bc
-			break
-		}
-	}
-	require.NotNil(t, cantonChain, "need at least one canton chain for this test")
-
-	var evmChain *blockchain.Input
-	for _, bc := range in.Blockchains {
-		if bc.Type == blockchain.TypeAnvil {
-			evmChain = bc
-			break
-		}
-	}
-	require.NotNil(t, evmChain, "need at least one evm chain for this test")
+	cantonChain := mustGetBlockchainInputByType(t, in, blockchain.TypeCanton)
+	evmChain := mustGetBlockchainInputByType(t, in, blockchain.TypeAnvil)
 
 	cantonDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(cantonChain.ChainID, chainsel.FamilyCanton)
 	require.NoError(t, err)
@@ -119,7 +146,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	l.Info().Uint64("SeqNo", seqNo).Msg("Expecting sequence number")
 	sendMessageResult, err := srcChain.SendMessage(ctx, dstSelector, cciptestinterfaces.MessageFields{
 		Receiver:    receiver.Bytes(),
-		Data:        []byte("Hello from EVM!"),
+		Data:        []byte(evmToCantonBasicPayload),
 		TokenAmount: cciptestinterfaces.TokenAmount{},
 		FeeToken:    nil,
 	}, cciptestinterfaces.MessageOptions{
@@ -163,30 +190,16 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, indexerMonitor)
 
-	aggregatorClients := make(map[string]*ccv.AggregatorClient)
-	for qualifier := range in.AggregatorEndpoints {
-		client, err := in.NewAggregatorClientForCommittee(
-			zerolog.Ctx(ctx).With().Str("component", fmt.Sprintf("aggregator-client-%s", qualifier)).Logger(),
-			qualifier)
-		require.NoError(t, err)
-		require.NotNil(t, client)
-		aggregatorClients[qualifier] = client
-		t.Cleanup(func() {
-			client.Close()
-		})
-	}
+	aggregatorClients := newAggregatorClients(t, ctx, in)
 	defaultAggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
 
 	t.Run("token transfer", func(t *testing.T) {
-		// Matches the default EVM->Canton lock/release lane configured by devenv.
-		const tokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
-		const transferAmount = int64(1000)
 		tokenRef, err := in.CLDF.DataStore.Addresses().Get(
 			datastore.NewAddressRefKey(
 				srcSelector,
 				datastore.ContractType("BurnMintERC20WithDrip"),
 				semver.MustParse("1.5.0"),
-				tokenQualifier,
+				evmToCantonTokenQualifier,
 			),
 		)
 		require.NoError(t, err, "failed to resolve source token address for token transfer e2e")
@@ -204,9 +217,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 			dstSelector,
 			cciptestinterfaces.MessageFields{
 				Receiver: receiver.Bytes(),
-				Data:     []byte("Hello token transfer from EVM!"),
+				Data:     []byte(evmToCantonTokenPayload),
 				TokenAmount: cciptestinterfaces.TokenAmount{
-					Amount:       big.NewInt(transferAmount),
+					Amount:       big.NewInt(evmToCantonTransferAmount),
 					TokenAddress: srcToken,
 				},
 			},
@@ -264,7 +277,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, senderBalanceAfter)
 		spent := new(big.Int).Sub(senderBalanceBefore, senderBalanceAfter)
-		require.Equal(t, big.NewInt(transferAmount), spent, "sender EVM token balance should decrease by transfer amount")
+		require.Equal(t, big.NewInt(evmToCantonTransferAmount), spent, "sender EVM token balance should decrease by transfer amount")
 	})
 
 	testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)

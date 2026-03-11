@@ -974,6 +974,120 @@ func (c *Chain) GetUserNonce(ctx context.Context, userAddress protocol.UnknownAd
 	return 0, nil // TODO: implement
 }
 
+func (c *Chain) findLatestActiveContractByInstanceAddress(
+	ctx context.Context,
+	participant canton.Participant,
+	templateID string,
+	address contracts.InstanceAddress,
+) (*ledgerv2.ActiveContract, error) {
+	active, err := contract.FindActiveContractByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, templateID, address)
+	if err == nil {
+		return active, nil
+	}
+	if !strings.Contains(err.Error(), "multiple active contracts found") {
+		return nil, err
+	}
+
+	parts := strings.Split(templateID, ":")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid template ID for fallback lookup %q: %w", templateID, err)
+	}
+	packageID, moduleName, entityName := parts[0], parts[1], parts[2]
+
+	lookupCtx, cancelLookup := context.WithTimeout(ctx, 20*time.Second)
+	defer cancelLookup()
+
+	ledgerEnd, endErr := participant.LedgerServices.State.GetLedgerEnd(lookupCtx, &ledgerv2.GetLedgerEndRequest{})
+	if endErr != nil {
+		return nil, fmt.Errorf("get ledger end for fallback lookup: %w", endErr)
+	}
+	stream, streamErr := participant.LedgerServices.State.GetActiveContracts(lookupCtx, &ledgerv2.GetActiveContractsRequest{
+		ActiveAtOffset: ledgerEnd.GetOffset(),
+		EventFormat: &ledgerv2.EventFormat{
+			FiltersByParty: map[string]*ledgerv2.Filters{
+				participant.PartyID: {
+					Cumulative: []*ledgerv2.CumulativeFilter{
+						{
+							IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
+								TemplateFilter: &ledgerv2.TemplateFilter{
+									TemplateId: &ledgerv2.Identifier{
+										PackageId:  packageID,
+										ModuleName: moduleName,
+										EntityName: entityName,
+									},
+									IncludeCreatedEventBlob: true,
+								},
+							},
+						},
+					},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	if streamErr != nil {
+		return nil, fmt.Errorf("get active contracts for fallback lookup: %w", streamErr)
+	}
+	defer stream.CloseSend()
+
+	var latestMatch *ledgerv2.ActiveContract
+	for {
+		resp, recvErr := stream.Recv()
+		if recvErr != nil {
+			if lookupCtx.Err() != nil {
+				return nil, fmt.Errorf("fallback lookup timed out while reading active contracts for %s: %w", address.String(), lookupCtx.Err())
+			}
+			if errors.Is(recvErr, io.EOF) {
+				break
+			}
+			return nil, fmt.Errorf("receive active contracts for fallback lookup: %w", recvErr)
+		}
+		entry, ok := resp.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
+		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
+			continue
+		}
+		created := entry.ActiveContract.GetCreatedEvent()
+		createArgs := created.GetCreateArguments()
+		if createArgs == nil {
+			continue
+		}
+		var instanceIDText string
+		for _, f := range createArgs.GetFields() {
+			if f.GetLabel() == "instanceId" {
+				instanceIDText = f.GetValue().GetText()
+				break
+			}
+		}
+		if instanceIDText == "" || len(created.GetSignatories()) != 1 {
+			continue
+		}
+		gotAddr := contracts.InstanceID(instanceIDText).RawInstanceAddress(types.PARTY(created.GetSignatories()[0])).InstanceAddress()
+		if gotAddr != address {
+			continue
+		}
+		if latestMatch == nil || created.GetOffset() > latestMatch.GetCreatedEvent().GetOffset() {
+			latestMatch = entry.ActiveContract
+		}
+	}
+	if latestMatch == nil {
+		return nil, err
+	}
+	return latestMatch, nil
+}
+
+func (c *Chain) resolveDisclosedContractByAddress(
+	ctx context.Context,
+	participant canton.Participant,
+	templateID string,
+	address contracts.InstanceAddress,
+) (types.CONTRACT_ID, *ledgerv2.DisclosedContract, error) {
+	active, err := c.findLatestActiveContractByInstanceAddress(ctx, participant, templateID, address)
+	if err != nil {
+		return "", nil, err
+	}
+	return types.CONTRACT_ID(active.GetCreatedEvent().GetContractId()), convertToDisclosedContract(active), nil
+}
+
 // SendMessage implements cciptestinterfaces.CCIP17.
 func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions) (cciptestinterfaces.MessageSentEvent, error) {
 	participant := c.chain.Participants[0]
@@ -981,107 +1095,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	seqNo := c.nextSeq + 1
 	findLatestActiveByAddress := func(templateID string, address contracts.InstanceAddress) (*ledgerv2.ActiveContract, error) {
-		active, err := contract.FindActiveContractByInstanceAddress(ctx, participant.LedgerServices.State, participant.PartyID, templateID, address)
-		if err == nil {
-			return active, nil
-		}
-		if !strings.Contains(err.Error(), "multiple active contracts found") {
-			return nil, err
-		}
-
-		parts := strings.Split(templateID, ":")
-		if len(parts) != 3 {
-			return nil, fmt.Errorf("invalid template ID for fallback lookup %q: %w", templateID, err)
-		}
-		packageID, moduleName, entityName := parts[0], parts[1], parts[2]
-
-		lookupCtx, cancelLookup := context.WithTimeout(ctx, 20*time.Second)
-		defer cancelLookup()
-
-		ledgerEnd, endErr := participant.LedgerServices.State.GetLedgerEnd(lookupCtx, &ledgerv2.GetLedgerEndRequest{})
-		if endErr != nil {
-			return nil, fmt.Errorf("get ledger end for fallback lookup: %w", endErr)
-		}
-		stream, streamErr := participant.LedgerServices.State.GetActiveContracts(lookupCtx, &ledgerv2.GetActiveContractsRequest{
-			ActiveAtOffset: ledgerEnd.GetOffset(),
-			EventFormat: &ledgerv2.EventFormat{
-				FiltersByParty: map[string]*ledgerv2.Filters{
-					participant.PartyID: {
-						Cumulative: []*ledgerv2.CumulativeFilter{
-							{
-								IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
-									TemplateFilter: &ledgerv2.TemplateFilter{
-										TemplateId: &ledgerv2.Identifier{
-											PackageId:  packageID,
-											ModuleName: moduleName,
-											EntityName: entityName,
-										},
-										IncludeCreatedEventBlob: true,
-									},
-								},
-							},
-						},
-					},
-				},
-				Verbose: true,
-			},
-		})
-		if streamErr != nil {
-			return nil, fmt.Errorf("get active contracts for fallback lookup: %w", streamErr)
-		}
-		defer stream.CloseSend()
-
-		var latestMatch *ledgerv2.ActiveContract
-		for {
-			resp, recvErr := stream.Recv()
-			if recvErr != nil {
-				if lookupCtx.Err() != nil {
-					return nil, fmt.Errorf("fallback lookup timed out while reading active contracts for %s: %w", address.String(), lookupCtx.Err())
-				}
-				if errors.Is(recvErr, io.EOF) {
-					break
-				}
-				return nil, fmt.Errorf("receive active contracts for fallback lookup: %w", recvErr)
-			}
-			entry, ok := resp.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
-			if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-				continue
-			}
-			created := entry.ActiveContract.GetCreatedEvent()
-			createArgs := created.GetCreateArguments()
-			if createArgs == nil {
-				continue
-			}
-			var instanceIDText string
-			for _, f := range createArgs.GetFields() {
-				if f.GetLabel() == "instanceId" {
-					instanceIDText = f.GetValue().GetText()
-					break
-				}
-			}
-			if instanceIDText == "" || len(created.GetSignatories()) != 1 {
-				continue
-			}
-			gotAddr := contracts.InstanceID(instanceIDText).RawInstanceAddress(types.PARTY(created.GetSignatories()[0])).InstanceAddress()
-			if gotAddr != address {
-				continue
-			}
-			if latestMatch == nil || created.GetOffset() > latestMatch.GetCreatedEvent().GetOffset() {
-				latestMatch = entry.ActiveContract
-			}
-		}
-		if latestMatch == nil {
-			return nil, err
-		}
-		return latestMatch, nil
+		return c.findLatestActiveContractByInstanceAddress(ctx, participant, templateID, address)
 	}
 	resolveDisclosedByAddress := func(templateID string, address contracts.InstanceAddress) (types.CONTRACT_ID, *ledgerv2.DisclosedContract, error) {
-		active, err := findLatestActiveByAddress(templateID, address)
-		if err != nil {
-			return "", nil, err
-		}
-
-		return types.CONTRACT_ID(active.GetCreatedEvent().GetContractId()), convertToDisclosedContract(active), nil
+		return c.resolveDisclosedContractByAddress(ctx, participant, templateID, address)
 	}
 
 	// Resolve commonly required contracts and disclosures.

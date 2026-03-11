@@ -64,34 +64,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	// We do not call basic.EOAReceiverDefaultVerifier here because its prerequisite
-	// lookup assumes EVM contract metadata (committee verifier resolver) on the source chain.
-	// For Canton source, we resolve Canton contract types directly and run the same tcapi assertions.
-	const executionEventTimeout = 45 * time.Second
-
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
-		ccvAddr, err := tcapi.GetContractAddress(
-			in,
-			cantonChain.ChainSelector(),
-			datastore.ContractType(canton_committee_verifier.ContractType),
-			canton_committee_verifier.Version.String(),
-			devenvcommon.DefaultCommitteeVerifierQualifier,
-			"canton committee verifier",
-		)
-		require.NoError(t, err)
-		executorAddr, err := tcapi.GetContractAddress(
-			in,
-			cantonChain.ChainSelector(),
-			datastore.ContractType(executor.ProxyType),
-			executor.DeployProxy.Version(),
-			devenvcommon.DefaultExecutorQualifier,
-			"source executor",
-		)
-		require.NoError(t, err)
+		ccvAddr, executorAddr := resolveCantonSendContracts(t, in, cantonChain.ChainSelector())
 		t.Logf(
 			"Resolved contracts: receiver=%x cantonCCV=%x cantonExecutor=%x srcSelector=%d dstSelector=%d",
 			receiver,
@@ -107,7 +85,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			evmChain.ChainSelector(),
 			cciptestinterfaces.MessageFields{
 				Receiver: receiver,
-				Data:     []byte("canton2evm tcapi test"),
+				Data:     []byte(cantonToEVMBasicPayload),
 			},
 			cciptestinterfaces.MessageOptions{
 				Version:           3,
@@ -139,7 +117,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 
 		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
-		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
+		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, cantonToEVMSentEventTimeout)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.Equal(t, seqNo, uint64(sentEvent.Message.SequenceNumber), "sent event sequence number should match send result")
@@ -172,16 +150,14 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 
 		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, executionEventTimeout)
+		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, cantonToEVMExecutionTimeout)
 		require.NoError(t, err)
-		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		assertExecutionStateSuccess(t, ev, "basic")
 		t.Logf("Execution event: %+v", ev)
 	})
 
 	t.Run("EOA receiver and default committee verifier with token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
-		const destTokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
-		const transferAmount = int64(1000)
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -190,7 +166,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 				evmChain.ChainSelector(),
 				datastore.ContractType("BurnMintERC20WithDrip"),
 				semver.MustParse("1.5.0"),
-				destTokenQualifier,
+				cantonToEVMDestTokenQualifier,
 			),
 		)
 		require.NoError(t, err, "failed to resolve destination EVM token address for Canton->EVM token transfer")
@@ -198,24 +174,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		receiverBalanceBefore, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
-		ccvAddr, err := tcapi.GetContractAddress(
-			in,
-			cantonChain.ChainSelector(),
-			datastore.ContractType(canton_committee_verifier.ContractType),
-			canton_committee_verifier.Version.String(),
-			devenvcommon.DefaultCommitteeVerifierQualifier,
-			"canton committee verifier",
-		)
-		require.NoError(t, err)
-		executorAddr, err := tcapi.GetContractAddress(
-			in,
-			cantonChain.ChainSelector(),
-			datastore.ContractType(executor.ProxyType),
-			executor.DeployProxy.Version(),
-			devenvcommon.DefaultExecutorQualifier,
-			"source executor",
-		)
-		require.NoError(t, err)
+		ccvAddr, executorAddr := resolveCantonSendContracts(t, in, cantonChain.ChainSelector())
 
 		t.Logf("Sending Canton -> EVM token transfer message")
 		sendMessageResult, err := cantonChain.SendMessage(
@@ -223,9 +182,9 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			evmChain.ChainSelector(),
 			cciptestinterfaces.MessageFields{
 				Receiver: receiver,
-				Data:     []byte("canton2evm token transfer tcapi test"),
+				Data:     []byte(cantonToEVMTokenPayload),
 				TokenAmount: cciptestinterfaces.TokenAmount{
-					Amount: big.NewInt(transferAmount),
+					Amount: big.NewInt(cantonToEVMTokenTransferAmount),
 				},
 			},
 			cciptestinterfaces.MessageOptions{
@@ -257,7 +216,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			sendMessageResult.Message.TokenTransfer != nil,
 		)
 
-		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, 30*time.Second)
+		sentEvent, err := cantonChain.WaitOneSentEventBySeqNo(subtestCtx, evmChain.ChainSelector(), seqNo, cantonToEVMSentEventTimeout)
 		require.NoError(t, err)
 		require.NotNil(t, sentEvent.Message)
 		require.NotNil(t, sentEvent.Message.TokenTransfer, "sent event should include token transfer")
@@ -269,22 +228,14 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			sentEvent.Message.TokenTransfer != nil,
 		)
 		t.Logf("Waiting for execution event on EVM for token transfer: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, executionEventTimeout)
+		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, cantonToEVMExecutionTimeout)
 		require.NoError(t, err)
-		if ev.State == cciptestinterfaces.ExecutionStateFailure {
-			t.Logf(
-				"Execution failure details (token transfer): sourceSelector=%d seqNo=%d returnData=0x%x",
-				ev.SourceChainSelector,
-				ev.MessageNumber,
-				ev.ReturnData,
-			)
-		}
-		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		assertExecutionStateSuccess(t, ev, "token transfer")
 		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
 		transferred := new(big.Int).Sub(receiverBalanceAfter, receiverBalanceBefore)
-		require.Equal(t, big.NewInt(transferAmount), transferred, "receiver token balance should increase by transfer amount")
+		require.Equal(t, big.NewInt(cantonToEVMTokenTransferAmount), transferred, "receiver token balance should increase by transfer amount")
 		t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
 	})
 }
