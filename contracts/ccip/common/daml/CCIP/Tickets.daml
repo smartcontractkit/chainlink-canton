@@ -44,6 +44,7 @@ template TokenReceiveTicket
 
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         amount : Numeric 0
+        sourcePoolData : BytesHex
 
         messageHash : BytesHex
         sourceChainSelector : Numeric 0
