@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"fmt"
 	"strings"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -56,4 +57,21 @@ func (t *TemplateID) ToLedgerIdentifier() *ledgerv2.Identifier {
 		ModuleName: t.ModuleName,
 		EntityName: t.EntityName,
 	}
+}
+
+func (t *TemplateID) String() string {
+	return fmt.Sprintf("%s:%s:%s", t.PackageID, t.ModuleName, t.EntityName)
+}
+
+// ParseTemplateIDFromString parses a template ID string like "#package:Module:Entity" into its components
+func ParseTemplateIDFromString(templateID string) (packageID, moduleName, entityName string, err error) {
+	if !strings.HasPrefix(templateID, "#") {
+		return "", "", "", fmt.Errorf("template ID must start with #")
+	}
+	parts := strings.Split(templateID, ":")
+	if len(parts) != 3 {
+		return "", "", "", fmt.Errorf("template ID must have format #package:module:entity, got: %s", templateID)
+	}
+
+	return parts[0], parts[1], parts[2], nil
 }
