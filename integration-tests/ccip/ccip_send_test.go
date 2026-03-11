@@ -292,7 +292,6 @@ func TestCCIPSend(t *testing.T) {
 								PremiumMultiplier: types.NUMERIC(premiumMultiplier),
 							},
 						},
-						Caller: types.PARTY(partyCCIP),
 					}),
 				}},
 			}},

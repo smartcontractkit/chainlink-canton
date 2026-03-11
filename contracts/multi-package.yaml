@@ -7,7 +7,6 @@ packages:
   - ccip/rmn
   - ccip/feequoter
   - ccip/tokenAdminRegistry
-  - ccip/tokenAdminRegistry/test
   - ccip/onramp
   - ccip/offramp
   - ccip/pools/interfaces

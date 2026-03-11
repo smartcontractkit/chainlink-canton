@@ -1,0 +1,455 @@
+-- | MCMS entrypoint tests for RMNRemote
+-- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+module CCIP.RMNTest.RMNRemoteMCMSTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+import DA.List (elem)
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import CCIP.RMNRemote
+import CCIP.RMNRemoteCodec
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - CURSE
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for Curse function
+testRMNRemoteMCMSEntrypoint_Curse : Script ()
+testRMNRemoteMCMSEntrypoint_Curse = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-test"
+      globalSubject = "01000000000000000000000000000001"
+
+  -- Create RMNRemote with no cursed subjects
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode Curse params
+  let encoded = encodeCurseParams globalSubject
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Curse"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify subject was cursed
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> do
+      length rmn.cursedSubjects === 1
+      (globalSubject `elem` rmn.cursedSubjects) === True
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- | Test MCMSReceiver entrypoint for Uncurse function
+testRMNRemoteMCMSEntrypoint_Uncurse : Script ()
+testRMNRemoteMCMSEntrypoint_Uncurse = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-uncurse-test"
+      subject = "01000000000000000000000000000001"
+
+  -- Create RMNRemote with subject already cursed
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [subject]
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode Uncurse params
+  let encoded = encodeUncurseParams subject
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Uncurse"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify subject was uncursed
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> rmn.cursedSubjects === []
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - CURSE CHAIN
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for CurseChain function
+testRMNRemoteMCMSEntrypoint_CurseChain : Script ()
+testRMNRemoteMCMSEntrypoint_CurseChain = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-cursechain-test"
+      chainSelector : Numeric 0 = 137.0
+
+  -- Create RMNRemote
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode CurseChain params
+  let encoded = encodeCurseChainParams chainSelector
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "CurseChain"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify chain was cursed
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(newCid, rmn)] -> do
+      length rmn.cursedSubjects === 1
+      -- Verify IsCursedForChain returns True
+      isCursed <- submit rmnOwner do
+        exerciseCmd newCid IsCursedForChain with
+          caller = rmnOwner
+          chainSelector = chainSelector
+      isCursed === True
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- | Test MCMSReceiver entrypoint for UncurseChain function
+testRMNRemoteMCMSEntrypoint_UncurseChain : Script ()
+testRMNRemoteMCMSEntrypoint_UncurseChain = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-uncursechain-test"
+      chainSelector : Numeric 0 = 42161.0
+      chainSubject = chainSelectorToSubject chainSelector
+
+  -- Create RMNRemote with chain already cursed
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [chainSubject]
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode UncurseChain params
+  let encoded = encodeUncurseChainParams chainSelector
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UncurseChain"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify chain was uncursed
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> rmn.cursedSubjects === []
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - CURSE MULTIPLE
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for CurseMultiple function
+testRMNRemoteMCMSEntrypoint_CurseMultiple : Script ()
+testRMNRemoteMCMSEntrypoint_CurseMultiple = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-cursemultiple-test"
+      subjects = [
+        "01000000000000000000000000000001",  -- Global
+        "00000000000000000000000000000001",  -- Chain 1
+        "00000000000000000000000000000089"   -- Chain 137
+        ]
+
+  -- Create RMNRemote
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode CurseMultiple params
+  let encoded = encodeCurseMultipleParams subjects
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "CurseMultiple"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify all subjects were cursed
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> length rmn.cursedSubjects === 3
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- | Test MCMSReceiver entrypoint for UncurseMultiple function
+testRMNRemoteMCMSEntrypoint_UncurseMultiple : Script ()
+testRMNRemoteMCMSEntrypoint_UncurseMultiple = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-uncursemultiple-test"
+      subjects = [
+        "00000000000000000000000000000001",
+        "00000000000000000000000000000002"
+        ]
+
+  -- Create RMNRemote with subjects already cursed
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = subjects
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode UncurseMultiple params
+  let encoded = encodeUncurseMultipleParams subjects
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UncurseMultiple"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify all subjects were uncursed
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> rmn.cursedSubjects === []
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - CUSTOM OBSERVERS
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for AddCustomObservers function
+testRMNRemoteMCMSEntrypoint_AddCustomObservers : Script ()
+testRMNRemoteMCMSEntrypoint_AddCustomObservers = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  observer1 <- allocateParty "Observer1"
+  observer2 <- allocateParty "Observer2"
+
+  let instanceId = "rmn-observers-test"
+
+  -- Create RMNRemote with no custom observers
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode AddCustomObservers params
+  let encoded = encodeAddCustomObserversParams [observer1, observer2]
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "AddCustomObservers"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify observers were added
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> length rmn.customObservers === 2
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- | Test MCMSReceiver entrypoint for RemoveCustomObservers function
+testRMNRemoteMCMSEntrypoint_RemoveCustomObservers : Script ()
+testRMNRemoteMCMSEntrypoint_RemoveCustomObservers = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  observer1 <- allocateParty "Observer1"
+  observer2 <- allocateParty "Observer2"
+
+  let instanceId = "rmn-remove-observers-test"
+
+  -- Create RMNRemote with custom observers
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = [observer1, observer2]
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode RemoveCustomObservers params (remove observer1)
+  let encoded = encodeRemoveCustomObserversParams [observer1]
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "RemoveCustomObservers"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  -- Verify observer1 was removed, observer2 remains
+  contracts <- query @RMNRemote rmnOwner
+  case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
+    [(_, rmn)] -> do
+      length rmn.customObservers === 1
+      (observer2 `elem` rmn.customObservers) === True
+    _ -> abort "Expected exactly one RMNRemote contract"
+
+  pure ()
+
+-- ===========================================================================
+-- ERROR CASE TESTS
+-- ===========================================================================
+
+-- | Test that unknown function name returns E_UNKNOWN_FUNCTION
+testRMNRemoteMCMSEntrypoint_UnknownFunction : Script ()
+testRMNRemoteMCMSEntrypoint_UnknownFunction = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-error-test"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Call with unknown function name - should fail
+  submitMustFail rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  pure ()
+
+-- | Test that invalid params returns E_INVALID_PARAMS
+testRMNRemoteMCMSEntrypoint_InvalidParams : Script ()
+testRMNRemoteMCMSEntrypoint_InvalidParams = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-invalid-test"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let instAddr = makeInstanceAddress instanceId rmnOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Call Curse with empty operationData - should fail
+  submitMustFail rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Curse"
+      operationData = ""  -- Invalid - needs length-prefixed bytes
+      contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
+
+  pure ()
+
+-- | Test that missing self CID returns E_SELF_CID_NOT_IN_MAP
+testRMNRemoteMCMSEntrypoint_MissingSelfCid : Script ()
+testRMNRemoteMCMSEntrypoint_MissingSelfCid = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "rmn-missing-cid-test"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
+
+  -- Encode valid params
+  let encoded = encodeCurseParams "01000000000000000000000000000001"
+
+  -- Call with empty contractIds map - should fail
+  submitMustFail rmnOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Curse"
+      operationData = encoded
+      contractIds = Map.empty  -- Missing self CID
+
+  pure ()
+
+-- Helper to convert ContractId to AnyContractId for the map
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId

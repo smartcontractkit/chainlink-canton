@@ -351,6 +351,35 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
 
 	// Token Pool Setup
+	// Deploy inbound RateLimiter required by ReleaseFromTicket receive flow.
+	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive-inbound-rl"}}},
+						{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
+						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
+						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
+						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
+						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
+					}},
+				}},
+			}},
+			ActAs: []string{partyTokenPoolOwner},
+		},
+	})
+	require.NoError(t, err)
+	inboundRateLimiterCid := extractCreatedContractId(res)
+	t.Logf("Deployed inbound RateLimiter: %s", inboundRateLimiterCid)
+
 	// Deploy LockReleaseTokenPool
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -375,6 +404,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							}}}},
 						}}}}}},
 						{Label: "chainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "outboundRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "inboundRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
+							Key:   &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
+							Value: rawInstanceAddress("test-pool-receive-inbound-rl@" + partyTokenPoolOwner),
+						}}}}}},
 						{Label: "remoteTokens", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
@@ -617,9 +651,13 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool",
 	})
 	require.NoError(t, err)
+	disclosedRateLimiter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter",
+	})
+	require.NoError(t, err)
 
 	executeDisclosures := slices.Concat(
-		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool},
+		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool, disclosedRateLimiter},
 		transferFactoryDisclosures,
 		poolHoldingDisclosures,
 	)
@@ -647,6 +685,15 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	}
 	executeContextValue, err := testhelpers.ChoiceContextFromData(executeContext)
 	require.NoError(t, err)
+	poolExtraContext, err := testhelpers.ChoiceContextFromData(map[string]any{
+		"values": map[string]any{
+			"rate-limiter": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedRateLimiter.ContractId,
+			},
+		},
+	})
+	require.NoError(t, err)
 
 	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release in one transaction
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -672,7 +719,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 								}}}}},
 								{Label: "tokenPoolHoldings", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: poolHoldingCids}}}},
 							}}}}},
-							{Label: "poolExtraContext", Value: emptyCCIPContext},
+							{Label: "poolExtraContext", Value: poolExtraContext},
 						}}}}}}}},
 						{Label: "ccvInputs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{

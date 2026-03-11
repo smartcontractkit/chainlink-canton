@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "241c526d74aacde9278c953b698d2e86610f76dbc5f7b5d53e87574034be1ffd"
+	PackageID   = "c87709f5a1a8f170990b75fcbee4e1b75c68386f19bb698aadbe05991895ac13"
 	SDKVersion  = "3.4.10"
 )
 
@@ -126,16 +127,18 @@ func (t *ChainPoolConfig) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	InstanceId         types.TEXT                               `json:"instanceId"`
-	CcipOwner          types.PARTY                              `json:"ccipOwner"`
-	PoolOwner          types.PARTY                              `json:"poolOwner"`
-	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals           types.INT64                              `json:"decimals"`
-	ChainPoolConfigs   types.GENMAP                             `json:"chainPoolConfigs"`
-	ChainFeeConfigs    types.GENMAP                             `json:"chainFeeConfigs"`
-	RemoteTokens       types.GENMAP                             `json:"remoteTokens"`
-	PoolReceiveContext common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout    TransferTimeout                          `json:"transferTimeout"`
+	InstanceId           types.TEXT                               `json:"instanceId"`
+	CcipOwner            types.PARTY                              `json:"ccipOwner"`
+	PoolOwner            types.PARTY                              `json:"poolOwner"`
+	InstrumentId         splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Decimals             types.INT64                              `json:"decimals"`
+	ChainPoolConfigs     types.GENMAP                             `json:"chainPoolConfigs"`
+	ChainFeeConfigs      types.GENMAP                             `json:"chainFeeConfigs"`
+	RemoteTokens         types.GENMAP                             `json:"remoteTokens"`
+	OutboundRateLimiters types.GENMAP                             `json:"outboundRateLimiters"`
+	InboundRateLimiters  types.GENMAP                             `json:"inboundRateLimiters"`
+	PoolReceiveContext   common.CCIPContext                       `json:"poolReceiveContext"`
+	TransferTimeout      TransferTimeout                          `json:"transferTimeout"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -195,6 +198,22 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
 		return map[string]any{"_type": "genmap", "value": t.RemoteTokens}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["outboundRateLimiters"] = func() any {
+		if t.OutboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.OutboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["inboundRateLimiters"] = func() any {
+		if t.InboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.InboundRateLimiters}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -271,6 +290,22 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["outboundRateLimiters"] = func() any {
+		if t.OutboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.OutboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["inboundRateLimiters"] = func() any {
+		if t.InboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.InboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["poolReceiveContext"] = func() any {
 		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.PoolReceiveContext).(mapper); ok {
@@ -318,27 +353,6 @@ func (t *LockReleaseTokenPool) UnmarshalHex(data string) error {
 
 // Choice methods for LockReleaseTokenPool
 
-// LockReleaseTokenPoolLockOrBurn exercises the LockReleaseTokenPool_LockOrBurn choice on this LockReleaseTokenPool contract
-// This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurn(contractID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_LockOrBurn",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// LockReleaseTokenPoolLockOrBurnWithPackageID exercises the LockReleaseTokenPool_LockOrBurn choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurnWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_LockOrBurn",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // LockReleaseTokenPoolReleaseFromTicket exercises the LockReleaseTokenPool_ReleaseFromTicket choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) LockReleaseTokenPoolReleaseFromTicket(contractID string, args LockReleaseTokenPoolReleaseFromTicket) *model.ExerciseCommand {
@@ -360,23 +374,23 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolReleaseFromTicketWithPackageID
 	}
 }
 
-// LockReleaseTokenPoolGetRequiredCCVs exercises the LockReleaseTokenPool_GetRequiredCCVs choice on this LockReleaseTokenPool contract
+// LockReleaseTokenPoolLockOrBurn exercises the LockReleaseTokenPool_LockOrBurn choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVs(contractID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurn(contractID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Choice:     "LockReleaseTokenPool_LockOrBurn",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolGetRequiredCCVsWithPackageID exercises the LockReleaseTokenPool_GetRequiredCCVs choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
+// LockReleaseTokenPoolLockOrBurnWithPackageID exercises the LockReleaseTokenPool_LockOrBurn choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurnWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolLockOrBurn) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Choice:     "LockReleaseTokenPool_LockOrBurn",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -423,23 +437,23 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyOutboundCCVsWithPackageI
 	}
 }
 
-// LockReleaseTokenPoolUpdateChainPoolConfigs exercises the LockReleaseTokenPool_UpdateChainPoolConfigs choice on this LockReleaseTokenPool contract
+// LockReleaseTokenPoolCalculateFee exercises the LockReleaseTokenPool_CalculateFee choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainPoolConfigs(contractID string, args LockReleaseTokenPoolUpdateChainPoolConfigs) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFee(contractID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_UpdateChainPoolConfigs",
+		Choice:     "LockReleaseTokenPool_CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolUpdateChainPoolConfigsWithPackageID exercises the LockReleaseTokenPool_UpdateChainPoolConfigs choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainPoolConfigsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolUpdateChainPoolConfigs) *model.ExerciseCommand {
+// LockReleaseTokenPoolCalculateFeeWithPackageID exercises the LockReleaseTokenPool_CalculateFee choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_UpdateChainPoolConfigs",
+		Choice:     "LockReleaseTokenPool_CalculateFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -465,23 +479,107 @@ func (t LockReleaseTokenPool) ArchiveWithPackageID(contractID string, packageID 
 	}
 }
 
-// LockReleaseTokenPoolCalculateFee exercises the LockReleaseTokenPool_CalculateFee choice on this LockReleaseTokenPool contract
+// LockReleaseTokenPoolGetRequiredCCVs exercises the LockReleaseTokenPool_GetRequiredCCVs choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFee(contractID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVs(contractID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_CalculateFee",
+		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// LockReleaseTokenPoolCalculateFeeWithPackageID exercises the LockReleaseTokenPool_CalculateFee choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFeeWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolCalculateFee) *model.ExerciseCommand {
+// LockReleaseTokenPoolGetRequiredCCVsWithPackageID exercises the LockReleaseTokenPool_GetRequiredCCVs choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolGetRequiredCCVsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_CalculateFee",
+		Choice:     "LockReleaseTokenPool_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolUpdateChainPoolConfigs exercises the LockReleaseTokenPool_UpdateChainPoolConfigs choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainPoolConfigs(contractID string, args LockReleaseTokenPoolUpdateChainPoolConfigs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_UpdateChainPoolConfigs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolUpdateChainPoolConfigsWithPackageID exercises the LockReleaseTokenPool_UpdateChainPoolConfigs choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainPoolConfigsWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolUpdateChainPoolConfigs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_UpdateChainPoolConfigs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolUpdateRateLimiters exercises the LockReleaseTokenPool_UpdateRateLimiters choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateRateLimiters(contractID string, args LockReleaseTokenPoolUpdateRateLimiters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_UpdateRateLimiters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolUpdateRateLimitersWithPackageID exercises the LockReleaseTokenPool_UpdateRateLimiters choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateRateLimitersWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolUpdateRateLimiters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_UpdateRateLimiters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this LockReleaseTokenPool contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this LockReleaseTokenPool contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -613,6 +711,8 @@ func (t LockReleaseTokenPool) TokenPoolCalculateFeeWithPackageID(contractID stri
 }
 
 // Verify interface implementations for LockReleaseTokenPool
+
+var _ mcms.IMCMSReceiver = (*LockReleaseTokenPool)(nil)
 
 var _ interfaces.IITokenPool = (*LockReleaseTokenPool)(nil)
 
@@ -1009,6 +1109,55 @@ func (t *LockReleaseTokenPoolUpdateChainPoolConfigs) UnmarshalHex(data string) e
 	return hexCodec.Unmarshal(data, t)
 }
 
+// LockReleaseTokenPoolUpdateRateLimiters is a Record type
+type LockReleaseTokenPoolUpdateRateLimiters struct {
+	NewOutboundRateLimiters types.GENMAP `json:"newOutboundRateLimiters"`
+	NewInboundRateLimiters  types.GENMAP `json:"newInboundRateLimiters"`
+}
+
+// ToMap converts LockReleaseTokenPoolUpdateRateLimiters to a map for DAML arguments
+func (t LockReleaseTokenPoolUpdateRateLimiters) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newOutboundRateLimiters"] = func() any {
+		if t.NewOutboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.NewOutboundRateLimiters}
+	}()
+
+	m["newInboundRateLimiters"] = func() any {
+		if t.NewInboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.NewInboundRateLimiters}
+	}()
+
+	return m
+}
+
+func (t LockReleaseTokenPoolUpdateRateLimiters) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LockReleaseTokenPoolUpdateRateLimiters) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LockReleaseTokenPoolUpdateRateLimiters to hex string (Canton MCMS format)
+func (t LockReleaseTokenPoolUpdateRateLimiters) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolUpdateRateLimiters from hex string (Canton MCMS format)
+func (t *LockReleaseTokenPoolUpdateRateLimiters) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // LockReleaseTokenPoolVerifyInboundMessage is a Record type
 type LockReleaseTokenPoolVerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
@@ -1293,6 +1442,7 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockReleaseTokenPoolReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolUpdateChainPoolConfigs(args LockReleaseTokenPoolUpdateChainPoolConfigs) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolUpdateRateLimiters(args LockReleaseTokenPoolUpdateRateLimiters) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyInboundMessage(args LockReleaseTokenPoolVerifyInboundMessage) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyInboundMessageMCMSParams(args LockReleaseTokenPoolVerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
@@ -1369,6 +1519,11 @@ func (e *encoder) LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockRelea
 // LockReleaseTokenPoolUpdateChainPoolConfigs encodes parameters for the LockReleaseTokenPoolUpdateChainPoolConfigs choice.
 func (e *encoder) LockReleaseTokenPoolUpdateChainPoolConfigs(args LockReleaseTokenPoolUpdateChainPoolConfigs) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolUpdateChainPoolConfigs", args)
+}
+
+// LockReleaseTokenPoolUpdateRateLimiters encodes parameters for the LockReleaseTokenPoolUpdateRateLimiters choice.
+func (e *encoder) LockReleaseTokenPoolUpdateRateLimiters(args LockReleaseTokenPoolUpdateRateLimiters) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolUpdateRateLimiters", args)
 }
 
 // LockReleaseTokenPoolVerifyInboundMessage encodes parameters for the LockReleaseTokenPoolVerifyInboundMessage choice.

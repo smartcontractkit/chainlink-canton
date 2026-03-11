@@ -1,0 +1,338 @@
+-- | MCMS entrypoint tests for FeeQuoter
+-- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+module CCIP.FeeQuoterTest.FeeQuoterMCMSTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+
+import qualified Splice.Api.Token.HoldingV1
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import CCIP.FeeQuoter
+import CCIP.FeeQuoterCodec
+import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - APPLY FEE TOKEN UPDATES
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for ApplyFeeTokenUpdates function
+testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates : Script ()
+testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instanceId = "feequoter-test"
+      instrumentId1 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      instrumentId2 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+
+  -- Create FeeQuoter with one existing fee token
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.fromList [(instrumentId1, 1.0)]
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Encode ApplyFeeTokenUpdates params: remove USDC, add LINK
+  let feeTokensToRemove = [instrumentId1]
+      feeTokensToAdd = [FeeTokenArgs instrumentId2 1.5]
+      encoded = encodeApplyFeeTokenUpdatesParams feeTokensToRemove feeTokensToAdd
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApplyFeeTokenUpdates"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  -- Verify state changed
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      -- USDC should be removed
+      Map.lookup instrumentId1 fq.feeTokens === None
+      -- LINK should be added
+      Map.lookup instrumentId2 fq.feeTokens === Some 1.5
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
+
+-- | Test adding multiple fee tokens
+testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple : Script ()
+testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instanceId = "feequoter-multi-test"
+      instrumentId1 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      instrumentId2 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      instrumentId3 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WETH"
+
+  -- Create FeeQuoter with no fee tokens
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Add multiple fee tokens
+  let feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId] = []
+      feeTokensToAdd = [
+        FeeTokenArgs instrumentId1 1.0,
+        FeeTokenArgs instrumentId2 1.25,
+        FeeTokenArgs instrumentId3 0.9
+        ]
+      encoded = encodeApplyFeeTokenUpdatesParams feeTokensToRemove feeTokensToAdd
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApplyFeeTokenUpdates"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  -- Verify all tokens added
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      Map.size fq.feeTokens === 3
+      Map.lookup instrumentId1 fq.feeTokens === Some 1.0
+      Map.lookup instrumentId2 fq.feeTokens === Some 1.25
+      Map.lookup instrumentId3 fq.feeTokens === Some 0.9
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - APPLY DEST CHAIN CONFIG UPDATES
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for ApplyDestChainConfigUpdates function
+testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates : Script ()
+testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "feequoter-dest-test"
+
+  -- Create FeeQuoter with no dest chain configs
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Create dest chain config
+  let destConfig = DestChainConfig with
+        isEnabled = True
+        maxDataBytes = 65535
+        maxPerMsgGasLimit = 3000000
+        destGasOverhead = 100000
+        destGasPerPayloadByteBase = 16
+        chainFamilySelector = "2812d52c"  -- EVM
+        defaultTxGasLimit = 200000
+        networkFeeUSD = 0.01
+        defaultTokenFeeUSD = 0.5
+        defaultTokenDestGasOverhead = 50000
+
+      configArgs = [DestChainConfigArgs 1.0 destConfig]
+      encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApplyDestChainConfigUpdates"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  -- Verify dest chain config was added
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      Map.size fq.destChainConfigs === 1
+      case Map.lookup 1.0 fq.destChainConfigs of
+        None -> abort "Expected dest chain config for chain 1"
+        Some config -> do
+          config.isEnabled === True
+          config.maxDataBytes === 65535
+          config.maxPerMsgGasLimit === 3000000
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
+
+-- | Test adding multiple dest chain configs
+testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple : Script ()
+testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "feequoter-multi-dest-test"
+
+  -- Create FeeQuoter
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Create multiple dest chain configs
+  let config1 = DestChainConfig True 65535 3000000 100000 16 "2812d52c" 200000 0.01 0.5 50000
+      config2 = DestChainConfig True 32768 1500000 50000 8 "2812d52c" 100000 0.02 1.0 25000
+
+      configArgs = [
+        DestChainConfigArgs 1.0 config1,
+        DestChainConfigArgs 137.0 config2
+        ]
+      encoded = encodeApplyDestChainConfigUpdatesParams configArgs
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApplyDestChainConfigUpdates"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  -- Verify both configs were added
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      Map.size fq.destChainConfigs === 2
+      case Map.lookup 1.0 fq.destChainConfigs of
+        None -> abort "Expected config for chain 1"
+        Some c -> c.maxDataBytes === 65535
+      case Map.lookup 137.0 fq.destChainConfigs of
+        None -> abort "Expected config for chain 137"
+        Some c -> c.maxDataBytes === 32768
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
+
+-- ===========================================================================
+-- ERROR CASE TESTS
+-- ===========================================================================
+
+-- | Test that unknown function name returns E_UNKNOWN_FUNCTION
+testFeeQuoterMCMSEntrypoint_UnknownFunction : Script ()
+testFeeQuoterMCMSEntrypoint_UnknownFunction = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "feequoter-error-test"
+
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Call with unknown function name - should fail
+  submitMustFail owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  pure ()
+
+-- | Test that invalid params returns E_INVALID_PARAMS
+testFeeQuoterMCMSEntrypoint_InvalidParams : Script ()
+testFeeQuoterMCMSEntrypoint_InvalidParams = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "feequoter-invalid-test"
+
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Call with invalid operationData - should fail
+  submitMustFail owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApplyFeeTokenUpdates"
+      operationData = "invalid"  -- Not valid encoded data
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  pure ()
+
+-- | Test that missing self CID returns E_SELF_CID_NOT_IN_MAP
+testFeeQuoterMCMSEntrypoint_MissingSelfCid : Script ()
+testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
+  owner <- allocateParty "ccip_owner"
+
+  let instanceId = "feequoter-missing-cid-test"
+
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      priceUpdaters = []
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Encode valid params
+  let encoded = encodeApplyDestChainConfigUpdatesParams []
+
+  -- Call with empty contractIds map - should fail
+  submitMustFail owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApplyDestChainConfigUpdates"
+      operationData = encoded
+      contractIds = Map.empty  -- Missing self CID
+
+  pure ()
+
+-- Helper to convert ContractId to AnyContractId for the map
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId

@@ -1,0 +1,390 @@
+-- | MCMS entrypoint tests for LockReleaseTokenPool
+-- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+module CCIP.LockReleaseTokenPoolTest.LockReleaseTokenPoolMCMSTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
+
+import qualified Splice.Api.Token.HoldingV1
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import CCIP.LockReleaseTokenPool
+import CCIP.LockReleaseTokenPoolCodec
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import qualified CCIP.Context
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - UPDATE CHAIN POOL CONFIGS
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for UpdateChainPoolConfigs function
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+
+  -- Create LockReleaseTokenPool with no chain pool configs
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 6
+      chainPoolConfigs = Map.empty
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+
+  let instAddr = makeInstanceAddress instanceId poolOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Create chain pool config
+  let config = ChainPoolConfig with
+        inboundCCVs = [RawInstanceAddress "ccv-inbound@owner"]
+        outboundCCVs = [RawInstanceAddress "ccv-outbound@owner"]
+        remotePools = ["1234567890abcdef"]
+
+      configs = Map.fromList [(1.0, config)]
+      encoded = encodeUpdateChainPoolConfigsParams configs
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateChainPoolConfigs"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+  -- Verify chain pool config was added
+  contracts <- query @LockReleaseTokenPool poolOwner
+  case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+    [(_, pool)] -> do
+      Map.size pool.chainPoolConfigs === 1
+      case Map.lookup 1.0 pool.chainPoolConfigs of
+        None -> abort "Expected chain pool config for chain 1"
+        Some c -> do
+          length c.inboundCCVs === 1
+          length c.outboundCCVs === 1
+          length c.remotePools === 1
+    _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+  pure ()
+
+-- | Test updating multiple chain pool configs
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-multi-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+
+  -- Create LockReleaseTokenPool
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
+      chainPoolConfigs = Map.empty
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = RelativeHours 24
+
+  let instAddr = makeInstanceAddress instanceId poolOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Create multiple chain pool configs
+  let config1 = ChainPoolConfig
+        [RawInstanceAddress "in1@p1"]
+        [RawInstanceAddress "out1@p1"]
+        ["abc001"]
+
+      config2 = ChainPoolConfig
+        [RawInstanceAddress "in2@p2", RawInstanceAddress "in2b@p2"]
+        []
+        ["aabb2a", "ccdd2b"]
+
+      config3 = ChainPoolConfig [] [] ["def003"]
+
+      configs = Map.fromList [
+        (1.0, config1),
+        (137.0, config2),
+        (42161.0, config3)
+        ]
+      encoded = encodeUpdateChainPoolConfigsParams configs
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateChainPoolConfigs"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+  -- Verify all configs were added
+  contracts <- query @LockReleaseTokenPool poolOwner
+  case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+    [(_, pool)] -> do
+      Map.size pool.chainPoolConfigs === 3
+      case Map.lookup 1.0 pool.chainPoolConfigs of
+        None -> abort "Expected config for chain 1"
+        Some c -> length c.inboundCCVs === 1
+      case Map.lookup 137.0 pool.chainPoolConfigs of
+        None -> abort "Expected config for chain 137"
+        Some c -> do
+          length c.inboundCCVs === 2
+          length c.outboundCCVs === 0
+          length c.remotePools === 2
+      case Map.lookup 42161.0 pool.chainPoolConfigs of
+        None -> abort "Expected config for chain 42161"
+        Some c -> do
+          c.inboundCCVs === []
+          c.outboundCCVs === []
+          length c.remotePools === 1
+    _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+  pure ()
+
+-- | Test replacing existing chain pool configs
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Replace : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Replace = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-replace-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WETH"
+      existingConfig = ChainPoolConfig [] [] ["abcd1234"]
+
+  -- Create LockReleaseTokenPool with existing config
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
+      chainPoolConfigs = Map.fromList [(1.0, existingConfig)]
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+
+  let instAddr = makeInstanceAddress instanceId poolOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Create new config to completely replace
+  let newConfig = ChainPoolConfig
+        [RawInstanceAddress "new-in@owner"]
+        [RawInstanceAddress "new-out@owner"]
+        ["ef123456", "ab789012"]
+
+      -- Note: This replaces the entire chainPoolConfigs map
+      configs = Map.fromList [(1.0, newConfig)]
+      encoded = encodeUpdateChainPoolConfigsParams configs
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateChainPoolConfigs"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+  -- Verify config was replaced
+  contracts <- query @LockReleaseTokenPool poolOwner
+  case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+    [(_, pool)] ->
+      case Map.lookup 1.0 pool.chainPoolConfigs of
+        None -> abort "Expected config for chain 1"
+        Some c -> do
+          length c.inboundCCVs === 1
+          length c.outboundCCVs === 1
+          length c.remotePools === 2
+    _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+  pure ()
+
+-- | Test setting empty chain pool configs
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Empty : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Empty = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-empty-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "DAI"
+      existingConfig = ChainPoolConfig [] [] ["aabbcc"]
+
+  -- Create LockReleaseTokenPool with existing config
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
+      chainPoolConfigs = Map.fromList [(1.0, existingConfig)]
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+
+  let instAddr = makeInstanceAddress instanceId poolOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Send empty configs map
+  let configs : Map.Map (Numeric 0) ChainPoolConfig = Map.empty
+      encoded = encodeUpdateChainPoolConfigsParams configs
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateChainPoolConfigs"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+  -- Verify configs were cleared
+  contracts <- query @LockReleaseTokenPool poolOwner
+  case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+    [(_, pool)] -> Map.size pool.chainPoolConfigs === 0
+    _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+  pure ()
+
+-- ===========================================================================
+-- ERROR CASE TESTS
+-- ===========================================================================
+
+-- | Test that unknown function name returns E_UNKNOWN_FUNCTION
+testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-error-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TEST"
+
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
+      chainPoolConfigs = Map.empty
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+
+  let instAddr = makeInstanceAddress instanceId poolOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Call with unknown function name - should fail
+  submitMustFail poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+  pure ()
+
+-- | Test that invalid params returns E_INVALID_PARAMS
+testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-invalid-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TEST"
+
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
+      chainPoolConfigs = Map.empty
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+
+  let instAddr = makeInstanceAddress instanceId poolOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Call with invalid operationData - should fail
+  submitMustFail poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateChainPoolConfigs"
+      operationData = "invalid"  -- Not valid encoded data
+      contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+  pure ()
+
+-- | Test that missing self CID returns E_SELF_CID_NOT_IN_MAP
+testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let instanceId = "pool-missing-cid-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TEST"
+
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
+      chainPoolConfigs = Map.empty
+      chainFeeConfigs = Map.empty
+      remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+  -- Encode valid params
+  let encoded = encodeUpdateChainPoolConfigsParams Map.empty
+
+  -- Call with empty contractIds map - should fail
+  submitMustFail poolOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateChainPoolConfigs"
+      operationData = encoded
+      contractIds = Map.empty  -- Missing self CID
+
+  pure ()
+
+-- Helper to convert ContractId to AnyContractId for the map
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId

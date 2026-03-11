@@ -1,0 +1,332 @@
+-- | MCMS entrypoint tests for GlobalConfig
+-- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+module CCIP.GlobalConfigTest.GlobalConfigMCMSTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import CCIP.GlobalConfig
+import CCIP.GlobalConfigCodec
+import CCIP.GlobalConfigTypes (DestChainConfig(..), SourceChainConfig(..))
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - UPDATE DEST CHAIN CONFIG
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for UpdateDestChainConfig function
+testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig : Script ()
+testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-test"
+      chainSelector : Numeric 0 = 1.0
+
+  -- Create GlobalConfig with no dest chain configs
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 42161.0  -- Local chain
+      onRampAddress = "1234"
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Create dest chain config
+  let destConfig = DestChainConfig with
+        isEnabled = True
+        offRampAddress = "abcdef1234567890"
+        laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
+        defaultCCVs = []
+        messageNetworkFeeUSDCents = 10.0
+        tokenNetworkFeeUSDCents = 5.0
+
+      encoded = encodeUpdateDestChainConfigParams 1.0 destConfig
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateDestChainConfig"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
+
+  -- Verify dest chain config was added
+  contracts <- query @GlobalConfig ccipOwner
+  case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
+    [(_, gc)] -> do
+      Map.size gc.destChainConfigs === 1
+      case Map.lookup 1.0 gc.destChainConfigs of
+        None -> abort "Expected dest chain config for chain 1"
+        Some config -> do
+          config.isEnabled === True
+          config.offRampAddress === "abcdef1234567890"
+          length config.laneMandatedCCVs === 1
+          config.messageNetworkFeeUSDCents === 10.0
+    _ -> abort "Expected exactly one GlobalConfig contract"
+
+  pure ()
+
+-- | Test updating existing dest chain config
+testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig_Replace : Script ()
+testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig_Replace = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-replace-test"
+      existingConfig = DestChainConfig True "abcd" [] [] 1.0 1.0
+
+  -- Create GlobalConfig with existing dest chain config
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 1.0
+      onRampAddress = "1234"
+      destChainConfigs = Map.fromList [(137.0, existingConfig)]
+      sourceChainConfigs = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Create new config to replace existing
+  let newConfig = DestChainConfig with
+        isEnabled = False
+        offRampAddress = "deadbeef12345678"
+        laneMandatedCCVs = []
+        defaultCCVs = [RawInstanceAddress "default@party"]
+        messageNetworkFeeUSDCents = 20.0
+        tokenNetworkFeeUSDCents = 10.0
+
+      encoded = encodeUpdateDestChainConfigParams 137.0 newConfig
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateDestChainConfig"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
+
+  -- Verify config was replaced
+  contracts <- query @GlobalConfig ccipOwner
+  case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
+    [(_, gc)] ->
+      case Map.lookup 137.0 gc.destChainConfigs of
+        None -> abort "Expected dest chain config"
+        Some config -> do
+          config.isEnabled === False
+          config.offRampAddress === "deadbeef12345678"
+          config.messageNetworkFeeUSDCents === 20.0
+    _ -> abort "Expected exactly one GlobalConfig contract"
+
+  pure ()
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - UPDATE SOURCE CHAIN CONFIG
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for UpdateSourceChainConfig function
+testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig : Script ()
+testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-source-test"
+
+  -- Create GlobalConfig with no source chain configs
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 1.0
+      onRampAddress = "1234"
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Create source chain config
+  let sourceConfig = SourceChainConfig with
+        isEnabled = True
+        onRampAddress = "fedcba0987654321"
+        laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
+        defaultCCVs = [RawInstanceAddress "src-default@party2"]
+
+      encoded = encodeUpdateSourceChainConfigParams 42161.0 sourceConfig
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateSourceChainConfig"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
+
+  -- Verify source chain config was added
+  contracts <- query @GlobalConfig ccipOwner
+  case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
+    [(_, gc)] -> do
+      Map.size gc.sourceChainConfigs === 1
+      case Map.lookup 42161.0 gc.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 42161"
+        Some config -> do
+          config.isEnabled === True
+          config.onRampAddress === "fedcba0987654321"
+          length config.laneMandatedCCVs === 1
+          length config.defaultCCVs === 1
+    _ -> abort "Expected exactly one GlobalConfig contract"
+
+  pure ()
+
+-- | Test adding multiple source chain configs sequentially
+testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig_Multiple : Script ()
+testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig_Multiple = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-multi-source-test"
+
+  -- Create GlobalConfig
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 1.0
+      onRampAddress = "1234"
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Add first source config
+  let config1 = SourceChainConfig True "abcd1234" [] []
+      encoded1 = encodeUpdateSourceChainConfigParams 10.0 config1
+
+  newContractIds1 <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateSourceChainConfig"
+      operationData = encoded1
+      contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
+
+  -- Get updated contract for second call
+  contracts1 <- query @GlobalConfig ccipOwner
+  case filter (\(_, gc) -> gc.instanceId == instanceId) contracts1 of
+    [(newCid, _)] -> do
+      let targetAsMcmsReceiver2 = toInterfaceContractId @MCMSReceiver newCid
+
+      -- Add second source config
+      let config2 = SourceChainConfig False "dcba4321" [] []
+          encoded2 = encodeUpdateSourceChainConfigParams 56.0 config2
+
+      newContractIds2 <- submit ccipOwner do
+        exerciseCmd targetAsMcmsReceiver2 MCMSReceiver_Entrypoint with
+          functionName = "UpdateSourceChainConfig"
+          operationData = encoded2
+          contractIds = Map.fromList [(instAddr, toAnyContractId newCid)]
+
+      -- Verify both configs exist
+      contracts2 <- query @GlobalConfig ccipOwner
+      case filter (\(_, gc) -> gc.instanceId == instanceId) contracts2 of
+        [(_, gc)] -> Map.size gc.sourceChainConfigs === 2
+        _ -> abort "Expected exactly one GlobalConfig contract"
+
+    _ -> abort "Expected exactly one GlobalConfig contract after first update"
+
+  pure ()
+
+-- ===========================================================================
+-- ERROR CASE TESTS
+-- ===========================================================================
+
+-- | Test that unknown function name returns E_UNKNOWN_FUNCTION
+testGlobalConfigMCMSEntrypoint_UnknownFunction : Script ()
+testGlobalConfigMCMSEntrypoint_UnknownFunction = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-error-test"
+
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 1.0
+      onRampAddress = "1234"
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Call with unknown function name - should fail
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
+
+  pure ()
+
+-- | Test that invalid params returns E_INVALID_PARAMS
+testGlobalConfigMCMSEntrypoint_InvalidParams : Script ()
+testGlobalConfigMCMSEntrypoint_InvalidParams = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-invalid-test"
+
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 1.0
+      onRampAddress = "1234"
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Call with invalid operationData - should fail
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateDestChainConfig"
+      operationData = "00"  -- Too short to decode
+      contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
+
+  pure ()
+
+-- | Test that missing self CID returns E_SELF_CID_NOT_IN_MAP
+testGlobalConfigMCMSEntrypoint_MissingSelfCid : Script ()
+testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "globalconfig-missing-cid-test"
+
+  gcCid <- submit ccipOwner do
+    createCmd GlobalConfig with
+      instanceId
+      ccipOwner
+      chainSelector = 1.0
+      onRampAddress = "1234"
+      destChainConfigs = Map.empty
+      sourceChainConfigs = Map.empty
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
+
+  -- Encode valid params
+  let config = DestChainConfig True "abcd" [] [] 1.0 1.0
+      encoded = encodeUpdateDestChainConfigParams 1.0 config
+
+  -- Call with empty contractIds map - should fail
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "UpdateDestChainConfig"
+      operationData = encoded
+      contractIds = Map.empty  -- Missing self CID
+
+  pure ()
+
+-- Helper to convert ContractId to AnyContractId for the map
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId

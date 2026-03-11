@@ -1,0 +1,95 @@
+module RateLimiterTest where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Optional (fromSome)
+import DA.Time (seconds)
+
+import CCIP.RateLimiter qualified as RateLimiter
+
+testRateLimiterConsumeAndRefill = script do
+    poolOwner <- allocateParty "pool-owner"
+
+    now <- getTime
+    limiter <- submit poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "rl-refill"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            remoteChainSelector = 123.0
+            direction = RateLimiter.RateLimitDirection_Outbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 5.0
+            tokens = 100.0
+            lastUpdated = now
+
+    consumed <- submit poolOwner do
+        exerciseCmd limiter RateLimiter.ConsumeCapacity with
+            requested = 90.0
+    consumed.availableBeforeConsume === 100.0
+
+    passTime (seconds 10)
+
+    limiterState <- fromSome <$> queryContractId poolOwner consumed.rateLimiterCid
+    now2 <- getTime
+    RateLimiter.availableTokensAt now2 limiterState === 60.0
+
+    debug "testRateLimiterConsumeAndRefill: PASSED"
+
+testRateLimiterRejectsOverCapacity = script do
+    poolOwner <- allocateParty "pool-owner"
+
+    now <- getTime
+    limiter <- submit poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "rl-over-cap"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            remoteChainSelector = 123.0
+            direction = RateLimiter.RateLimitDirection_Outbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 5.0
+            tokens = 100.0
+            lastUpdated = now
+
+    submitMustFail poolOwner do
+        exerciseCmd limiter RateLimiter.ConsumeCapacity with
+            requested = 101.0
+
+    debug "testRateLimiterRejectsOverCapacity: PASSED"
+
+testRateLimiterSetConfigResetsBucket = script do
+    poolOwner <- allocateParty "pool-owner"
+
+    now <- getTime
+    limiter <- submit poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = "rl-set-config"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            remoteChainSelector = 123.0
+            direction = RateLimiter.RateLimitDirection_Inbound
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 5.0
+            tokens = 20.0
+            lastUpdated = now
+
+    limiter <- submit poolOwner do
+        exerciseCmd limiter RateLimiter.SetConfig with
+            newIsEnabled = True
+            newCapacity = 200.0
+            newRate = 10.0
+
+    limiterState <- fromSome <$> queryContractId poolOwner limiter
+    limiterState.tokens === 200.0
+    limiterState.capacity === 200.0
+    limiterState.rate === 10.0
+
+    debug "testRateLimiterSetConfigResetsBucket: PASSED"

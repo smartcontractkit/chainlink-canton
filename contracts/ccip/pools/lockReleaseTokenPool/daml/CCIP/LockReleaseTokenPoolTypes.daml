@@ -1,0 +1,14 @@
+-- | Types for LockReleaseTokenPool, extracted to avoid circular dependencies
+module CCIP.LockReleaseTokenPoolTypes where
+
+import DA.Crypto.Text (BytesHex)
+import CCIP.RawInstanceAddress (RawInstanceAddress)
+
+-- | Per-chain pool configuration combining CCV requirements and allowed remote pools.
+-- Matches the EVM pattern where RemoteChainConfig holds both remote pools and CCV config.
+data ChainPoolConfig = ChainPoolConfig
+    with
+        inboundCCVs : [RawInstanceAddress]   -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]  -- Required CCVs for outgoing transfers
+        remotePools : [BytesHex]             -- Allowed remote pool addresses for this chain
+    deriving (Eq, Show)

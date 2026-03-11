@@ -1,0 +1,35 @@
+-- | Types for FeeQuoter, extracted to avoid circular dependencies
+module CCIP.FeeQuoterTypes where
+
+import DA.Crypto.Text (BytesHex)
+import Splice.Api.Token.HoldingV1
+
+-- | Arguments for adding fee tokens
+data FeeTokenArgs = FeeTokenArgs
+    with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        premiumMultiplier : Decimal
+    deriving (Eq, Show)
+
+-- | Arguments for destination chain config updates
+data DestChainConfigArgs = DestChainConfigArgs
+    with
+        destChainSelector : Numeric 0
+        destChainConfig : DestChainConfig
+    deriving (Eq, Show)
+
+-- | Configuration for a destination chain
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool -- ────────────────────╮ Whether this destination chain is enabled.
+        maxDataBytes : Int --                   │ Maximum data payload size in bytes.
+        maxPerMsgGasLimit : Int --              │ Maximum gas limit.
+        destGasOverhead : Int --                │ Gas charged on top of the gasLimit to cover destionation chain costs.
+        destGasPerPayloadByteBase : Int --      │ Default dest-chain gas charged for each byte of `data` payload.
+        chainFamilySelector : BytesHex --       │ Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
+        defaultTxGasLimit : Int --              │ Default gas limit for a tx.
+        networkFeeUSD : Decimal --              │ Flat network fee to charge for messages.
+        -- | The following two properties are defaults, they can be overridden by setting the TokenTransferFeeConfig for a token.
+        defaultTokenFeeUSD : Decimal --         │ Default token fee charged per token transfer.
+        defaultTokenDestGasOverhead : Int --  ──╯ Default gas charged to execute a token transfer on the destination chain.
+    deriving (Eq, Show)

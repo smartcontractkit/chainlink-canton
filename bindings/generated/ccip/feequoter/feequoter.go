@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "671203311d78750500884a4c1b181664961c58537d37393853ac813129641d64"
+	PackageID   = "e00435b6264d01c25aa0fb59a3829a3d2fa5df6f83dceef0dd7e9acb400a2bfc"
 	SDKVersion  = "3.4.10"
 )
 
@@ -103,7 +104,6 @@ func (t *ApplyDestChainConfigUpdates) UnmarshalHex(data string) error {
 type ApplyFeeTokenUpdates struct {
 	FeeTokensToRemove []splice_api_token_holding_v1.InstrumentId `json:"feeTokensToRemove"`
 	FeeTokensToAdd    []FeeTokenArgs                             `json:"feeTokensToAdd"`
-	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts ApplyFeeTokenUpdates to a map for DAML arguments
@@ -136,8 +136,6 @@ func (t ApplyFeeTokenUpdates) ToMap() map[string]any {
 		return res
 	}()
 
-	m["caller"] = t.Caller.ToMap()
-
 	return m
 }
 
@@ -163,25 +161,6 @@ func (t *ApplyFeeTokenUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ApplyFeeTokenUpdatesMCMSParams is ApplyFeeTokenUpdates without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type ApplyFeeTokenUpdatesMCMSParams struct {
-	FeeTokensToRemove []splice_api_token_holding_v1.InstrumentId `json:"feeTokensToRemove"`
-	FeeTokensToAdd    []FeeTokenArgs                             `json:"feeTokensToAdd"`
-}
-
-// MarshalHex encodes ApplyFeeTokenUpdatesMCMSParams to hex string for MCMS operationData.
-func (t ApplyFeeTokenUpdatesMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ApplyFeeTokenUpdatesMCMSParams from hex string.
-func (t *ApplyFeeTokenUpdatesMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // DestChainConfig2 is a Record type
 type DestChainConfig2 struct {
 	IsEnabled                   types.BOOL    `json:"isEnabled"`
@@ -189,7 +168,7 @@ type DestChainConfig2 struct {
 	MaxPerMsgGasLimit           types.INT64   `json:"maxPerMsgGasLimit"`
 	DestGasOverhead             types.INT64   `json:"destGasOverhead"`
 	DestGasPerPayloadByteBase   types.INT64   `json:"destGasPerPayloadByteBase"`
-	ChainFamilySelector         types.TEXT    `json:"chainFamilySelector"`
+	ChainFamilySelector         types.TEXT    `json:"chainFamilySelector" hex:"bytes"`
 	DefaultTxGasLimit           types.INT64   `json:"defaultTxGasLimit"`
 	NetworkFeeUSD               types.NUMERIC `json:"networkFeeUSD"`
 	DefaultTokenFeeUSD          types.NUMERIC `json:"defaultTokenFeeUSD"`
@@ -529,27 +508,6 @@ func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string
 	}
 }
 
-// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // FeeQuoterFinalizeFee exercises the FeeQuoter_FinalizeFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterFinalizeFee(contractID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
@@ -567,27 +525,6 @@ func (t FeeQuoter) FeeQuoterFinalizeFeeWithPackageID(contractID string, packageI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFeeTokens exercises the GetFeeTokens choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) GetFeeTokens(contractID string, args GetFeeTokens) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetFeeTokens",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetFeeTokensWithPackageID exercises the GetFeeTokens choice using the provided package ID instead of package name
-func (t FeeQuoter) GetFeeTokensWithPackageID(contractID string, packageID string, args GetFeeTokens) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetFeeTokens",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -613,27 +550,6 @@ func (t FeeQuoter) GetPremiumMultiplierWeiPerEthWithPackageID(contractID string,
 	}
 }
 
-// ApplyFeeTokenUpdates exercises the ApplyFeeTokenUpdates choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) ApplyFeeTokenUpdates(contractID string, args ApplyFeeTokenUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "ApplyFeeTokenUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyFeeTokenUpdatesWithPackageID exercises the ApplyFeeTokenUpdates choice using the provided package ID instead of package name
-func (t FeeQuoter) ApplyFeeTokenUpdatesWithPackageID(contractID string, packageID string, args ApplyFeeTokenUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "ApplyFeeTokenUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // GetDestChainConfig exercises the GetDestChainConfig choice on this FeeQuoter contract
 // This method uses the package name in the template ID
 func (t FeeQuoter) GetDestChainConfig(contractID string, args GetDestChainConfig2) *model.ExerciseCommand {
@@ -651,6 +567,27 @@ func (t FeeQuoter) GetDestChainConfigWithPackageID(contractID string, packageID 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetDestChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyDestChainConfigUpdates exercises the ApplyDestChainConfigUpdates choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) ApplyDestChainConfigUpdates(contractID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "ApplyDestChainConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyDestChainConfigUpdatesWithPackageID exercises the ApplyDestChainConfigUpdates choice using the provided package ID instead of package name
+func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "ApplyDestChainConfigUpdates",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -676,26 +613,114 @@ func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *mo
 	}
 }
 
-// ApplyDestChainConfigUpdates exercises the ApplyDestChainConfigUpdates choice on this FeeQuoter contract
+// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
-func (t FeeQuoter) ApplyDestChainConfigUpdates(contractID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
+func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "ApplyDestChainConfigUpdates",
+		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ApplyDestChainConfigUpdatesWithPackageID exercises the ApplyDestChainConfigUpdates choice using the provided package ID instead of package name
-func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
+// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "ApplyDestChainConfigUpdates",
+		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
+
+// GetFeeTokens exercises the GetFeeTokens choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) GetFeeTokens(contractID string, args GetFeeTokens) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "GetFeeTokens",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeTokensWithPackageID exercises the GetFeeTokens choice using the provided package ID instead of package name
+func (t FeeQuoter) GetFeeTokensWithPackageID(contractID string, packageID string, args GetFeeTokens) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "GetFeeTokens",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyFeeTokenUpdates exercises the ApplyFeeTokenUpdates choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) ApplyFeeTokenUpdates(contractID string, args ApplyFeeTokenUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "ApplyFeeTokenUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyFeeTokenUpdatesWithPackageID exercises the ApplyFeeTokenUpdates choice using the provided package ID instead of package name
+func (t FeeQuoter) ApplyFeeTokenUpdatesWithPackageID(contractID string, packageID string, args ApplyFeeTokenUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "ApplyFeeTokenUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this FeeQuoter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t FeeQuoter) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this FeeQuoter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for FeeQuoter
+
+var _ mcms.IMCMSReceiver = (*FeeQuoter)(nil)
 
 // FeeQuoterFinalizeFee is a Record type
 type FeeQuoterFinalizeFee struct {
@@ -1459,7 +1484,6 @@ func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error)
-	ApplyFeeTokenUpdatesMCMSParams(args ApplyFeeTokenUpdatesMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error)
 	FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error)
@@ -1512,11 +1536,6 @@ func (e *encoder) ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) 
 
 // ApplyFeeTokenUpdates encodes parameters for the ApplyFeeTokenUpdates choice.
 func (e *encoder) ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ApplyFeeTokenUpdates", args)
-}
-
-// ApplyFeeTokenUpdatesMCMSParams encodes MCMS parameters (without Caller) for the ApplyFeeTokenUpdates choice.
-func (e *encoder) ApplyFeeTokenUpdatesMCMSParams(args ApplyFeeTokenUpdatesMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyFeeTokenUpdates", args)
 }
 

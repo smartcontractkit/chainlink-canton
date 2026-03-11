@@ -4,7 +4,20 @@ module CCIP.RMNRemote where
 
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup, elem, notElem, filter)
+import DA.Map qualified as Map
 import DA.Text qualified as Text
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import CCIP.RMNRemoteCodec
+  ( decodeCurseParams
+  , decodeUncurseParams
+  , decodeCurseChainParams
+  , decodeUncurseChainParams
+  , decodeCurseMultipleParams
+  , decodeUncurseMultipleParams
+  , decodeAddCustomObserversParams
+  , decodeRemoveCustomObserversParams
+  )
 
 
 
@@ -118,6 +131,76 @@ template RMNRemote
     where
         signatory rmnOwner
         observer ccipOwner, customObservers
+
+        interface instance MCMSReceiver for RMNRemote where
+          view = MCMSReceiverView with
+            owner = rmnOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText rmnOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId RMNRemote)
+
+            case functionName of
+              "Curse" -> do
+                case decodeCurseParams operationData of
+                  None -> abort "E_INVALID_PARAMS: Curse"
+                  Some subject -> do
+                    newCid <- exercise selfCid Curse with subject
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "Uncurse" -> do
+                case decodeUncurseParams operationData of
+                  None -> abort "E_INVALID_PARAMS: Uncurse"
+                  Some subject -> do
+                    newCid <- exercise selfCid Uncurse with subject
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "CurseChain" -> do
+                case decodeCurseChainParams operationData of
+                  None -> abort "E_INVALID_PARAMS: CurseChain"
+                  Some chainSelector -> do
+                    newCid <- exercise selfCid CurseChain with chainSelector
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "UncurseChain" -> do
+                case decodeUncurseChainParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UncurseChain"
+                  Some chainSelector -> do
+                    newCid <- exercise selfCid UncurseChain with chainSelector
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "CurseMultiple" -> do
+                case decodeCurseMultipleParams operationData of
+                  None -> abort "E_INVALID_PARAMS: CurseMultiple"
+                  Some subjects -> do
+                    newCid <- exercise selfCid CurseMultiple with subjects
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "UncurseMultiple" -> do
+                case decodeUncurseMultipleParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UncurseMultiple"
+                  Some subjects -> do
+                    newCid <- exercise selfCid UncurseMultiple with subjects
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "AddCustomObservers" -> do
+                case decodeAddCustomObserversParams operationData of
+                  None -> abort "E_INVALID_PARAMS: AddCustomObservers"
+                  Some parties -> do
+                    newCid <- exercise selfCid AddCustomObservers with parties
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "RemoveCustomObservers" -> do
+                case decodeRemoveCustomObserversParams operationData of
+                  None -> abort "E_INVALID_PARAMS: RemoveCustomObservers"
+                  Some parties -> do
+                    newCid <- exercise selfCid RemoveCustomObservers with parties
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
         -- Check if globally cursed (party-as-parameter pattern for open access)
         nonconsuming choice IsCursed : Bool
