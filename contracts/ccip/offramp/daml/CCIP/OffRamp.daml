@@ -211,6 +211,8 @@ template OffRamp
                     None -> abort "offramp: unknown source chain"
                     Some c -> do
                         assertMsg "offramp: source chain disabled" c.isEnabled
+                        assertMsg "offramp: invalid source onramp"
+                            (message.onRampAddress `elem` c.onRampAddresses)
                         pure c
 
                 -- Get pool's declared CCV requirements from ExecutingMessageV1.

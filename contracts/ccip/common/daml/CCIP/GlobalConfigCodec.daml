@@ -14,6 +14,8 @@ import CCIP.MCMSCodecUtils
   , decodeNumeric0At
   , encodeBytesHex
   , decodeBytesHexAt
+  , encodeBytesHexList
+  , decodeBytesHexList
   , encodeDecimal
   , decodeDecimalAt
   , encodeRawInstanceAddressList
@@ -86,22 +88,21 @@ decodeDestChainConfigAt encoded offset = do
 
 -- ===========================================================================
 -- SOURCE CHAIN CONFIG ENCODING/DECODING
--- Format: [bool isEnabled][bytesHex onRampAddress][rawInstanceAddressList laneMandatedCCVs]
+-- Format: [bool isEnabled][bytesHexList onRampAddresses][rawInstanceAddressList laneMandatedCCVs]
 --         [rawInstanceAddressList defaultCCVs]
 -- ===========================================================================
 
 encodeSourceChainConfig : SourceChainConfig -> BytesHex
 encodeSourceChainConfig scc =
   encodeBool scc.isEnabled <>
-  encodeBytesHex scc.onRampAddress <>
+  encodeBytesHexList scc.onRampAddresses <>
   encodeRawInstanceAddressList scc.laneMandatedCCVs <>
   encodeRawInstanceAddressList scc.defaultCCVs
 
 decodeSourceChainConfigAt : BytesHex -> Int -> Optional (SourceChainConfig, Int)
 decodeSourceChainConfigAt encoded offset = do
   (isEnabled, offset1) <- decodeBoolAt encoded offset
-  (onRampAddress, offset2) <- decodeBytesHexAt encoded offset1
+  (onRampAddresses, offset2) <- decodeBytesHexList encoded offset1
   (laneMandatedCCVs, offset3) <- decodeRawInstanceAddressList encoded offset2
   (defaultCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
-  Some (SourceChainConfig isEnabled onRampAddress laneMandatedCCVs defaultCCVs, offset4)
-
+  Some (SourceChainConfig isEnabled onRampAddresses laneMandatedCCVs defaultCCVs, offset4)

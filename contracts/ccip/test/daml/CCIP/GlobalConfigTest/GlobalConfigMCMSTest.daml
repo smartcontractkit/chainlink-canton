@@ -151,7 +151,7 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
   -- Create source chain config
   let sourceConfig = SourceChainConfig with
         isEnabled = True
-        onRampAddress = "fedcba0987654321"
+        onRampAddresses = ["fedcba0987654321", "0011223344556677"]
         laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
         defaultCCVs = [RawInstanceAddress "src-default@party2"]
 
@@ -173,7 +173,7 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
         None -> abort "Expected source chain config for chain 42161"
         Some config -> do
           config.isEnabled === True
-          config.onRampAddress === "fedcba0987654321"
+          config.onRampAddresses === ["fedcba0987654321", "0011223344556677"]
           length config.laneMandatedCCVs === 1
           length config.defaultCCVs === 1
     _ -> abort "Expected exactly one GlobalConfig contract"
@@ -201,7 +201,7 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig_Multiple = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Add first source config
-  let config1 = SourceChainConfig True "abcd1234" [] []
+  let config1 = SourceChainConfig True ["abcd1234"] [] []
       encoded1 = encodeUpdateSourceChainConfigParams 10.0 config1
 
   newContractIds1 <- submit ccipOwner do
@@ -217,7 +217,7 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig_Multiple = script do
       let targetAsMcmsReceiver2 = toInterfaceContractId @MCMSReceiver newCid
 
       -- Add second source config
-      let config2 = SourceChainConfig False "dcba4321" [] []
+      let config2 = SourceChainConfig False ["dcba4321", "abcd0000"] [] []
           encoded2 = encodeUpdateSourceChainConfigParams 56.0 config2
 
       newContractIds2 <- submit ccipOwner do
