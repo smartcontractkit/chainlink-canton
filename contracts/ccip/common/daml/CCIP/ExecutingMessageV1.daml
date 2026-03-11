@@ -150,6 +150,9 @@ template ExecutingMessageV1
                             tokenReceiver = resolvedTokenReceiver
                             instrumentId = instrumentId
                             amount = amount
+                            sourcePoolData = case message.tokenTransfer of
+                                Some tokenTransfer -> tokenTransfer.extraData
+                                None -> abort "executingMessage: missing token transfer for ticket"
                             messageHash = messageId
                             sourceChainSelector = message.sourceChainSelector
                         pure (Some ticketCid)
