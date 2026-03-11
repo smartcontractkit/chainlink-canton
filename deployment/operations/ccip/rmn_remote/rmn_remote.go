@@ -38,8 +38,9 @@ var Curse = contract.NewExercise(contract.ExerciseParams[rmn.Curse]{
 	ContractType: ContractType,
 	Validate: func(input rmn.Curse) error {
 		if input.Subject == "" {
-			return errors.New("Subject cannot be empty")
+			return errors.New("subject cannot be empty")
 		}
+
 		return nil
 	},
 	Template: rmn.RMNRemote{},
@@ -53,8 +54,9 @@ var Uncurse = contract.NewExercise(contract.ExerciseParams[rmn.Uncurse]{
 	ContractType: ContractType,
 	Validate: func(input rmn.Uncurse) error {
 		if input.Subject == "" {
-			return errors.New("Subject cannot be empty")
+			return errors.New("subject cannot be empty")
 		}
+
 		return nil
 	},
 	Template: rmn.RMNRemote{},

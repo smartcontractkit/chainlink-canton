@@ -6,12 +6,6 @@ import (
 	"testing"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-canton/ccip"
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
-	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
@@ -21,6 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
+	"github.com/smartcontractkit/chainlink-canton/ccip"
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
+	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )
 
 func getCantonConfig(t *testing.T, in *ccv.Cfg, cantonSelector string) *ccip.Config {
@@ -28,10 +29,12 @@ func getCantonConfig(t *testing.T, in *ccv.Cfg, cantonSelector string) *ccip.Con
 		if v.ChainFamily == blockchain.FamilyCanton {
 			cantonConfig, err := util.OpaqueToConcreteStrict[ccip.Config](v.CantonConfigs)
 			require.NoError(t, err)
+
 			return cantonConfig
 		}
 	}
 	require.FailNowf(t, "no canton config found for selector %s", cantonSelector)
+
 	return nil
 }
 
@@ -43,10 +46,12 @@ func getCantonGRPCURL(t *testing.T, in *ccv.Cfg, cantonSelector string) string {
 			if strconv.FormatUint(details.ChainSelector, 10) != cantonSelector {
 				continue
 			}
+
 			return b.Out.NetworkSpecificData.CantonData.ExternalEndpoints.Participants[0].GRPCLedgerAPIURL
 		}
 	}
 	require.FailNowf(t, "no canton chain found for selector %s", cantonSelector)
+
 	return ""
 }
 

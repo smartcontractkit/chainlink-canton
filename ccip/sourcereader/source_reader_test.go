@@ -1215,11 +1215,13 @@ func (s *fakeActiveContractsStream) Recv() (*ledgerv2.GetActiveContractsResponse
 	if s.idx < len(s.responses) {
 		resp := s.responses[s.idx]
 		s.idx++
+
 		return resp, nil
 	}
 	if s.err != nil {
 		return nil, s.err
 	}
+
 	return nil, io.EOF
 }
 
@@ -1239,6 +1241,7 @@ func (s *fakeActiveContractsStream) Context() context.Context {
 	if s.ctx != nil {
 		return s.ctx
 	}
+
 	return context.Background()
 }
 
