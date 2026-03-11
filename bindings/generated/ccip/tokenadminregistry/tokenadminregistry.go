@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "174024d6f2c7fef2e46d81d009fb08e4e33a2764d3f0447e9f89c5109e7ca6e4"
+	PackageID   = "169dc284edafd83ecb5372cd218dfae34170bdf739372d6ac6a9a00328f74381"
 	SDKVersion  = "3.4.10"
 )
 
@@ -266,6 +266,27 @@ func (t TokenAdminRegistry) TokenAdminRegistryFinalizeExecuteWithPackageID(contr
 	}
 }
 
+// TokenAdminRegistryGetTokenConfig exercises the TokenAdminRegistry_GetTokenConfig choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_GetTokenConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryGetTokenConfigWithPackageID exercises the TokenAdminRegistry_GetTokenConfig choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfigWithPackageID(contractID string, packageID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_GetTokenConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // TokenAdminRegistrySetPool exercises the TokenAdminRegistry_SetPool choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args TokenAdminRegistrySetPool) *model.ExerciseCommand {
@@ -329,6 +350,27 @@ func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRoleWithPackageID(con
 	}
 }
 
+// TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // TokenAdminRegistryProposeAdministrator exercises the TokenAdminRegistry_ProposeAdministrator choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID string, args TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
@@ -368,48 +410,6 @@ func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID st
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
-	}
-}
-
-// TokenAdminRegistryGetTokenConfig exercises the TokenAdminRegistry_GetTokenConfig choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfig(contractID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_GetTokenConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryGetTokenConfigWithPackageID exercises the TokenAdminRegistry_GetTokenConfig choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryGetTokenConfigWithPackageID(contractID string, packageID string, args TokenAdminRegistryGetTokenConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_GetTokenConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IsAdministrator",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
-		ContractID: contractID,
-		Choice:     "TokenAdminRegistry_IsAdministrator",
-		Arguments:  argsToMap(args),
 	}
 }
 
@@ -1172,14 +1172,23 @@ func (t *TokenAdminRegistryTransferAdminRoleMCMSParams) UnmarshalHex(data string
 
 // TokenConfig is a Record type
 type TokenConfig struct {
-	Admin        *types.PARTY      `json:"admin" hex:"optional"`
-	PendingAdmin *types.PARTY      `json:"pendingAdmin" hex:"optional"`
-	TokenPool    *PoolRegistration `json:"tokenPool" hex:"optional"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Admin        *types.PARTY                             `json:"admin" hex:"optional"`
+	PendingAdmin *types.PARTY                             `json:"pendingAdmin" hex:"optional"`
+	TokenPool    *PoolRegistration                        `json:"tokenPool" hex:"optional"`
 }
 
 // ToMap converts TokenConfig to a map for DAML arguments
 func (t TokenConfig) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["instrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.InstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.InstrumentId
+	}()
 
 	if t.Admin != nil {
 		m["admin"] = map[string]any{
