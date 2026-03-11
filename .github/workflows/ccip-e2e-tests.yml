@@ -105,7 +105,7 @@ jobs:
         continue-on-error: true
         id: test_run_sourcereader_curse_detection
 
-      - name: Run CCIP EVM2Canton token transfer subtest
+      - name: Run CCIP EVM2Canton token transfer 
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
           go test -timeout 8m -v -count 1 -run 'TestEVM2Canton_Basic/token_transfer'

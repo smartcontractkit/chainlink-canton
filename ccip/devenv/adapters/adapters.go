@@ -38,7 +38,8 @@ func NewTokenAdapter(base tokenadapters.TokenAdapter) *CantonTokenAdapter {
 
 // AddressRefToBytes implements tokens.TokenAdapter.
 func (t *CantonTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return t.base.AddressRefToBytes(ref)
+	// Canton "addresses" are 32-byte instance addresses, not 20-byte EVM addresses.
+	return contracts.HexToInstanceAddress(ref.Address).Bytes(), nil
 }
 
 // ConfigureTokenForTransfersSequence implements tokens.TokenAdapter.

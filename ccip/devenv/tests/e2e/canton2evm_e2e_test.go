@@ -65,6 +65,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	// We do not call basic.EOAReceiverDefaultVerifier here because its prerequisite
 	// lookup assumes EVM contract metadata (committee verifier resolver) on the source chain.
 	// For Canton source, we resolve Canton contract types directly and run the same tcapi assertions.
+	const executionEventTimeout = 45 * time.Second
+
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
@@ -168,7 +170,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 
 		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, tests.WaitTimeout(t))
+		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, executionEventTimeout)
 		require.NoError(t, err)
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 		t.Logf("Execution event: %+v", ev)
@@ -211,7 +213,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			},
 			cciptestinterfaces.MessageOptions{
 				Version:           3,
-				ExecutionGasLimit: 200_000,
+				ExecutionGasLimit: 500_000,
 				FinalityConfig:    1,
 				Executor:          executorAddr,
 				CCVs: []protocol.CCV{
@@ -250,27 +252,17 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			sentEvent.Message.TokenTransfer != nil,
 		)
 		t.Logf("Waiting for execution event on EVM for token transfer: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-		executionObserved := false
-		ev, execErr := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, 90*time.Second)
-		if execErr != nil {
-			// This execution lane is known to be flaky in local devenv; keep this as a best-effort
-			// execution signal without failing the subtest when the event is not observed in time.
-			t.Logf("Execution event not observed within timeout for token transfer: seqNo=%d err=%v", seqNo, execErr)
-		} else {
-			assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
-			executionObserved = true
+		ev, err := evmChain.WaitOneExecEventBySeqNo(subtestCtx, cantonChain.ChainSelector(), seqNo, executionEventTimeout)
+		require.NoError(t, err)
+		if ev.State == cciptestinterfaces.ExecutionStateFailure {
 			t.Logf(
-				"Execution event observed (token transfer): sourceSelector=%d seqNo=%d state=%s",
+				"Execution failure details (token transfer): sourceSelector=%d seqNo=%d returnData=0x%x",
 				ev.SourceChainSelector,
 				ev.MessageNumber,
-				ev.State,
+				ev.ReturnData,
 			)
 		}
-
-		if executionObserved {
-			t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
-		} else {
-			t.Logf("Token transfer sent successfully; execution not observed within timeout (seq=%d)", seqNo)
-		}
+		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
 	})
 }
