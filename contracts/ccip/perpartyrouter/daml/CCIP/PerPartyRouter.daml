@@ -176,7 +176,7 @@ template PerPartyRouter
         -- OnRamp, updates sequence number state, emits CCIPMessageSent event.
         -- Fee collection happens here (not OnRamp) because partyOwner's Daml
         -- authorization is needed for the sender-side Splice transfer.
-        nonconsuming choice CCIPSend : CCIPSendResult
+        choice CCIPSend : CCIPSendResult
             with
                 context : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
