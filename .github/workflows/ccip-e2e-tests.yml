@@ -97,6 +97,13 @@ jobs:
           go test -timeout 8m -v -count 1 -run TestCanton2EVM_Basic
         continue-on-error: true
         id: test_run_canton2evm_basic
+      
+      - name: Run CCIP TestIntegration_SourceReader_CurseDetection test
+        working-directory: chainlink-canton/ccip/devenv/tests/integration
+        run: |
+          go test -timeout 5m -v -count 1 -run TestIntegration_SourceReader_CurseDetection
+        continue-on-error: true
+        id: test_run_sourcereader_curse_detection
 
       - name: Dump logs if they're not already dumped
         if: always()
@@ -118,7 +125,7 @@ jobs:
           retention-days: 1
 
       - name: Check test results
-        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure')
+        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure' || steps.test_run_sourcereader_curse_detection.outcome == 'failure')
         run: |
           echo "CCIP E2E tests failed."
           exit 1

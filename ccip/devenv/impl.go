@@ -49,6 +49,7 @@ import (
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -625,7 +626,78 @@ func (c *Chain) FundNodes(ctx context.Context, cls []*simple_node_set.Input, bc 
 
 // Curse implements cciptestinterfaces.CCIP17.
 func (c *Chain) Curse(ctx context.Context, subjects [][16]byte) error {
-	return nil // TODO: implement
+	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	if err != nil {
+		return fmt.Errorf("get rmn remote address: %w", err)
+	}
+
+	deps := dependencies.CantonDeps{
+		Chain:       c.chain,
+		Participant: 0,
+	}
+	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
+	party := c.chain.Participants[0].PartyID
+
+	c.logger.Info().
+		Uint64("chainSelector", c.chainDetails.ChainSelector).
+		Int("numSubjects", len(subjects)).
+		Msg("Cursing subjects on chain")
+	for _, subject := range subjects {
+		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Curse, deps, contract.ChoiceInput[rmn.Curse]{
+			ChainSelector:   c.chainDetails.ChainSelector,
+			InstanceAddress: instanceAddr,
+			ActAs:           []string{party},
+			Args: rmn.Curse{
+				Subject: types.TEXT(hex.EncodeToString(subject[:])),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("curse subject: %w", err)
+		}
+		c.logger.Info().
+			Uint64("chainSelector", c.chainDetails.ChainSelector).
+			Msg("Cursed chain")
+	}
+
+	return nil
+}
+
+// Uncurse implements cciptestinterfaces.CCIP17.
+func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
+	rmnRemoteRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(c.chainDetails.ChainSelector, datastore.ContractType(rmn_remote.ContractType), rmn_remote.Version, ""))
+	if err != nil {
+		return fmt.Errorf("get rmn remote address: %w", err)
+	}
+
+	deps := dependencies.CantonDeps{
+		Chain:       c.chain,
+		Participant: 0,
+	}
+	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
+	party := c.chain.Participants[0].PartyID
+
+	c.logger.Info().
+		Uint64("chainSelector", c.chainDetails.ChainSelector).
+		Int("numSubjects", len(subjects)).
+		Msg("Uncursing subjects on chain")
+	for _, subject := range subjects {
+		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Uncurse, deps, contract.ChoiceInput[rmn.Uncurse]{
+			ChainSelector:   c.chainDetails.ChainSelector,
+			InstanceAddress: instanceAddr,
+			ActAs:           []string{party},
+			Args: rmn.Uncurse{
+				Subject: types.TEXT(hex.EncodeToString(subject[:])),
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("uncurse subject: %w", err)
+		}
+		c.logger.Info().
+			Uint64("chainSelector", c.chainDetails.ChainSelector).
+			Msg("Uncursed chain")
+	}
+
+	return nil
 }
 
 // ExposeMetrics implements cciptestinterfaces.CCIP17.
@@ -1272,11 +1344,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 // SendMessageWithNonce implements cciptestinterfaces.CCIP17.
 func (c *Chain) SendMessageWithNonce(ctx context.Context, dest uint64, fields cciptestinterfaces.MessageFields, opts cciptestinterfaces.MessageOptions, sender *bind.TransactOpts, nonce *uint64, disableTokenAmountCheck bool) (cciptestinterfaces.MessageSentEvent, error) {
 	return c.SendMessage(ctx, dest, fields, opts)
-}
-
-// Uncurse implements cciptestinterfaces.CCIP17.
-func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
-	return nil // TODO: implement
 }
 
 // WaitOneExecEventBySeqNo implements cciptestinterfaces.CCIP17.

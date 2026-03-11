@@ -81,7 +81,7 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 
 			// Get template ID components
 			templateID := templWithID.(TT).GetTemplateID()
-			packageID, moduleName, entityName, err := parseTemplateIDFromString(templateID)
+			packageID, moduleName, entityName, err := contracts.ParseTemplateIDFromString(templateID)
 			if err != nil {
 				return datastore.AddressRef{}, fmt.Errorf("failed to parse template ID %s: %w", templateID, err)
 			}

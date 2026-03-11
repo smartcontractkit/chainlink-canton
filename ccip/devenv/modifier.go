@@ -115,6 +115,9 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 		if readerConfig.CCIPMessageSentTemplateID == (contracts.TemplateID{}) {
 			return nil, fmt.Errorf("CCIPMessageSentTemplateID is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
 		}
+		if readerConfig.RMNRemoteTemplateID == (contracts.TemplateID{}) {
+			return nil, fmt.Errorf("RMNRemoteTemplateID is not set for chain %s, please update the config appropriately if you're using canton", strSelector)
+		}
 
 		// Get the full party ID (name + hex id) from the canton participant.
 		// TODO: how to support multiple participants?
@@ -157,6 +160,7 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 					NodeOperatorParty:         partyDetail.GetParty(),
 					CCIPOwnerParty:            partyDetail.GetParty(),
 					CCIPMessageSentTemplateID: readerConfig.CCIPMessageSentTemplateID,
+					RMNRemoteTemplateID:       readerConfig.RMNRemoteTemplateID,
 					Authority:                 authority,
 				}
 				found = true

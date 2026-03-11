@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -86,7 +85,7 @@ func NewExercise[ARGS any](params ExerciseParams[ARGS]) *operations.Operation[Ch
 			exerciseCommand := params.Method(contractID, input.Args)
 
 			// Parse template ID to get package ID, module name, and entity name
-			packageID, moduleName, entityName, err := parseTemplateIDFromString(exerciseCommand.TemplateID)
+			packageID, moduleName, entityName, err := contracts.ParseTemplateIDFromString(exerciseCommand.TemplateID)
 			if err != nil {
 				return ExerciseOutput{}, fmt.Errorf("failed to parse template ID %s: %w", exerciseCommand.TemplateID, err)
 			}
@@ -139,7 +138,7 @@ func FindActiveContractByInstanceAddress(ctx context.Context, stateService apiv2
 	}
 
 	// Parse template ID to get package ID, module name, and entity name
-	packageID, moduleName, entityName, err := parseTemplateIDFromString(templateId)
+	packageID, moduleName, entityName, err := contracts.ParseTemplateIDFromString(templateId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template ID: %w", err)
 	}
@@ -235,17 +234,4 @@ func FindActiveContractIDByInstanceAddress(ctx context.Context, stateService api
 	}
 
 	return activeContract.GetCreatedEvent().GetContractId(), nil
-}
-
-// parseTemplateIDFromString parses a template ID string like "#package:Module:Entity" into its components
-func parseTemplateIDFromString(templateID string) (packageID, moduleName, entityName string, err error) {
-	if !strings.HasPrefix(templateID, "#") {
-		return "", "", "", fmt.Errorf("template ID must start with #")
-	}
-	parts := strings.Split(templateID, ":")
-	if len(parts) != 3 {
-		return "", "", "", fmt.Errorf("template ID must have format #package:module:entity, got: %s", templateID)
-	}
-
-	return parts[0], parts[1], parts[2], nil
 }
