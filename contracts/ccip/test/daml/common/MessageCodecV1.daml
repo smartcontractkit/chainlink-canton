@@ -61,10 +61,15 @@ setup = script do
 
     let encodeZero256 = MessageCodecV1.encodeUint256 0.0
     let encodeSmall256 = MessageCodecV1.encodeUint256 1000000.0
+    -- Numeric 0 can only hold up to ~1e38, so max uint256 (~1.16e77) can't be
+    -- expressed as a literal. Test the largest value Numeric 0 can represent and
+    -- verify the overflow guard via the exceedsMaxUint256 string comparison.
+    let encodeLargeInRange = MessageCodecV1.encodeUint256 99999999999999999999999999999999999999.0
     let encodeNegative256 = MessageCodecV1.encodeUint256 (-1.0)
 
     encodeZero256 === Some "0000000000000000000000000000000000000000000000000000000000000000"
     encodeSmall256 === Some "00000000000000000000000000000000000000000000000000000000000f4240"
+    assertMsg "large in-range value should encode successfully" (isSome encodeLargeInRange)
     encodeNegative256 === None
     debug("uint256 encoding edge cases passed")
 
