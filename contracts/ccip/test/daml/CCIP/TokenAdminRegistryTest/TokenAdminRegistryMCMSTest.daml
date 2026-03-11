@@ -9,6 +9,7 @@ import DA.Optional (isSome)
 
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import qualified CCIP.MessageCodecV1
 import CCIP.TokenAdminRegistry
 import CCIP.TokenAdminRegistryCodec
 import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
@@ -26,6 +27,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
 
   let instanceId = "tar-test-instance"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
   -- Create TokenAdminRegistry with a token config that has an admin set
   tarCid <- submit owner do
@@ -33,7 +35,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
       instanceId
       owner
       tokenConfigs = Map.fromList [
-        (instrumentId, TokenConfig (Some owner) None None)
+        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
         ]
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -54,7 +56,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] -> do
-      case Map.lookup instrumentId tar.tokenConfigs of
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config"
         Some config -> do
           isSome config.tokenPool === True
@@ -76,6 +78,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
 
   let instanceId = "tar-test-instance"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
       existingPool = PoolRegistration poolOwner "old-pool"
 
   -- Create TokenAdminRegistry with existing pool
@@ -84,7 +87,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
       instanceId
       owner
       tokenConfigs = Map.fromList [
-        (instrumentId, TokenConfig (Some owner) None (Some existingPool))
+        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None (Some existingPool))
         ]
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -104,7 +107,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] ->
-      case Map.lookup instrumentId tar.tokenConfigs of
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config"
         Some config -> config.tokenPool === None
     _ -> abort "Expected exactly one TokenAdminRegistry contract"
@@ -124,6 +127,7 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
 
   let instanceId = "tar-propose-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
   -- Create TokenAdminRegistry with no config for this instrument
   tarCid <- submit owner do
@@ -149,7 +153,7 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] ->
-      case Map.lookup instrumentId tar.tokenConfigs of
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config to be created"
         Some config -> do
           config.admin === None
@@ -171,6 +175,7 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
 
   let instanceId = "tar-transfer-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WETH"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
   -- Create TokenAdminRegistry with admin set to owner
   tarCid <- submit owner do
@@ -178,7 +183,7 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
       instanceId
       owner
       tokenConfigs = Map.fromList [
-        (instrumentId, TokenConfig (Some owner) None None)
+        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
         ]
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -198,7 +203,7 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] ->
-      case Map.lookup instrumentId tar.tokenConfigs of
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config"
         Some config -> config.admin === Some newAdmin
     _ -> abort "Expected exactly one TokenAdminRegistry contract"
@@ -217,6 +222,7 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
 
   let instanceId = "tar-accept-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "DAI"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
 
   -- Create TokenAdminRegistry with pending admin set to owner
   tarCid <- submit owner do
@@ -224,7 +230,7 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
       instanceId
       owner
       tokenConfigs = Map.fromList [
-        (instrumentId, TokenConfig None (Some owner) None)
+        (encodedInstrumentId, TokenConfig instrumentId None (Some owner) None)
         ]
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -244,7 +250,7 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] ->
-      case Map.lookup instrumentId tar.tokenConfigs of
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config"
         Some config -> do
           config.admin === Some owner
