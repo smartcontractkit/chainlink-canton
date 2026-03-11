@@ -4,12 +4,60 @@ module CCIP.OffRampTest.OffRampCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import CCIP.OffRampCodec
-import CCIP.OffRampTypes (OffRampDeps(..))
+import CCIP.OffRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
--- OFFRAMP DEPS ENCODING/DECODING TESTS
+-- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)
+-- ===========================================================================
+
+testSetDepsParamsRoundtrip_AllSome : Script ()
+testSetDepsParamsRoundtrip_AllSome = do
+  let params = SetDepsParams with
+        globalConfig = Some (RawInstanceAddress "gc-instance@party::namespace")
+        rmnRemote = Some (RawInstanceAddress "rmn-instance@another-party")
+        tokenAdminRegistry = Some (RawInstanceAddress "tar-instance@yet-another")
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (all Some)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+testSetDepsParamsRoundtrip_AllNone : Script ()
+testSetDepsParamsRoundtrip_AllNone = do
+  let params = SetDepsParams with
+        globalConfig = None
+        rmnRemote = None
+        tokenAdminRegistry = None
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (all None)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+testSetDepsParamsRoundtrip_Mixed : Script ()
+testSetDepsParamsRoundtrip_Mixed = do
+  let params = SetDepsParams with
+        globalConfig = Some (RawInstanceAddress "gc@owner")
+        rmnRemote = None
+        tokenAdminRegistry = Some (RawInstanceAddress "tar@owner")
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (mixed)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+-- ===========================================================================
+-- OFFRAMP DEPS ENCODING/DECODING TESTS (full, non-optional)
 -- ===========================================================================
 
 testOffRampDepsRoundtrip : Script ()
@@ -19,54 +67,16 @@ testOffRampDepsRoundtrip = do
         rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
         tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
 
-      encoded = encodeSetDepsParams deps
+      encoded = encodeOffRampDeps deps
 
-  case decodeSetDepsParams encoded of
+  case decodeOffRampDepsAt encoded 0 of
     None -> abort "Failed to decode OffRampDeps"
-    Some decoded -> do
+    Some (decoded, _) -> do
       decoded.globalConfig === deps.globalConfig
       decoded.rmnRemote === deps.rmnRemote
       decoded.tokenAdminRegistry === deps.tokenAdminRegistry
 
   pure ()
-
-testOffRampDepsEmptyAddresses : Script ()
-testOffRampDepsEmptyAddresses = do
-  let deps = OffRampDeps with
-        globalConfig = RawInstanceAddress ""
-        rmnRemote = RawInstanceAddress ""
-        tokenAdminRegistry = RawInstanceAddress ""
-
-      encoded = encodeSetDepsParams deps
-
-  case decodeSetDepsParams encoded of
-    None -> abort "Failed to decode OffRampDeps with empty addresses"
-    Some decoded -> do
-      decoded.globalConfig === RawInstanceAddress ""
-      decoded.rmnRemote === RawInstanceAddress ""
-      decoded.tokenAdminRegistry === RawInstanceAddress ""
-
-  pure ()
-
-testSetDepsParamsRoundtrip : Script ()
-testSetDepsParamsRoundtrip = do
-  let deps = OffRampDeps with
-        globalConfig = RawInstanceAddress "gc-instance@party::namespace"
-        rmnRemote = RawInstanceAddress "rmn-instance@another-party"
-        tokenAdminRegistry = RawInstanceAddress "tar-instance@yet-another"
-
-      encoded = encodeSetDepsParams deps
-
-  case decodeSetDepsParams encoded of
-    None -> abort "Failed to decode SetDepsParams"
-    Some decoded -> do
-      decoded === deps
-
-  pure ()
-
--- ===========================================================================
--- RAW INSTANCE ADDRESS SPECIAL CHARACTERS TESTS
--- ===========================================================================
 
 testOffRampDepsSpecialCharacters : Script ()
 testOffRampDepsSpecialCharacters = do
@@ -75,11 +85,11 @@ testOffRampDepsSpecialCharacters = do
         rmnRemote = RawInstanceAddress "rmn_with_underscores@party2::namespace2"
         tokenAdminRegistry = RawInstanceAddress "tar.with.dots@party3"
 
-      encoded = encodeSetDepsParams deps
+      encoded = encodeOffRampDeps deps
 
-  case decodeSetDepsParams encoded of
+  case decodeOffRampDepsAt encoded 0 of
     None -> abort "Failed to decode OffRampDeps with special characters"
-    Some decoded -> do
+    Some (decoded, _) -> do
       decoded.globalConfig === deps.globalConfig
       decoded.rmnRemote === deps.rmnRemote
       decoded.tokenAdminRegistry === deps.tokenAdminRegistry
@@ -92,14 +102,12 @@ testOffRampDepsSpecialCharacters = do
 
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
-  -- Empty data should fail
   case decodeSetDepsParams "" of
-    None -> pure ()  -- Expected
+    None -> pure ()
     Some _ -> abort "Expected decodeSetDepsParams to fail on empty data"
 
-  -- Truncated data should fail (only partial encoding)
-  case decodeSetDepsParams "0000" of
-    None -> pure ()  -- Expected
-    Some _ -> abort "Expected decodeSetDepsParams to fail on truncated data"
+  case decodeSetDepsParams "ff" of
+    None -> pure ()
+    Some _ -> abort "Expected decodeSetDepsParams to fail on invalid tag"
 
   pure ()

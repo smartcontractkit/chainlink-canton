@@ -25,38 +25,6 @@ template GlobalConfig
     where
         signatory ccipOwner
 
-        interface instance MCMSReceiver for GlobalConfig where
-          view = MCMSReceiverView with
-            owner = ccipOwner
-            instanceId
-
-          mcmsEntrypoint functionName operationData contractIds = do
-            let instAddr = instanceId <> "@" <> partyToText ccipOwner
-            selfCid <- case Map.lookup instAddr contractIds of
-              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
-              Some cid -> pure (coerceContractId cid : ContractId GlobalConfig)
-
-            case functionName of
-              "UpdateDestChainConfig" -> do
-                case decodeUpdateDestChainConfigParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateDestChainConfig"
-                  Some (destChainSelector, config) -> do
-                    newCid <- exercise selfCid UpdateDestChainConfig with
-                      destChainSelector
-                      config
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              "UpdateSourceChainConfig" -> do
-                case decodeUpdateSourceChainConfigParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateSourceChainConfig"
-                  Some (sourceChainSelector, config) -> do
-                    newCid <- exercise selfCid UpdateSourceChainConfig with
-                      sourceChainSelector
-                      config
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
         nonconsuming choice GetDestChainConfig : Optional DestChainConfig
             with
                 destChainSelector : Numeric 0
@@ -88,6 +56,38 @@ template GlobalConfig
             do
                 let newConfigs = Map.insert sourceChainSelector config sourceChainConfigs
                 create this with sourceChainConfigs = newConfigs
+
+        interface instance MCMSReceiver for GlobalConfig where
+          view = MCMSReceiverView with
+            owner = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId GlobalConfig)
+
+            case functionName of
+              "UpdateDestChainConfig" -> do
+                case decodeUpdateDestChainConfigParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UpdateDestChainConfig"
+                  Some (destChainSelector, config) -> do
+                    newCid <- exercise selfCid UpdateDestChainConfig with
+                      destChainSelector
+                      config
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "UpdateSourceChainConfig" -> do
+                case decodeUpdateSourceChainConfigParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UpdateSourceChainConfig"
+                  Some (sourceChainSelector, config) -> do
+                    newCid <- exercise selfCid UpdateSourceChainConfig with
+                      sourceChainSelector
+                      config
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 globalConfigKey : Text
 globalConfigKey = "global-config"

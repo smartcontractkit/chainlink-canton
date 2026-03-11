@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "e6c910162786b455d4438cc55bf343e29170180d0a37f16a4fe9ee8f5504282e"
+	PackageID   = "f7fd81feee3978c1843af2b7bfc39819d6cba53069dde948f491daf9b5769dcf"
 	SDKVersion  = "3.4.10"
 )
 
@@ -384,6 +384,27 @@ func (t OnRamp) PrepareSendFromRouterWithPackageID(contractID string, packageID 
 	}
 }
 
+// SetDeps exercises the SetDeps choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t OnRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend) *model.ExerciseCommand {
@@ -423,27 +444,6 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
-	}
-}
-
-// SetDeps exercises the SetDeps choice on this OnRamp contract
-// This method uses the package name in the template ID
-func (t OnRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
-func (t OnRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
 	}
 }
 
@@ -725,7 +725,7 @@ func (t *PrepareSendFromRouter) UnmarshalHex(data string) error {
 
 // SetDeps is a Record type
 type SetDeps struct {
-	NewDeps OnRampDeps `json:"newDeps"`
+	NewDeps SetDepsParams `json:"newDeps"`
 }
 
 // ToMap converts SetDeps to a map for DAML arguments
@@ -765,6 +765,99 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDepsParams is a Record type
+type SetDepsParams struct {
+	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	CcvRegistry        *common.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
+}
+
+// ToMap converts SetDepsParams to a map for DAML arguments
+func (t SetDepsParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.GlobalConfig != nil {
+		m["globalConfig"] = map[string]any{
+			"_type": "optional",
+			"value": *t.GlobalConfig,
+		}
+	} else {
+		m["globalConfig"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.RmnRemote != nil {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RmnRemote,
+		}
+	} else {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenAdminRegistry != nil {
+		m["tokenAdminRegistry"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenAdminRegistry,
+		}
+	} else {
+		m["tokenAdminRegistry"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.FeeQuoter != nil {
+		m["feeQuoter"] = map[string]any{
+			"_type": "optional",
+			"value": *t.FeeQuoter,
+		}
+	} else {
+		m["feeQuoter"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.CcvRegistry != nil {
+		m["ccvRegistry"] = map[string]any{
+			"_type": "optional",
+			"value": *t.CcvRegistry,
+		}
+	} else {
+		m["ccvRegistry"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetDepsParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDepsParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDepsParams to hex string (Canton MCMS format)
+func (t SetDepsParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDepsParams from hex string (Canton MCMS format)
+func (t *SetDepsParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
@@ -772,6 +865,7 @@ type MCMSEncoder interface {
 	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
 	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
+	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -818,6 +912,11 @@ func (e *encoder) PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.Encod
 
 // SetDeps encodes parameters for the SetDeps choice.
 func (e *encoder) SetDeps(args SetDeps) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
+}
+
+// SetDepsParams encodes parameters for the SetDeps choice.
+func (e *encoder) SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDeps", args)
 }
 

@@ -47,6 +47,9 @@ module CCIP.MCMSCodecUtils
   , decodeRawInstanceAddressAt
   , encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
+  -- Optional RawInstanceAddress encoding
+  , encodeOptionalRawInstanceAddress
+  , decodeOptionalRawInstanceAddressAt
   ) where
 
 import MCMS.Codec
@@ -301,3 +304,21 @@ decodeRawInstanceAddressListHelper encoded offset 0 acc = Some (reverse acc, off
 decodeRawInstanceAddressListHelper encoded offset remaining acc = do
   (ria, newOffset) <- decodeRawInstanceAddressAt encoded offset
   decodeRawInstanceAddressListHelper encoded newOffset (remaining - 1) (ria :: acc)
+
+-- ===========================================================================
+-- OPTIONAL RAW INSTANCE ADDRESS ENCODING/DECODING
+-- Format: [00] for None, [01][RawInstanceAddress] for Some
+-- ===========================================================================
+
+encodeOptionalRawInstanceAddress : Optional RawInstanceAddress -> BytesHex
+encodeOptionalRawInstanceAddress None = "00"
+encodeOptionalRawInstanceAddress (Some ria) = "01" <> encodeRawInstanceAddress ria
+
+decodeOptionalRawInstanceAddressAt : BytesHex -> Int -> Optional (Optional RawInstanceAddress, Int)
+decodeOptionalRawInstanceAddressAt encoded offset = do
+  tagHex <- extractBytes encoded offset 1
+  if tagHex == "00" then Some (None, offset + 1)
+  else if tagHex == "01" then do
+    (ria, newOffset) <- decodeRawInstanceAddressAt encoded (offset + 1)
+    Some (Some ria, newOffset)
+  else None

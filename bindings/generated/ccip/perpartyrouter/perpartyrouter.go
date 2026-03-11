@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "dfc4aba85072c924fdddc9c7331ae9bb252cef155dcf56dd3e799dbb34695417"
+	PackageID   = "299d3eec2122c2a626ba897a5adb28b4bdf3ad999cb8b08964f92c3683d989df"
 	SDKVersion  = "3.4.10"
 )
 
@@ -428,7 +428,7 @@ func (t *ExecuteResult) UnmarshalHex(data string) error {
 
 // FactorySetDeps is a Record type
 type FactorySetDeps struct {
-	NewDeps PerPartyRouterDeps `json:"newDeps"`
+	NewDeps SetDepsParams3 `json:"newDeps"`
 }
 
 // ToMap converts FactorySetDeps to a map for DAML arguments
@@ -833,6 +833,27 @@ func (t *PerPartyRouter) UnmarshalHex(data string) error {
 
 // Choice methods for PerPartyRouter
 
+// SetDeps exercises the SetDeps choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t PerPartyRouter) SetDepsWithPackageID(contractID string, packageID string, args SetDeps3) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // PrepareSend exercises the PrepareSend choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) PrepareSend(contractID string, args PrepareSend) *model.ExerciseCommand {
@@ -875,6 +896,27 @@ func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID strin
 	}
 }
 
+// GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetRequiredCCVsForSendWithPackageID exercises the GetRequiredCCVsForSend choice using the provided package ID instead of package name
+func (t PerPartyRouter) GetRequiredCCVsForSendWithPackageID(contractID string, packageID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "GetRequiredCCVsForSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // PrepareExecute exercises the PrepareExecute choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) PrepareExecute(contractID string, args PrepareExecute2) *model.ExerciseCommand {
@@ -913,27 +955,6 @@ func (t PerPartyRouter) ExecuteWithPackageID(contractID string, packageID string
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "Execute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVsForSend exercises the GetRequiredCCVsForSend choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) GetRequiredCCVsForSend(contractID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetRequiredCCVsForSendWithPackageID exercises the GetRequiredCCVsForSend choice using the provided package ID instead of package name
-func (t PerPartyRouter) GetRequiredCCVsForSendWithPackageID(contractID string, packageID string, args GetRequiredCCVsForSend2) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "GetRequiredCCVsForSend",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1018,27 +1039,6 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetSequenceNumber",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDeps exercises the SetDeps choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
-func (t PerPartyRouter) SetDepsWithPackageID(contractID string, packageID string, args SetDeps3) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1284,6 +1284,27 @@ func (t *PerPartyRouterFactory) UnmarshalHex(data string) error {
 
 // Choice methods for PerPartyRouterFactory
 
+// FactorySetDeps exercises the FactorySetDeps choice on this PerPartyRouterFactory contract
+// This method uses the package name in the template ID
+func (t PerPartyRouterFactory) FactorySetDeps(contractID string, args FactorySetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		ContractID: contractID,
+		Choice:     "FactorySetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FactorySetDepsWithPackageID exercises the FactorySetDeps choice using the provided package ID instead of package name
+func (t PerPartyRouterFactory) FactorySetDepsWithPackageID(contractID string, packageID string, args FactorySetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		ContractID: contractID,
+		Choice:     "FactorySetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // CreateRouter exercises the CreateRouter choice on this PerPartyRouterFactory contract
 // This method uses the package name in the template ID
 func (t PerPartyRouterFactory) CreateRouter(contractID string, args CreateRouter) *model.ExerciseCommand {
@@ -1343,27 +1364,6 @@ func (t PerPartyRouterFactory) HasRouterWithPackageID(contractID string, package
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
 		ContractID: contractID,
 		Choice:     "HasRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FactorySetDeps exercises the FactorySetDeps choice on this PerPartyRouterFactory contract
-// This method uses the package name in the template ID
-func (t PerPartyRouterFactory) FactorySetDeps(contractID string, args FactorySetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
-		ContractID: contractID,
-		Choice:     "FactorySetDeps",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FactorySetDepsWithPackageID exercises the FactorySetDeps choice using the provided package ID instead of package name
-func (t PerPartyRouterFactory) FactorySetDepsWithPackageID(contractID string, packageID string, args FactorySetDeps) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
-		ContractID: contractID,
-		Choice:     "FactorySetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1616,7 +1616,7 @@ func (t *PrepareSend) UnmarshalHex(data string) error {
 
 // SetDeps3 is a Record type
 type SetDeps3 struct {
-	NewDeps PerPartyRouterDeps `json:"newDeps"`
+	NewDeps SetDepsParams3 `json:"newDeps"`
 }
 
 // ToMap converts SetDeps3 to a map for DAML arguments
@@ -1652,6 +1652,111 @@ func (t SetDeps3) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetDeps3 from hex string (Canton MCMS format)
 func (t *SetDeps3) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetDepsParams3 is a Record type
+type SetDepsParams3 struct {
+	OnRamp             *common.RawInstanceAddress `json:"onRamp" hex:"optional"`
+	OffRamp            *common.RawInstanceAddress `json:"offRamp" hex:"optional"`
+	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+}
+
+// ToMap converts SetDepsParams3 to a map for DAML arguments
+func (t SetDepsParams3) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.OnRamp != nil {
+		m["onRamp"] = map[string]any{
+			"_type": "optional",
+			"value": *t.OnRamp,
+		}
+	} else {
+		m["onRamp"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.OffRamp != nil {
+		m["offRamp"] = map[string]any{
+			"_type": "optional",
+			"value": *t.OffRamp,
+		}
+	} else {
+		m["offRamp"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.GlobalConfig != nil {
+		m["globalConfig"] = map[string]any{
+			"_type": "optional",
+			"value": *t.GlobalConfig,
+		}
+	} else {
+		m["globalConfig"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenAdminRegistry != nil {
+		m["tokenAdminRegistry"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenAdminRegistry,
+		}
+	} else {
+		m["tokenAdminRegistry"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.FeeQuoter != nil {
+		m["feeQuoter"] = map[string]any{
+			"_type": "optional",
+			"value": *t.FeeQuoter,
+		}
+	} else {
+		m["feeQuoter"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.RmnRemote != nil {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RmnRemote,
+		}
+	} else {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetDepsParams3) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDepsParams3) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDepsParams3 to hex string (Canton MCMS format)
+func (t SetDepsParams3) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDepsParams3 from hex string (Canton MCMS format)
+func (t *SetDepsParams3) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

@@ -47,37 +47,6 @@ template FeeQuoter
         signatory owner
         observer priceUpdaters
 
-        interface instance MCMSReceiver for FeeQuoter where
-          view = MCMSReceiverView with
-            owner
-            instanceId
-
-          mcmsEntrypoint functionName operationData contractIds = do
-            let instAddr = instanceId <> "@" <> partyToText owner
-            selfCid <- case Map.lookup instAddr contractIds of
-              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
-              Some cid -> pure (coerceContractId cid : ContractId FeeQuoter)
-
-            case functionName of
-              "ApplyFeeTokenUpdates" -> do
-                case decodeApplyFeeTokenUpdatesParams operationData of
-                  None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
-                  Some (feeTokensToRemove, feeTokensToAdd) -> do
-                    newCid <- exercise selfCid ApplyFeeTokenUpdates with
-                      feeTokensToRemove
-                      feeTokensToAdd
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              "ApplyDestChainConfigUpdates" -> do
-                case decodeApplyDestChainConfigUpdatesParams operationData of
-                  None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                  Some destChainConfigArgs -> do
-                    newCid <- exercise selfCid ApplyDestChainConfigUpdates with
-                      destChainConfigArgs
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
         -- ================================================================
         -- │                          Prices                              │
         -- ================================================================
@@ -219,6 +188,36 @@ template FeeQuoter
                 let newDestChainConfigs = foldl (\acc dcca -> Map.insert dcca.destChainSelector dcca.destChainConfig acc) destChainConfigs destChainConfigArgs
                 create this with destChainConfigs = newDestChainConfigs
 
+        interface instance MCMSReceiver for FeeQuoter where
+          view = MCMSReceiverView with
+            owner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText owner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId FeeQuoter)
+
+            case functionName of
+              "ApplyFeeTokenUpdates" -> do
+                case decodeApplyFeeTokenUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
+                  Some (feeTokensToRemove, feeTokensToAdd) -> do
+                    newCid <- exercise selfCid ApplyFeeTokenUpdates with
+                      feeTokensToRemove
+                      feeTokensToAdd
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "ApplyDestChainConfigUpdates" -> do
+                case decodeApplyDestChainConfigUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
+                  Some destChainConfigArgs -> do
+                    newCid <- exercise selfCid ApplyDestChainConfigUpdates with
+                      destChainConfigArgs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 
 -- DestChainConfigArgs and DestChainConfig are imported from CCIP.FeeQuoterTypes
