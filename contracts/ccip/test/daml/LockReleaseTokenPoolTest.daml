@@ -623,7 +623,8 @@ testExecutionGasLimitAggregation = script do
             observingParties = [sender]
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit ccvOwner1 do
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner1 <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-1"
             feeUSDCents = 1.0
@@ -631,7 +632,8 @@ testExecutionGasLimitAggregation = script do
             destBytesOverhead = 0
             caller = ccvOwner1
 
-    sendingMessageCid <- submit ccvOwner2 do
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner2 <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-2"
             feeUSDCents = 2.0
@@ -639,7 +641,8 @@ testExecutionGasLimitAggregation = script do
             destBytesOverhead = 0
             caller = ccvOwner2
 
-    sendingMessageCid <- submit executorOwner do
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorWithFee with
             executorInstanceId = "executor-gas"
             executorArgs = ""
@@ -689,6 +692,130 @@ testParseSourcePoolDecimals_Valid = script do
     let result = LockReleaseTokenPool.parseSourcePoolDecimals 18 encoded
     result === 6
     debug "testParseSourcePoolDecimals_Valid: PASSED"
+
+-- C-3: tokenSendFee contributes destGasOverhead to execution gas limit.
+testExecutionGasLimitWithTokenSendFee = script do
+    ccipOwner <- allocateParty "ccip-owner-gas-pool"
+    sender <- allocateParty "sender-gas-pool"
+    ccvOwner <- allocateParty "ccv-owner-gas-pool"
+    executorOwner <- allocateParty "executor-owner-gas-pool"
+    poolOwner <- allocateParty "pool-owner-gas-pool"
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+    let testTokenInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "SendToken"
+    let senderAddr = MessageCodecV1.encodePartyAddress sender
+
+    sendingMessageCid <- submit ccipOwner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            ccipOwner = ccipOwner
+            sender = sender
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "test-router-gas-pool" sender
+                onRamp = RawInstanceAddress.make "test-onramp-gas-pool" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalconfig-gas-pool" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-gas-pool" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tar-gas-pool" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-gas-pool" ccipOwner
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "default-executor-gas-pool" ccipOwner
+            sourceChainSelector = 123.0
+            senderAddress = senderAddr
+            receiver = "0000000000000000000000000000000000000001"
+            payload = "abcd"
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 250000
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000002"
+            tokenReceiver = "0000000000000000000000000000000000000003"
+            tokenArgs = ""
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            feeToken = testInstrumentId
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = Some testTokenInstrumentId
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            verifierData = []
+            ccvOwners = []
+            tokenSendData = None
+            observingParties = [sender]
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    -- Add CCV fee with gas 10000
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSM) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-pool"
+            feeUSDCents = 1.0
+            destGasLimit = 10000
+            destBytesOverhead = 0
+            caller = ccvOwner
+
+    -- Add token send fee with destGasOverhead 50000
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs poolOwner <> disclose disclosedSM) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
+            poolInstanceId = "pool-gas"
+            poolOwner = poolOwner
+            feeUSDCents = 2.0
+            destGasOverhead = 50000
+            destBytesOverhead = 0
+            caller = poolOwner
+
+    -- SetOutboundPoolCCVs to advance state
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid SendingMessageV1.SetOutboundPoolCCVs with
+            poolCCVs = []
+
+    -- AddTokenSend
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs poolOwner <> disclose disclosedSM) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSend with
+            poolInstanceId = "pool-gas"
+            poolOwner = poolOwner
+            instrumentId = testTokenInstrumentId
+            amount = 100.0
+            destTokenAddress = "0000000000000000000000000000000000000099"
+            extraData = ""
+            caller = poolOwner
+
+    -- AddExecutorWithFee with gas 30000
+    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorWithFee with
+            executorInstanceId = "executor-gas-pool"
+            executorArgs = ""
+            blockConfirmations = 0
+            feeUSDCents = 3.0
+            destGasLimit = 30000
+            destBytesOverhead = 0
+            caller = executorOwner
+
+    -- Verify: CCV (10000) + pool (50000) + executor (30000) = 90000
+    finalized <- queryContractId ccipOwner sendingMessageCid
+    let sm = fromSome finalized
+    sm.executionGasLimit === 90000
+    let outboundMessage = fromSome sm.message
+    outboundMessage.executionGasLimit === 90000
+
+    debug "testExecutionGasLimitWithTokenSendFee: PASSED"
+
 
 -- | Test VerifyInboundMessage succeeds when sourcePoolAddress is in remotePools.
 testVerifyInboundMessage = script do

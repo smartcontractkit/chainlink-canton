@@ -81,6 +81,16 @@ data SendingMessageState
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
 
+sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
+sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
+    let
+        ccvGasLimit = foldl (\acc fee -> acc + fee.destGasLimit) 0 ccvFees
+        poolGasLimit = case tokenSendFee of
+            Some fee -> fee.destGasOverhead
+            None -> 0
+    in
+        ccvGasLimit + poolGasLimit + executorDestGasLimit
+
 template SendingMessageV1
     with
         deps : SendingMessageDeps
@@ -246,6 +256,8 @@ template SendingMessageV1
                         feeUSDCents = feeUSDCents
                         destGasLimit = destGasLimit
                         destBytesOverhead = destBytesOverhead
+                let finalExecutionGasLimit =
+                        sumExecutionGasLimit ccvFees tokenSendFee destGasLimit
 
                 let tokenTransferV1Opt = case tokenSendData of
                         None -> None
@@ -261,7 +273,7 @@ template SendingMessageV1
                         sourceChainSelector
                         destChainSelector
                         sequenceNumber
-                        executionGasLimit
+                        executionGasLimit = finalExecutionGasLimit
                         ccipReceiveGasLimit
                         finality = blockConfirmations
                         ccvAndExecutorHash = finalHash
@@ -280,6 +292,7 @@ template SendingMessageV1
                     requiredCCVs = finalCCVs
                     executorAddress = derivedExecutor
                     executorArgs = executorArgs
+                    executionGasLimit = finalExecutionGasLimit
                     blockConfirmations = blockConfirmations
                     ccvAndExecutorHash = finalHash
                     executorFee = Some ef
