@@ -40,6 +40,7 @@ func normalizeConfiguredOnRamp(onRamp []byte) (string, error) {
 	if len(raw) > 32 {
 		return "", fmt.Errorf("onramp address exceeds 32 bytes: %d", len(raw))
 	}
+
 	return hex.EncodeToString(gethcommon.LeftPadBytes(raw, 32)), nil
 }
 
