@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "40f4518440cf0c86e4f06f0bddc63388b4310660fa8cbbb99318ad708c1cfc43"
+	PackageID   = "c87709f5a1a8f170990b75fcbee4e1b75c68386f19bb698aadbe05991895ac13"
 	SDKVersion  = "3.4.10"
 )
 
@@ -127,16 +127,18 @@ func (t *ChainPoolConfig) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	InstanceId         types.TEXT                               `json:"instanceId"`
-	CcipOwner          types.PARTY                              `json:"ccipOwner"`
-	PoolOwner          types.PARTY                              `json:"poolOwner"`
-	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals           types.INT64                              `json:"decimals"`
-	ChainPoolConfigs   types.GENMAP                             `json:"chainPoolConfigs"`
-	ChainFeeConfigs    types.GENMAP                             `json:"chainFeeConfigs"`
-	RemoteTokens       types.GENMAP                             `json:"remoteTokens"`
-	PoolReceiveContext common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout    TransferTimeout                          `json:"transferTimeout"`
+	InstanceId           types.TEXT                               `json:"instanceId"`
+	CcipOwner            types.PARTY                              `json:"ccipOwner"`
+	PoolOwner            types.PARTY                              `json:"poolOwner"`
+	InstrumentId         splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Decimals             types.INT64                              `json:"decimals"`
+	ChainPoolConfigs     types.GENMAP                             `json:"chainPoolConfigs"`
+	ChainFeeConfigs      types.GENMAP                             `json:"chainFeeConfigs"`
+	RemoteTokens         types.GENMAP                             `json:"remoteTokens"`
+	OutboundRateLimiters types.GENMAP                             `json:"outboundRateLimiters"`
+	InboundRateLimiters  types.GENMAP                             `json:"inboundRateLimiters"`
+	PoolReceiveContext   common.CCIPContext                       `json:"poolReceiveContext"`
+	TransferTimeout      TransferTimeout                          `json:"transferTimeout"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -196,6 +198,22 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
 		return map[string]any{"_type": "genmap", "value": t.RemoteTokens}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["outboundRateLimiters"] = func() any {
+		if t.OutboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.OutboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["inboundRateLimiters"] = func() any {
+		if t.InboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.InboundRateLimiters}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -269,6 +287,22 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
 		return map[string]any{"_type": "genmap", "value": t.RemoteTokens}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["outboundRateLimiters"] = func() any {
+		if t.OutboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.OutboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["inboundRateLimiters"] = func() any {
+		if t.InboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.InboundRateLimiters}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -483,6 +517,27 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateChainPoolConfigsWithPack
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
 		Choice:     "LockReleaseTokenPool_UpdateChainPoolConfigs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolUpdateRateLimiters exercises the LockReleaseTokenPool_UpdateRateLimiters choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateRateLimiters(contractID string, args LockReleaseTokenPoolUpdateRateLimiters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_UpdateRateLimiters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// LockReleaseTokenPoolUpdateRateLimitersWithPackageID exercises the LockReleaseTokenPool_UpdateRateLimiters choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateRateLimitersWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolUpdateRateLimiters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "LockReleaseTokenPool_UpdateRateLimiters",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1054,6 +1109,55 @@ func (t *LockReleaseTokenPoolUpdateChainPoolConfigs) UnmarshalHex(data string) e
 	return hexCodec.Unmarshal(data, t)
 }
 
+// LockReleaseTokenPoolUpdateRateLimiters is a Record type
+type LockReleaseTokenPoolUpdateRateLimiters struct {
+	NewOutboundRateLimiters types.GENMAP `json:"newOutboundRateLimiters"`
+	NewInboundRateLimiters  types.GENMAP `json:"newInboundRateLimiters"`
+}
+
+// ToMap converts LockReleaseTokenPoolUpdateRateLimiters to a map for DAML arguments
+func (t LockReleaseTokenPoolUpdateRateLimiters) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newOutboundRateLimiters"] = func() any {
+		if t.NewOutboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.NewOutboundRateLimiters}
+	}()
+
+	m["newInboundRateLimiters"] = func() any {
+		if t.NewInboundRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.NewInboundRateLimiters}
+	}()
+
+	return m
+}
+
+func (t LockReleaseTokenPoolUpdateRateLimiters) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LockReleaseTokenPoolUpdateRateLimiters) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LockReleaseTokenPoolUpdateRateLimiters to hex string (Canton MCMS format)
+func (t LockReleaseTokenPoolUpdateRateLimiters) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolUpdateRateLimiters from hex string (Canton MCMS format)
+func (t *LockReleaseTokenPoolUpdateRateLimiters) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // LockReleaseTokenPoolVerifyInboundMessage is a Record type
 type LockReleaseTokenPoolVerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
@@ -1338,6 +1442,7 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockReleaseTokenPoolReleaseFromTicketMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolUpdateChainPoolConfigs(args LockReleaseTokenPoolUpdateChainPoolConfigs) (*bind.EncodedChoice, error)
+	LockReleaseTokenPoolUpdateRateLimiters(args LockReleaseTokenPoolUpdateRateLimiters) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyInboundMessage(args LockReleaseTokenPoolVerifyInboundMessage) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyInboundMessageMCMSParams(args LockReleaseTokenPoolVerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
@@ -1414,6 +1519,11 @@ func (e *encoder) LockReleaseTokenPoolReleaseFromTicketMCMSParams(args LockRelea
 // LockReleaseTokenPoolUpdateChainPoolConfigs encodes parameters for the LockReleaseTokenPoolUpdateChainPoolConfigs choice.
 func (e *encoder) LockReleaseTokenPoolUpdateChainPoolConfigs(args LockReleaseTokenPoolUpdateChainPoolConfigs) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolUpdateChainPoolConfigs", args)
+}
+
+// LockReleaseTokenPoolUpdateRateLimiters encodes parameters for the LockReleaseTokenPoolUpdateRateLimiters choice.
+func (e *encoder) LockReleaseTokenPoolUpdateRateLimiters(args LockReleaseTokenPoolUpdateRateLimiters) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("LockReleaseTokenPoolUpdateRateLimiters", args)
 }
 
 // LockReleaseTokenPoolVerifyInboundMessage encodes parameters for the LockReleaseTokenPoolVerifyInboundMessage choice.
