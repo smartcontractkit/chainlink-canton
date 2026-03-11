@@ -74,7 +74,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
 				Config: common.SourceChainConfig{
 					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
-					OnRampAddress:    onRamps[0], // TODO: currently only supports one onRamp
+					OnRampAddresses:  onRamps,
 					LaneMandatedCCVs: laneMandatedInboundCCVs,
 					DefaultCCVs:      defaultInboundCCVs,
 				},
