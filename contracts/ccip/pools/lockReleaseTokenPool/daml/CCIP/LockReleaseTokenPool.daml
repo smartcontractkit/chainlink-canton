@@ -31,6 +31,7 @@ import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.RateLimiter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
@@ -81,6 +82,28 @@ toSpliceChoiceContext : CCIP.Context.CCIPContext -> Splice.Api.Token.MetadataV1.
 toSpliceChoiceContext ctx = Splice.Api.Token.MetadataV1.ChoiceContext with
     values = TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList ctx.values))
 
+assertRateLimiter
+    : Text
+    -> Text
+    -> Numeric 0
+    -> CCIP.RateLimiter.RateLimitDirection
+    -> CCIP.RawInstanceAddress.RawInstanceAddress
+    -> CCIP.RateLimiter.RateLimiter
+    -> Update ()
+assertRateLimiter prefix poolInstanceId remoteChainSelector direction expected limiter = do
+    CCIP.RawInstanceAddress.assertEqual (prefix <> ": instance address mismatch")
+        limiter.instanceId
+        limiter.poolOwner
+        expected
+    assertMsg (prefix <> ": pool instance mismatch")
+        (limiter.poolInstanceId == poolInstanceId)
+    assertMsg (prefix <> ": remote chain mismatch")
+        (limiter.remoteChainSelector == remoteChainSelector)
+    assertMsg (prefix <> ": direction mismatch")
+        (limiter.direction == direction)
+    assertMsg (prefix <> ": unsupported rate limit mode")
+        (limiter.mode == CCIP.RateLimiter.RateLimitMode_DefaultFinality)
+
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 -- Performs best-effort RMN curse checks via disclosed RMNRemote contract.
 -- The pool cannot validate the RMN instance address (not a stakeholder);
@@ -98,6 +121,10 @@ template LockReleaseTokenPool
         chainFeeConfigs : Map.Map (Numeric 0) PoolFeeConfig
         -- Destination token address per remote chain, matching EVM's getRemoteToken()
         remoteTokens : Map.Map (Numeric 0) BytesHex
+        -- Expected outbound rate limiter identity per destination chain.
+        outboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
+        -- Expected inbound rate limiter identity per source chain.
+        inboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
         -- Context merged into extraArgs for transfers TO the pool (LockOrBurn).
         -- For tokens following Splice patterns (e.g., Amulet), this should contain
         -- the pool's preapproval CID under the key the TransferFactory expects
@@ -290,6 +317,21 @@ template LockReleaseTokenPool
                     assertMsg ("ReleaseFromTicket: missing required pool CCV owner " <> show requiredOwner)
                         (requiredOwner `elem` ticketSignatories)
 
+                expectedRateLimiter <- case Map.lookup ticket.sourceChainSelector inboundRateLimiters of
+                    None -> abort "ReleaseFromTicket: no inbound rate limiter configured for source chain"
+                    Some limiter -> pure limiter
+                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiter <- fetch rateLimiterCid
+                assertRateLimiter
+                    "ReleaseFromTicket: rateLimiter"
+                    instanceId
+                    ticket.sourceChainSelector
+                    CCIP.RateLimiter.RateLimitDirection_Inbound
+                    expectedRateLimiter
+                    rateLimiter
+                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                    requested = ticket.amount
+
                 -- Consume ticket via TAR. The TAR validates the ticket was issued by
                 -- the correct registry instance and archives it. The TAR is not fetchable
                 -- by the pool (visibility), but the caller discloses it.
@@ -344,6 +386,16 @@ template LockReleaseTokenPool
             do
                 create this with chainPoolConfigs = newChainPoolConfigs
 
+        choice LockReleaseTokenPool_UpdateRateLimiters : ContractId LockReleaseTokenPool
+            with
+                newOutboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
+                newInboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
+            controller poolOwner
+            do
+                create this with
+                    outboundRateLimiters = newOutboundRateLimiters
+                    inboundRateLimiters = newInboundRateLimiters
+
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
         -- fee config, appends fee directly to SendingMessageV1.
@@ -395,6 +447,21 @@ template LockReleaseTokenPool
                         (Map.lookup sendingMsg.destChainSelector remoteTokens)
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
+
+                expectedRateLimiter <- case Map.lookup sendingMsg.destChainSelector outboundRateLimiters of
+                    None -> abort "LockOrBurn: no outbound rate limiter configured for dest chain"
+                    Some limiter -> pure limiter
+                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiter <- fetch rateLimiterCid
+                assertRateLimiter
+                    "LockOrBurn: rateLimiter"
+                    instanceId
+                    sendingMsg.destChainSelector
+                    CCIP.RateLimiter.RateLimitDirection_Outbound
+                    expectedRateLimiter
+                    rateLimiter
+                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                    requested = amount
 
                 -- Convert pool's CCIPContext to Splice ChoiceContext at TransferFactory boundary.
                 let splicePoolCtx = toSpliceChoiceContext poolReceiveContext

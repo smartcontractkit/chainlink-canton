@@ -39,6 +39,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs = script do
       chainPoolConfigs = Map.empty
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -97,6 +99,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
       chainPoolConfigs = Map.empty
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = RelativeHours 24
 
@@ -176,6 +180,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Replace = script d
       chainPoolConfigs = Map.fromList [(1.0, existingConfig)]
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -235,6 +241,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Empty = script do
       chainPoolConfigs = Map.fromList [(1.0, existingConfig)]
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -284,6 +292,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
       chainPoolConfigs = Map.empty
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -319,6 +329,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
       chainPoolConfigs = Map.empty
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -354,6 +366,8 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
       chainPoolConfigs = Map.empty
       chainFeeConfigs = Map.empty
       remoteTokens = Map.empty
+      outboundRateLimiters = Map.empty
+      inboundRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 

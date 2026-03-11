@@ -170,6 +170,10 @@ execution_interval = 15_000_000_000
         package_id = "#ccip-common"
         module_name = "CCIP.Events"
         entity_name = "CCIPMessageSent"
+      [verifier.canton_configs.reader_configs.8706591216959472610.rmn_remote_template_id]
+        package_id = "#ccip-rmn"
+        module_name = "CCIP.RMNRemote"
+        entity_name = "RMNRemote"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.
@@ -200,6 +204,10 @@ execution_interval = 15_000_000_000
         package_id = "#ccip-common"
         module_name = "CCIP.Events"
         entity_name = "CCIPMessageSent"
+      [verifier.canton_configs.reader_configs.8706591216959472610.rmn_remote_template_id]
+        package_id = "#ccip-rmn"
+        module_name = "CCIP.RMNRemote"
+        entity_name = "RMNRemote"
     [verifier.canton_configs.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
       # the full URLs and JWT token.

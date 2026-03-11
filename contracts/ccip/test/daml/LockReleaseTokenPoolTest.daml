@@ -7,11 +7,13 @@ import DA.Assert
 import DA.List (head)
 import DA.Map qualified as Map
 import DA.Optional
+import DA.TextMap qualified as TextMap
 import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
+import CCIP.RateLimiter qualified as RateLimiter
 import CCIP.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
@@ -23,6 +25,42 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 import TestToken qualified
+
+mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
+mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
+    values = TextMap.fromList
+        [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
+
+createRateLimiter
+    : Party
+    -> Text
+    -> Numeric 0
+    -> RateLimiter.RateLimitDirection
+    -> Numeric 0
+    -> Numeric 0
+    -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
+createRateLimiter poolOwner poolInstanceId remoteChainSelector direction capacity rate = do
+    now <- getTime
+    let instanceId = poolInstanceId <> "-"
+            <> (case direction of
+                    RateLimiter.RateLimitDirection_Outbound -> "outbound"
+                    RateLimiter.RateLimitDirection_Inbound -> "inbound")
+            <> "-"
+            <> show remoteChainSelector
+    rateLimiterCid <- submit poolOwner do
+        createCmd RateLimiter.RateLimiter with
+            instanceId = instanceId
+            poolInstanceId = poolInstanceId
+            poolOwner = poolOwner
+            remoteChainSelector = remoteChainSelector
+            direction = direction
+            mode = RateLimiter.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = capacity
+            rate = rate
+            tokens = capacity
+            lastUpdated = now
+    pure (rateLimiterCid, RawInstanceAddress.make instanceId poolOwner)
 
 
 -- | Test LockOrBurn transfers tokens from sender to pool.
@@ -98,6 +136,14 @@ testLockOrBurn = script do
             admin = ccipOwner
             preapprovalCid = Some poolPreapproval
 
+    (outboundRateLimiter, outboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        "test-lock-release-pool"
+        destChainSelector
+        RateLimiter.RateLimitDirection_Outbound
+        10000000.0
+        1000.0
+
     -- Deploy LockReleaseTokenPool with dest chain config
     let destTokenAddr = "0000000000000000000000000000000000000099"
     tokenPool <- submit poolOwner do
@@ -110,6 +156,8 @@ testLockOrBurn = script do
             chainPoolConfigs = Map.empty
             chainFeeConfigs = Map.empty
             remoteTokens = Map.fromList [(destChainSelector, destTokenAddr)]
+            outboundRateLimiters = Map.fromList [(destChainSelector, outboundRateLimiterAddr)]
+            inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
@@ -178,19 +226,20 @@ testLockOrBurn = script do
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
 
     -- LockOrBurn stores token data via AddTokenSend
     result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
-                      <> disclose disclosedRmn) do
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5000000.0
             rmnRemoteCid = rmnRemote
-            extraContext = CCIP.Context.emptyCCIPContext
+            extraContext = mkRateLimiterContext outboundRateLimiter
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -283,6 +332,14 @@ testReleaseFromTicket = script do
             customObservers = []
             cursedSubjects = []
 
+    (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        "test-lock-release-pool"
+        sourceChainSelector
+        RateLimiter.RateLimitDirection_Inbound
+        10000000.0
+        1000.0
+
     -- Deploy LockReleaseTokenPool with source chain config for inbound
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -297,6 +354,8 @@ testReleaseFromTicket = script do
                 remotePools = [])]
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
@@ -326,16 +385,18 @@ testReleaseFromTicket = script do
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
 
     -- Call ReleaseFromTicket
     result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
                       <> disclose disclosedTar <> disclose disclosedFactory
-                      <> disclose disclosedPreapproval <> disclose disclosedRmn) do
+                      <> disclose disclosedPreapproval <> disclose disclosedRmn
+                      <> disclose disclosedRateLimiter) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = CCIP.Context.emptyCCIPContext
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -419,6 +480,8 @@ testVerifyInboundMessage = script do
                 remotePools = [allowedSourcePool])]
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
@@ -545,6 +608,8 @@ testVerifyInboundMessageInvalidSourcePool = script do
                 remotePools = [allowedSourcePool])]
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
@@ -663,6 +728,8 @@ testVerifyInboundMessageMissingChainConfig = script do
                 remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"])]
             chainFeeConfigs = Map.empty
             remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 

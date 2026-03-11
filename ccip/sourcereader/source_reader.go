@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"slices"
+	"strings"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"google.golang.org/grpc"
@@ -19,7 +20,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 // ReaderConfig is the configuration required to create a canton source reader.
@@ -27,21 +30,27 @@ type ReaderConfig struct {
 	// NodeOperatorParty is the observer party that node operators will use to observe CCIPMessageSent events.
 	// This is used to filter out events that are not observed by the node operator.
 	NodeOperatorParty string `toml:"node_operator_party"`
+
 	// CCIPOwnerParty is the party that we expect to be present in the CCIPMessageSent.ccipOwner field.
 	// This proves that the ccipOwner is a signatory on the CCIPMessageSent contract(event).
 	CCIPOwnerParty string `toml:"ccip_owner_party"`
+
 	// CCIPMessageSentTemplateID is the template ID of the CCIPMessageSent contract.
-	// Formatted as packageId:moduleName:entityName
 	CCIPMessageSentTemplateID contracts.TemplateID `toml:"ccip_message_sent_template_id"`
+
+	// RMNRemoteTemplateID is the template ID of the RMNRemote contract.
+	RMNRemoteTemplateID contracts.TemplateID `toml:"rmn_remote_template_id"`
+
 	// Authority is the authority to use for the gRPC connection.
 	// Connecting to the gRPC API via nginx usually requires this to be set.
 	Authority string `toml:"authority"`
 }
 
 type sourceReader struct {
-	lggr                logger.Logger
-	stateServiceClient  ledgerv2.StateServiceClient
-	updateServiceClient ledgerv2.UpdateServiceClient
+	lggr                     logger.Logger
+	stateServiceClient       ledgerv2.StateServiceClient
+	updateServiceClient      ledgerv2.UpdateServiceClient
+	rmnRemoteInstanceAddress contracts.InstanceAddress
 
 	config ReaderConfig
 }
@@ -52,6 +61,7 @@ func NewSourceReader(
 	lggr logger.Logger,
 	grpcEndpoint string,
 	config ReaderConfig,
+	rmnRemoteInstanceAddress contracts.InstanceAddress,
 	opts ...grpc.DialOption,
 ) (chainaccess.SourceReader, error) {
 	lggr.Infow("creating gRPC connection to canton node", "grpcEndpoint", grpcEndpoint, "config", config)
@@ -66,10 +76,11 @@ func NewSourceReader(
 	}
 
 	return &sourceReader{
-		lggr:                lggr,
-		stateServiceClient:  ledgerv2.NewStateServiceClient(conn),
-		updateServiceClient: ledgerv2.NewUpdateServiceClient(conn),
-		config:              config,
+		lggr:                     lggr,
+		stateServiceClient:       ledgerv2.NewStateServiceClient(conn),
+		updateServiceClient:      ledgerv2.NewUpdateServiceClient(conn),
+		config:                   config,
+		rmnRemoteInstanceAddress: rmnRemoteInstanceAddress,
 	}, nil
 }
 
@@ -354,8 +365,49 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 
 // GetRMNCursedSubjects implements chainaccess.SourceReader.
 func (c *sourceReader) GetRMNCursedSubjects(ctx context.Context) ([]protocol.Bytes16, error) {
-	// TODO: implement this.
-	return nil, nil
+	latest, _, err := c.LatestAndFinalizedBlock(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+	if latest == nil {
+		return nil, fmt.Errorf("latest block is nil")
+	}
+
+	activeContract, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		c.stateServiceClient,
+		c.config.NodeOperatorParty,
+		c.config.RMNRemoteTemplateID.String(),
+		c.rmnRemoteInstanceAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find active contract: %w", err)
+	}
+
+	createdEvent := activeContract.GetCreatedEvent()
+	if createdEvent == nil {
+		return nil, fmt.Errorf("created event is nil")
+	}
+
+	rmnRemote, err := bindings.UnmarshalCreatedEvent[rmn.RMNRemote](createdEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal RMNRemote created event: %w", err)
+	}
+
+	var cursedSubjects []protocol.Bytes16
+	for _, subject := range rmnRemote.CursedSubjects {
+		subjectStr := string(subject)
+		if !strings.HasPrefix(subjectStr, "0x") {
+			subjectStr = "0x" + subjectStr
+		}
+		subjectBytes16, err := protocol.NewBytes16FromString(subjectStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode subject from BytesHex: %w, input: %s", err, subject)
+		}
+		cursedSubjects = append(cursedSubjects, subjectBytes16)
+	}
+
+	return cursedSubjects, nil
 }
 
 // LatestAndFinalizedBlock returns the latest offset of the canton validator we are connected to.
