@@ -510,9 +510,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		CCIPReceiveGasLimit: 100000,
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       []byte("0000000000000000000000000000000000000001"),
-		OffRampAddress:      []byte("0000000000000000000000000000000000000002"),
-		Sender:              []byte("0000000000000000000000000000000000000003"),
+		OnRampAddress:       hexToBytes("0000000000000000000000000000000000000000000000000000000000000001"),
+		OffRampAddress:      hexToBytes("0000000000000000000000000000000000000002"),
+		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),
 		DestBlob:            []byte{},
 		TokenTransfer:       nil, // No token transfer

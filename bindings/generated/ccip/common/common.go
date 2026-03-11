@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "d6c32fe6d7ca92daadcff46ac9fd7b409ab9b0f8e3d82e11e198ef435bd568b5"
+	PackageID   = "3d4260e74c54e9af56fb0af0a16898d4e4606a533215940ebf147b8c7080ab03"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2824,6 +2824,27 @@ func (t *GlobalConfig) UnmarshalHex(data string) error {
 
 // Choice methods for GlobalConfig
 
+// UpdateSourceChainConfig exercises the UpdateSourceChainConfig choice on this GlobalConfig contract
+// This method uses the package name in the template ID
+func (t GlobalConfig) UpdateSourceChainConfig(contractID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
+		ContractID: contractID,
+		Choice:     "UpdateSourceChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// UpdateSourceChainConfigWithPackageID exercises the UpdateSourceChainConfig choice using the provided package ID instead of package name
+func (t GlobalConfig) UpdateSourceChainConfigWithPackageID(contractID string, packageID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
+		ContractID: contractID,
+		Choice:     "UpdateSourceChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Archive exercises the Archive choice on this GlobalConfig contract
 // This method uses the package name in the template ID
 func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
@@ -2904,27 +2925,6 @@ func (t GlobalConfig) UpdateDestChainConfigWithPackageID(contractID string, pack
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "UpdateDestChainConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UpdateSourceChainConfig exercises the UpdateSourceChainConfig choice on this GlobalConfig contract
-// This method uses the package name in the template ID
-func (t GlobalConfig) UpdateSourceChainConfig(contractID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
-		ContractID: contractID,
-		Choice:     "UpdateSourceChainConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UpdateSourceChainConfigWithPackageID exercises the UpdateSourceChainConfig choice using the provided package ID instead of package name
-func (t GlobalConfig) UpdateSourceChainConfigWithPackageID(contractID string, packageID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
-		ContractID: contractID,
-		Choice:     "UpdateSourceChainConfig",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4661,7 +4661,7 @@ func (t *SetOutboundPoolCCVs) UnmarshalHex(data string) error {
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        types.BOOL           `json:"isEnabled"`
-	OnRampAddress    types.TEXT           `json:"onRampAddress"`
+	OnRampAddresses  []types.TEXT         `json:"onRampAddresses"`
 	LaneMandatedCCVs []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs      []RawInstanceAddress `json:"defaultCCVs"`
 }
@@ -4672,7 +4672,13 @@ func (t SourceChainConfig) ToMap() map[string]any {
 
 	m["isEnabled"] = bool(t.IsEnabled)
 
-	m["onRampAddress"] = string(t.OnRampAddress)
+	m["onRampAddresses"] = func() []any {
+		res := make([]any, 0, len(t.OnRampAddresses))
+		for _, e := range t.OnRampAddresses {
+			res = append(res, string(e))
+		}
+		return res
+	}()
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))

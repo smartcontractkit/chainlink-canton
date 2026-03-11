@@ -63,7 +63,7 @@ testExecuteWithCCVVerification = script do
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
-                onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                 laneMandatedCCVs = [ccvRawAddress]
                 defaultCCVs = [])]
 
@@ -214,7 +214,7 @@ testExecuteFailsMissingCCV = script do
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
-                onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                 laneMandatedCCVs = [ccvRawAddress]
                 defaultCCVs = [])]
 
@@ -345,7 +345,7 @@ testExecuteWrongReceiver = script do
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
                 isEnabled = True
-                onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                 laneMandatedCCVs = []
                 defaultCCVs = [])]
 
@@ -430,4 +430,247 @@ testExecuteWrongReceiver = script do
             caller = receiver
 
     debug ("Execute fails with wrong receiver: PASSED")
+    pure ()
+
+
+-- | Test that execute accepts a message from any configured source onramp.
+testExecuteAllowsMultipleOnRamps = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+    receiver <- allocateParty "receiver"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let primaryOnRamp = "0000000000000000000000000000000000000000000000000000000000000001"
+    let rotatedOnRamp = "0000000000000000000000000000000000000000000000000000000000000009"
+
+    let globalConfigInstanceId = "test-globalconfig-multionramp"
+    let rmnInstanceId = "test-rmn-multionramp"
+    let tokenAdminRegistryInstanceId = "test-tar-multionramp"
+
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            onRampAddress = primaryOnRamp
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = [primaryOnRamp, rotatedOnRamp]
+                laneMandatedCCVs = []
+                defaultCCVs = [])]
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    offRamp <- submit ccipOwner do
+        createCmd OffRamp.OffRamp with
+            instanceId = "test-offramp-multionramp"
+            ccipOwner = ccipOwner
+            deps = OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "test-factory-multionramp"
+            ccipOwner = ccipOwner
+            deps = PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make "test-offramp-multionramp" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs receiver <> disclose disclosedFactory) do
+        exerciseCmd factory PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = "test-router-multionramp"
+    let router = createResult.router
+
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = rotatedOnRamp
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = MessageCodecV1.encodeMessageV1 message
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = []
+
+    executeResult.state === Internal.SUCCESS
+    debug ("Execute succeeds with alternate configured onramp: PASSED")
+    pure ()
+
+
+-- | Test that execute rejects a message from an unconfigured source onramp.
+testExecuteRejectsUnconfiguredOnRamp = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+    receiver <- allocateParty "receiver"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+    let allowedOnRamp = "0000000000000000000000000000000000000000000000000000000000000001"
+    let disallowedOnRamp = "0000000000000000000000000000000000000000000000000000000000000009"
+
+    let globalConfigInstanceId = "test-globalconfig-badonramp"
+    let rmnInstanceId = "test-rmn-badonramp"
+    let tokenAdminRegistryInstanceId = "test-tar-badonramp"
+
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            onRampAddress = allowedOnRamp
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = [allowedOnRamp]
+                laneMandatedCCVs = []
+                defaultCCVs = [])]
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    offRamp <- submit ccipOwner do
+        createCmd OffRamp.OffRamp with
+            instanceId = "test-offramp-badonramp"
+            ccipOwner = ccipOwner
+            deps = OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "test-factory-badonramp"
+            ccipOwner = ccipOwner
+            deps = PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make "test-offramp-badonramp" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs receiver <> disclose disclosedFactory) do
+        exerciseCmd factory PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = "test-router-badonramp"
+    let router = createResult.router
+
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = disallowedOnRamp
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = MessageCodecV1.encodeMessageV1 message
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = []
+
+    debug ("Execute fails with unconfigured onramp: PASSED")
     pure ()
