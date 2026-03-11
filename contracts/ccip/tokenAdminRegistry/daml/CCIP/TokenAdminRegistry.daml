@@ -33,7 +33,8 @@ template TokenAdminRegistry
         -- TODO: rename to ccipOwner to be explicit
         owner : Party
 
-        tokenConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenConfig
+        -- | Maps keccak256(InstrumentId) to token configuration
+        tokenConfigs : Map.Map BytesHex TokenConfig
     where
         signatory owner
 
@@ -95,7 +96,7 @@ template TokenAdminRegistry
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
-            do pure (Map.lookup instrumentId tokenConfigs)
+            do pure (Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs)
 
         choice TokenAdminRegistry_SetPool : ContractId TokenAdminRegistry
             with
@@ -104,7 +105,7 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                case Map.lookup instrumentId tokenConfigs of
+                case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_SetPool: No config for instrument"
                     Some config ->
@@ -116,7 +117,7 @@ template TokenAdminRegistry
                                     abort "TokenAdminRegistry_SetPool: Caller is not the admin"
                                 else do
                                     let updatedConfig = config with tokenPool
-                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                        updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
         choice TokenAdminRegistry_AcceptAdminRole : ContractId TokenAdminRegistry
@@ -125,7 +126,7 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                case Map.lookup instrumentId tokenConfigs of
+                case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_AcceptAdminRole: No config for instrument"
                     Some config ->
@@ -139,7 +140,7 @@ template TokenAdminRegistry
                                     let updatedConfig = config with
                                             admin = Some pendingAdmin
                                             pendingAdmin = None
-                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                        updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
         choice TokenAdminRegistry_TransferAdminRole : ContractId TokenAdminRegistry
@@ -149,7 +150,7 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                case Map.lookup instrumentId tokenConfigs of
+                case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_TransferAdminRole: No config for instrument"
                     Some config ->
@@ -161,7 +162,7 @@ template TokenAdminRegistry
                                     abort "TokenAdminRegistry_TransferAdminRole: Caller is not the current admin"
                                 else do
                                     let updatedConfig = config with admin = Some newAdmin
-                                        updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                        updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 
         nonconsuming choice TokenAdminRegistry_IsAdministrator : Bool
@@ -170,7 +171,7 @@ template TokenAdminRegistry
                 administrator : Party
                 caller : Party
             controller caller
-            do pure (case Map.lookup instrumentId tokenConfigs of
+            do pure (case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None -> False
                     Some config -> config.admin == Some administrator)
 
@@ -190,14 +191,15 @@ template TokenAdminRegistry
                 if not (isOwner || isAdmin) then
                     abort "TokenAdminRegistry_ProposeAdministrator: Caller must be either the registry owner or the token admin"
                 else
-                    case Map.lookup instrumentId tokenConfigs of
+                    case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                         None -> do
                             -- Config doesn't exist, create new entry
                             let newConfig = TokenConfig with
+                                    instrumentId = instrumentId
                                     admin = None
                                     pendingAdmin = Some newAdmin
                                     tokenPool = None
-                                updatedMap = Map.insert instrumentId newConfig tokenConfigs
+                                updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) newConfig tokenConfigs
                             create this with tokenConfigs = updatedMap
                         Some config ->
                             if isSome config.admin then
@@ -205,7 +207,7 @@ template TokenAdminRegistry
                             else do
                                 -- Config exists but admin is not set, update it
                                 let updatedConfig = config with pendingAdmin = Some newAdmin
-                                    updatedMap = Map.insert instrumentId updatedConfig tokenConfigs
+                                    updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                 create this with tokenConfigs = updatedMap
 
         -- | Consume a token receive ticket to authorize token release.
@@ -219,7 +221,7 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                case Map.lookup instrumentId tokenConfigs of
+                case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None ->
                         abort "TokenAdminRegistry_ConsumeReceiveTicket: No config for instrument"
                     Some config ->
@@ -267,7 +269,7 @@ template TokenAdminRegistry
                     None -> abort "TAR outbound: missing expected token instrument"
                     Some iid -> pure iid
 
-                config <- case Map.lookup instrumentId tokenConfigs of
+                config <- case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
                     None -> abort "TAR outbound: no config for instrument"
                     Some c -> pure c
 
@@ -304,10 +306,7 @@ template TokenAdminRegistry
                 let tt = fromSomeNote
                         "TokenAdminRegistry_SetInboundPoolCCVs: no token transfer in message"
                         execMsg.message.tokenTransfer
-                let instrumentId = fromSomeNote
-                        "TokenAdminRegistry_SetInboundPoolCCVs: cannot decode destTokenAddress"
-                        (CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress)
-                config <- case Map.lookup instrumentId tokenConfigs of
+                config <- case Map.lookup tt.destTokenAddress tokenConfigs of
                     None -> abort "TokenAdminRegistry_SetInboundPoolCCVs: no config for instrument"
                     Some c -> pure c
                 pool <- case config.tokenPool of
@@ -341,11 +340,8 @@ template TokenAdminRegistry
                 let tt = fromSomeNote
                         "TAR finalize: tokenReceiver set but no tokenTransfer in message"
                         execMsg.message.tokenTransfer
-                let instrumentId = fromSomeNote
-                        "TAR finalize: cannot decode destTokenAddress"
-                        (CCIP.MessageCodecV1.decodeInstrumentId tt.destTokenAddress)
 
-                config <- case Map.lookup instrumentId tokenConfigs of
+                config <- case Map.lookup tt.destTokenAddress tokenConfigs of
                     None -> abort "TAR finalize: no config for instrument"
                     Some c -> pure c
                 pool <- case config.tokenPool of
@@ -357,6 +353,6 @@ template TokenAdminRegistry
                     maybePoolOwner = Some pool.poolOwner
                     maybeTicketReceiver = Some ticketReceiver
                     maybeTokenReceiver = Some resolvedTokenReceiver
-                    maybeInstrumentId = Some instrumentId
+                    maybeInstrumentId = Some config.instrumentId
                     maybeAmount = Some tt.amount
                     returnData = returnData

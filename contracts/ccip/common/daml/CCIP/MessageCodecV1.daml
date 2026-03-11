@@ -20,7 +20,6 @@ module CCIP.MessageCodecV1
   , decodeUint32
   , decodeUint64
   , decodeUint256
-  , decodeInstrumentId
   , messageId
   ) where
 
@@ -143,7 +142,7 @@ encodeTokenTransferV1 tokenTransfer =
 encodeInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
 encodeInstrumentId instrumentId =
     let combined = instrumentId.id <> "@" <> partyToText instrumentId.admin
-    in DA.Crypto.Text.toHex combined
+    in keccak256 (DA.Crypto.Text.toHex combined)
 
 encodeUint8 : Int -> Optional BytesHex
 encodeUint8 n =
@@ -439,22 +438,6 @@ decodeUint256 hex =
         case hexToDecimalString hex of
             Some decStr -> Some (parseDecimal decStr)
             None -> None
-
-decodeInstrumentId : BytesHex -> Optional Splice.Api.Token.HoldingV1.InstrumentId
-decodeInstrumentId encoded =
-    do
-        -- Decode hex to text (format: id@party)
-        combined <- DA.Crypto.Text.fromHex encoded
-        -- Find the "@" separator
-        let parts = Text.splitOn "@" combined
-        case parts of
-            [idText, partyText] -> do
-                admin <- partyFromText partyText
-                return Splice.Api.Token.HoldingV1.InstrumentId
-                    { admin = admin
-                    , id = idText
-                    }
-            _ -> None
 
 -- Helpers
 
