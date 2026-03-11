@@ -90,7 +90,7 @@ template ExecutingMessageV1
             controller caller
             do
                 assertMsg "executingMessage: duplicate CCV verification"
-                    (all (\v -> v.ccvInstanceId /= ccvInstanceId) ccvVerifications)
+                    (not (any (\v -> v.ccvInstanceId == ccvInstanceId && v.ccvOwner == caller) ccvVerifications))
 
                 create this with
                     ccvVerifications = ccvVerifications ++ [CCVVerification with
