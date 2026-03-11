@@ -85,8 +85,6 @@ setup = script do
             id = "LINK"
 
     let encodedInstrumentId = MessageCodecV1.encodeInstrumentId instrumentId
-    let decodedInstrumentId = fromSome (MessageCodecV1.decodeInstrumentId encodedInstrumentId)
-    decodedInstrumentId === instrumentId
 
     debug ("--- PASS ---")
 

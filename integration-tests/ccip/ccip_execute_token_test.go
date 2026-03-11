@@ -481,11 +481,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	// Build Message
 	// Encode instrumentId for destTokenAddress
 	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
-	encodedInstrumentIdHex := hex.EncodeToString(encodedInstrumentId)
+	hashedInstrumentIdHex := hex.EncodeToString(crypto.Keccak256(encodedInstrumentId))
 
 	// Build token transfer (5 AMT in Splice Decimal format)
 	tokenAmount := big.NewInt(5)
-	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, partyTokenPoolOwner, encodedInstrumentIdHex, partyReceiver)
+	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, partyTokenPoolOwner, hashedInstrumentIdHex, partyReceiver)
 
 	// Build message
 	msg := &MessageV1{

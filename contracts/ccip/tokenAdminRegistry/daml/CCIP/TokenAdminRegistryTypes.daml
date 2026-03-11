@@ -5,6 +5,8 @@ module CCIP.TokenAdminRegistryTypes
   , TokenConfig(..)
   ) where
 
+import qualified Splice.Api.Token.HoldingV1
+
 -- | Registered pool identity for a token instrument.
 data PoolRegistration = PoolRegistration
     with
@@ -14,6 +16,7 @@ data PoolRegistration = PoolRegistration
 
 data TokenConfig = TokenConfig
     with
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         admin : Optional Party
         pendingAdmin : Optional Party
         tokenPool : Optional PoolRegistration
