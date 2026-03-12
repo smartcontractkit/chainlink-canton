@@ -167,7 +167,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
         SourceChainConfigArgs with
           sourceChainSelector = 456.0
           isEnabled = True
-          onRampAddress = "fedcba0987654321"
+          onRampAddresses = ["fedcba0987654321"]
           laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
           defaultCCVs = [RawInstanceAddress "src-default@party2"]
         ]
@@ -190,14 +190,6 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
         None -> abort "Expected source chain config for chain 456"
         Some config -> do
           assertSourceChainConfigsEqual config (head args)
-    _ -> abort "Expected exactly one GlobalConfig contract"
-
-  pure ()
-
--- | Test updating existing source chain config
-testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates_Replace : Script ()
-testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates_Replace = script do
-  ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-source-replace-test"
 
@@ -209,7 +201,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates_Replace = script do
       chainSelector = 123.0
       onRampAddress = "1234"
       destChainConfigs = Map.empty
-      sourceChainConfigs = Map.fromList [(456.0, SourceChainConfig True "abcd" [] [])]
+      sourceChainConfigs = Map.fromList [(456.0, SourceChainConfig True ["abcd"] [] [])]
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
@@ -219,13 +211,13 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates_Replace = script do
         SourceChainConfigArgs with
           sourceChainSelector = 456.0
           isEnabled = True
-          onRampAddress = "fedcba0987654321"
+          onRampAddresses = ["fedcba0987654321"]
           laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
           defaultCCVs = [RawInstanceAddress "src-default@party2"]
         ,SourceChainConfigArgs with
           sourceChainSelector = 789.0
           isEnabled = True
-          onRampAddress = "cafe5678"
+          onRampAddresses = ["cafe5678"]
           laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
           defaultCCVs = []
         ]
@@ -377,6 +369,6 @@ assertDestChainConfigsEqual got expected = do
 assertSourceChainConfigsEqual : SourceChainConfig -> SourceChainConfigArgs -> Script ()
 assertSourceChainConfigsEqual got expected = do
   assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
-  assertMsg ("onRampAddress mismatch, got: " <> show got.onRampAddress <> ", expected: " <> show expected.onRampAddress) (got.onRampAddress == expected.onRampAddress)
+  assertMsg ("onRampAddresses mismatch, got: " <> show got.onRampAddresses <> ", expected: " <> show expected.onRampAddresses) (got.onRampAddresses == expected.onRampAddresses)
   assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
   assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)

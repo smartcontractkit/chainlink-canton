@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	gethcommon "github.com/ethereum/go-ethereum/common"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -21,6 +22,27 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
+
+func normalizeConfiguredOnRamp(onRamp []byte) (string, error) {
+	raw := onRamp
+	if len(onRamp) > 0 {
+		maybeHex := strings.TrimPrefix(string(onRamp), "0x")
+		if len(maybeHex)%2 == 0 && maybeHex != "" && strings.IndexFunc(maybeHex, func(r rune) bool {
+			return !strings.ContainsRune("0123456789abcdefABCDEF", r)
+		}) == -1 {
+			decoded, err := hex.DecodeString(maybeHex)
+			if err != nil {
+				return "", fmt.Errorf("failed to decode onramp hex bytes %q: %w", string(onRamp), err)
+			}
+			raw = decoded
+		}
+	}
+	if len(raw) > 32 {
+		return "", fmt.Errorf("onramp address exceeds 32 bytes: %d", len(raw))
+	}
+
+	return hex.EncodeToString(gethcommon.LeftPadBytes(raw, 32)), nil
+}
 
 // TODO should align this with the EVM changesets if possible? Currently, these field are hardcoded
 type ConfigureChainForLanesInput struct {
@@ -68,13 +90,19 @@ var ConfigureChainForLanes = operations.NewSequence(
 			}
 			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
 			for _, onRamp := range remoteConfig.OnRamps {
-				onRamps = append(onRamps, types.TEXT(hex.EncodeToString(onRamp)))
+				// EVM messages encode source addresses as 32-byte left-padded values, so we must
+				// normalize configured remote onramps to that same shape or OffRamp validation will reject them.
+				normalizedOnRamp, err := normalizeConfiguredOnRamp(onRamp)
+				if err != nil {
+					return sequences.OnChainOutput{}, fmt.Errorf("failed to normalize onramp for remote chain %d: %w", remoteSelector, err)
+				}
+				onRamps = append(onRamps, types.TEXT(normalizedOnRamp))
 			}
 			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.UpdateSourceChainConfig{
 				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
 				Config: common.SourceChainConfig{
 					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
-					OnRampAddress:    onRamps[0], // TODO: currently only supports one onRamp
+					OnRampAddresses:  onRamps,
 					LaneMandatedCCVs: laneMandatedInboundCCVs,
 					DefaultCCVs:      defaultInboundCCVs,
 				},

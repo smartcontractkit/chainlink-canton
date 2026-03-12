@@ -12,7 +12,6 @@ import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import CCIP.GlobalConfigTypes (DestChainConfig(..), DestChainConfigArgs(..), SourceChainConfig(..), SourceChainConfigArgs(..), validateDefaultAndMandatedCCVs)
 import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
 template GlobalConfig
     with
@@ -95,17 +94,20 @@ template GlobalConfig
             controller ccipOwner
             do
               -- Validate
-              forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, defaultCCVs, laneMandatedCCVs} -> do
+              forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
                 assertMsg "ZeroChainSelectorNotAllowed: source chain selector must be non-zero" (sourceChainSelector /= 0.0)
+                -- Allow for empty onRampAddresses
+                -- This list could be empty, which would mean no onRamps are allowed and the lane is disabled, even for existing messages
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
               -- Update
               let newConfigs = foldl
-                    (\configs SourceChainConfigArgs{sourceChainSelector, isEnabled, onRampAddress, defaultCCVs, laneMandatedCCVs} ->
-                      Map.insert sourceChainSelector SourceChainConfig{isEnabled, onRampAddress, defaultCCVs, laneMandatedCCVs} configs)
+                    (\configs SourceChainConfigArgs{sourceChainSelector, isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} ->
+                      Map.insert sourceChainSelector SourceChainConfig{isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} configs)
                     sourceChainConfigs
                     sourceChainConfigUpdates
               create this with sourceChainConfigs = newConfigs
+
 
 globalConfigKey : Text
 globalConfigKey = "global-config"

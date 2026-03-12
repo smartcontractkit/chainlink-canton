@@ -61,19 +61,19 @@ testApplySourceChainConfigUpdatesParamsRoundtrip = do
         SourceChainConfigArgs with
           sourceChainSelector = 1.0
           isEnabled = True
-          onRampAddress = "abcdef1234567890"
+          onRampAddresses = ["abcdef1234567890"]
           laneMandatedCCVs = [RawInstanceAddress "src-ccv1@partyA", RawInstanceAddress "src-ccv2@partyB"]
           defaultCCVs = [RawInstanceAddress "src-default@partyC"]
         ,SourceChainConfigArgs with
           sourceChainSelector = 18446744073709551615.0 -- max uint64
           isEnabled = False
-          onRampAddress = "feedface"
+          onRampAddresses = ["feedface"]
           laneMandatedCCVs = [RawInstanceAddress "src-ccv2@partyB"]
           defaultCCVs = []
         ,SourceChainConfigArgs with
           sourceChainSelector = 0.0 -- edge case: zero selector
           isEnabled = False
-          onRampAddress = "feedface"
+          onRampAddresses = ["feedface"]
           laneMandatedCCVs = [RawInstanceAddress "src-ccv2@partyB"]
           defaultCCVs = []
         ]
@@ -127,6 +127,6 @@ assertSourceChainConfigArgsEqual : SourceChainConfigArgs -> SourceChainConfigArg
 assertSourceChainConfigArgsEqual got expected = do
   assertMsg ("SourceChainSelector mismatch, got: " <> show got.sourceChainSelector <> ", expected: " <> show expected.sourceChainSelector) (got.sourceChainSelector == expected.sourceChainSelector)
   assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
-  assertMsg ("onRampAddress mismatch, got: " <> show got.onRampAddress <> ", expected: " <> show expected.onRampAddress) (got.onRampAddress == expected.onRampAddress)
+  assertMsg ("onRampAddresses mismatch, got: " <> show got.onRampAddresses <> ", expected: " <> show expected.onRampAddresses) (got.onRampAddresses == expected.onRampAddresses)
   assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
   assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)

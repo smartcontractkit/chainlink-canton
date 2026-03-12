@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "d6c32fe6d7ca92daadcff46ac9fd7b409ab9b0f8e3d82e11e198ef435bd568b5"
+	PackageID   = "99a2615fac6a7389ce3c69ccb8e2eb2fb4c4fe0187d87e44d15d16c534c417c3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2824,6 +2824,27 @@ func (t *GlobalConfig) UnmarshalHex(data string) error {
 
 // Choice methods for GlobalConfig
 
+// UpdateSourceChainConfig exercises the UpdateSourceChainConfig choice on this GlobalConfig contract
+// This method uses the package name in the template ID
+func (t GlobalConfig) UpdateSourceChainConfig(contractID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
+		ContractID: contractID,
+		Choice:     "UpdateSourceChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// UpdateSourceChainConfigWithPackageID exercises the UpdateSourceChainConfig choice using the provided package ID instead of package name
+func (t GlobalConfig) UpdateSourceChainConfigWithPackageID(contractID string, packageID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
+		ContractID: contractID,
+		Choice:     "UpdateSourceChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Archive exercises the Archive choice on this GlobalConfig contract
 // This method uses the package name in the template ID
 func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
@@ -2904,27 +2925,6 @@ func (t GlobalConfig) UpdateDestChainConfigWithPackageID(contractID string, pack
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "UpdateDestChainConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UpdateSourceChainConfig exercises the UpdateSourceChainConfig choice on this GlobalConfig contract
-// This method uses the package name in the template ID
-func (t GlobalConfig) UpdateSourceChainConfig(contractID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
-		ContractID: contractID,
-		Choice:     "UpdateSourceChainConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UpdateSourceChainConfigWithPackageID exercises the UpdateSourceChainConfig choice using the provided package ID instead of package name
-func (t GlobalConfig) UpdateSourceChainConfigWithPackageID(contractID string, packageID string, args UpdateSourceChainConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
-		ContractID: contractID,
-		Choice:     "UpdateSourceChainConfig",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4312,6 +4312,48 @@ func (t *SendingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for SendingMessageV1
 
+// FinalizeFee exercises the FinalizeFee choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddExecutorWithFee exercises the AddExecutorWithFee choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) AddExecutorWithFee(contractID string, args AddExecutorWithFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddExecutorWithFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddExecutorWithFeeWithPackageID exercises the AddExecutorWithFee choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddExecutorWithFeeWithPackageID(contractID string, packageID string, args AddExecutorWithFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddExecutorWithFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // AddCCVFee exercises the AddCCVFee choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddCCVFee(contractID string, args AddCCVFee) *model.ExerciseCommand {
@@ -4375,27 +4417,6 @@ func (t SendingMessageV1) SetOutboundPoolCCVsWithPackageID(contractID string, pa
 	}
 }
 
-// AddExecutorWithFee exercises the AddExecutorWithFee choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) AddExecutorWithFee(contractID string, args AddExecutorWithFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddExecutorWithFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddExecutorWithFeeWithPackageID exercises the AddExecutorWithFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddExecutorWithFeeWithPackageID(contractID string, packageID string, args AddExecutorWithFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddExecutorWithFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
@@ -4434,27 +4455,6 @@ func (t SendingMessageV1) AddTokenSendWithPackageID(contractID string, packageID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "AddTokenSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FinalizeFee exercises the FinalizeFee choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
-func (t SendingMessageV1) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4661,7 +4661,7 @@ func (t *SetOutboundPoolCCVs) UnmarshalHex(data string) error {
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
 	IsEnabled        types.BOOL           `json:"isEnabled"`
-	OnRampAddress    types.TEXT           `json:"onRampAddress"`
+	OnRampAddresses  []types.TEXT         `json:"onRampAddresses"`
 	LaneMandatedCCVs []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs      []RawInstanceAddress `json:"defaultCCVs"`
 }
@@ -4672,7 +4672,13 @@ func (t SourceChainConfig) ToMap() map[string]any {
 
 	m["isEnabled"] = bool(t.IsEnabled)
 
-	m["onRampAddress"] = string(t.OnRampAddress)
+	m["onRampAddresses"] = func() []any {
+		res := make([]any, 0, len(t.OnRampAddresses))
+		for _, e := range t.OnRampAddresses {
+			res = append(res, string(e))
+		}
+		return res
+	}()
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -4735,6 +4741,7 @@ type TokenReceiveTicket struct {
 	TokenReceiver                types.PARTY                              `json:"tokenReceiver"`
 	InstrumentId                 splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Amount                       types.NUMERIC                            `json:"amount"`
+	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageHash                  types.TEXT                               `json:"messageHash"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
 }
@@ -4791,6 +4798,9 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourcePoolData"] = string(t.SourcePoolData)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["messageHash"] = string(t.MessageHash)
 
 	if t.SourceChainSelector != "" {
@@ -4843,6 +4853,9 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	if t.Amount != "" {
 		args["amount"] = t.Amount
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourcePoolData"] = string(t.SourcePoolData)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["messageHash"] = string(t.MessageHash)

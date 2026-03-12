@@ -34,7 +34,7 @@ data SourceChainConfigArgs = SourceChainConfigArgs
     with
         sourceChainSelector : Numeric 0         -- Source chain selector of the config to update.
         isEnabled : Bool                        -- Flag whether the source chain is enabled or not.
-        onRampAddress : BytesHex                -- OnRamp address on the source chain.
+        onRampAddresses : [BytesHex]            -- OnRamp addresses on the source chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages from this source chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages from this source chain.
     deriving (Eq, Show)
@@ -43,7 +43,7 @@ data SourceChainConfigArgs = SourceChainConfigArgs
 data SourceChainConfig = SourceChainConfig
     with
         isEnabled : Bool                        -- Flag whether the source chain is enabled or not.
-        onRampAddress : BytesHex                -- OnRamp address on the source chain.
+        onRampAddresses : [BytesHex]            -- OnRamp addresses on the source chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages from this source chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages from this source chain.
     deriving (Eq, Show)
