@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "1d04cd756d3c498f4b35f12e075a0b7db5499d709dae7ece94b179d874c3efd8"
+	PackageID   = "47f8079769a8da75ebaef44e9dab0b7d365bc8244cbf9438d3ff1d6e70d1eaac"
 	SDKVersion  = "3.4.10"
 )
 
@@ -360,6 +361,27 @@ func (t *OffRamp) UnmarshalHex(data string) error {
 
 // Choice methods for OffRamp
 
+// ExecuteFromRouter exercises the ExecuteFromRouter choice on this OffRamp contract
+// This method uses the package name in the template ID
+func (t OffRamp) ExecuteFromRouter(contractID string, args ExecuteFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "ExecuteFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecuteFromRouterWithPackageID exercises the ExecuteFromRouter choice using the provided package ID instead of package name
+func (t OffRamp) ExecuteFromRouterWithPackageID(contractID string, packageID string, args ExecuteFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "ExecuteFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // PrepareExecute exercises the PrepareExecute choice on this OffRamp contract
 // This method uses the package name in the template ID
 func (t OffRamp) PrepareExecute(contractID string, args PrepareExecute) *model.ExerciseCommand {
@@ -377,6 +399,27 @@ func (t OffRamp) PrepareExecuteWithPackageID(contractID string, packageID string
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
 		ContractID: contractID,
 		Choice:     "PrepareExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDeps exercises the SetDeps choice on this OffRamp contract
+// This method uses the package name in the template ID
+func (t OffRamp) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t OffRamp) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -423,26 +466,30 @@ func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *mode
 	}
 }
 
-// ExecuteFromRouter exercises the ExecuteFromRouter choice on this OffRamp contract
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this OffRamp contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t OffRamp) ExecuteFromRouter(contractID string, args ExecuteFromRouter) *model.ExerciseCommand {
+func (t OffRamp) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
-		Choice:     "ExecuteFromRouter",
+		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// ExecuteFromRouterWithPackageID exercises the ExecuteFromRouter choice using the provided package ID instead of package name
-func (t OffRamp) ExecuteFromRouterWithPackageID(contractID string, packageID string, args ExecuteFromRouter) *model.ExerciseCommand {
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t OffRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
-		Choice:     "ExecuteFromRouter",
+		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
 	}
 }
+
+// Verify interface implementations for OffRamp
+
+var _ mcms.IMCMSReceiver = (*OffRamp)(nil)
 
 // OffRampDeps is a Record type
 type OffRampDeps struct {
@@ -588,6 +635,117 @@ func (t *PrepareExecuteMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDeps is a Record type
+type SetDeps struct {
+	NewDeps SetDepsParams `json:"newDeps"`
+}
+
+// ToMap converts SetDeps to a map for DAML arguments
+func (t SetDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newDeps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewDeps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewDeps
+	}()
+
+	return m
+}
+
+func (t SetDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDeps to hex string (Canton MCMS format)
+func (t SetDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDeps from hex string (Canton MCMS format)
+func (t *SetDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetDepsParams is a Record type
+type SetDepsParams struct {
+	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+}
+
+// ToMap converts SetDepsParams to a map for DAML arguments
+func (t SetDepsParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.GlobalConfig != nil {
+		m["globalConfig"] = map[string]any{
+			"_type": "optional",
+			"value": *t.GlobalConfig,
+		}
+	} else {
+		m["globalConfig"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.RmnRemote != nil {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RmnRemote,
+		}
+	} else {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenAdminRegistry != nil {
+		m["tokenAdminRegistry"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenAdminRegistry,
+		}
+	} else {
+		m["tokenAdminRegistry"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetDepsParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDepsParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDepsParams to hex string (Canton MCMS format)
+func (t SetDepsParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDepsParams from hex string (Canton MCMS format)
+func (t *SetDepsParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
@@ -595,6 +753,8 @@ type MCMSEncoder interface {
 	GetRequiredCCVsForExecute(args GetRequiredCCVsForExecute) (*bind.EncodedChoice, error)
 	PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, error)
 	PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error)
+	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
+	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -642,6 +802,16 @@ func (e *encoder) PrepareExecute(args PrepareExecute) (*bind.EncodedChoice, erro
 // PrepareExecuteMCMSParams encodes MCMS parameters (without Caller) for the PrepareExecute choice.
 func (e *encoder) PrepareExecuteMCMSParams(args PrepareExecuteMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareExecute", args)
+}
+
+// SetDeps encodes parameters for the SetDeps choice.
+func (e *encoder) SetDeps(args SetDeps) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
+}
+
+// SetDepsParams encodes parameters for the SetDeps choice.
+func (e *encoder) SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
 }
 
 // Verify MCMSEncoder interface implementation
