@@ -9,7 +9,7 @@ import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 data DestChainConfigArgs = DestChainConfigArgs
     with
         destChainSelector : Numeric 0           -- Destination chain selector of the config to update.
-        isEnabled : Bool                        -- TODO: this doesn't exist on EVM
+        isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
@@ -20,7 +20,7 @@ data DestChainConfigArgs = DestChainConfigArgs
 -- | Configuration for a destination chain.
 data DestChainConfig = DestChainConfig
     with
-        isEnabled : Bool                        -- TODO: this doesn't exist on EVM
+        isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
