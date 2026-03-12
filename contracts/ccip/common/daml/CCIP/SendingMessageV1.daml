@@ -81,6 +81,24 @@ data SendingMessageState
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
 
+-- 1e16: EVM fee token scale factor per USD cent.
+evmFeeTokenScalePerUsdCent : Decimal
+evmFeeTokenScalePerUsdCent = 10000000000000000.0
+
+-- 1e18: the "100%" identity value in EVM's wei-per-eth premium convention.
+evmPremiumIdentity : Decimal
+evmPremiumIdentity = 1000000000000000000.0
+
+sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
+sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
+    let
+        ccvGasLimit = foldl (\acc fee -> acc + fee.destGasLimit) 0 ccvFees
+        poolGasLimit = case tokenSendFee of
+            Some fee -> fee.destGasOverhead
+            None -> 0
+    in
+        ccvGasLimit + poolGasLimit + executorDestGasLimit
+
 template SendingMessageV1
     with
         deps : SendingMessageDeps
@@ -246,6 +264,8 @@ template SendingMessageV1
                         feeUSDCents = feeUSDCents
                         destGasLimit = destGasLimit
                         destBytesOverhead = destBytesOverhead
+                let finalExecutionGasLimit =
+                        sumExecutionGasLimit ccvFees tokenSendFee destGasLimit
 
                 let tokenTransferV1Opt = case tokenSendData of
                         None -> None
@@ -261,7 +281,7 @@ template SendingMessageV1
                         sourceChainSelector
                         destChainSelector
                         sequenceNumber
-                        executionGasLimit
+                        executionGasLimit = finalExecutionGasLimit
                         ccipReceiveGasLimit
                         finality = blockConfirmations
                         ccvAndExecutorHash = finalHash
@@ -280,6 +300,7 @@ template SendingMessageV1
                     requiredCCVs = finalCCVs
                     executorAddress = derivedExecutor
                     executorArgs = executorArgs
+                    executionGasLimit = finalExecutionGasLimit
                     blockConfirmations = blockConfirmations
                     ccvAndExecutorHash = finalHash
                     executorFee = Some ef
@@ -339,10 +360,10 @@ template SendingMessageV1
                     tokenSendData = Some tsd
                     state = SendingMessageState_TokenLocked
 
-        -- Batch-converts all USD fees to fee token units at a single
-        -- price point, applying the fee token's premium multiplier.
-        -- Only exercisable by ccipOwner (via FeeQuoter) to prevent
-        -- untrusted callers from fabricating fee token prices.
+        -- Batch-converts all USD fees to fee token units at a single price point.
+        -- CCV, pool, and network fees get the premium multiplier applied; executor
+        -- fees convert at par (EVM separates gas costs from premium costs).
+        -- Only exercisable by ccipOwner (via FeeQuoter).
         choice FinalizeFee : ContractId SendingMessageV1
             with
                 feeTokenPrice : Decimal
@@ -356,19 +377,27 @@ template SendingMessageV1
                 assertMsg "premium multiplier must be positive"
                     (premiumMultiplier > 0.0)
 
-                let convertUSD usdCents = intToNumeric
+                -- Premium path: CCV, pool, and network fees.
+                -- Formula: usdCents * premiumMultiplier / feeTokenPrice * 1e16
+                -- Operation order avoids Numeric 10 overflow (max ~1e28).
+                let convertWithPremium usdCents = intToNumeric
                         (truncate (usdCents * premiumMultiplier
-                            / feeTokenPrice))
+                            / feeTokenPrice * evmFeeTokenScalePerUsdCent))
+                -- Direct path: executor fees (no premium discount/surcharge).
+                -- Uses 1e18 (identity) instead of the fee token's premium.
+                let convertDirect usdCents = intToNumeric
+                        (truncate (usdCents * evmPremiumIdentity
+                            / feeTokenPrice * evmFeeTokenScalePerUsdCent))
 
                 let ccvAmounts = map
-                        (\fee -> convertUSD fee.feeUSDCents) ccvFees
+                        (\fee -> convertWithPremium fee.feeUSDCents) ccvFees
                 let poolAmount = case tokenSendFee of
                         None -> 0.0
-                        Some fee -> convertUSD fee.feeUSDCents
+                        Some fee -> convertWithPremium fee.feeUSDCents
                 let executorAmount = case executorFee of
                         None -> 0.0
-                        Some fee -> convertUSD fee.feeUSDCents
-                let networkAmount = convertUSD networkFeeUSDCents
+                        Some fee -> convertDirect fee.feeUSDCents
+                let networkAmount = convertWithPremium networkFeeUSDCents
 
                 create this with
                     ccvFeeTokenAmounts = ccvAmounts

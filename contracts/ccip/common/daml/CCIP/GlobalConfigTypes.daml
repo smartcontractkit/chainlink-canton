@@ -19,7 +19,7 @@ data DestChainConfig = DestChainConfig
 data SourceChainConfig = SourceChainConfig
     with
         isEnabled : Bool
-        onRampAddress : BytesHex
+        onRampAddresses : [BytesHex]
         laneMandatedCCVs : [RawInstanceAddress]
         defaultCCVs : [RawInstanceAddress]
     deriving (Eq, Show)

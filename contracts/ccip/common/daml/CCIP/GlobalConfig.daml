@@ -6,6 +6,7 @@ module CCIP.GlobalConfig
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex)
+import DA.List qualified
 
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -54,6 +55,10 @@ template GlobalConfig
                 config : SourceChainConfig
             controller ccipOwner
             do
+                assertMsg "globalconfig: source chain config must include at least one onramp"
+                    (not (null config.onRampAddresses))
+                assertMsg "globalconfig: source chain config onramps must be unique"
+                    (length config.onRampAddresses == length (DA.List.dedup config.onRampAddresses))
                 let newConfigs = Map.insert sourceChainSelector config sourceChainConfigs
                 create this with sourceChainConfigs = newConfigs
 

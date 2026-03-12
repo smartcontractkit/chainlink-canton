@@ -312,7 +312,7 @@ testCCIPExecute = script do
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
                 isEnabled = True
-                onRampAddress = "0000000000000000000000000000000000000001"
+                onRampAddresses = ["0000000000000000000000000000000000000001"]
                 laneMandatedCCVs = []
                 defaultCCVs = [])]
 

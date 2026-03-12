@@ -105,7 +105,7 @@ testNonConsumingMigrateV1ToV2 = script do
             laneMandatedCCVs = ["ccv1"]
     let sourceConfig = SourceChainConfig with
             isEnabled = True
-            onRampAddress = "cc"
+            onRampAddresses = ["cc"]
             laneMandatedCCVs = ["ccv2"]
 
     v1Cid <- submit ccipOwner do

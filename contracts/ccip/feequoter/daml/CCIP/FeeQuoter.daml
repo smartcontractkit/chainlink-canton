@@ -33,14 +33,16 @@ template FeeQuoter
         instanceId : Text
         owner : Party
 
-        -- | Set of fee tokens that can be used to pay for fees. The values of the map are the fee multipliers which
-        -- | can be used to set a premium or discount for a specific fee token.
+        -- | Set of fee tokens that can be used to pay for fees. Values are EVM-style
+        -- | multipliers with 1e18 precision, so 1e18 = 1.0x.
         feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId Decimal
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
         tokenTransferFeeConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig
 
         usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
+        -- | Token prices are stored in EVM units: 18-decimal USD price for 1e18
+        -- | smallest fee-token units. This matches EVM FeeQuoter scaling.
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
         priceUpdaters : [Party]
     where

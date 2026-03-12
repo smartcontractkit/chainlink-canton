@@ -113,7 +113,7 @@ testUpdateSourceChainConfigParamsRoundtrip = do
   let sourceChainSelector : Numeric 0 = 42161.0  -- Arbitrum
       config = SourceChainConfig with
         isEnabled = True
-        onRampAddress = "fedcba9876543210"
+        onRampAddresses = ["fedcba9876543210", "0123456789abcdef"]
         laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
         defaultCCVs = [RawInstanceAddress "src-default@party2", RawInstanceAddress "src-default2@party3"]
 
@@ -124,7 +124,7 @@ testUpdateSourceChainConfigParamsRoundtrip = do
     Some (decodedSelector, decodedConfig) -> do
       decodedSelector === sourceChainSelector
       decodedConfig.isEnabled === True
-      decodedConfig.onRampAddress === "fedcba9876543210"
+      decodedConfig.onRampAddresses === ["fedcba9876543210", "0123456789abcdef"]
       length decodedConfig.laneMandatedCCVs === 1
       length decodedConfig.defaultCCVs === 2
 
@@ -135,7 +135,7 @@ testUpdateSourceChainConfigParamsDisabled = do
   let sourceChainSelector : Numeric 0 = 10.0
       config = SourceChainConfig with
         isEnabled = False
-        onRampAddress = ""
+        onRampAddresses = [""]
         laneMandatedCCVs = []
         defaultCCVs = []
 
@@ -146,7 +146,7 @@ testUpdateSourceChainConfigParamsDisabled = do
     Some (decodedSelector, decodedConfig) -> do
       decodedSelector === 10.0
       decodedConfig.isEnabled === False
-      decodedConfig.onRampAddress === ""
+      decodedConfig.onRampAddresses === [""]
       decodedConfig.laneMandatedCCVs === []
       decodedConfig.defaultCCVs === []
 

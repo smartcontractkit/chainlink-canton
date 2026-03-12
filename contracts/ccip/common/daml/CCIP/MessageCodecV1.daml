@@ -208,6 +208,7 @@ encodeUint64 n =
 encodeUint256 : Numeric 0 -> Optional BytesHex
 encodeUint256 n =
     if n < 0.0 then None
+    else if exceedsMaxUint256 n then None
     else
         let
             -- Convert numeric to string to preserve full precision
@@ -270,9 +271,9 @@ computeCCVAndExecutorHash ccvInstanceAddresses executorInstanceAddress =
 
 -- Helpers
 
--- Check if a Numeric 0 is greater than uint256 max
-compareWithMaxUint256 : Numeric 0 -> Bool
-compareWithMaxUint256 n =
+-- Check if a Numeric 0 exceeds uint256 max
+exceedsMaxUint256 : Numeric 0 -> Bool
+exceedsMaxUint256 n =
     let
         -- Maximum value for uint256 as string
         maxUint256String = "115792089237316195423570985008687907853269984665640564039457584007913129639935"

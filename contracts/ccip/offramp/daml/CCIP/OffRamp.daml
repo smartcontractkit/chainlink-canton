@@ -237,6 +237,8 @@ template OffRamp
                     None -> abort "offramp: unknown source chain"
                     Some c -> do
                         assertMsg "offramp: source chain disabled" c.isEnabled
+                        assertMsg "offramp: invalid source onramp"
+                            (message.onRampAddress `elem` c.onRampAddresses)
                         pure c
 
                 -- Get pool's declared CCV requirements from ExecutingMessageV1.
@@ -254,18 +256,22 @@ template OffRamp
                         message.messageData == ""
                         && message.ccipReceiveGasLimit == 0
                         && isSome message.tokenTransfer
+                let resolvedReceiverRequiredCCVs = if isTokenOnlyTransfer
+                        then []
+                        else receiverRequiredCCVs
 
                 -- Defaults apply when any source (receiver or pool) lacks specific
                 -- requirements, matching EVM's address(0) sentinel logic.
                 -- Token-only transfers skip defaults since only the token
                 -- issuer/pool takes risk.
                 let resolvedDefaultCCVs = if isTokenOnlyTransfer
-                        || (not (null receiverRequiredCCVs) && not (null poolCCVs))
+                        || (not (null resolvedReceiverRequiredCCVs) && not (null poolCCVs))
                         then []
                         else sourceConfig.defaultCCVs
 
-                -- Unified CCV list: lane-mandated + receiver + pool + defaults
-                let allRawAddrs = sourceConfig.laneMandatedCCVs ++ receiverRequiredCCVs ++ poolCCVs ++ resolvedDefaultCCVs
+                -- Unified CCV list matches EVM merge order:
+                -- receiver + pool + lane-mandated + defaults
+                let allRawAddrs = resolvedReceiverRequiredCCVs ++ poolCCVs ++ sourceConfig.laneMandatedCCVs ++ resolvedDefaultCCVs
                 let requiredCCVAddresses = dedup $
                         map CCIP.RawInstanceAddress.toInstanceAddress allRawAddrs
 
