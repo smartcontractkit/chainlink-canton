@@ -309,7 +309,11 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Updated FeeQuoter cID: %s", disclosedFeeQuoterForConfig.ContractId)
 
-	// UpdatePrices: Set price for FeeToken (e.g., $1.00 per token)
+	// UpdatePrices: Set price for FeeToken and LINK token
+	linkTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(partyCCIP),
+		Id:    types.TEXT("link-token"),
+	}
 	usdPerToken := "1.00"
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -326,8 +330,12 @@ func TestCCIPSend(t *testing.T) {
 									InstrumentId: feeTokenInstrumentId,
 									UsdPerToken:  types.NUMERIC(usdPerToken),
 								},
+								{
+									InstrumentId: linkTokenInstrumentId,
+									UsdPerToken:  types.NUMERIC("15.00"),
+								},
 							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{}, // No gas price updates for this test
+							GasPriceUpdates: []feequoter.GasPriceUpdate{},
 						},
 						Caller: types.PARTY(partyCCIP),
 					}),
