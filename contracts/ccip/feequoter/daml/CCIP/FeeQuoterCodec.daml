@@ -25,7 +25,6 @@ import MCMS.Codec
   , decodeBytesHexAt
   , encodeDecimal
   , decodeDecimalAt
-  , encodeText
   )
 import CCIP.Codec
   ( encodeInstrumentId

@@ -41,28 +41,28 @@ var Deploy = contract.NewDeploy(contract.DeployParams[common.GlobalConfig]{
 	Prefix:      "globalconfig",
 })
 
-var UpdateDestChainConfig = contract.NewExercise(contract.ExerciseParams[common.UpdateDestChainConfig]{
-	Name:         "canton/ccip/global_config/update_dest_chain_config",
+var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[common.ApplyDestChainConfigUpdates]{
+	Name:         "canton/ccip/global_config/apply_dest_chain_config_updates",
 	Version:      Version,
 	Description:  "Updates the GlobalConfig's destination chain configuration",
 	ContractType: ContractType,
-	Validate: func(input common.UpdateDestChainConfig) error {
+	Validate: func(input common.ApplyDestChainConfigUpdates) error {
 		// TODO add validation
 		return nil
 	},
 	Template: common.GlobalConfig{},
-	Method:   common.GlobalConfig{}.UpdateDestChainConfig,
+	Method:   common.GlobalConfig{}.ApplyDestChainConfigUpdates,
 })
 
-var UpdateSourceChainConfig = contract.NewExercise(contract.ExerciseParams[common.UpdateSourceChainConfig]{
-	Name:         "canton/ccip/global_config/update_source_chain_config",
+var ApplySourceChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[common.ApplySourceChainConfigUpdates]{
+	Name:         "canton/ccip/global_config/apply_source_chain_config_updates",
 	Version:      Version,
 	Description:  "Updates the GlobalConfig's source chain configuration",
 	ContractType: ContractType,
-	Validate: func(input common.UpdateSourceChainConfig) error {
+	Validate: func(input common.ApplySourceChainConfigUpdates) error {
 		// TODO add validation
 		return nil
 	},
 	Template: common.GlobalConfig{},
-	Method:   common.GlobalConfig{}.UpdateSourceChainConfig,
+	Method:   common.GlobalConfig{}.ApplySourceChainConfigUpdates,
 })

@@ -3,7 +3,6 @@ module CCIP.FeeQuoter
   , module CCIP.FeeQuoterTypes
   ) where
 
-import DA.Crypto.Text (BytesHex)
 import DA.Foldable qualified as Foldable
 import DA.Map qualified as Map
 import DA.Optional

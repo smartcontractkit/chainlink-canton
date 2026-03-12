@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "06e1245e9619c0b65d557535319e86078e0a04abc006512dee44fdfac9f4c5d8"
+	PackageID   = "fa45803b487b7ec96b75af6a2ff49b0958fc00bab7e89db87da0e67a29910d5e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -538,6 +538,27 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateRateLimitersWithPackageI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
 		Choice:     "LockReleaseTokenPool_UpdateRateLimiters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this LockReleaseTokenPool contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }

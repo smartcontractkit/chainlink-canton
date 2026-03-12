@@ -11,8 +11,6 @@ import MCMS.Codec
   , decodeUint8
   , encodeNumeric0
   , decodeNumeric0At
-  , encodeBytesHex
-  , decodeBytesHexAt
   , encodeBytesHexList
   , decodeBytesHexList
   )

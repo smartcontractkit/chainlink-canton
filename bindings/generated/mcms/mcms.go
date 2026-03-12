@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "34f7bd1751b2db1d1789aa737b95ac8c35521603f78d260047369394b71f96c3"
+	PackageID   = "0190550227d857fc64f855a081f872dc5da16562c14770dd4bc9b53154bf4cf3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -37,6 +37,9 @@ type IMCMSReceiver interface {
 
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
+
+	// MCMSReceiverGetInstanceId executes the MCMSReceiver_GetInstanceId choice
+	MCMSReceiverGetInstanceId(contractID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand
 
 	// MCMSReceiverEntrypoint executes the MCMSReceiver_Entrypoint choice
 	MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand
@@ -674,6 +677,27 @@ func (t Counter) ResetWithPackageID(contractID string, packageID string, args Re
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "Counter"),
 		ContractID: contractID,
 		Choice:     "Reset",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this Counter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t Counter) MCMSReceiverGetInstanceId(contractID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Counter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t Counter) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Counter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1889,15 +1913,15 @@ func (t MCMS) GetBlockedFunctionsCountWithPackageID(contractID string, packageID
 
 // MCMSReceiverView is a Record type
 type MCMSReceiverView struct {
-	McmsController types.PARTY `json:"mcmsController"`
-	InstanceId     types.TEXT  `json:"instanceId"`
+	Owner      types.PARTY `json:"owner"`
+	InstanceId types.TEXT  `json:"instanceId"`
 }
 
 // ToMap converts MCMSReceiverView to a map for DAML arguments
 func (t MCMSReceiverView) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["mcmsController"] = t.McmsController.ToMap()
+	m["owner"] = t.Owner.ToMap()
 
 	m["instanceId"] = string(t.InstanceId)
 
@@ -1969,6 +1993,42 @@ func (t MCMSReceiverEntrypoint) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes MCMSReceiverEntrypoint from hex string (Canton MCMS format)
 func (t *MCMSReceiverEntrypoint) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// MCMSReceiverGetInstanceId is a Record type
+type MCMSReceiverGetInstanceId struct {
+	C types.PARTY `json:"c"`
+}
+
+// ToMap converts MCMSReceiverGetInstanceId to a map for DAML arguments
+func (t MCMSReceiverGetInstanceId) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["c"] = t.C.ToMap()
+
+	return m
+}
+
+func (t MCMSReceiverGetInstanceId) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *MCMSReceiverGetInstanceId) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes MCMSReceiverGetInstanceId to hex string (Canton MCMS format)
+func (t MCMSReceiverGetInstanceId) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MCMSReceiverGetInstanceId from hex string (Canton MCMS format)
+func (t *MCMSReceiverGetInstanceId) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2818,6 +2878,7 @@ type MCMSEncoder interface {
 	IsOperationPending(args IsOperationPending) (*bind.EncodedChoice, error)
 	IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, error)
 	MCMSReceiverEntrypoint(args MCMSReceiverEntrypoint) (*bind.EncodedChoice, error)
+	MCMSReceiverGetInstanceId(args MCMSReceiverGetInstanceId) (*bind.EncodedChoice, error)
 	Reset(args Reset) (*bind.EncodedChoice, error)
 	ScheduleBatch(args ScheduleBatchParams) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
@@ -2946,6 +3007,11 @@ func (e *encoder) IsOperationReady(args IsOperationReady) (*bind.EncodedChoice, 
 // MCMSReceiverEntrypoint encodes parameters for the MCMSReceiverEntrypoint choice.
 func (e *encoder) MCMSReceiverEntrypoint(args MCMSReceiverEntrypoint) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("MCMSReceiverEntrypoint", args)
+}
+
+// MCMSReceiverGetInstanceId encodes parameters for the MCMSReceiverGetInstanceId choice.
+func (e *encoder) MCMSReceiverGetInstanceId(args MCMSReceiverGetInstanceId) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("MCMSReceiverGetInstanceId", args)
 }
 
 // Reset encodes parameters for the Reset choice.

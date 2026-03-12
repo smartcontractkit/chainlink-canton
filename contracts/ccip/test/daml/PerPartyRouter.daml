@@ -19,7 +19,6 @@ import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
-import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
