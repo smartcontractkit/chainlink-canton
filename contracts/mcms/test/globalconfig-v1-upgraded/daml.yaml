@@ -11,3 +11,5 @@ upgrades: ../globalconfig-v1/.daml/dist/globalconfig-1.0.0.dar
 build-options:
   - -Wno-upgrade-interfaces
   - -Wno-crypto-text-is-alpha
+  - -Werror=unused-dependency
+  - -Wno-template-interface-depends-on-daml-script

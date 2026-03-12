@@ -400,7 +400,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
 
   -- Third party submits ExecuteOp with ccipOwner as actAs party (disclosure)
   -- This tests that anyone with proper disclosure can submit the transaction
-  mcmsCid <- submitMulti [ccipOwner] [thirdParty] do
+  mcmsCid <- submit (actAs ccipOwner <> actAs thirdParty) do
     exerciseCmd mcmsCid ExecuteOp with
       targetRole = Bypasser
       submitter = ccipOwner  -- The submitter in the choice is still ccipOwner

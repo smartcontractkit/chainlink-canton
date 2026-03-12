@@ -5,16 +5,15 @@ version: 0.0.1
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Wno-template-interface-depends-on-daml-script"
+  - "-Werror=unused-dependency"
 data-dependencies:
   - ../../dependencies/splice-api-token-metadata-v1-1.0.0.dar
   - ../../dependencies/splice-api-token-holding-v1-1.0.0.dar
-  - ../../dependencies/splice-api-token-burn-mint-v1-1.0.0.dar
   - ../../dependencies/splice-api-token-transfer-instruction-v1-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
-  - ../../coin/.daml/dist/coin-0.0.1.dar
   - ../common/.daml/dist/ccip-common-0.0.1.dar
   - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
   - ../ccvs/.daml/dist/ccip-committeeverifier-0.0.1.dar
@@ -22,7 +21,6 @@ dependencies:
   - ../onramp/.daml/dist/ccip-onramp-0.0.1.dar
   - ../offramp/.daml/dist/ccip-offramp-0.0.1.dar
   - ../perpartyrouter/.daml/dist/ccip-perpartyrouter-0.0.1.dar
-  - ../ccipreceiver/.daml/dist/ccip-receiver-0.0.1.dar
   - ../pools/lockReleaseTokenPool/.daml/dist/ccip-lockreleasetokenpool-0.0.1.dar
   - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-0.0.1.dar
   - ../../mcms/.daml/dist/mcms-0.0.1.dar

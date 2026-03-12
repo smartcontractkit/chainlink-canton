@@ -10,3 +10,5 @@ dependencies:
 build-options:
   - -Wno-upgrade-interfaces
   - -Wno-crypto-text-is-alpha
+  - -Werror=unused-dependency
+  - -Wno-template-interface-depends-on-daml-script

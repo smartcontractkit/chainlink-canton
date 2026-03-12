@@ -29,7 +29,6 @@ import MCMS.Types
   , RootMetadata(..)
   , ExpiringRoot(..)
   , RoleState(..)
-  , emptyRoleState
   , numGroups
   , maxNumSigners
   , zeroHash

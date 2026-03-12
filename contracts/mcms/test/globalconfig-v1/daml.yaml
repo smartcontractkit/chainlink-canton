@@ -9,3 +9,4 @@ dependencies:
 build-options:
   - -Wno-upgrade-interfaces
   - -Wno-crypto-text-is-alpha
+  - -Werror=unused-dependency

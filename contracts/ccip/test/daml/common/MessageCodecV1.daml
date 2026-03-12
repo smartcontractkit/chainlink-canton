@@ -3,7 +3,6 @@ module MessageCodecV1 where
 import Daml.Script
 
 import DA.Assert
-import DA.Crypto.Text
 import DA.Text qualified as Text
 import DA.Optional
 
