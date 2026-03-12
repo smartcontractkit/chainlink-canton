@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	offrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	onrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
@@ -124,6 +125,17 @@ var DeployChainContracts = operations.NewSequence(
 		}
 
 		// Deploy FeeQuoter
+		linkTokenId := input.FeeQuoterConfig.Template.LinkTokenInstrumentId
+		if linkTokenId.Admin == "" {
+			linkTokenId = splice_api_token_holding_v1.InstrumentId{
+				Admin: types.PARTY(input.CCIPOwnerParty),
+				Id:    types.TEXT("link-token"),
+			}
+		}
+		maxFeeJuels := input.FeeQuoterConfig.Template.MaxFeeJuelsPerMsg
+		if maxFeeJuels == "" {
+			maxFeeJuels = types.NUMERIC("1000000000000000000000000")
+		}
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
@@ -134,8 +146,8 @@ var DeployChainContracts = operations.NewSequence(
 				TokenTransferFeeConfigs:          nil,
 				UsdPerUnitGasByDestChainSelector: nil,
 				UsdPerToken:                      nil,
-				LinkTokenInstrumentId:            input.FeeQuoterConfig.Template.LinkTokenInstrumentId,
-				MaxFeeJuelsPerMsg:                input.FeeQuoterConfig.Template.MaxFeeJuelsPerMsg,
+				LinkTokenInstrumentId:            linkTokenId,
+				MaxFeeJuelsPerMsg:                maxFeeJuels,
 				PriceUpdaters:                    input.FeeQuoterConfig.Template.PriceUpdaters,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
