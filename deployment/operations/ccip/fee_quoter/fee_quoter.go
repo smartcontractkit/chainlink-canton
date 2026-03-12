@@ -57,12 +57,12 @@ var ApplyFeeTokenUpdates = contract.NewExercise(contract.ExerciseParams[feequote
 	Method:   feequoter.FeeQuoter{}.ApplyFeeTokenUpdates,
 })
 
-var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates]{
+var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyDestChainConfigUpdates2]{
 	Name:         "canton/ccip/fee_quoter/apply_dest_chain_config_updates",
 	Version:      Version,
 	Description:  "Applies destination chain configuration updates to the FeeQuoter",
 	ContractType: ContractType,
-	Validate: func(input feequoter.ApplyDestChainConfigUpdates) error {
+	Validate: func(input feequoter.ApplyDestChainConfigUpdates2) error {
 		// TODO add validation
 		return nil
 	},
