@@ -134,6 +134,8 @@ var DeployChainContracts = operations.NewSequence(
 				TokenTransferFeeConfigs:          nil,
 				UsdPerUnitGasByDestChainSelector: nil,
 				UsdPerToken:                      nil,
+				LinkTokenInstrumentId:            input.FeeQuoterConfig.Template.LinkTokenInstrumentId,
+				MaxFeeJuelsPerMsg:                input.FeeQuoterConfig.Template.MaxFeeJuelsPerMsg,
 				PriceUpdaters:                    input.FeeQuoterConfig.Template.PriceUpdaters,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
