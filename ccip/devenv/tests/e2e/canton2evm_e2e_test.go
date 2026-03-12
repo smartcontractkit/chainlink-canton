@@ -23,8 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 )
 
@@ -33,7 +33,7 @@ const (
 	cantonToEVMTokenPayload = "Hello token transfer from Canton!"
 
 	// Token qualifier for Canton lock/release -> EVM burn/mint topology.
-	cantonToEVMDestTokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+	cantonToEVMDestTokenQualifier  = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
 	cantonToEVMTokenTransferAmount = int64(1000)
 
 	cantonToEVMSentEventTimeout = 2 * time.Minute
@@ -129,7 +129,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 				Data:     []byte(cantonToEVMBasicPayload),
 			},
 			cciptestinterfaces.MessageOptions{
-				Version:           3,
+				Version: 3,
 				// Token transfer execution on EVM is materially more expensive than a data-only message.
 				ExecutionGasLimit: 500_000,
 				FinalityConfig:    1,

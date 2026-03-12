@@ -116,6 +116,7 @@ func (t *CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainS
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode token address %q: %w", addr.Address, err)
 	}
+
 	return crypto.Keccak256(addrBytes), nil
 }
 
@@ -149,6 +150,7 @@ func deriveInstrumentTokenAddress(e deployment.Environment, chainSelector uint64
 		return nil, fmt.Errorf("parse lock/release token pool at %s: %w", addr.Address, err)
 	}
 	instrumentCombined := string(pool.InstrumentId.Id) + "@" + string(pool.InstrumentId.Admin)
+
 	return crypto.Keccak256([]byte(instrumentCombined)), nil
 }
 

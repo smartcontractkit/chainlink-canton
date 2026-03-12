@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/big"
 	"net/http"
 	"os"
@@ -39,6 +40,14 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
+	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+	"github.com/smartcontractkit/chainlink-ccv/deployments"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
@@ -52,6 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
@@ -66,16 +76,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-
-	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
-	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/deployments"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
-
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -443,6 +443,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				if candidate.Qualifier == defaultBurnMintQualifier {
 					c := candidate
 					tokenRef = &c
+
 					return
 				}
 			}
@@ -700,8 +701,8 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 					}},
 				}}},
 			)
-			outboundRaw := contracts.MustNewInstanceID(outboundInstanceId).RawInstanceAddress(types.PARTY(parsedPool.PoolOwner))
-			inboundRaw := contracts.MustNewInstanceID(inboundInstanceId).RawInstanceAddress(types.PARTY(parsedPool.PoolOwner))
+			outboundRaw := contracts.MustNewInstanceID(outboundInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
+			inboundRaw := contracts.MustNewInstanceID(inboundInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
 			newOutbound[selectorKey] = outboundRaw.Binding()
 			newInbound[selectorKey] = inboundRaw.Binding()
 		}
@@ -1047,9 +1048,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			return fmt.Errorf("parse active lock/release pool for lane remotePools update: %w", parseErr)
 		}
 		updatedChainPoolConfigs := types.GENMAP{}
-		for k, v := range parsedPool.ChainPoolConfigs {
-			updatedChainPoolConfigs[k] = v
-		}
+		maps.Copy(updatedChainPoolConfigs, parsedPool.ChainPoolConfigs)
 		needsPoolUpdate := false
 		for _, remoteSelector := range remoteSelectors {
 			remotePoolHex := ""
@@ -1659,6 +1658,7 @@ func (c *Chain) resolveInstrumentIDForRemoteToken(
 			}
 			inst := parsed.InstrumentId
 			found = &inst
+
 			break
 		}
 	}
@@ -2154,6 +2154,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 
 		// Use the default Canton->EVM lock/release pool pair wired by devenv topology.
+		//nolint:gosec // Topology qualifier string, not credentials.
 		const tokenPoolQualifier = "TEST (LockReleaseTokenPool 1.7.0 [default] to BurnMintTokenPool 1.7.0 [default])"
 		const remoteDestBurnMintQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
 		tokenPoolRef, err := c.e.DataStore.Addresses().Get(
@@ -2192,14 +2193,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		_, hasDestPoolCfg := parsedTokenPool.ChainPoolConfigs[destSelectorKey]
 		if !hasDestPoolCfg {
 			_, hasDestPoolCfg = parsedTokenPool.ChainPoolConfigs[destSelectorNumericKey]
-		}
-		_, hasDestOutboundRateLimiter := parsedTokenPool.OutboundRateLimiters[destSelectorKey]
-		if !hasDestOutboundRateLimiter {
-			_, hasDestOutboundRateLimiter = parsedTokenPool.OutboundRateLimiters[destSelectorNumericKey]
-		}
-		_, hasDestInboundRateLimiter := parsedTokenPool.InboundRateLimiters[destSelectorKey]
-		if !hasDestInboundRateLimiter {
-			_, hasDestInboundRateLimiter = parsedTokenPool.InboundRateLimiters[destSelectorNumericKey]
 		}
 		if !hasDestRemoteToken || !hasDestPoolCfg {
 			keys := func(m types.GENMAP) []string {
@@ -2268,6 +2261,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
 							e.Value = &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: remoteTokenHex}}
 							updated = true
+
 							break
 						}
 					}
@@ -2377,18 +2371,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve remote pool address for destination selector %d: %w", dest, err)
 			}
 			updatedChainPoolConfigs := types.GENMAP{}
-			for k, v := range parsedTokenPool.ChainPoolConfigs {
-				updatedChainPoolConfigs[k] = v
-			}
+			maps.Copy(updatedChainPoolConfigs, parsedTokenPool.ChainPoolConfigs)
 			updatedChainPoolConfigs[destSelectorKey] = lockreleasetokenpool.ChainPoolConfig{
 				InboundCCVs:  senderRequiredCCVs,
 				OutboundCCVs: senderRequiredCCVs,
 				RemotePools:  []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
 			}
 			updatedChainFeeConfigs := types.GENMAP{}
-			for k, v := range parsedTokenPool.ChainFeeConfigs {
-				updatedChainFeeConfigs[k] = v
-			}
+			maps.Copy(updatedChainFeeConfigs, parsedTokenPool.ChainFeeConfigs)
 			updatedChainFeeConfigs[destSelectorKey] = lockreleasetokenpool.PoolFeeConfig{
 				FeeUSDCents:       types.NUMERIC("0"),
 				DestGasOverhead:   types.INT64(0),
@@ -2476,7 +2466,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			if deployErr != nil {
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("configure lock/release pool for destination selector %d: %w", dest, deployErr)
 			}
-			tokenPoolCID, tokenPoolDisclosure, err = resolveDisclosedByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), tokenPoolAddress)
+			_, _, err = resolveDisclosedByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), tokenPoolAddress)
 			if err != nil {
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve updated token pool disclosed contract: %w", err)
 			}
@@ -2507,11 +2497,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					continue
 				}
 				outboundFallback = v
+
 				break
 			}
 			if outboundFallback == nil {
 				for _, v := range parsedTokenPool.OutboundRateLimiters {
 					outboundFallback = v
+
 					break
 				}
 			}

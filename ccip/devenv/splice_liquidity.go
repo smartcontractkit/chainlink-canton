@@ -20,6 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
+const instrumentFieldAdmin = "admin"
+
 func seedAMTLiquidity(ctx context.Context, participant canton.Participant, ownerParty string, amount string) error {
 	requestEditor := func(reqCtx context.Context, req *http.Request) error {
 		token, err := participant.TokenSource.Token()
@@ -66,8 +68,8 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 				"receiver": ownerParty,
 				"amount":   amount,
 				"instrumentId": map[string]any{
-					"admin": registryAdmin,
-					"id":    "Amulet",
+					instrumentFieldAdmin: registryAdmin,
+					"id":                 "Amulet",
 				},
 				"lock":             nil,
 				"requestedAt":      time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
@@ -234,8 +236,8 @@ func getTransferFactoryFromScanProxy(
 				"receiver": receiver,
 				"amount":   amount,
 				"instrumentId": map[string]any{
-					"admin": instrumentAdmin,
-					"id":    instrumentID,
+					instrumentFieldAdmin: instrumentAdmin,
+					"id":                 instrumentID,
 				},
 				"lock":             nil,
 				"requestedAt":      time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
@@ -333,7 +335,7 @@ func selectUnlockedHoldingCIDs(holdings []*apiv2.ActiveContract, owner, admin, i
 		var holdingAdmin, holdingID string
 		for _, f := range instrumentRecord.GetFields() {
 			switch f.GetLabel() {
-			case "admin":
+			case instrumentFieldAdmin:
 				holdingAdmin = f.GetValue().GetParty()
 			case "id":
 				holdingID = f.GetValue().GetText()

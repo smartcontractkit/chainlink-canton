@@ -50,6 +50,12 @@ var executeRequiredPackages = []contracts.Package{
 	contracts.CCIPRMN,
 }
 
+const (
+	perPartyRouterEntityName = "PerPartyRouter"
+	createArgFieldPartyOwner = "partyOwner"
+	createArgFieldInstanceID = "instanceId"
+)
+
 func uniqueParties(parties ...string) []string {
 	seen := make(map[string]struct{}, len(parties))
 	out := make([]string, 0, len(parties))
@@ -253,7 +259,7 @@ func (c *Chain) createRouterWithDisclosedFactory(
 				if createdEvent == nil || createdEvent.GetTemplateId() == nil {
 					continue
 				}
-				if createdEvent.GetTemplateId().GetEntityName() == "PerPartyRouter" {
+				if createdEvent.GetTemplateId().GetEntityName() == perPartyRouterEntityName {
 					return createdEvent.GetContractId(), nil
 				}
 			}
@@ -744,7 +750,7 @@ func (c *Chain) findPerPartyRouterContractID(
 			if created.GetTemplateId() == nil {
 				continue
 			}
-			if created.GetTemplateId().GetModuleName() != "CCIP.PerPartyRouter" || created.GetTemplateId().GetEntityName() != "PerPartyRouter" {
+			if created.GetTemplateId().GetModuleName() != "CCIP.PerPartyRouter" || created.GetTemplateId().GetEntityName() != perPartyRouterEntityName {
 				continue
 			}
 			args := created.GetCreateArguments()
@@ -758,9 +764,9 @@ func (c *Chain) findPerPartyRouterContractID(
 					continue
 				}
 				switch field.GetLabel() {
-				case "partyOwner":
+				case createArgFieldPartyOwner:
 					gotOwner = field.GetValue().GetParty()
-				case "instanceId":
+				case createArgFieldInstanceID:
 					gotInstanceID = field.GetValue().GetText()
 				}
 			}
@@ -836,7 +842,7 @@ func (c *Chain) findAnyPerPartyRouterForOwner(
 			continue
 		}
 		created := entry.ActiveContract.GetCreatedEvent()
-		if created.GetTemplateId() == nil || created.GetTemplateId().GetModuleName() != "CCIP.PerPartyRouter" || created.GetTemplateId().GetEntityName() != "PerPartyRouter" {
+		if created.GetTemplateId() == nil || created.GetTemplateId().GetModuleName() != "CCIP.PerPartyRouter" || created.GetTemplateId().GetEntityName() != perPartyRouterEntityName {
 			continue
 		}
 		args := created.GetCreateArguments()
@@ -849,9 +855,9 @@ func (c *Chain) findAnyPerPartyRouterForOwner(
 				continue
 			}
 			switch field.GetLabel() {
-			case "partyOwner":
+			case createArgFieldPartyOwner:
 				gotOwner = field.GetValue().GetParty()
-			case "instanceId":
+			case createArgFieldInstanceID:
 				gotInstanceID = field.GetValue().GetText()
 			}
 		}
@@ -1006,6 +1012,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 				fallbackPool = parsed
 				fallbackPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
 			}
+
 			continue
 		}
 		for _, remotePool := range remotePools {
@@ -1029,6 +1036,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 				fallbackPool = parsed
 				fallbackPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
 			}
+
 			continue
 		}
 		if instrumentTokenMatch {
@@ -1092,12 +1100,17 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 			)
 		}
 		if requireInstrumentMatch {
+			ensureSourcePoolErrMsg := "<nil>"
+			if ensureSourcePoolErr != nil {
+				ensureSourcePoolErrMsg = ensureSourcePoolErr.Error()
+			}
+
 			return nil, nil, fmt.Errorf(
-				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; ensureSourcePoolErr=%v; candidates=%v",
+				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; ensureSourcePoolErr=%s; candidates=%v",
 				destTokenHex,
 				sourceSelectorKey,
 				sourcePoolHex,
-				ensureSourcePoolErr,
+				ensureSourcePoolErrMsg,
 				debugPoolCandidates,
 			)
 		}
@@ -1350,7 +1363,8 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	if err != nil {
 		return nil, nil, fmt.Errorf("get token pool disclosure: %w", err)
 	}
-	disclosures := []*apiv2.DisclosedContract{rateLimiterDisclosure, poolDisclosure}
+	disclosures := make([]*apiv2.DisclosedContract, 0, 2+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
+	disclosures = append(disclosures, rateLimiterDisclosure, poolDisclosure)
 	disclosures = append(disclosures, transferFactoryDisclosures...)
 	disclosures = append(disclosures, poolHoldingDisclosures...)
 	finalRemotePools := []string{}
@@ -1468,6 +1482,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 				bestPool = parsedPool
 				bestCID = created.GetContractId()
 			}
+
 			continue
 		}
 		if raw, ok := parsedPool.InboundRateLimiters[sourceSelectorNumericKey]; ok && tryResolveConfigured(parsedPool, raw) {
@@ -1512,7 +1527,6 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 	defer stream.CloseSend()
 
 	var replacementRaw common.RawInstanceAddress
-	found := false
 	for {
 		resp, recvErr := stream.Recv()
 		if errors.Is(recvErr, io.EOF) {
@@ -1543,10 +1557,9 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 			continue
 		}
 		replacementRaw = contracts.InstanceID(string(parsed.InstanceId)).RawInstanceAddress(parsed.PoolOwner).Binding()
-		found = true
 		break
 	}
-	if !found {
+	if replacementRaw == (common.RawInstanceAddress{}) {
 		selectorForInstanceID := strings.ReplaceAll(sourceSelectorKey, ".", "-")
 		instanceID := fmt.Sprintf("manualexec-inbound-rl-%s-%s", selectorForInstanceID, uuid.NewString()[:8])
 		selectorNumeric := sourceSelectorKey
@@ -1565,7 +1578,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 							EntityName: "RateLimiter",
 						},
 						CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}}},
+							{Label: createArgFieldInstanceID, Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}}},
 							{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: string(pool.InstanceId)}}},
 							{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(pool.PoolOwner)}}},
 							{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: selectorNumeric}}},
@@ -1586,7 +1599,6 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 			return nil, "", fmt.Errorf("create inbound rate limiter for selector %s and pool %s@%s: %w", sourceSelectorKey, pool.InstanceId, pool.PoolOwner, createErr)
 		}
 		replacementRaw = contracts.MustNewInstanceID(instanceID).RawInstanceAddress(pool.PoolOwner).Binding()
-		found = true
 	}
 
 	updatedInbound := types.GENMAP{}
