@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "a70d5dcacd4e39107244e6bbfb36f5af9815c1c000a7242d881b309afdc22464"
+	PackageID   = "53b30cdb4080627fc154f6c235be019106a5c704daed0c5aa300c536007ac350"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1464,7 +1464,6 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 // DestChainConfig is a Record type
 type DestChainConfig struct {
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -1477,8 +1476,6 @@ func (t DestChainConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
-
-	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
@@ -1541,7 +1538,6 @@ func (t *DestChainConfig) UnmarshalHex(data string) error {
 type DestChainConfigArgs struct {
 	DestChainSelector         types.NUMERIC        `json:"destChainSelector"`
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -1556,8 +1552,6 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["isEnabled"] = bool(t.IsEnabled)
-
-	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
@@ -3101,27 +3095,6 @@ func (t GlobalConfig) GetSourceChainConfigWithPackageID(contractID string, packa
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GetSourceChainConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this GlobalConfig contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t GlobalConfig) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
-func (t GlobalConfig) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }

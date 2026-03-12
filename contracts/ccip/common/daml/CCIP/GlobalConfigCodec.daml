@@ -10,9 +10,11 @@ module CCIP.GlobalConfigCodec
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.MCMSCodecUtils
+import MCMS.Codec
   ( encodeBool
   , decodeBoolAt
+  , encodeNumeric0
+  , decodeNumeric0At
   , encodeBytesHex
   , decodeBytesHexAt
   , encodeBytesHexList
@@ -23,11 +25,12 @@ import CCIP.MCMSCodecUtils
   , decodeInt64At
   , encodeList
   , decodeList
-  , encodeNumeric0
-  , decodeNumeric0At
-  , encodeRawInstanceAddressList
+  )
+import CCIP.Codec
+  ( encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
+
 import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), SourceChainConfigArgs(..))
 
 -- ===========================================================================

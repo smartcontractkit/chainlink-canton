@@ -1,0 +1,127 @@
+-- | Round-trip tests for OnRamp codec functions
+module CCIP.OnRampTest.OnRampCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import CCIP.OnRamp
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)
+-- ===========================================================================
+
+testSetDepsParamsRoundtrip_AllSome : Script ()
+testSetDepsParamsRoundtrip_AllSome = do
+  let params = SetDepsParams with
+        globalConfig = Some (RawInstanceAddress "gc-instance@party::namespace")
+        rmnRemote = Some (RawInstanceAddress "rmn-instance@another-party")
+        tokenAdminRegistry = Some (RawInstanceAddress "tar-instance@yet-another")
+        feeQuoter = Some (RawInstanceAddress "fq-instance@fee-owner")
+        ccvRegistry = Some (RawInstanceAddress "ccv-registry@registry-owner")
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (all Some)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+testSetDepsParamsRoundtrip_AllNone : Script ()
+testSetDepsParamsRoundtrip_AllNone = do
+  let params = SetDepsParams with
+        globalConfig = None
+        rmnRemote = None
+        tokenAdminRegistry = None
+        feeQuoter = None
+        ccvRegistry = None
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (all None)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+testSetDepsParamsRoundtrip_Mixed : Script ()
+testSetDepsParamsRoundtrip_Mixed = do
+  let params = SetDepsParams with
+        globalConfig = Some (RawInstanceAddress "gc@owner")
+        rmnRemote = None
+        tokenAdminRegistry = None
+        feeQuoter = Some (RawInstanceAddress "fq@owner")
+        ccvRegistry = None
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (mixed)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+-- ===========================================================================
+-- ONRAMP DEPS ENCODING/DECODING TESTS (full, non-optional)
+-- ===========================================================================
+
+testOnRampDepsRoundtrip : Script ()
+testOnRampDepsRoundtrip = do
+  let deps = OnRampDeps with
+        globalConfig = RawInstanceAddress "globalconfig@ccip_owner"
+        rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
+        feeQuoter = RawInstanceAddress "feequoter@ccip_owner"
+        ccvRegistry = RawInstanceAddress "ccvregistry@ccip_owner"
+
+      encoded = encodeOnRampDeps deps
+
+  case decodeOnRampDepsAt encoded 0 of
+    None -> abort "Failed to decode OnRampDeps"
+    Some (decoded, _) -> do
+      decoded.globalConfig === deps.globalConfig
+      decoded.rmnRemote === deps.rmnRemote
+      decoded.tokenAdminRegistry === deps.tokenAdminRegistry
+      decoded.feeQuoter === deps.feeQuoter
+      decoded.ccvRegistry === deps.ccvRegistry
+
+  pure ()
+
+testOnRampDepsSpecialCharacters : Script ()
+testOnRampDepsSpecialCharacters = do
+  let deps = OnRampDeps with
+        globalConfig = RawInstanceAddress "config-with-dashes@party1::namespace1"
+        rmnRemote = RawInstanceAddress "rmn_with_underscores@party2::namespace2"
+        tokenAdminRegistry = RawInstanceAddress "tar.with.dots@party3"
+        feeQuoter = RawInstanceAddress "fq/with/slashes@party4"
+        ccvRegistry = RawInstanceAddress "ccv:with:colons@party5"
+
+      encoded = encodeOnRampDeps deps
+
+  case decodeOnRampDepsAt encoded 0 of
+    None -> abort "Failed to decode OnRampDeps with special characters"
+    Some (decoded, _) -> do
+      decoded.globalConfig === deps.globalConfig
+      decoded.rmnRemote === deps.rmnRemote
+      decoded.tokenAdminRegistry === deps.tokenAdminRegistry
+      decoded.feeQuoter === deps.feeQuoter
+      decoded.ccvRegistry === deps.ccvRegistry
+
+  pure ()
+
+-- ===========================================================================
+-- INVALID DATA REJECTION TESTS
+-- ===========================================================================
+
+testInvalidDataRejection : Script ()
+testInvalidDataRejection = do
+  case decodeSetDepsParams "" of
+    None -> pure ()
+    Some _ -> abort "Expected decodeSetDepsParams to fail on empty data"
+
+  case decodeSetDepsParams "ff" of
+    None -> pure ()
+    Some _ -> abort "Expected decodeSetDepsParams to fail on invalid tag"
+
+  pure ()

@@ -28,7 +28,7 @@ template GlobalConfig
 
         interface instance MCMSReceiver for GlobalConfig where
           view = MCMSReceiverView with
-            owner = ccipOwner
+            mcmsController = ccipOwner
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do
