@@ -215,6 +215,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		receiverBalanceBefore, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
+		t.Logf(
+			"Receiver balance before token execution (EVM): receiver=%x token=%x balance=%s",
+			receiver,
+			destTokenAddress,
+			receiverBalanceBefore.String(),
+		)
 		ccvAddr, executorAddr := resolveCantonSendContracts(t, in, cantonChain.ChainSelector())
 
 		t.Logf("Sending Canton -> EVM token transfer message")
@@ -279,6 +285,13 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter, "receiver final token balance should equal initial balance plus transfer amount")
 		transferred := new(big.Int).Sub(receiverBalanceAfter, receiverBalanceBefore)
 		require.Equal(t, big.NewInt(cantonToEVMTokenTransferAmount), transferred, "receiver token balance should increase by transfer amount")
+		t.Logf(
+			"Receiver balance after token execution (EVM): receiver=%x before=%s after=%s delta=%s",
+			receiver,
+			receiverBalanceBefore.String(),
+			receiverBalanceAfter.String(),
+			transferred.String(),
+		)
 		t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
 	})
 }

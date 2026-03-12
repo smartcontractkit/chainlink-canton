@@ -149,8 +149,7 @@ func deriveInstrumentTokenAddress(e deployment.Environment, chainSelector uint64
 		return nil, fmt.Errorf("parse lock/release token pool at %s: %w", addr.Address, err)
 	}
 	instrumentCombined := string(pool.InstrumentId.Id) + "@" + string(pool.InstrumentId.Admin)
-	instrumentHex := hex.EncodeToString([]byte(instrumentCombined))
-	return crypto.Keccak256([]byte(instrumentHex)), nil
+	return crypto.Keccak256([]byte(instrumentCombined)), nil
 }
 
 // CantonAdapter is an implementation of the ChainFamily interface for Canton.
