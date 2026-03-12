@@ -5,7 +5,7 @@ source: daml
 dependencies:
   - daml-prim
   - daml-stdlib
-  - daml-script
 build-options:
   - -Wno-upgrade-interfaces
   - -Wno-crypto-text-is-alpha
+  - -Werror=unused-dependency

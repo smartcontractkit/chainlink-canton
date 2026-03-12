@@ -1,13 +1,13 @@
 -- | Codec module for GlobalConfig MCMS parameter encoding/decoding
 -- Used by the MCMSReceiver interface implementation to decode operationData
 module CCIP.GlobalConfigCodec
-  ( decodeUpdateDestChainConfigParams
-  , encodeUpdateDestChainConfigParams
-  , decodeUpdateSourceChainConfigParams
-  , encodeUpdateSourceChainConfigParams
+  ( decodeApplyDestChainConfigUpdatesParams
+  , encodeApplyDestChainConfigUpdatesParams
+  , decodeApplySourceChainConfigUpdatesParams
+  , encodeApplySourceChainConfigUpdatesParams
   ) where
 
-import CCIP.MCMSCodecUtils
+import MCMS.Codec
   ( encodeBool
   , decodeBoolAt
   , encodeNumeric0
@@ -18,46 +18,48 @@ import CCIP.MCMSCodecUtils
   , decodeBytesHexList
   , encodeDecimal
   , decodeDecimalAt
-  , encodeRawInstanceAddressList
+  , encodeList
+  , decodeList
+  )
+import CCIP.Codec
+  ( encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
 
 import DA.Crypto.Text (BytesHex)
-import CCIP.GlobalConfigTypes (DestChainConfig(..), SourceChainConfig(..))
+import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), SourceChainConfigArgs(..))
 
 -- ===========================================================================
 -- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
 -- ===========================================================================
 
--- | Decode UpdateDestChainConfig params
--- Format: [numeric0 destChainSelector][destChainConfig]
-decodeUpdateDestChainConfigParams : BytesHex -> Optional (Numeric 0, DestChainConfig)
-decodeUpdateDestChainConfigParams encoded = do
-  (destChainSelector, offset1) <- decodeNumeric0At encoded 0
-  (config, _) <- decodeDestChainConfigAt encoded offset1
-  Some (destChainSelector, config)
+-- | Decode ApplyDestChainConfigUpdates params
+-- Format: [DestChainConfigArgs]
+decodeApplyDestChainConfigUpdatesParams : BytesHex -> Optional [DestChainConfigArgs]
+decodeApplyDestChainConfigUpdatesParams encoded = do
+  (destChainConfigArgs, _) <- decodeList encoded 0 decodeDestChainConfigArgsAt
+  Some destChainConfigArgs
 
--- | Decode UpdateSourceChainConfig params
--- Format: [numeric0 sourceChainSelector][sourceChainConfig]
-decodeUpdateSourceChainConfigParams : BytesHex -> Optional (Numeric 0, SourceChainConfig)
-decodeUpdateSourceChainConfigParams encoded = do
-  (sourceChainSelector, offset1) <- decodeNumeric0At encoded 0
-  (config, _) <- decodeSourceChainConfigAt encoded offset1
-  Some (sourceChainSelector, config)
+-- | Decode ApplySourceChainConfigUpdates params
+-- Format: [SourceChainConfigArgs]
+decodeApplySourceChainConfigUpdatesParams : BytesHex -> Optional [SourceChainConfigArgs]
+decodeApplySourceChainConfigUpdatesParams encoded = do
+  (sourceChainConfigArgs, _) <- decodeList encoded 0 decodeSourceChainConfigArgsAt
+  Some sourceChainConfigArgs
 
 -- ===========================================================================
 -- ENCODE FUNCTIONS (for tests and Go integration)
 -- ===========================================================================
 
--- | Encode UpdateDestChainConfig params
-encodeUpdateDestChainConfigParams : Numeric 0 -> DestChainConfig -> BytesHex
-encodeUpdateDestChainConfigParams destChainSelector config =
-  encodeNumeric0 destChainSelector <> encodeDestChainConfig config
+-- | Encode ApplyDestChainConfigUpdates params
+encodeApplyDestChainConfigUpdatesParams : [DestChainConfigArgs] -> BytesHex
+encodeApplyDestChainConfigUpdatesParams destChainConfigUpdates =
+  encodeList destChainConfigUpdates encodeDestChainConfigArgs
 
--- | Encode UpdateSourceChainConfig params
-encodeUpdateSourceChainConfigParams : Numeric 0 -> SourceChainConfig -> BytesHex
-encodeUpdateSourceChainConfigParams sourceChainSelector config =
-  encodeNumeric0 sourceChainSelector <> encodeSourceChainConfig config
+-- | Encode ApplySourceChainConfigUpdates params
+encodeApplySourceChainConfigUpdatesParams : [SourceChainConfigArgs] -> BytesHex
+encodeApplySourceChainConfigUpdatesParams sourceChainConfigUpdates =
+  encodeList sourceChainConfigUpdates encodeSourceChainConfigArgs
 
 -- ===========================================================================
 -- DEST CHAIN CONFIG ENCODING/DECODING
@@ -66,8 +68,9 @@ encodeUpdateSourceChainConfigParams sourceChainSelector config =
 --         [decimal tokenNetworkFeeUSDCents]
 -- ===========================================================================
 
-encodeDestChainConfig : DestChainConfig -> BytesHex
-encodeDestChainConfig dcc =
+encodeDestChainConfigArgs : DestChainConfigArgs -> BytesHex
+encodeDestChainConfigArgs dcc =
+  encodeNumeric0 dcc.destChainSelector <>
   encodeBool dcc.isEnabled <>
   encodeBytesHex dcc.offRampAddress <>
   encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
@@ -75,16 +78,25 @@ encodeDestChainConfig dcc =
   encodeDecimal dcc.messageNetworkFeeUSDCents <>
   encodeDecimal dcc.tokenNetworkFeeUSDCents
 
-decodeDestChainConfigAt : BytesHex -> Int -> Optional (DestChainConfig, Int)
-decodeDestChainConfigAt encoded offset = do
-  (isEnabled, offset1) <- decodeBoolAt encoded offset
-  (offRampAddress, offset2) <- decodeBytesHexAt encoded offset1
-  (laneMandatedCCVs, offset3) <- decodeRawInstanceAddressList encoded offset2
-  (defaultCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
-  (messageNetworkFeeUSDCents, offset5) <- decodeDecimalAt encoded offset4
-  (tokenNetworkFeeUSDCents, offset6) <- decodeDecimalAt encoded offset5
-  Some (DestChainConfig isEnabled offRampAddress laneMandatedCCVs defaultCCVs
-                        messageNetworkFeeUSDCents tokenNetworkFeeUSDCents, offset6)
+decodeDestChainConfigArgsAt : BytesHex -> Int -> Optional (DestChainConfigArgs, Int)
+decodeDestChainConfigArgsAt encoded offset = do
+  (destChainSelector, offset1) <- decodeNumeric0At encoded offset
+  (isEnabled, offset2) <- decodeBoolAt encoded offset1
+  (offRampAddress, offset3) <- decodeBytesHexAt encoded offset2
+  (laneMandatedCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
+  (defaultCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
+  (messageNetworkFeeUSDCents, offset6) <- decodeDecimalAt encoded offset5
+  (tokenNetworkFeeUSDCents, offset7) <- decodeDecimalAt encoded offset6
+  Some 
+    ( DestChainConfigArgs with
+        destChainSelector = destChainSelector
+        isEnabled = isEnabled
+        offRampAddress = offRampAddress
+        laneMandatedCCVs = laneMandatedCCVs
+        defaultCCVs = defaultCCVs
+        messageNetworkFeeUSDCents = messageNetworkFeeUSDCents
+        tokenNetworkFeeUSDCents = tokenNetworkFeeUSDCents
+    ,offset7)
 
 -- ===========================================================================
 -- SOURCE CHAIN CONFIG ENCODING/DECODING
@@ -92,17 +104,27 @@ decodeDestChainConfigAt encoded offset = do
 --         [rawInstanceAddressList defaultCCVs]
 -- ===========================================================================
 
-encodeSourceChainConfig : SourceChainConfig -> BytesHex
-encodeSourceChainConfig scc =
+encodeSourceChainConfigArgs : SourceChainConfigArgs -> BytesHex
+encodeSourceChainConfigArgs scc =
+  encodeNumeric0 scc.sourceChainSelector <>
   encodeBool scc.isEnabled <>
   encodeBytesHexList scc.onRampAddresses <>
   encodeRawInstanceAddressList scc.laneMandatedCCVs <>
   encodeRawInstanceAddressList scc.defaultCCVs
 
-decodeSourceChainConfigAt : BytesHex -> Int -> Optional (SourceChainConfig, Int)
-decodeSourceChainConfigAt encoded offset = do
-  (isEnabled, offset1) <- decodeBoolAt encoded offset
-  (onRampAddresses, offset2) <- decodeBytesHexList encoded offset1
-  (laneMandatedCCVs, offset3) <- decodeRawInstanceAddressList encoded offset2
-  (defaultCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
-  Some (SourceChainConfig isEnabled onRampAddresses laneMandatedCCVs defaultCCVs, offset4)
+decodeSourceChainConfigArgsAt : BytesHex -> Int -> Optional (SourceChainConfigArgs, Int)
+decodeSourceChainConfigArgsAt encoded offset = do
+  (sourceChainSelector, offset1) <- decodeNumeric0At encoded offset
+  (isEnabled, offset2) <- decodeBoolAt encoded offset1
+  (onRampAddresses, offset3) <- decodeBytesHexList encoded offset2
+  (laneMandatedCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
+  (defaultCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
+  Some 
+    ( SourceChainConfigArgs with
+        sourceChainSelector = sourceChainSelector
+        isEnabled = isEnabled
+        onRampAddresses = onRampAddresses
+        laneMandatedCCVs = laneMandatedCCVs
+        defaultCCVs = defaultCCVs
+    ,offset5)
+

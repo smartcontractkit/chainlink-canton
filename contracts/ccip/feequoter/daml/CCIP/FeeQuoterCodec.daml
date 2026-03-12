@@ -11,14 +11,12 @@ module CCIP.FeeQuoterCodec
   , decodeDestChainConfigArgsAt
   ) where
 
-import CCIP.MCMSCodecUtils
-  ( encodeUint8
+import MCMS.Codec
+  ( extractBytes
+  , encodeUint8
   , decodeUint8
-  , extractBytes
-  , encodeInstrumentId
-  , decodeInstrumentId
-  , decodeBoolAt
   , encodeBool
+  , decodeBoolAt
   , encodeNumeric0
   , decodeNumeric0At
   , encodeInt64
@@ -27,7 +25,12 @@ import CCIP.MCMSCodecUtils
   , decodeBytesHexAt
   , encodeDecimal
   , decodeDecimalAt
-  , encodeText
+  )
+import CCIP.Codec
+  ( encodeInstrumentId
+  , decodeInstrumentId
+  , encodeInstrumentIdList
+  , decodeInstrumentIdList
   )
 
 import DA.Crypto.Text (BytesHex)
@@ -69,28 +72,6 @@ encodeApplyFeeTokenUpdatesParams toRemove toAdd =
 encodeApplyDestChainConfigUpdatesParams : [DestChainConfigArgs] -> BytesHex
 encodeApplyDestChainConfigUpdatesParams configs =
   encodeDestChainConfigArgsList configs
-
--- ===========================================================================
--- INSTRUMENT ID LIST ENCODING/DECODING
--- Format: [uint8 count][instrumentId...]
--- ===========================================================================
-
-encodeInstrumentIdList : [Splice.Api.Token.HoldingV1.InstrumentId] -> BytesHex
-encodeInstrumentIdList ids =
-  let count = length ids
-  in fromSome (encodeUint8 count) <> foldl (\acc iid -> acc <> encodeInstrumentId iid) "" ids
-
-decodeInstrumentIdList : BytesHex -> Int -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], Int)
-decodeInstrumentIdList encoded offset = do
-  countHex <- extractBytes encoded offset 1
-  count <- decodeUint8 countHex
-  decodeInstrumentIdListHelper encoded (offset + 1) count []
-
-decodeInstrumentIdListHelper : BytesHex -> Int -> Int -> [Splice.Api.Token.HoldingV1.InstrumentId] -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], Int)
-decodeInstrumentIdListHelper encoded offset 0 acc = Some (reverse acc, offset)
-decodeInstrumentIdListHelper encoded offset remaining acc = do
-  (iid, newOffset) <- decodeInstrumentId encoded offset
-  decodeInstrumentIdListHelper encoded newOffset (remaining - 1) (iid :: acc)
 
 -- ===========================================================================
 -- FEE TOKEN ARGS ENCODING/DECODING

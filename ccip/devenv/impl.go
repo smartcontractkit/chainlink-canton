@@ -892,7 +892,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			AllowTrafficFrom:         true,
 			OnRamps:                  [][]byte{remoteOnRamp},
 			OffRamp:                  remoteOffRamp,
-			DefaultInboundCCVs:       nil,
+			DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedInboundCCVs:  nil,
 			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedOutboundCCVs: nil,
