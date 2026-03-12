@@ -1,0 +1,180 @@
+module GlobalConfig where
+
+import Daml.Script
+
+import DA.List (head, (!!))
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+
+import qualified CCIP.GlobalConfig
+import qualified CCIP.GlobalConfigTypes
+import CCIP.RawInstanceAddress(RawInstanceAddress(..))
+
+testGlobalConfig_ApplySourceChainConfigUpdates : Script ()
+testGlobalConfig_ApplySourceChainConfigUpdates = do
+    owner <- allocateParty "Owner"
+    let instanceId = "instance1"
+    
+    -- | Create GlobalConfig without any source chain configs
+    globalConfigCid <- submit owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 123.0
+            onRampAddress = "0x1234567890abcdef"
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.empty
+
+    -- | ======== Test 1 =======
+    -- | Add multiple source chain configs
+    -- | =======================
+    let sourceChainConfigUpdates1 = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 456.0
+                isEnabled = True
+                onRampAddress = "0x1111111111111111"
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+            ,CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 789.0
+                isEnabled = True
+                onRampAddress = "0x2222222222222222"
+                defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
+                laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+            ]
+    globalConfigCid <- submit owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = sourceChainConfigUpdates1
+    -- Fetch the updated GlobalConfig and verify the source chain configs were added correctly
+    globalConfig <- fromSome <$> queryContractId owner globalConfigCid
+    assertMsg "Expected 2 source chain configs" (Map.size globalConfig.sourceChainConfigs == 2)
+    case Map.lookup 456.0 globalConfig.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 456"
+        Some config -> do
+          assertSourceChainConfigsEqual config (head sourceChainConfigUpdates1)
+    case Map.lookup 789.0 globalConfig.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 789"
+        Some config -> do
+          assertSourceChainConfigsEqual config (sourceChainConfigUpdates1 !! 1)
+
+    -- | ======== Test 2 =======
+    -- | Update and add a source chain config
+    -- | =======================
+    let sourceChainConfigUpdates2 = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 789.0
+                isEnabled = False
+                onRampAddress = "0x343434"
+                defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
+                laneMandatedCCVs = []
+            ,CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 123123.0
+                isEnabled = True
+                onRampAddress = "0x565656"
+                defaultCCVs = []
+                laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+            ]
+    globalConfigCid <- submit owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = sourceChainConfigUpdates2
+    -- Fetch the updated GlobalConfig and verify the source chain configs were added correctly
+    globalConfig <- fromSome <$> queryContractId owner globalConfigCid
+    assertMsg "Expected 3 source chain configs" (Map.size globalConfig.sourceChainConfigs == 3)
+    case Map.lookup 456.0 globalConfig.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 456"
+        Some config -> do
+          assertSourceChainConfigsEqual config (head sourceChainConfigUpdates1)
+    case Map.lookup 789.0 globalConfig.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 789"
+        Some config -> do
+          assertSourceChainConfigsEqual config (head sourceChainConfigUpdates2)
+    case Map.lookup 123123.0 globalConfig.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 123123"
+        Some config -> do
+          assertSourceChainConfigsEqual config (sourceChainConfigUpdates2 !! 1)
+
+    -- | ======== Test 3 =======
+    -- | Add invalid source chain config updates and verify that the entire transaction is reverted
+    -- | =======================
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 0.0 -- Invalid zero chain selector
+                isEnabled = True
+                onRampAddress = "0x1111111111111111"
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 123.0
+                isEnabled = True
+                onRampAddress = "0x1111111111111111"
+                -- Empty default and mandated CCV lists, which is invalid since at least one CCV must be provided
+                defaultCCVs = []
+                laneMandatedCCVs = []
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 123.0
+                isEnabled = True
+                onRampAddress = "0x1111111111111111"
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xabc"] -- Duplicate CCVs within the default list, which is invalid
+                laneMandatedCCVs = [RawInstanceAddress "0x123"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 123.0
+                isEnabled = True
+                onRampAddress = "0x1111111111111111"
+                defaultCCVs = [RawInstanceAddress "0xabc"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x123"] -- Duplicate CCVs within the mandated list, which is invalid
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 123.0
+                isEnabled = True
+                onRampAddress = "0x1111111111111111"
+                -- Duplicate CCVs across the default and mandated lists, which is invalid
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0x123"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    pure()
+
+-- Assertion helpers
+-- These compare Config <> Args, and therefore cannot assert on the chain selector since it's not part of the config itself, but rather the key in the map. The rest of the fields can be compared directly.
+
+assertDestChainConfigsEqual : CCIP.GlobalConfigTypes.DestChainConfig -> CCIP.GlobalConfigTypes.DestChainConfigArgs -> Script ()
+assertDestChainConfigsEqual got expected = do
+  assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
+  assertMsg ("offRampAddress mismatch, got: " <> show got.offRampAddress <> ", expected: " <> show expected.offRampAddress) (got.offRampAddress == expected.offRampAddress)
+  assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
+  assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)
+  assertMsg ("messageNetworkFeeUSDCents mismatch, got: " <> show got.messageNetworkFeeUSDCents <> ", expected: " <> show expected.messageNetworkFeeUSDCents) (got.messageNetworkFeeUSDCents == expected.messageNetworkFeeUSDCents)
+  assertMsg ("tokenNetworkFeeUSDCents mismatch, got: " <> show got.tokenNetworkFeeUSDCents <> ", expected: " <> show expected.tokenNetworkFeeUSDCents) (got.tokenNetworkFeeUSDCents == expected.tokenNetworkFeeUSDCents)
+
+assertSourceChainConfigsEqual : CCIP.GlobalConfigTypes.SourceChainConfig -> CCIP.GlobalConfigTypes.SourceChainConfigArgs -> Script ()
+assertSourceChainConfigsEqual got expected = do
+  assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
+  assertMsg ("onRampAddress mismatch, got: " <> show got.onRampAddress <> ", expected: " <> show expected.onRampAddress) (got.onRampAddress == expected.onRampAddress)
+  assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
+  assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)

@@ -1,0 +1,161 @@
+module GlobalConfigTypes where
+
+import Daml.Script
+
+import qualified CCIP.GlobalConfigTypes
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+template ValidationHarness
+    with
+        owner : Party
+    where
+        signatory owner
+
+        nonconsuming choice RunValidateDefaultAndMandatedCCVs : ()
+            with
+                defaultCCVs : [RawInstanceAddress]
+                laneMandatedCCVs : [RawInstanceAddress]
+            controller owner
+            do
+                CCIP.GlobalConfigTypes.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+
+        nonconsuming choice RunAssertNoDuplicates : ()
+            with
+                addresses : [RawInstanceAddress]
+            controller owner
+            do
+                CCIP.GlobalConfigTypes.assertNoDuplicates addresses
+        
+        nonconsuming choice RunValidateNoEmptyAddresses : ()
+            with
+                addresses : [RawInstanceAddress]
+            controller owner
+            do
+                CCIP.GlobalConfigTypes.validateNoEmptyAddresses addresses
+
+testValidateDefaultAndMandatedCCVs : Script ()
+testValidateDefaultAndMandatedCCVs = do
+    owner <- allocateParty "owner"
+    let ccv1 = RawInstanceAddress "ccv1@partyA"
+    let ccv2 = RawInstanceAddress "ccv2@partyB"
+    let ccv3 = RawInstanceAddress "ccv3@partyC"
+    let ccvEmpty = RawInstanceAddress ""
+
+    harness <- submit owner do
+        createCmd ValidationHarness with
+            owner = owner
+
+    -- Valid case
+    submit owner do
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccv1]
+                    laneMandatedCCVs = [ccv2, ccv3]
+
+    -- Invalid case: no CCVs at all across both default and mandated lists
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = []
+                    laneMandatedCCVs = []
+
+    -- Valid case: only lane mandated CCVs, no default CCVs
+    submit owner do
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = []
+                    laneMandatedCCVs = [ccv1]
+
+    -- Valid case: only default CCVs, no lane mandated CCVs
+    submit owner do
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccv1]
+                    laneMandatedCCVs = []
+
+    -- Invalid case: duplicate CCV across default and mandated lists
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccv2]
+                    laneMandatedCCVs = [ccv1, ccv2, ccv3]
+
+    -- Invalid case: duplicate CCV within the default list
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccv1, ccv1]
+                    laneMandatedCCVs = [ccv2, ccv3]
+
+    -- Invalid case: duplicate CCV within the lane mandated list
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccv1]
+                    laneMandatedCCVs = [ccv2, ccv2]
+
+    -- Invalid case: empty CCV address in default CCVs
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccvEmpty]
+                    laneMandatedCCVs = [ccv2, ccv3]
+
+    -- Invalid case: empty CCV address in lane mandated CCVs
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateDefaultAndMandatedCCVs with
+                    defaultCCVs = [ccv1]
+                    laneMandatedCCVs = [ccvEmpty]
+
+testAssertNoDuplicates : Script ()
+testAssertNoDuplicates = do
+    owner <- allocateParty "owner"
+    let ccv1 = RawInstanceAddress "ccv1@partyA"
+    let ccv2 = RawInstanceAddress "ccv2@partyB"
+
+    harness <- submit owner do
+        createCmd ValidationHarness with
+            owner = owner
+
+    -- Valid case: no duplicates
+    submit owner do
+            exerciseCmd harness RunAssertNoDuplicates with
+                    addresses = [ccv1, ccv2]
+
+    -- Invalid case: duplicate addresses
+    submitMustFail owner do            
+            exerciseCmd harness RunAssertNoDuplicates with
+                    addresses = [ccv1, ccv2, ccv1]
+
+    -- Invalid case: duplicate addresses
+    submitMustFail owner do            
+            exerciseCmd harness RunAssertNoDuplicates with
+                    addresses = [ccv1, ccv1, ccv2]
+
+    -- Valid case: empty list of addresses (the function should not fail if the list is empty, it should just pass as there are no duplicates in the list)
+    submit owner do
+            exerciseCmd harness RunAssertNoDuplicates with
+                    addresses = []
+
+testValidateNoEmptyAddresses : Script ()
+testValidateNoEmptyAddresses = do
+    owner <- allocateParty "owner"
+    let ccv1 = RawInstanceAddress "ccv1@partyA"
+    let ccv2 = RawInstanceAddress "ccv2@partyB"
+    let ccvEmpty = RawInstanceAddress ""
+
+    harness <- submit owner do
+        createCmd ValidationHarness with
+            owner = owner
+
+    -- Valid case: no empty addresses
+    submit owner do
+            exerciseCmd harness RunValidateNoEmptyAddresses with
+                    addresses = [ccv1, ccv2]
+
+    -- Invalid case: empty address present
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateNoEmptyAddresses with
+                    addresses = [ccv1, ccvEmpty, ccv2]
+
+    -- Invalid case: empty address present
+    submitMustFail owner do            
+            exerciseCmd harness RunValidateNoEmptyAddresses with
+                    addresses = [ccvEmpty]
+
+    -- Valid case: no addresses at all (the function should not fail if the list is empty, it should just pass as there are no empty addresses in the list)
+    submit owner do
+            exerciseCmd harness RunValidateNoEmptyAddresses with
+                    addresses = []
