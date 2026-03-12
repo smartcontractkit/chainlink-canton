@@ -7,10 +7,9 @@ module CCIP.GlobalConfigCodec
   , encodeApplySourceChainConfigUpdatesParams
   ) where
 
-import CCIP.MCMSCodecUtils
+import MCMS.Codec
   ( encodeBool
   , decodeBoolAt
-  , decodeList
   , encodeNumeric0
   , decodeNumeric0At
   , encodeBytesHex
@@ -20,7 +19,10 @@ import CCIP.MCMSCodecUtils
   , encodeDecimal
   , decodeDecimalAt
   , encodeList
-  , encodeRawInstanceAddressList
+  , decodeList
+  )
+import CCIP.Codec
+  ( encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
 

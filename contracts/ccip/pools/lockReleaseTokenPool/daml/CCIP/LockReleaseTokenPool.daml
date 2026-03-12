@@ -162,28 +162,6 @@ template LockReleaseTokenPool
     where
         signatory poolOwner
 
-        interface instance MCMSReceiver for LockReleaseTokenPool where
-          view = MCMSReceiverView with
-            owner = poolOwner
-            instanceId
-
-          mcmsEntrypoint functionName operationData contractIds = do
-            let instAddr = instanceId <> "@" <> partyToText poolOwner
-            selfCid <- case Map.lookup instAddr contractIds of
-              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
-              Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
-
-            case functionName of
-              "UpdateChainPoolConfigs" -> do
-                case decodeUpdateChainPoolConfigsParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateChainPoolConfigs"
-                  Some newChainPoolConfigs -> do
-                    newCid <- exercise selfCid LockReleaseTokenPool_UpdateChainPoolConfigs with
-                      newChainPoolConfigs
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with
                 owner = poolOwner
@@ -560,3 +538,25 @@ template LockReleaseTokenPool
                             senderChangeCids = transferResult.senderChangeCids
                             sendingMessageCid = newSendingMessageCid
                     _ -> abort "LockOrBurn: transfer did not complete directly"
+
+        interface instance MCMSReceiver for LockReleaseTokenPool where
+          view = MCMSReceiverView with
+            mcmsController = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText poolOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
+
+            case functionName of
+              "UpdateChainPoolConfigs" -> do
+                case decodeUpdateChainPoolConfigsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UpdateChainPoolConfigs"
+                  Some newChainPoolConfigs -> do
+                    newCid <- exercise selfCid LockReleaseTokenPool_UpdateChainPoolConfigs with
+                      newChainPoolConfigs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

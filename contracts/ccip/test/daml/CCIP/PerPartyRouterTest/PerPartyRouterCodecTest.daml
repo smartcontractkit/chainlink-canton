@@ -1,0 +1,134 @@
+-- | Round-trip tests for PerPartyRouter codec functions
+module CCIP.PerPartyRouterTest.PerPartyRouterCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import CCIP.PerPartyRouter
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)
+-- ===========================================================================
+
+testSetDepsParamsRoundtrip_AllSome : Script ()
+testSetDepsParamsRoundtrip_AllSome = do
+  let params = SetDepsParams with
+        onRamp = Some (RawInstanceAddress "onramp-instance@party::namespace")
+        offRamp = Some (RawInstanceAddress "offramp-instance@another-party")
+        globalConfig = Some (RawInstanceAddress "gc-instance@yet-another")
+        tokenAdminRegistry = Some (RawInstanceAddress "tar-instance@tar-owner")
+        feeQuoter = Some (RawInstanceAddress "fq-instance@fee-owner")
+        rmnRemote = Some (RawInstanceAddress "rmn-instance@rmn-owner")
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (all Some)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+testSetDepsParamsRoundtrip_AllNone : Script ()
+testSetDepsParamsRoundtrip_AllNone = do
+  let params = SetDepsParams with
+        onRamp = None
+        offRamp = None
+        globalConfig = None
+        tokenAdminRegistry = None
+        feeQuoter = None
+        rmnRemote = None
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (all None)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+testSetDepsParamsRoundtrip_Mixed : Script ()
+testSetDepsParamsRoundtrip_Mixed = do
+  let params = SetDepsParams with
+        onRamp = Some (RawInstanceAddress "onramp@owner")
+        offRamp = None
+        globalConfig = None
+        tokenAdminRegistry = Some (RawInstanceAddress "tar@owner")
+        feeQuoter = None
+        rmnRemote = Some (RawInstanceAddress "rmn@owner")
+
+      encoded = encodeSetDepsParams params
+
+  case decodeSetDepsParams encoded of
+    None -> abort "Failed to decode SetDepsParams (mixed)"
+    Some decoded -> decoded === params
+
+  pure ()
+
+-- ===========================================================================
+-- PERPARTYROUTERDEPS ENCODING/DECODING TESTS (full, non-optional)
+-- ===========================================================================
+
+testPerPartyRouterDepsRoundtrip : Script ()
+testPerPartyRouterDepsRoundtrip = do
+  let deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@ccip_owner"
+        offRamp = RawInstanceAddress "offramp@ccip_owner"
+        globalConfig = RawInstanceAddress "globalconfig@ccip_owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
+        feeQuoter = RawInstanceAddress "feequoter@ccip_owner"
+        rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
+
+      encoded = encodePerPartyRouterDeps deps
+
+  case decodePerPartyRouterDepsAt encoded 0 of
+    None -> abort "Failed to decode PerPartyRouterDeps"
+    Some (decoded, _) -> do
+      decoded.onRamp === deps.onRamp
+      decoded.offRamp === deps.offRamp
+      decoded.globalConfig === deps.globalConfig
+      decoded.tokenAdminRegistry === deps.tokenAdminRegistry
+      decoded.feeQuoter === deps.feeQuoter
+      decoded.rmnRemote === deps.rmnRemote
+
+  pure ()
+
+testPerPartyRouterDepsSpecialCharacters : Script ()
+testPerPartyRouterDepsSpecialCharacters = do
+  let deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-with-dashes@party1::namespace1"
+        offRamp = RawInstanceAddress "offramp_with_underscores@party2::namespace2"
+        globalConfig = RawInstanceAddress "gc.with.dots@party3"
+        tokenAdminRegistry = RawInstanceAddress "tar/with/slashes@party4"
+        feeQuoter = RawInstanceAddress "fq:with:colons@party5"
+        rmnRemote = RawInstanceAddress "rmn+with+plus@party6"
+
+      encoded = encodePerPartyRouterDeps deps
+
+  case decodePerPartyRouterDepsAt encoded 0 of
+    None -> abort "Failed to decode PerPartyRouterDeps with special characters"
+    Some (decoded, _) -> do
+      decoded.onRamp === deps.onRamp
+      decoded.offRamp === deps.offRamp
+      decoded.globalConfig === deps.globalConfig
+      decoded.tokenAdminRegistry === deps.tokenAdminRegistry
+      decoded.feeQuoter === deps.feeQuoter
+      decoded.rmnRemote === deps.rmnRemote
+
+  pure ()
+
+-- ===========================================================================
+-- INVALID DATA REJECTION TESTS
+-- ===========================================================================
+
+testInvalidDataRejection : Script ()
+testInvalidDataRejection = do
+  case decodeSetDepsParams "" of
+    None -> pure ()
+    Some _ -> abort "Expected decodeSetDepsParams to fail on empty data"
+
+  case decodeSetDepsParams "ff" of
+    None -> pure ()
+    Some _ -> abort "Expected decodeSetDepsParams to fail on invalid tag"
+
+  pure ()

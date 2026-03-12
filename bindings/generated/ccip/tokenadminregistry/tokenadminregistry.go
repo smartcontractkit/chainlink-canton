@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "5dd350978b0e21df700bb16049f910784a4d97852dfa2db3a57a01a04b6467a1"
+	PackageID   = "e7167b5e790ec85ae1c4cbd1ec0221b3407e47d0bece66946fa2552378763c15"
 	SDKVersion  = "3.4.10"
 )
 
@@ -410,27 +410,6 @@ func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID st
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
-	}
-}
-
-// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t TokenAdminRegistry) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
 	}
 }
 

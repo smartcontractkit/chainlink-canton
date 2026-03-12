@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "aadb070b0068adb14b333cda6d476b28376ab6077bb468551eaf26decca46ed9"
+	PackageID   = "3d1cf92a741ff311b253e3e603aaa95a85c202d357d29e44110533fa3deb3a2e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -905,27 +905,6 @@ func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID str
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UpdateCCIPOwner",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this RMNRemote contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t RMNRemote) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
-func (t RMNRemote) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }

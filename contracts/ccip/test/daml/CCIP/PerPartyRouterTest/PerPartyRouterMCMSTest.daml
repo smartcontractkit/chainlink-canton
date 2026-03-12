@@ -1,0 +1,450 @@
+-- | MCMS entrypoint tests for PerPartyRouter and PerPartyRouterFactory
+-- Tests the MCMSReceiver interface implementation by calling mcmsEntrypoint directly
+module CCIP.PerPartyRouterTest.PerPartyRouterMCMSTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import CCIP.PerPartyRouter
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===========================================================================
+-- PERPARTYROUTER MCMS ENTRYPOINT TESTS - SET DEPS
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for SetDeps function on PerPartyRouter (all fields)
+testPerPartyRouterMCMSEntrypoint_SetDeps : Script ()
+testPerPartyRouterMCMSEntrypoint_SetDeps = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  partyOwner <- allocateParty "party_owner"
+
+  let instanceId = "router-test"
+      initialDeps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-old@owner"
+        offRamp = RawInstanceAddress "offramp-old@owner"
+        globalConfig = RawInstanceAddress "gc-old@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar-old@owner"
+        feeQuoter = RawInstanceAddress "fq-old@owner"
+        rmnRemote = RawInstanceAddress "rmn-old@owner"
+
+  routerCid <- submit ccipOwner do
+    createCmd PerPartyRouter with
+      instanceId
+      ccipOwner
+      partyOwner
+      deps = initialDeps
+      outboundSequenceNumbers = Map.empty
+      executionStates = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
+
+  let newDeps = SetDepsParams with
+        onRamp = Some (RawInstanceAddress "onramp-new@owner")
+        offRamp = Some (RawInstanceAddress "offramp-new@owner")
+        globalConfig = Some (RawInstanceAddress "gc-new@owner")
+        tokenAdminRegistry = Some (RawInstanceAddress "tar-new@owner")
+        feeQuoter = Some (RawInstanceAddress "fq-new@owner")
+        rmnRemote = Some (RawInstanceAddress "rmn-new@owner")
+
+      encoded = encodeSetDepsParams newDeps
+
+  newContractIds <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId routerCid)]
+
+  contracts <- query @PerPartyRouter ccipOwner
+  case filter (\(_, router) -> router.instanceId == instanceId) contracts of
+    [(_, router)] -> do
+      router.deps.onRamp === RawInstanceAddress "onramp-new@owner"
+      router.deps.offRamp === RawInstanceAddress "offramp-new@owner"
+      router.deps.globalConfig === RawInstanceAddress "gc-new@owner"
+      router.deps.tokenAdminRegistry === RawInstanceAddress "tar-new@owner"
+      router.deps.feeQuoter === RawInstanceAddress "fq-new@owner"
+      router.deps.rmnRemote === RawInstanceAddress "rmn-new@owner"
+    _ -> abort "Expected exactly one PerPartyRouter contract"
+
+  pure ()
+
+-- | Test partial update: only update onRamp and offRamp
+testPerPartyRouterMCMSEntrypoint_SetDeps_Partial : Script ()
+testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  partyOwner <- allocateParty "party_owner"
+
+  let instanceId = "router-partial-test"
+      initialDeps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-old@owner"
+        offRamp = RawInstanceAddress "offramp-old@owner"
+        globalConfig = RawInstanceAddress "gc-old@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar-old@owner"
+        feeQuoter = RawInstanceAddress "fq-old@owner"
+        rmnRemote = RawInstanceAddress "rmn-old@owner"
+
+  routerCid <- submit ccipOwner do
+    createCmd PerPartyRouter with
+      instanceId
+      ccipOwner
+      partyOwner
+      deps = initialDeps
+      outboundSequenceNumbers = Map.empty
+      executionStates = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
+
+  let partialDeps = SetDepsParams with
+        onRamp = Some (RawInstanceAddress "onramp-new@owner")
+        offRamp = Some (RawInstanceAddress "offramp-new@owner")
+        globalConfig = None
+        tokenAdminRegistry = None
+        feeQuoter = None
+        rmnRemote = None
+
+      encoded = encodeSetDepsParams partialDeps
+
+  submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId routerCid)]
+
+  contracts <- query @PerPartyRouter ccipOwner
+  case filter (\(_, router) -> router.instanceId == instanceId) contracts of
+    [(_, router)] -> do
+      router.deps.onRamp === RawInstanceAddress "onramp-new@owner"
+      router.deps.offRamp === RawInstanceAddress "offramp-new@owner"
+      router.deps.globalConfig === RawInstanceAddress "gc-old@owner"
+      router.deps.tokenAdminRegistry === RawInstanceAddress "tar-old@owner"
+      router.deps.feeQuoter === RawInstanceAddress "fq-old@owner"
+      router.deps.rmnRemote === RawInstanceAddress "rmn-old@owner"
+    _ -> abort "Expected exactly one PerPartyRouter contract"
+
+  pure ()
+
+-- | Test that unknown function name returns E_UNKNOWN_FUNCTION for PerPartyRouter
+testPerPartyRouterMCMSEntrypoint_UnknownFunction : Script ()
+testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  partyOwner <- allocateParty "party_owner"
+
+  let instanceId = "router-error-test"
+      deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+
+  routerCid <- submit ccipOwner do
+    createCmd PerPartyRouter with
+      instanceId
+      ccipOwner
+      partyOwner
+      deps
+      outboundSequenceNumbers = Map.empty
+      executionStates = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
+
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId routerCid)]
+
+  pure ()
+
+testPerPartyRouterMCMSEntrypoint_InvalidParams : Script ()
+testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  partyOwner <- allocateParty "party_owner"
+
+  let instanceId = "router-invalid-test"
+      deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+
+  routerCid <- submit ccipOwner do
+    createCmd PerPartyRouter with
+      instanceId
+      ccipOwner
+      partyOwner
+      deps
+      outboundSequenceNumbers = Map.empty
+      executionStates = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
+
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = "ff"
+      contractIds = Map.fromList [(instAddr, toAnyContractId routerCid)]
+
+  pure ()
+
+testPerPartyRouterMCMSEntrypoint_MissingSelfCid : Script ()
+testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  partyOwner <- allocateParty "party_owner"
+
+  let instanceId = "router-missing-cid-test"
+      deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+
+  routerCid <- submit ccipOwner do
+    createCmd PerPartyRouter with
+      instanceId
+      ccipOwner
+      partyOwner
+      deps
+      outboundSequenceNumbers = Map.empty
+      executionStates = Map.empty
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
+
+  let encoded = encodeSetDepsParams (SetDepsParams with
+        onRamp = Some deps.onRamp
+        offRamp = Some deps.offRamp
+        globalConfig = Some deps.globalConfig
+        tokenAdminRegistry = Some deps.tokenAdminRegistry
+        feeQuoter = Some deps.feeQuoter
+        rmnRemote = Some deps.rmnRemote)
+
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "SetDeps"
+      operationData = encoded
+      contractIds = Map.empty
+
+  pure ()
+
+-- ===========================================================================
+-- PERPARTYROUTERFACTORY MCMS ENTRYPOINT TESTS - FACTORY SET DEPS
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for FactorySetDeps function (all fields)
+testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps : Script ()
+testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "factory-test"
+      initialDeps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-old@owner"
+        offRamp = RawInstanceAddress "offramp-old@owner"
+        globalConfig = RawInstanceAddress "gc-old@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar-old@owner"
+        feeQuoter = RawInstanceAddress "fq-old@owner"
+        rmnRemote = RawInstanceAddress "rmn-old@owner"
+
+  factoryCid <- submit ccipOwner do
+    createCmd PerPartyRouterFactory with
+      instanceId
+      ccipOwner
+      deps = initialDeps
+      registeredRouters = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+
+  let newDeps = SetDepsParams with
+        onRamp = Some (RawInstanceAddress "onramp-new@owner")
+        offRamp = Some (RawInstanceAddress "offramp-new@owner")
+        globalConfig = Some (RawInstanceAddress "gc-new@owner")
+        tokenAdminRegistry = Some (RawInstanceAddress "tar-new@owner")
+        feeQuoter = Some (RawInstanceAddress "fq-new@owner")
+        rmnRemote = Some (RawInstanceAddress "rmn-new@owner")
+
+      encoded = encodeSetDepsParams newDeps
+
+  newContractIds <- submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "FactorySetDeps"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  contracts <- query @PerPartyRouterFactory ccipOwner
+  case filter (\(_, factory) -> factory.instanceId == instanceId) contracts of
+    [(_, factory)] -> do
+      factory.deps.onRamp === RawInstanceAddress "onramp-new@owner"
+      factory.deps.offRamp === RawInstanceAddress "offramp-new@owner"
+      factory.deps.globalConfig === RawInstanceAddress "gc-new@owner"
+      factory.deps.tokenAdminRegistry === RawInstanceAddress "tar-new@owner"
+      factory.deps.feeQuoter === RawInstanceAddress "fq-new@owner"
+      factory.deps.rmnRemote === RawInstanceAddress "rmn-new@owner"
+    _ -> abort "Expected exactly one PerPartyRouterFactory contract"
+
+  pure ()
+
+-- | Test partial update on Factory: only update rmnRemote
+testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps_Partial : Script ()
+testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps_Partial = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "factory-partial-test"
+      initialDeps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp-old@owner"
+        offRamp = RawInstanceAddress "offramp-old@owner"
+        globalConfig = RawInstanceAddress "gc-old@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar-old@owner"
+        feeQuoter = RawInstanceAddress "fq-old@owner"
+        rmnRemote = RawInstanceAddress "rmn-old@owner"
+
+  factoryCid <- submit ccipOwner do
+    createCmd PerPartyRouterFactory with
+      instanceId
+      ccipOwner
+      deps = initialDeps
+      registeredRouters = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+
+  let partialDeps = SetDepsParams with
+        onRamp = None
+        offRamp = None
+        globalConfig = None
+        tokenAdminRegistry = None
+        feeQuoter = None
+        rmnRemote = Some (RawInstanceAddress "rmn-new@owner")
+
+      encoded = encodeSetDepsParams partialDeps
+
+  submit ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "FactorySetDeps"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  contracts <- query @PerPartyRouterFactory ccipOwner
+  case filter (\(_, factory) -> factory.instanceId == instanceId) contracts of
+    [(_, factory)] -> do
+      factory.deps.onRamp === RawInstanceAddress "onramp-old@owner"
+      factory.deps.offRamp === RawInstanceAddress "offramp-old@owner"
+      factory.deps.globalConfig === RawInstanceAddress "gc-old@owner"
+      factory.deps.tokenAdminRegistry === RawInstanceAddress "tar-old@owner"
+      factory.deps.feeQuoter === RawInstanceAddress "fq-old@owner"
+      factory.deps.rmnRemote === RawInstanceAddress "rmn-new@owner"
+    _ -> abort "Expected exactly one PerPartyRouterFactory contract"
+
+  pure ()
+
+testPerPartyRouterFactoryMCMSEntrypoint_UnknownFunction : Script ()
+testPerPartyRouterFactoryMCMSEntrypoint_UnknownFunction = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "factory-error-test"
+      deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+
+  factoryCid <- submit ccipOwner do
+    createCmd PerPartyRouterFactory with
+      instanceId
+      ccipOwner
+      deps
+      registeredRouters = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "NonExistentFunction"
+      operationData = ""
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+testPerPartyRouterFactoryMCMSEntrypoint_InvalidParams : Script ()
+testPerPartyRouterFactoryMCMSEntrypoint_InvalidParams = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "factory-invalid-test"
+      deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+
+  factoryCid <- submit ccipOwner do
+    createCmd PerPartyRouterFactory with
+      instanceId
+      ccipOwner
+      deps
+      registeredRouters = Map.empty
+
+  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "FactorySetDeps"
+      operationData = "ff"
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+testPerPartyRouterFactoryMCMSEntrypoint_MissingSelfCid : Script ()
+testPerPartyRouterFactoryMCMSEntrypoint_MissingSelfCid = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let instanceId = "factory-missing-cid-test"
+      deps = PerPartyRouterDeps with
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+
+  factoryCid <- submit ccipOwner do
+    createCmd PerPartyRouterFactory with
+      instanceId
+      ccipOwner
+      deps
+      registeredRouters = Map.empty
+
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+
+  let encoded = encodeSetDepsParams (SetDepsParams with
+        onRamp = Some deps.onRamp
+        offRamp = Some deps.offRamp
+        globalConfig = Some deps.globalConfig
+        tokenAdminRegistry = Some deps.tokenAdminRegistry
+        feeQuoter = Some deps.feeQuoter
+        rmnRemote = Some deps.rmnRemote)
+
+  submitMustFail ccipOwner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "FactorySetDeps"
+      operationData = encoded
+      contractIds = Map.empty
+
+  pure ()
+
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId

@@ -8,7 +8,7 @@ module MCMS.GlobalConfig.UpgradeTest where
 
 import DA.Map qualified as Map
 import Daml.Script
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), MCMSReceiver_GetInstanceId(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
 import MCMS.GlobalConfig.Types
 import MCMS.GlobalConfig.V1
 import MCMS.GlobalConfig.V2
@@ -68,8 +68,11 @@ testV1ViaMcmsReceiver = script do
 
     let v1AsReceiver = toInterfaceContractId @MCMSReceiver v1Cid
 
-    instId <- submit ccipOwner do
-        exerciseCmd v1AsReceiver MCMSReceiver_GetInstanceId with c = ccipOwner
+    -- Use interface view to get instanceId instead of deprecated MCMSReceiver_GetInstanceId
+    receiverViewOpt <- queryInterfaceContractId @MCMSReceiver ccipOwner v1AsReceiver
+    let instId = case receiverViewOpt of
+          Some (MCMSReceiverView _ viewInstanceId) -> viewInstanceId
+          None -> error "Interface view not found"
     assertMsg "instanceId via interface should match" $ instId == configInstId
 
     -- Pass the contract's CID in the map (required by MCMSReceiver interface)
