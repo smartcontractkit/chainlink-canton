@@ -6,12 +6,12 @@ module CCIP.GlobalConfig
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex)
-import DA.List qualified
+import DA.Foldable (forA_)
 
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.GlobalConfigTypes (DestChainConfig(..), SourceChainConfig(..))
-import CCIP.GlobalConfigCodec (decodeUpdateDestChainConfigParams, decodeUpdateSourceChainConfigParams)
+import CCIP.GlobalConfigTypes (DestChainConfig(..), DestChainConfigArgs(..), SourceChainConfig(..), SourceChainConfigArgs(..), validateDefaultAndMandatedCCVs)
+import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
 
 template GlobalConfig
     with
@@ -38,22 +38,20 @@ template GlobalConfig
               Some cid -> pure (coerceContractId cid : ContractId GlobalConfig)
 
             case functionName of
-              "UpdateDestChainConfig" -> do
-                case decodeUpdateDestChainConfigParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateDestChainConfig"
-                  Some (destChainSelector, config) -> do
-                    newCid <- exercise selfCid UpdateDestChainConfig with
-                      destChainSelector
-                      config
+              "ApplyDestChainConfigUpdates" -> do
+                case decodeApplyDestChainConfigUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
+                  Some destChainConfigUpdates -> do
+                    newCid <- exercise selfCid ApplyDestChainConfigUpdates with
+                      destChainConfigUpdates
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
-              "UpdateSourceChainConfig" -> do
-                case decodeUpdateSourceChainConfigParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateSourceChainConfig"
-                  Some (sourceChainSelector, config) -> do
-                    newCid <- exercise selfCid UpdateSourceChainConfig with
-                      sourceChainSelector
-                      config
+              "ApplySourceChainConfigUpdates" -> do
+                case decodeApplySourceChainConfigUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplySourceChainConfigUpdates"
+                  Some sourceChainConfigUpdates -> do
+                    newCid <- exercise selfCid ApplySourceChainConfigUpdates with
+                      sourceChainConfigUpdates
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
@@ -72,27 +70,44 @@ template GlobalConfig
             controller caller
             do pure (Map.lookup sourceChainSelector sourceChainConfigs)
 
-        choice UpdateDestChainConfig : ContractId GlobalConfig
+        choice ApplyDestChainConfigUpdates : ContractId GlobalConfig
             with
-                destChainSelector : Numeric 0
-                config : DestChainConfig
+              destChainConfigUpdates : [DestChainConfigArgs]
             controller ccipOwner
             do
-                let newConfigs = Map.insert destChainSelector config destChainConfigs
-                create this with destChainConfigs = newConfigs
+              -- Validate
+              forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, defaultCCVs, laneMandatedCCVs} -> do
+                assertMsg "ZeroChainSelectorNotAllowed: destination chain selector must be non-zero" (destChainSelector /= 0.0)
+                validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
-        choice UpdateSourceChainConfig : ContractId GlobalConfig
+              -- Update
+              let newConfigs = foldl
+                    (\configs DestChainConfigArgs{destChainSelector, isEnabled, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
+                      Map.insert destChainSelector DestChainConfig{isEnabled, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
+                    destChainConfigs
+                    destChainConfigUpdates
+              create this with destChainConfigs = newConfigs
+
+        choice ApplySourceChainConfigUpdates : ContractId GlobalConfig
             with
-                sourceChainSelector : Numeric 0
-                config : SourceChainConfig
+              sourceChainConfigUpdates : [SourceChainConfigArgs]
             controller ccipOwner
             do
-                assertMsg "globalconfig: source chain config must include at least one onramp"
-                    (not (null config.onRampAddresses))
-                assertMsg "globalconfig: source chain config onramps must be unique"
-                    (length config.onRampAddresses == length (DA.List.dedup config.onRampAddresses))
-                let newConfigs = Map.insert sourceChainSelector config sourceChainConfigs
-                create this with sourceChainConfigs = newConfigs
+              -- Validate
+              forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
+                assertMsg "ZeroChainSelectorNotAllowed: source chain selector must be non-zero" (sourceChainSelector /= 0.0)
+                -- Allow for empty onRampAddresses
+                -- This list could be empty, which would mean no onRamps are allowed and the lane is disabled, even for existing messages
+                validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+
+              -- Update
+              let newConfigs = foldl
+                    (\configs SourceChainConfigArgs{sourceChainSelector, isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} ->
+                      Map.insert sourceChainSelector SourceChainConfig{isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} configs)
+                    sourceChainConfigs
+                    sourceChainConfigUpdates
+              create this with sourceChainConfigs = newConfigs
+
 
 globalConfigKey : Text
 globalConfigKey = "global-config"

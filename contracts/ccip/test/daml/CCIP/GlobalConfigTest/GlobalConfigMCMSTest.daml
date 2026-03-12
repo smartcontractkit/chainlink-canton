@@ -4,21 +4,21 @@ module CCIP.GlobalConfigTest.GlobalConfigMCMSTest where
 
 import Daml.Script
 import DA.Assert ((===))
+import DA.List
 import DA.Map qualified as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
 import CCIP.GlobalConfig
 import CCIP.GlobalConfigCodec
-import CCIP.GlobalConfigTypes (DestChainConfig(..), SourceChainConfig(..))
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
--- MCMS ENTRYPOINT TESTS - UPDATE DEST CHAIN CONFIG
+-- MCMS ENTRYPOINT TESTS - APPLY DEST CHAIN CONFIG UPDATES
 -- ===========================================================================
 
--- | Test MCMSReceiver entrypoint for UpdateDestChainConfig function
-testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig : Script ()
-testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig = script do
+-- | Test MCMSReceiver entrypoint for ApplyDestChainConfigUpdates function
+testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates : Script ()
+testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-test"
@@ -29,7 +29,7 @@ testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig = script do
     createCmd GlobalConfig with
       instanceId
       ccipOwner
-      chainSelector = 42161.0  -- Local chain
+      chainSelector = 123.0  -- Local chain
       onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
@@ -37,21 +37,24 @@ testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig = script do
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
-  -- Create dest chain config
-  let destConfig = DestChainConfig with
-        isEnabled = True
-        offRampAddress = "abcdef1234567890"
-        laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
-        defaultCCVs = []
-        messageNetworkFeeUSDCents = 10.0
-        tokenNetworkFeeUSDCents = 5.0
+  -- Create dest chain config update
+  let args = [
+        DestChainConfigArgs with
+          destChainSelector = 456.0
+          isEnabled = True
+          offRampAddress = "abcdef1234567890"
+          laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
+          defaultCCVs = []
+          messageNetworkFeeUSDCents = 10.0
+          tokenNetworkFeeUSDCents = 5.0
+        ]
 
-      encoded = encodeUpdateDestChainConfigParams 1.0 destConfig
+      encoded = encodeApplyDestChainConfigUpdatesParams args
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "UpdateDestChainConfig"
+      functionName = "ApplyDestChainConfigUpdates"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
 
@@ -60,20 +63,17 @@ testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig = script do
   case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
     [(_, gc)] -> do
       Map.size gc.destChainConfigs === 1
-      case Map.lookup 1.0 gc.destChainConfigs of
-        None -> abort "Expected dest chain config for chain 1"
-        Some config -> do
-          config.isEnabled === True
-          config.offRampAddress === "abcdef1234567890"
-          length config.laneMandatedCCVs === 1
-          config.messageNetworkFeeUSDCents === 10.0
+      case Map.lookup 456.0 gc.destChainConfigs of
+        None -> abort "Expected dest chain config for chain 456"
+        Some got -> do
+          assertDestChainConfigsEqual got (head args)
     _ -> abort "Expected exactly one GlobalConfig contract"
 
   pure ()
 
 -- | Test updating existing dest chain config
-testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig_Replace : Script ()
-testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig_Replace = script do
+testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace : Script ()
+testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-replace-test"
@@ -84,53 +84,67 @@ testGlobalConfigMCMSEntrypoint_UpdateDestChainConfig_Replace = script do
     createCmd GlobalConfig with
       instanceId
       ccipOwner
-      chainSelector = 1.0
+      chainSelector = 123.0
       onRampAddress = "1234"
-      destChainConfigs = Map.fromList [(137.0, existingConfig)]
+      destChainConfigs = Map.fromList [(456.0, existingConfig)]
       sourceChainConfigs = Map.empty
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
-  -- Create new config to replace existing
-  let newConfig = DestChainConfig with
-        isEnabled = False
-        offRampAddress = "deadbeef12345678"
-        laneMandatedCCVs = []
-        defaultCCVs = [RawInstanceAddress "default@party"]
-        messageNetworkFeeUSDCents = 20.0
-        tokenNetworkFeeUSDCents = 10.0
+  -- Create multiple new configs, one to replace existing
+  let args = [
+        DestChainConfigArgs with
+          destChainSelector = 456.0
+          isEnabled = False
+          offRampAddress = "deadbeef12345678"
+          laneMandatedCCVs = []
+          defaultCCVs = [RawInstanceAddress "default@party"]
+          messageNetworkFeeUSDCents = 20.0
+          tokenNetworkFeeUSDCents = 10.0
+        ,DestChainConfigArgs with
+          destChainSelector = 789.0
+          isEnabled = True
+          offRampAddress = "cafe1234"
+          laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
+          defaultCCVs = [RawInstanceAddress "default@party"]
+          messageNetworkFeeUSDCents = 300.0
+          tokenNetworkFeeUSDCents = 777.0
+        ]
 
-      encoded = encodeUpdateDestChainConfigParams 137.0 newConfig
+      encoded = encodeApplyDestChainConfigUpdatesParams args
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "UpdateDestChainConfig"
+      functionName = "ApplyDestChainConfigUpdates"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
 
   -- Verify config was replaced
   contracts <- query @GlobalConfig ccipOwner
   case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
-    [(_, gc)] ->
-      case Map.lookup 137.0 gc.destChainConfigs of
-        None -> abort "Expected dest chain config"
+    [(_, gc)] -> do
+      Map.size gc.destChainConfigs === 2
+      case Map.lookup 456.0 gc.destChainConfigs of
+        None -> abort "Expected dest chain config for chain 456"
         Some config -> do
-          config.isEnabled === False
-          config.offRampAddress === "deadbeef12345678"
-          config.messageNetworkFeeUSDCents === 20.0
+          assertDestChainConfigsEqual config (head args)
+      case Map.lookup 789.0 gc.destChainConfigs of
+        None -> abort "Expected dest chain config for chain 789"
+        Some config -> do
+          assertDestChainConfigsEqual config (args !! 1)
     _ -> abort "Expected exactly one GlobalConfig contract"
 
   pure ()
 
 -- ===========================================================================
--- MCMS ENTRYPOINT TESTS - UPDATE SOURCE CHAIN CONFIG
+-- MCMS ENTRYPOINT TESTS - APPLY SOURCE CHAIN CONFIG UPDATES
 -- ===========================================================================
 
--- | Test MCMSReceiver entrypoint for UpdateSourceChainConfig function
-testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig : Script ()
-testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
+-- | Test MCMSReceiver entrypoint for ApplySourceChainConfigUpdates function
+testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates : Script ()
+testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-source-test"
@@ -140,7 +154,7 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
     createCmd GlobalConfig with
       instanceId
       ccipOwner
-      chainSelector = 1.0
+      chainSelector = 123.0
       onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
@@ -149,18 +163,21 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Create source chain config
-  let sourceConfig = SourceChainConfig with
-        isEnabled = True
-        onRampAddresses = ["fedcba0987654321", "0011223344556677"]
-        laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
-        defaultCCVs = [RawInstanceAddress "src-default@party2"]
+  let args = [
+        SourceChainConfigArgs with
+          sourceChainSelector = 456.0
+          isEnabled = True
+          onRampAddresses = ["fedcba0987654321"]
+          laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
+          defaultCCVs = [RawInstanceAddress "src-default@party2"]
+        ]
 
-      encoded = encodeUpdateSourceChainConfigParams 42161.0 sourceConfig
+      encoded = encodeApplySourceChainConfigUpdatesParams args
 
   -- Call mcmsEntrypoint
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "UpdateSourceChainConfig"
+      functionName = "ApplySourceChainConfigUpdates"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
 
@@ -169,72 +186,68 @@ testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig = script do
   case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
     [(_, gc)] -> do
       Map.size gc.sourceChainConfigs === 1
-      case Map.lookup 42161.0 gc.sourceChainConfigs of
-        None -> abort "Expected source chain config for chain 42161"
+      case Map.lookup 456.0 gc.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 456"
         Some config -> do
-          config.isEnabled === True
-          config.onRampAddresses === ["fedcba0987654321", "0011223344556677"]
-          length config.laneMandatedCCVs === 1
-          length config.defaultCCVs === 1
-    _ -> abort "Expected exactly one GlobalConfig contract"
+          assertSourceChainConfigsEqual config (head args)
 
-  pure ()
+  let instanceId = "globalconfig-source-replace-test"
 
--- | Test adding multiple source chain configs sequentially
-testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig_Multiple : Script ()
-testGlobalConfigMCMSEntrypoint_UpdateSourceChainConfig_Multiple = script do
-  ccipOwner <- allocateParty "ccip_owner"
-
-  let instanceId = "globalconfig-multi-source-test"
-
-  -- Create GlobalConfig
+  -- Create GlobalConfig with existing source chain config
   gcCid <- submit ccipOwner do
     createCmd GlobalConfig with
       instanceId
       ccipOwner
-      chainSelector = 1.0
+      chainSelector = 123.0
       onRampAddress = "1234"
       destChainConfigs = Map.empty
-      sourceChainConfigs = Map.empty
+      sourceChainConfigs = Map.fromList [(456.0, SourceChainConfig True ["abcd"] [] [])]
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
-  -- Add first source config
-  let config1 = SourceChainConfig True ["abcd1234"] [] []
-      encoded1 = encodeUpdateSourceChainConfigParams 10.0 config1
+  -- Create multiple new configs, one to replace existing
+  let args = [
+        SourceChainConfigArgs with
+          sourceChainSelector = 456.0
+          isEnabled = True
+          onRampAddresses = ["fedcba0987654321"]
+          laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
+          defaultCCVs = [RawInstanceAddress "src-default@party2"]
+        ,SourceChainConfigArgs with
+          sourceChainSelector = 789.0
+          isEnabled = True
+          onRampAddresses = ["cafe5678"]
+          laneMandatedCCVs = [RawInstanceAddress "src-ccv@party1"]
+          defaultCCVs = []
+        ]
 
-  newContractIds1 <- submit ccipOwner do
+      encoded = encodeApplySourceChainConfigUpdatesParams args
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "UpdateSourceChainConfig"
-      operationData = encoded1
+      functionName = "ApplySourceChainConfigUpdates"
+      operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
 
-  -- Get updated contract for second call
-  contracts1 <- query @GlobalConfig ccipOwner
-  case filter (\(_, gc) -> gc.instanceId == instanceId) contracts1 of
-    [(newCid, _)] -> do
-      let targetAsMcmsReceiver2 = toInterfaceContractId @MCMSReceiver newCid
-
-      -- Add second source config
-      let config2 = SourceChainConfig False ["dcba4321", "abcd0000"] [] []
-          encoded2 = encodeUpdateSourceChainConfigParams 56.0 config2
-
-      newContractIds2 <- submit ccipOwner do
-        exerciseCmd targetAsMcmsReceiver2 MCMSReceiver_Entrypoint with
-          functionName = "UpdateSourceChainConfig"
-          operationData = encoded2
-          contractIds = Map.fromList [(instAddr, toAnyContractId newCid)]
-
-      -- Verify both configs exist
-      contracts2 <- query @GlobalConfig ccipOwner
-      case filter (\(_, gc) -> gc.instanceId == instanceId) contracts2 of
-        [(_, gc)] -> Map.size gc.sourceChainConfigs === 2
-        _ -> abort "Expected exactly one GlobalConfig contract"
-
-    _ -> abort "Expected exactly one GlobalConfig contract after first update"
+  -- Verify source chain config was added
+  contracts <- query @GlobalConfig ccipOwner
+  case filter (\(_, gc) -> gc.instanceId == instanceId) contracts of
+    [(_, gc)] -> do
+      Map.size gc.sourceChainConfigs === 2
+      case Map.lookup 456.0 gc.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 456"
+        Some config -> do
+          assertSourceChainConfigsEqual config (head args)
+      case Map.lookup 789.0 gc.sourceChainConfigs of
+        None -> abort "Expected source chain config for chain 789"
+        Some config -> do
+          assertSourceChainConfigsEqual config (args !! 1)
+    _ -> abort "Expected exactly one GlobalConfig contract"
 
   pure ()
+
 
 -- ===========================================================================
 -- ERROR CASE TESTS
@@ -290,8 +303,8 @@ testGlobalConfigMCMSEntrypoint_InvalidParams = script do
   -- Call with invalid operationData - should fail
   submitMustFail ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "UpdateDestChainConfig"
-      operationData = "00"  -- Too short to decode
+      functionName = "ApplyDestChainConfigUpdates"
+      operationData = "1234"  -- Invalid encoded data
       contractIds = Map.fromList [(instAddr, toAnyContractId gcCid)]
 
   pure ()
@@ -315,8 +328,18 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Encode valid params
-  let config = DestChainConfig True "abcd" [] [] 1.0 1.0
-      encoded = encodeUpdateDestChainConfigParams 1.0 config
+  let args = [
+        DestChainConfigArgs with
+          destChainSelector = 456.0
+          isEnabled = True
+          offRampAddress = "abcdef1234567890"
+          laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
+          defaultCCVs = []
+          messageNetworkFeeUSDCents = 10.0
+          tokenNetworkFeeUSDCents = 5.0
+        ]
+
+      encoded = encodeApplyDestChainConfigUpdatesParams args
 
   -- Call with empty contractIds map - should fail
   submitMustFail ccipOwner do
@@ -330,3 +353,22 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
 -- Helper to convert ContractId to AnyContractId for the map
 toAnyContractId : ContractId a -> ContractId ()
 toAnyContractId = coerceContractId
+
+-- Assertion helpers
+-- These compare Config <> Args, and therefore cannot assert on the chain selector since it's not part of the config itself, but rather the key in the map. The rest of the fields can be compared directly.
+
+assertDestChainConfigsEqual : DestChainConfig -> DestChainConfigArgs -> Script ()
+assertDestChainConfigsEqual got expected = do
+  assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
+  assertMsg ("offRampAddress mismatch, got: " <> show got.offRampAddress <> ", expected: " <> show expected.offRampAddress) (got.offRampAddress == expected.offRampAddress)
+  assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
+  assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)
+  assertMsg ("messageNetworkFeeUSDCents mismatch, got: " <> show got.messageNetworkFeeUSDCents <> ", expected: " <> show expected.messageNetworkFeeUSDCents) (got.messageNetworkFeeUSDCents == expected.messageNetworkFeeUSDCents)
+  assertMsg ("tokenNetworkFeeUSDCents mismatch, got: " <> show got.tokenNetworkFeeUSDCents <> ", expected: " <> show expected.tokenNetworkFeeUSDCents) (got.tokenNetworkFeeUSDCents == expected.tokenNetworkFeeUSDCents)
+
+assertSourceChainConfigsEqual : SourceChainConfig -> SourceChainConfigArgs -> Script ()
+assertSourceChainConfigsEqual got expected = do
+  assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
+  assertMsg ("onRampAddresses mismatch, got: " <> show got.onRampAddresses <> ", expected: " <> show expected.onRampAddresses) (got.onRampAddresses == expected.onRampAddresses)
+  assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
+  assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)
