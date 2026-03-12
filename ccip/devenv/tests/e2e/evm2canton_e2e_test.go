@@ -204,11 +204,10 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		)
 		require.NoError(t, err, "failed to resolve source token address for token transfer e2e")
 		srcToken := protocol.UnknownAddress(gethcommon.HexToAddress(tokenRef.Address).Bytes())
-		senderAddress, err := srcChain.GetSenderAddress()
-		require.NoError(t, err)
-		senderBalanceBefore, err := srcChain.GetTokenBalance(ctx, senderAddress, srcToken)
-		require.NoError(t, err)
-		require.NotNil(t, senderBalanceBefore)
+		cantonReceiver := protocol.UnknownAddress(receiver.Bytes())
+		receiverBalanceBefore, err := dstChain.GetTokenBalance(ctx, cantonReceiver, srcToken)
+		require.NoError(t, err, "failed to read receiver token balance on Canton before execution")
+		require.NotNil(t, receiverBalanceBefore)
 
 		seqNo, err := srcChain.GetExpectedNextSequenceNumber(ctx, dstSelector)
 		require.NoError(t, err)
@@ -273,11 +272,21 @@ func TestEVM2Canton_Basic(t *testing.T) {
 
 		message := res.IndexedVerifications.Results[0].VerifierResult.Message
 		require.NotNil(t, message.TokenTransfer, "indexed message should include token transfer")
-		senderBalanceAfter, err := srcChain.GetTokenBalance(ctx, senderAddress, srcToken)
-		require.NoError(t, err)
-		require.NotNil(t, senderBalanceAfter)
-		spent := new(big.Int).Sub(senderBalanceBefore, senderBalanceAfter)
-		require.Equal(t, big.NewInt(evmToCantonTransferAmount), spent, "sender EVM token balance should decrease by transfer amount")
+		require.EqualValues(t, receiver.Bytes(), message.TokenTransfer.TokenReceiver, "token transfer receiver should match Canton message receiver")
+		// Assert the receiver's token amount (amount credited to receiver on Canton) matches the EVM->Canton transfer amount.
+		require.Equal(t, 0, message.TokenTransfer.Amount.Cmp(big.NewInt(evmToCantonTransferAmount)), "receiver token amount should match transfer amount")
+
+		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(ctx, message, 0, []protocol.UnknownAddress{res.IndexedVerifications.Results[0].VerifierResult.VerifierDestAddress}, [][]byte{res.IndexedVerifications.Results[0].VerifierResult.CCVData})
+		require.NoError(t, err, "failed to manually execute token transfer message on Canton chain")
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected token transfer message execution to succeed")
+
+		receiverBalanceAfter, err := dstChain.GetTokenBalance(ctx, cantonReceiver, srcToken)
+		require.NoError(t, err, "failed to read receiver token balance on Canton after execution")
+		require.NotNil(t, receiverBalanceAfter)
+		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), big.NewInt(evmToCantonTransferAmount))
+		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter, "receiver final token balance should equal initial balance plus transfer amount")
+		transferred := new(big.Int).Sub(receiverBalanceAfter, receiverBalanceBefore)
+		require.Equal(t, big.NewInt(evmToCantonTransferAmount), transferred, "receiver token balance should increase by transfer amount")
 	})
 
 	testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)

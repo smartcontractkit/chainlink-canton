@@ -8,7 +8,6 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -24,9 +23,51 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 )
+
+const (
+	cantonToEVMBasicPayload = "Hello from Canton!"
+	cantonToEVMTokenPayload = "Hello token transfer from Canton!"
+
+	// Token qualifier for Canton lock/release -> EVM burn/mint topology.
+	cantonToEVMDestTokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+	cantonToEVMTokenTransferAmount = int64(1000)
+
+	cantonToEVMSentEventTimeout = 2 * time.Minute
+	cantonToEVMExecutionTimeout = 4 * time.Minute
+)
+
+func resolveCantonSendContracts(t *testing.T, in *ccv.Cfg, chainSelector uint64) (protocol.UnknownAddress, protocol.UnknownAddress) {
+	t.Helper()
+
+	selectRef := func(contractType datastore.ContractType, preferredQualifier string) datastore.AddressRef {
+		candidates := in.CLDF.DataStore.Addresses().Filter(
+			datastore.AddressRefByChainSelector(chainSelector),
+			datastore.AddressRefByType(contractType),
+		)
+		require.NotEmptyf(t, candidates, "missing %s address for chain selector %d", contractType, chainSelector)
+		for _, ref := range candidates {
+			if ref.Qualifier == preferredQualifier {
+				return ref
+			}
+		}
+		return candidates[0]
+	}
+
+	ccvRef := selectRef(datastore.ContractType(canton_committee_verifier.ContractType), devenvcommon.DefaultCommitteeVerifierQualifier)
+	executorRef := selectRef(datastore.ContractType(executor.ContractType), devenvcommon.DefaultExecutorQualifier)
+
+	return protocol.UnknownAddress(contracts.HexToInstanceAddress(ccvRef.Address).Bytes()),
+		protocol.UnknownAddress(contracts.HexToInstanceAddress(executorRef.Address).Bytes())
+}
+
+func assertExecutionStateSuccess(t *testing.T, ev cciptestinterfaces.ExecutionStateChangedEvent, context string) {
+	t.Helper()
+	require.Equalf(t, cciptestinterfaces.ExecutionStateSuccess, ev.State, "execution state should be success for %s", context)
+}
 
 //nolint:paralleltest // we won't run this in parallel.
 func TestCanton2EVM_Basic(t *testing.T) {
@@ -234,6 +275,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
+		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), big.NewInt(cantonToEVMTokenTransferAmount))
+		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter, "receiver final token balance should equal initial balance plus transfer amount")
 		transferred := new(big.Int).Sub(receiverBalanceAfter, receiverBalanceBefore)
 		require.Equal(t, big.NewInt(cantonToEVMTokenTransferAmount), transferred, "receiver token balance should increase by transfer amount")
 		t.Logf("Token transfer sent and execution observed successfully with sequence %d", seqNo)
