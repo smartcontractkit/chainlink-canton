@@ -71,7 +71,7 @@ import MCMS.Codec
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import DA.Optional (fromSome)
-import DA.Text qualified as DA.Text
+import qualified DA.Text
 import qualified Splice.Api.Token.HoldingV1
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 

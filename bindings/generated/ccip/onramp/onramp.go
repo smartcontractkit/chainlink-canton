@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "7763ba8d311b0fcf7f328ff7f3b53107a9ce0d6ac6417557c0d907186e8baed1"
+	PackageID   = "3ae6b6bb43c3d936f2d05c9491d7d77752d4d669d7decd87eccdec15d7dbe042"
 	SDKVersion  = "3.4.10"
 )
 
@@ -341,27 +341,6 @@ func (t *OnRamp) UnmarshalHex(data string) error {
 
 // Choice methods for OnRamp
 
-// CCIPSendFromRouter exercises the CCIPSendFromRouter choice on this OnRamp contract
-// This method uses the package name in the template ID
-func (t OnRamp) CCIPSendFromRouter(contractID string, args CCIPSendFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "CCIPSendFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CCIPSendFromRouterWithPackageID exercises the CCIPSendFromRouter choice using the provided package ID instead of package name
-func (t OnRamp) CCIPSendFromRouterWithPackageID(contractID string, packageID string, args CCIPSendFromRouter) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
-		ContractID: contractID,
-		Choice:     "CCIPSendFromRouter",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // PrepareSendFromRouter exercises the PrepareSendFromRouter choice on this OnRamp contract
 // This method uses the package name in the template ID
 func (t OnRamp) PrepareSendFromRouter(contractID string, args PrepareSendFromRouter) *model.ExerciseCommand {
@@ -379,6 +358,27 @@ func (t OnRamp) PrepareSendFromRouterWithPackageID(contractID string, packageID 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
 		ContractID: contractID,
 		Choice:     "PrepareSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CCIPSendFromRouter exercises the CCIPSendFromRouter choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) CCIPSendFromRouter(contractID string, args CCIPSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "CCIPSendFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CCIPSendFromRouterWithPackageID exercises the CCIPSendFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) CCIPSendFromRouterWithPackageID(contractID string, packageID string, args CCIPSendFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "CCIPSendFromRouter",
 		Arguments:  argsToMap(args),
 	}
 }

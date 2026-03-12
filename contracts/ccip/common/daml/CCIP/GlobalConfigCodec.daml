@@ -7,24 +7,27 @@ module CCIP.GlobalConfigCodec
   , encodeApplySourceChainConfigUpdatesParams
   ) where
 
+import DA.Crypto.Text (BytesHex)
+import DA.Optional (fromSome)
+
 import CCIP.MCMSCodecUtils
   ( encodeBool
   , decodeBoolAt
-  , decodeList
-  , encodeNumeric0
-  , decodeNumeric0At
   , encodeBytesHex
   , decodeBytesHexAt
   , encodeBytesHexList
   , decodeBytesHexList
   , encodeDecimal
   , decodeDecimalAt
+  , encodeInt64
+  , decodeInt64At
   , encodeList
+  , decodeList
+  , encodeNumeric0
+  , decodeNumeric0At
   , encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
-
-import DA.Crypto.Text (BytesHex)
 import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), SourceChainConfigArgs(..))
 
 -- ===========================================================================
@@ -70,6 +73,7 @@ encodeDestChainConfigArgs : DestChainConfigArgs -> BytesHex
 encodeDestChainConfigArgs dcc =
   encodeNumeric0 dcc.destChainSelector <>
   encodeBool dcc.isEnabled <>
+  fromSome (encodeInt64 dcc.addressBytesLength) <>
   encodeBytesHex dcc.offRampAddress <>
   encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
   encodeRawInstanceAddressList dcc.defaultCCVs <>
@@ -80,21 +84,23 @@ decodeDestChainConfigArgsAt : BytesHex -> Int -> Optional (DestChainConfigArgs, 
 decodeDestChainConfigArgsAt encoded offset = do
   (destChainSelector, offset1) <- decodeNumeric0At encoded offset
   (isEnabled, offset2) <- decodeBoolAt encoded offset1
-  (offRampAddress, offset3) <- decodeBytesHexAt encoded offset2
-  (laneMandatedCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
-  (defaultCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
-  (messageNetworkFeeUSDCents, offset6) <- decodeDecimalAt encoded offset5
-  (tokenNetworkFeeUSDCents, offset7) <- decodeDecimalAt encoded offset6
+  (addressBytesLength, offset3) <- decodeInt64At encoded offset2
+  (offRampAddress, offset4) <- decodeBytesHexAt encoded offset3
+  (laneMandatedCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
+  (defaultCCVs, offset6) <- decodeRawInstanceAddressList encoded offset5
+  (messageNetworkFeeUSDCents, offset7) <- decodeDecimalAt encoded offset6
+  (tokenNetworkFeeUSDCents, offset8) <- decodeDecimalAt encoded offset7
   Some 
     ( DestChainConfigArgs with
         destChainSelector = destChainSelector
         isEnabled = isEnabled
+        addressBytesLength = addressBytesLength
         offRampAddress = offRampAddress
         laneMandatedCCVs = laneMandatedCCVs
         defaultCCVs = defaultCCVs
         messageNetworkFeeUSDCents = messageNetworkFeeUSDCents
         tokenNetworkFeeUSDCents = tokenNetworkFeeUSDCents
-    ,offset7)
+    ,offset8)
 
 -- ===========================================================================
 -- SOURCE CHAIN CONFIG ENCODING/DECODING

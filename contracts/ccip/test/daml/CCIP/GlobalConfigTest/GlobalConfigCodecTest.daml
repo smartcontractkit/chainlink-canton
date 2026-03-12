@@ -18,7 +18,8 @@ testApplyDestChainConfigUpdateParamsRoundtrip = do
         DestChainConfigArgs with
           destChainSelector = 1.0
           isEnabled = True
-          offRampAddress = "1234567890abcdef"
+          addressBytesLength = 20
+          offRampAddress = "e95aad72f136c035ecc1cabf477fcdeedace3bce"
           laneMandatedCCVs = [RawInstanceAddress "ccv1@party1", RawInstanceAddress "ccv2@party2"]
           defaultCCVs = [RawInstanceAddress "default-ccv@party3"]
           messageNetworkFeeUSDCents = 10.5
@@ -26,7 +27,8 @@ testApplyDestChainConfigUpdateParamsRoundtrip = do
         ,DestChainConfigArgs with
           destChainSelector = 18446744073709551615.0 -- max uint64
           isEnabled = False
-          offRampAddress = "deadbeef"
+          addressBytesLength = 32
+          offRampAddress = "78d10cee9ec94b0bc1da62fa3eaeca1bc85c78abee0eafeab7a20bd12c877cd1"
           laneMandatedCCVs = [RawInstanceAddress "ccv2@party2"]
           defaultCCVs = []
           messageNetworkFeeUSDCents = 0.5
@@ -34,7 +36,8 @@ testApplyDestChainConfigUpdateParamsRoundtrip = do
         ,DestChainConfigArgs with
           destChainSelector = 0.0 -- edge case: zero selector
           isEnabled = False
-          offRampAddress = "deadbeef"
+          addressBytesLength = 20
+          offRampAddress = "41c8c7184de518bcaaf75f3aea14c3bccb256f97"
           laneMandatedCCVs = [RawInstanceAddress "ccv2@party2"]
           defaultCCVs = []
           messageNetworkFeeUSDCents = 0.5

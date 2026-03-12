@@ -182,7 +182,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 456.0
                 isEnabled = True
-                offRampAddress = "0x1111111111111111"
+                addressBytesLength = 20
+                offRampAddress = "1111111111111111111111111111111111111111"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
                 messageNetworkFeeUSDCents = 10.0
@@ -190,7 +191,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             ,CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 789.0
                 isEnabled = True
-                offRampAddress = "0x2222222222222222"
+                addressBytesLength = 32
+                offRampAddress = "2222222222222222222222222222222222222222222222222222222222222222"
                 defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
                 laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 messageNetworkFeeUSDCents = 15.0
@@ -218,7 +220,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 789.0 -- Update the existing config
                 isEnabled = True
-                offRampAddress = "0x3434"
+                addressBytesLength = 20
+                offRampAddress = "7b546b15ab63b57e65ffeeffd6ccefbf8f164efd"
                 defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
                 laneMandatedCCVs = []
                 messageNetworkFeeUSDCents = 100.0
@@ -226,7 +229,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             ,CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 123123.0 -- Add a new config
                 isEnabled = True
-                offRampAddress = "0x5656"
+                addressBytesLength = 20
+                offRampAddress = "6dcb7fde9ac46dba422dcd6627cab455d7e93b14"
                 defaultCCVs = []
                 laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 messageNetworkFeeUSDCents = 15.0
@@ -258,7 +262,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 0.0 -- Invalid zero chain selector
                 isEnabled = True
-                offRampAddress = "0x1111111111111111"
+                addressBytesLength = 20
+                offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
                 messageNetworkFeeUSDCents = 10.0
@@ -272,7 +277,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 123.0
                 isEnabled = True
-                offRampAddress = "0x1111111111111111"
+                addressBytesLength = 20
+                offRampAddress = "bc30fdec959bce0af7a36ac681dfadddfddac2ab"
                 -- Empty default and mandated CCV lists, which is invalid since at least one CCV must be provided
                 defaultCCVs = []
                 laneMandatedCCVs = []
@@ -287,7 +293,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 123.0
                 isEnabled = True
-                offRampAddress = "0x1111111111111111"
+                addressBytesLength = 20
+                offRampAddress = "beafb8e4f9fab41badca6edfb9f0aaea8b6cc9c3"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xabc"] -- Duplicate CCVs within the default list, which is invalid
                 laneMandatedCCVs = [RawInstanceAddress "0x123"]
                 messageNetworkFeeUSDCents = 10.0
@@ -301,7 +308,8 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 123.0
                 isEnabled = True
-                offRampAddress = "0x1111111111111111"
+                addressBytesLength = 20
+                offRampAddress = "8a16cb05dcffcbe196a5c8c2d6ebc4ba664fd41b"
                 defaultCCVs = [RawInstanceAddress "0xabc"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x123"] -- Duplicate CCVs within the mandated list, which is invalid
                 messageNetworkFeeUSDCents = 10.0
@@ -316,10 +324,26 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 123.0
                 isEnabled = True
-                offRampAddress = "0x1111111111111111"
+                addressBytesLength = 20
+                offRampAddress = "8fd2fe964b7ebbdf1ba2eaf949fdcf05baead07f"
                 -- Duplicate CCVs across the default and mandated lists, which is invalid
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0x123"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+                messageNetworkFeeUSDCents = 10.0
+                tokenNetworkFeeUSDCents = 20.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+    
+    let invalidDestChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.DestChainConfigArgs with
+                destChainSelector = 123.0
+                isEnabled = True
+                addressBytesLength = 3
+                offRampAddress = "12345678" -- 4 bytes, which is invalid given the addressBytesLength of 3
+                defaultCCVs = [RawInstanceAddress "0xabc"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123"]
                 messageNetworkFeeUSDCents = 10.0
                 tokenNetworkFeeUSDCents = 20.0
             ]

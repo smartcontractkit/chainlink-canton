@@ -32,6 +32,7 @@ import qualified TestToken
 
 
 -- | Test CCIP send via PerPartyRouter (message-only, no fees collected).
+testCCIPSend : Script ()
 testCCIPSend = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -65,6 +66,7 @@ testCCIPSend = script do
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
+                addressBytesLength = 20
                 offRampAddress = "0000000000000000000000000000000000000003"
                 laneMandatedCCVs = []
                 defaultCCVs = []
@@ -157,7 +159,7 @@ testCCIPSend = script do
     disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    let receiver = CCIP.MessageCodecV1.encodePartyAddress user
+    let receiver = "9df48df28ecc2863af9e90cde2e82fa62a9ee2c5" -- 20 bytes
 
     -- PrepareSend: create SendingMessageV1 (message deferred to executor)
     sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
@@ -457,6 +459,7 @@ testPrepareSendExtraArgs = script do
             onRampAddress = "0000000000000000000000000000000000000001"
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
+                addressBytesLength = 20
                 offRampAddress = "0000000000000000000000000000000000000003"
                 laneMandatedCCVs = []
                 defaultCCVs = [defaultCCV]
@@ -530,7 +533,7 @@ testPrepareSendExtraArgs = script do
 
     -- Message-only send with explicit blockConfirmations.
     -- Message is deferred to executor; only blockConfirmations is verifiable here.
-    let receiver = CCIP.MessageCodecV1.encodePartyAddress user
+    let receiver = "b8a3d7a9c797b5bd47f8c5efd96dadecf15ddd3c" -- 20 bytes
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
@@ -578,5 +581,72 @@ testPrepareSendExtraArgs = script do
     Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
     smTokenOnly.requiredCCVs === []
     smTokenOnly.tokenArgs === "aabbccdd"
+    smTokenOnly.tokenReceiver === receiver
+
+    -- Token-only send with separate receiver and tokenReceiver
+    let tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89" -- 20 bytes
+    smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destChainSelector = destChainSelector
+            receiver = receiver
+            payload = ""
+            ccipReceiveGasLimit = 0
+            blockConfirmations = None
+            senderRequiredCCVs = []
+            tokenInstrumentId = Some tokenInstrumentId
+            tokenReceiver = Some tokenReceiver
+            tokenArgs = "aabbccdd"
+            feeToken = feeTokenId
+
+    Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
+    smTokenOnly.requiredCCVs === []
+    smTokenOnly.tokenArgs === "aabbccdd"
+    smTokenOnly.receiver === receiver
+    smTokenOnly.tokenReceiver === tokenReceiver
+
+    -- Failure cases
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destChainSelector = destChainSelector
+            receiver = "12345678" -- invalid receiver (not 20 bytes)
+            payload = ""
+            ccipReceiveGasLimit = 0
+            blockConfirmations = None
+            senderRequiredCCVs = []
+            tokenInstrumentId = Some tokenInstrumentId
+            tokenReceiver = Some tokenReceiver
+            tokenArgs = "aabbccdd"
+            feeToken = feeTokenId
+
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destChainSelector = destChainSelector
+            receiver = receiver
+            payload = ""
+            ccipReceiveGasLimit = 0
+            blockConfirmations = None
+            senderRequiredCCVs = []
+            tokenInstrumentId = Some tokenInstrumentId
+            tokenReceiver = Some("12345678") -- invalid token receiver (not 20 bytes)
+            tokenArgs = "aabbccdd"
+            feeToken = feeTokenId
 
     pure ()

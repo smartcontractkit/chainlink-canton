@@ -5,7 +5,7 @@ module CCIP.GlobalConfig
   ) where
 
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable (forA_)
 
 import qualified CCIP.Context
@@ -76,14 +76,16 @@ template GlobalConfig
             controller ccipOwner
             do
               -- Validate
-              forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, defaultCCVs, laneMandatedCCVs} -> do
+              forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, offRampAddress, defaultCCVs, laneMandatedCCVs} -> do
                 assertMsg "ZeroChainSelectorNotAllowed: destination chain selector must be non-zero" (destChainSelector /= 0.0)
+                assertMsg "InvalidAddressByteLength: address byte length must be positive" (addressBytesLength >= 0)
+                assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
               -- Update
               let newConfigs = foldl
-                    (\configs DestChainConfigArgs{destChainSelector, isEnabled, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
-                      Map.insert destChainSelector DestChainConfig{isEnabled, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
+                    (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
+                      Map.insert destChainSelector DestChainConfig{isEnabled, addressBytesLength, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
                     destChainConfigs
                     destChainConfigUpdates
               create this with destChainConfigs = newConfigs
@@ -107,7 +109,6 @@ template GlobalConfig
                     sourceChainConfigs
                     sourceChainConfigUpdates
               create this with sourceChainConfigs = newConfigs
-
 
 globalConfigKey : Text
 globalConfigKey = "global-config"

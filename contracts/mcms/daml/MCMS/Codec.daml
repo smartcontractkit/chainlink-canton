@@ -42,7 +42,6 @@ module MCMS.Codec
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import qualified DA.Text as Text
-import DA.Text qualified as DA.Text
 import DA.Optional (fromSome)
 import DA.Foldable ()
 import MCMS.Types (SignerInfo(..), Role(..), BlockedFunction(..), TimelockCall(..), intToRole)
@@ -477,23 +476,23 @@ decodeNumeric0At encoded offset = do
 numeric0ToDecimalString : Numeric 0 -> Text
 numeric0ToDecimalString n =
   let str = show n
-  in if DA.Text.isSuffixOf ".0" str
-     then DA.Text.take (DA.Text.length str - 2) str
+  in if Text.isSuffixOf ".0" str
+     then Text.take (Text.length str - 2) str
      else str
 
 -- | Parse decimal string to Numeric 0
 -- Multiplies accumulated value by 10 and adds each digit
 parseNumeric0 : Text -> Optional (Numeric 0)
 parseNumeric0 text =
-  if DA.Text.length text == 0 then None
+  if Text.length text == 0 then None
   else parseNumeric0Helper text 0.0
 
 parseNumeric0Helper : Text -> Numeric 0 -> Optional (Numeric 0)
 parseNumeric0Helper text acc =
-  if DA.Text.length text == 0 then Some acc
+  if Text.length text == 0 then Some acc
   else
-    let firstChar = DA.Text.take 1 text
-        rest = DA.Text.drop 1 text
+    let firstChar = Text.take 1 text
+        rest = Text.drop 1 text
         digitOpt = charToDigit firstChar
     in case digitOpt of
       None -> None
