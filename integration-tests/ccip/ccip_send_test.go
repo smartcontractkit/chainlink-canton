@@ -213,7 +213,7 @@ func TestCCIPSend(t *testing.T) {
 						AllowTrafficFrom:         true,
 						OnRamps:                  [][]byte{[]byte("0000000000000000000000000000000000000001")}, // remote chain onRamp
 						OffRamp:                  nil,
-						DefaultInboundCCVs:       nil,
+						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedInboundCCVs:  nil,
 						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
