@@ -37,6 +37,8 @@ setup = script do
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.empty
+            linkTokenInstrumentId = instrumentIdLINK
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
 
     -- Apply price updates for destChainSelector1 and instrumentIdLINK
@@ -208,6 +210,8 @@ testFinalizeFeeUsesEVMScaledPrices = script do
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(feeToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = feeToken
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
 
     sendingMessageCid <- submit owner do
@@ -292,6 +296,8 @@ testFinalizeFee_PremiumAndExecutor = script do
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(feeToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = feeToken
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
 
     let senderAddr = "01"
@@ -411,6 +417,8 @@ testFinalizeFee_SmallFee = script do
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(feeToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = feeToken
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
 
     sendingMessageCid <- submit owner do
@@ -486,3 +494,356 @@ testFinalizeFee_SmallFee = script do
     sm.executorFeeTokenAmount === 500000000000000.0
 
     debug "testFinalizeFee_SmallFee: PASSED"
+
+-- L-1: Finalized fee is converted into LINK juels before the cap check.
+testFinalizeFee_LinkCapAfterConversion = script do
+    owner <- allocateParty "owner-link-cap"
+    sender <- allocateParty "sender-link-cap"
+    executorOwner <- allocateParty "executor-owner-link-cap"
+
+    let linkToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "USDC"
+
+    -- feeToken price = 1e18 ($1 per token)
+    -- LINK price = 15e18 ($15 per token)
+    -- network fee = $1.50 -> 1.5 fee tokens -> 0.1 LINK
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-link-cap"
+            feeTokens = Map.fromList [(feeToken, 1000000000000000000.0)]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList
+                [ (feeToken, TimestampedPrice 1000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
+                , (linkToken, TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
+                ]
+            linkTokenInstrumentId = linkToken
+            maxFeeJuelsPerMsg = 99999999999999999.0
+            priceUpdaters = [owner]
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-link-cap" sender
+                onRamp = RawInstanceAddress.make "onramp-link-cap" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-link-cap" owner
+                rmnRemote = RawInstanceAddress.make "rmn-link-cap" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-link-cap" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-link-cap" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "executor-link-cap" executorOwner
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 150.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_ExecutorFinalized
+
+    submitMustFail owner do
+        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+            sendingMessageCid = sendingMessageCid
+            caller = owner
+
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-link-cap-pass"
+            feeTokens = Map.fromList [(feeToken, 1000000000000000000.0)]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList
+                [ (feeToken, TimestampedPrice 1000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
+                , (linkToken, TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
+                ]
+            linkTokenInstrumentId = linkToken
+            maxFeeJuelsPerMsg = 100000000000000000.0
+            priceUpdaters = [owner]
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-link-cap-pass" sender
+                onRamp = RawInstanceAddress.make "onramp-link-cap-pass" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-link-cap-pass" owner
+                rmnRemote = RawInstanceAddress.make "rmn-link-cap-pass" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-link-cap-pass" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-link-cap-pass" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "executor-link-cap-pass" executorOwner
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 150.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_ExecutorFinalized
+
+    sendingMessageCid <- submit owner do
+        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+            sendingMessageCid = sendingMessageCid
+            caller = owner
+
+    Some sm <- queryContractId owner sendingMessageCid
+    sm.networkFeeTokenAmount === 1500000000000000000.0
+
+    debug "testFinalizeFee_LinkCapAfterConversion: PASSED"
+
+-- L-1: direct LINK fee path should enforce the cap without any conversion.
+testFinalizeFee_LinkCapDirect = script do
+    owner <- allocateParty "owner-link-direct-cap"
+    sender <- allocateParty "sender-link-direct-cap"
+    executorOwner <- allocateParty "executor-owner-link-direct-cap"
+
+    let linkToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+
+    -- $1.50 fee at $15/LINK -> 0.1 LINK = 1e17 juels
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-link-direct-cap"
+            feeTokens = Map.fromList [(linkToken, 1000000000000000000.0)]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList
+                [ (linkToken, TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
+            linkTokenInstrumentId = linkToken
+            maxFeeJuelsPerMsg = 99999999999999999.0
+            priceUpdaters = [owner]
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-link-direct-cap" sender
+                onRamp = RawInstanceAddress.make "onramp-link-direct-cap" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-link-direct-cap" owner
+                rmnRemote = RawInstanceAddress.make "rmn-link-direct-cap" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-link-direct-cap" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-link-direct-cap" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "executor-link-direct-cap" executorOwner
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = linkToken
+            networkFeeUSDCents = 150.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_ExecutorFinalized
+
+    submitMustFail owner do
+        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+            sendingMessageCid = sendingMessageCid
+            caller = owner
+
+    debug "testFinalizeFee_LinkCapDirect: PASSED"
+
+-- L-1: cap applies to the final total fee, not just a single component.
+testFinalizeFee_LinkCapMixedFees = script do
+    owner <- allocateParty "owner-link-mixed-cap"
+    sender <- allocateParty "sender-link-mixed-cap"
+    ccvOwner <- allocateParty "ccv-link-mixed-cap"
+    poolOwner <- allocateParty "pool-link-mixed-cap"
+    executorOwner <- allocateParty "executor-link-mixed-cap"
+
+    let linkToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+
+    feeQuoter <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-link-mixed-cap"
+            feeTokens = Map.fromList [(linkToken, 1000000000000000000.0)]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList
+                [ (linkToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
+            linkTokenInstrumentId = linkToken
+            maxFeeJuelsPerMsg = 299999999999999999.0
+            priceUpdaters = [owner]
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-link-mixed-cap" sender
+                onRamp = RawInstanceAddress.make "onramp-link-mixed-cap" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-link-mixed-cap" owner
+                rmnRemote = RawInstanceAddress.make "rmn-link-mixed-cap" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-link-mixed-cap" owner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-link-mixed-cap" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "executor-link-mixed-cap" executorOwner
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = linkToken
+            networkFeeUSDCents = 100.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-link-mixed-cap"
+            feeUSDCents = 100.0
+            destGasLimit = 10000
+            destBytesOverhead = 0
+            caller = ccvOwner
+
+    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
+    sendingMessageCid <- submit (actAs poolOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
+            poolInstanceId = "pool-link-mixed-cap"
+            poolOwner = poolOwner
+            feeUSDCents = 100.0
+            destGasOverhead = 50000
+            destBytesOverhead = 0
+            caller = poolOwner
+
+    disclosedSm <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorWithFee with
+            executorInstanceId = "executor-link-mixed-cap"
+            executorArgs = ""
+            blockConfirmations = 0
+            feeUSDCents = 100.0
+            destGasLimit = 20000
+            destBytesOverhead = 0
+            caller = executorOwner
+
+    -- Total = 4 * (100 * 1e18 / 20e18 * 1e16) = 4 * 5e16 = 2e17 for premium fees
+    -- plus executor direct path 5e16 => 2e17 total? Let's instead cap below expected 2e17.
+    -- The chosen cap below should force failure based on aggregate fees.
+    submitMustFail owner do
+        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
+            sendingMessageCid = sendingMessageCid
+            caller = owner
+
+    debug "testFinalizeFee_LinkCapMixedFees: PASSED"

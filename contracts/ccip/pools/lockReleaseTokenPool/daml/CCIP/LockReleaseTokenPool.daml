@@ -29,6 +29,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RateLimiter
@@ -58,6 +59,7 @@ data TransferTimeout
 -- | Per-chain fee config for outbound pool fee calculation.
 data PoolFeeConfig = PoolFeeConfig
     with
+        isEnabled : Bool
         feeUSDCents : Decimal
         destGasOverhead : Int
         destBytesOverhead : Int
@@ -220,6 +222,8 @@ template LockReleaseTokenPool
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
+                        feeQuoterCid = arg.feeQuoterCid
+                        tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
         -- Get required CCV raw instance addresses based on chain and direction.
@@ -433,21 +437,33 @@ template LockReleaseTokenPool
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
             do
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
-                let feeConfig = fromSomeNote "no pool fee config for dest chain"
-                        (Map.lookup sendingMsg.destChainSelector chainFeeConfigs)
+                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector chainFeeConfigs of
+                    Some feeConfig | feeConfig.isEnabled ->
+                        pure
+                            ( feeConfig.feeUSDCents
+                            , feeConfig.destGasOverhead
+                            , feeConfig.destBytesOverhead
+                            )
+                    _ ->
+                        exercise feeQuoterCid CCIP.FeeQuoter.FeeQuoter_GetTokenTransferFee with
+                            destChainSelector = sendingMsg.destChainSelector
+                            token = tokenInstrumentId
+                            caller = poolOwner
 
                 exercise sendingMessageCid
                     CCIP.SendingMessageV1.AddTokenSendFee with
                         poolInstanceId = instanceId
                         poolOwner = poolOwner
-                        feeUSDCents = feeConfig.feeUSDCents
-                        destGasOverhead = feeConfig.destGasOverhead
-                        destBytesOverhead = feeConfig.destBytesOverhead
+                        feeUSDCents
+                        destGasOverhead
+                        destBytesOverhead
                         caller = poolOwner
 
         -- Lock tokens for outbound transfer and append token send data.

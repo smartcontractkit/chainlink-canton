@@ -35,6 +35,8 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = instrumentId2
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -85,6 +87,8 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = instrumentId2
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -139,6 +143,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -199,6 +205,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -256,6 +264,8 @@ testFeeQuoterMCMSEntrypoint_UnknownFunction = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -286,6 +296,8 @@ testFeeQuoterMCMSEntrypoint_InvalidParams = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let instAddr = makeInstanceAddress instanceId owner
@@ -316,6 +328,8 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
       usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+      maxFeeJuelsPerMsg = 1000000000000000000000000.0
       priceUpdaters = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid

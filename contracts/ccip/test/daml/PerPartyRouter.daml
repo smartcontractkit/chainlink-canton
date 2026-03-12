@@ -101,6 +101,8 @@ testCCIPSend = script do
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 1.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = testFeeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     -- Deploy OnRamp
@@ -490,6 +492,8 @@ testPrepareSendExtraArgs = script do
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 1.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = feeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
