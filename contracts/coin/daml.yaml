@@ -9,6 +9,7 @@ version: 0.0.1
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Wno-template-interface-depends-on-daml-script"
+  - "-Werror=unused-dependency"
 data-dependencies:
   - ../dependencies/splice-api-token-metadata-v1-1.0.0.dar
   - ../dependencies/splice-api-token-holding-v1-1.0.0.dar

@@ -3,7 +3,7 @@
 module CCIP.RMNRemote where
 
 import DA.Crypto.Text (BytesHex)
-import DA.List (dedup, elem, notElem, filter)
+import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as Text
 

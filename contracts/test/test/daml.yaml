@@ -5,6 +5,7 @@ version: 0.0.1
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Wno-template-interface-depends-on-daml-script"
+  - "-Werror=unused-dependency"
 data-dependencies:
 dependencies:
   - daml-prim

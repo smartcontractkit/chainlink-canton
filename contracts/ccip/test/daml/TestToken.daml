@@ -4,8 +4,6 @@
 module TestToken where
 
 import DA.Action (foldlA)
-import DA.Optional (fromOptional)
-import DA.Time (addRelTime, hours)
 
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1

@@ -27,7 +27,6 @@ import CCIP.MCMSCodecUtils
   , decodeBytesHexAt
   , encodeDecimal
   , decodeDecimalAt
-  , encodeText
   )
 
 import DA.Crypto.Text (BytesHex)

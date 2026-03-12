@@ -190,6 +190,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
         None -> abort "Expected source chain config for chain 456"
         Some config -> do
           assertSourceChainConfigsEqual config (head args)
+    _ -> abort "Expected exactly one GlobalConfig contract"
 
   let instanceId = "globalconfig-source-replace-test"
 

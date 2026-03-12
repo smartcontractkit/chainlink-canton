@@ -10,7 +10,6 @@ import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
 import CCIP.FeeQuoter
 import CCIP.FeeQuoterCodec
-import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - APPLY FEE TOKEN UPDATES
