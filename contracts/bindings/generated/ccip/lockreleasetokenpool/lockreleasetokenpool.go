@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "ba95d709e4e45fa2a46d37260eb27e477758ac254cbdf762f9ffa3cd59d3c59e"
+	PackageID   = "f06f3aff427786eff65f30d21a90942b3e29d1c06fb0490edbf18a6a0a523041"
 	SDKVersion  = "3.4.10"
 )
 
@@ -697,8 +697,10 @@ var _ interfaces.IITokenPool = (*LockReleaseTokenPool)(nil)
 
 // LockReleaseTokenPoolCalculateFee is a Record type
 type LockReleaseTokenPoolCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	Caller            types.PARTY       `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller            types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolCalculateFee to a map for DAML arguments
@@ -711,6 +713,22 @@ func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
+	}()
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -743,7 +761,9 @@ func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
 // LockReleaseTokenPoolCalculateFeeMCMSParams is LockReleaseTokenPoolCalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolCalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1309,6 +1329,7 @@ func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data str
 
 // PoolFeeConfig is a Record type
 type PoolFeeConfig struct {
+	IsEnabled         types.BOOL    `json:"isEnabled"`
 	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
@@ -1317,6 +1338,8 @@ type PoolFeeConfig struct {
 // ToMap converts PoolFeeConfig to a map for DAML arguments
 func (t PoolFeeConfig) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["isEnabled"] = bool(t.IsEnabled)
 
 	m["feeUSDCents"] = t.FeeUSDCents
 
