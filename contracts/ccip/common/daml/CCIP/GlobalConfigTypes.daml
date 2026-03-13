@@ -13,8 +13,8 @@ data DestChainConfigArgs = DestChainConfigArgs
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
-        messageNetworkFeeUSDCents : Decimal     -- Network fee in USD cents for messages without token transfers.
-        tokenNetworkFeeUSDCents : Decimal       -- Network fee in USD cents for messages with token transfers.
+        messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.
+        tokenNetworkFeeUSDCents : Numeric 0     -- Network fee in USD cents for messages with token transfers.
     deriving (Eq, Show)
 
 -- | Configuration for a destination chain.
@@ -24,8 +24,8 @@ data DestChainConfig = DestChainConfig
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
-        messageNetworkFeeUSDCents : Decimal     -- Network fee in USD cents for messages without token transfers.
-        tokenNetworkFeeUSDCents : Decimal       -- Network fee in USD cents for messages with token transfers.
+        messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.
+        tokenNetworkFeeUSDCents : Numeric 0     -- Network fee in USD cents for messages with token transfers.
     deriving (Eq, Show)
 
 -- | Same as SourceChainConfig but with source chain selector so that a list of these

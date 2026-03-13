@@ -12,6 +12,9 @@ import CCIP.GlobalConfig
 import CCIP.GlobalConfigCodec
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
+
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - APPLY DEST CHAIN CONFIG UPDATES
 -- ===========================================================================
@@ -77,7 +80,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-replace-test"
-      existingConfig = DestChainConfig True "abcd" [] [] 1.0 1.0
+      existingConfig = DestChainConfig True "abcd" [] [] (cents 1.0) (cents 1.0)
 
   -- Create GlobalConfig with existing dest chain config
   gcCid <- submit ccipOwner do
