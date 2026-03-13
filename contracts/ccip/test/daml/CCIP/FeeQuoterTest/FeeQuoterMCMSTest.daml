@@ -11,6 +11,15 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeIns
 import CCIP.FeeQuoter
 import CCIP.FeeQuoterCodec
 
+usd : Decimal -> Numeric 0
+usd d = intToNumeric (truncate (d * 1000000000000000000.0))
+
+usdToCents : Decimal -> Numeric 0
+usdToCents d = intToNumeric (truncate (d * 100.0))
+
+mult : Decimal -> Numeric 0
+mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - APPLY FEE TOKEN UPDATES
 -- ===========================================================================
@@ -30,7 +39,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
     createCmd FeeQuoter with
       instanceId
       owner
-      feeTokens = Map.fromList [(instrumentId1, 1.0)]
+      feeTokens = Map.fromList [(instrumentId1, mult 1.0)]
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
@@ -44,7 +53,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
 
   -- Encode ApplyFeeTokenUpdates params: remove USDC, add LINK
   let feeTokensToRemove = [instrumentId1]
-      feeTokensToAdd = [FeeTokenArgs instrumentId2 1.5]
+      feeTokensToAdd = [FeeTokenArgs instrumentId2 (mult 1.5)]
       encoded = encodeApplyFeeTokenUpdatesParams feeTokensToRemove feeTokensToAdd
 
   -- Call mcmsEntrypoint
@@ -61,7 +70,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
       -- USDC should be removed
       Map.lookup instrumentId1 fq.feeTokens === None
       -- LINK should be added
-      Map.lookup instrumentId2 fq.feeTokens === Some 1.5
+      Map.lookup instrumentId2 fq.feeTokens === Some (mult 1.5)
     _ -> abort "Expected exactly one FeeQuoter contract"
 
   pure ()
@@ -97,9 +106,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
   -- Add multiple fee tokens
   let feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId] = []
       feeTokensToAdd = [
-        FeeTokenArgs instrumentId1 1.0,
-        FeeTokenArgs instrumentId2 1.25,
-        FeeTokenArgs instrumentId3 0.9
+        FeeTokenArgs instrumentId1 (mult 1.0),
+        FeeTokenArgs instrumentId2 (mult 1.25),
+        FeeTokenArgs instrumentId3 (mult 0.9)
         ]
       encoded = encodeApplyFeeTokenUpdatesParams feeTokensToRemove feeTokensToAdd
 
@@ -115,9 +124,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
   case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
     [(_, fq)] -> do
       Map.size fq.feeTokens === 3
-      Map.lookup instrumentId1 fq.feeTokens === Some 1.0
-      Map.lookup instrumentId2 fq.feeTokens === Some 1.25
-      Map.lookup instrumentId3 fq.feeTokens === Some 0.9
+      Map.lookup instrumentId1 fq.feeTokens === Some (mult 1.0)
+      Map.lookup instrumentId2 fq.feeTokens === Some (mult 1.25)
+      Map.lookup instrumentId3 fq.feeTokens === Some (mult 0.9)
     _ -> abort "Expected exactly one FeeQuoter contract"
 
   pure ()
@@ -159,8 +168,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
         destGasPerPayloadByteBase = 16
         chainFamilySelector = "2812d52c"  -- EVM
         defaultTxGasLimit = 200000
-        networkFeeUSD = 0.01
-        defaultTokenFeeUSD = 0.5
+        networkFeeUSD = usdToCents 0.01
+        defaultTokenFeeUSD = usdToCents 0.5
         defaultTokenDestGasOverhead = 50000
 
       configArgs = [DestChainConfigArgs 1.0 destConfig]
@@ -213,8 +222,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
   -- Create multiple dest chain configs
-  let config1 = DestChainConfig True 65535 3000000 100000 16 "2812d52c" 200000 0.01 0.5 50000
-      config2 = DestChainConfig True 32768 1500000 50000 8 "2812d52c" 100000 0.02 1.0 25000
+  let config1 = DestChainConfig True 65535 3000000 100000 16 "2812d52c" 200000 (usdToCents 0.01) (usdToCents 0.5) 50000
+      config2 = DestChainConfig True 32768 1500000 50000 8 "2812d52c" 100000 (usdToCents 0.02) (usdToCents 1.0) 25000
 
       configArgs = [
         DestChainConfigArgs 1.0 config1,

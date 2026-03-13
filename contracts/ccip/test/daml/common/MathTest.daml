@@ -1,0 +1,153 @@
+module MathTest where
+
+import Daml.Script
+
+import DA.Assert
+
+import qualified CCIP.Math as Math
+
+-- mulDivDown: basic small-value cases
+
+testMulDivDown_SmallValues = script do
+    -- floor(7 * 3 / 2) = floor(10.5) = 10
+    -- Exercises floorDiv banker's rounding correction: 7/2 = 3.5 rounds
+    -- to 4 (banker's), corrected back to 3.
+    Math.mulDivDown 7.0 3.0 2.0 === 10.0
+    -- floor(5 * 3 / 2) = floor(7.5) = 7
+    -- 5/2 = 2.5, banker's rounds to 2 (nearest even), no correction needed.
+    Math.mulDivDown 5.0 3.0 2.0 === 7.0
+    -- floor(1 * 1 / 3) = 0
+    Math.mulDivDown 1.0 1.0 3.0 === 0.0
+    -- floor(10 * 10 / 3) = floor(33.33) = 33
+    Math.mulDivDown 10.0 10.0 3.0 === 33.0
+    -- c = 1 returns a * b
+    Math.mulDivDown 123.0 456.0 1.0 === 56088.0
+
+testMulDivDown_ZeroInputs = script do
+    Math.mulDivDown 0.0 1000.0 7.0 === 0.0
+    Math.mulDivDown 1000.0 0.0 7.0 === 0.0
+    Math.mulDivDown 0.0 0.0 1.0 === 0.0
+
+testMulDivDown_Commutativity = script do
+    -- floor(a*b/c) must equal floor(b*a/c)
+    Math.mulDivDown 7.0 3.0 2.0 === Math.mulDivDown 3.0 7.0 2.0
+    Math.mulDivDown 1000000000000000000.0 2000000000000000000.0 1500000000000000000.0
+        === Math.mulDivDown 2000000000000000000.0 1000000000000000000.0 1500000000000000000.0
+
+testMulDivDown_AEqualsC = script do
+    -- floor(c * b / c) = b
+    Math.mulDivDown 100.0 37.0 100.0 === 37.0
+    Math.mulDivDown 1000000000000000000.0 999.0 1000000000000000000.0 === 999.0
+
+-- mulDivDown: EVM-scaled values (non-overflow path)
+
+testMulDivDown_EVMScale = script do
+    -- floor(1e18 * 2e18 / 1.5e18) = floor(1.333e18) = 1333333333333333333
+    Math.mulDivDown 1000000000000000000.0 2000000000000000000.0 1500000000000000000.0
+        === 1333333333333333333.0
+
+-- mulDivDown: both qa > 0 and qb > 0 (term1 and term2 nonzero)
+
+testMulDivDown_BothQuotientsNonzero = script do
+    -- a = 10, b = 10, c = 3 → qa=3, ra=1, qb=3, rb=1
+    -- term1 = 3*(10-1) = 27, term2 = 3*1 = 3, term3 = 1*3 = 3, term4 = floor(1/3) = 0
+    -- result = 33
+    Math.mulDivDown 10.0 10.0 3.0 === 33.0
+    -- a = 1e19, b = 3e19, c = 7e18 → qa=1, qb=4, both > 0
+    -- exact: floor(3e38 / 7e18) = floor(42857142857142857142.857...) = 42857142857142857142
+    Math.mulDivDown 10000000000000000000.0 30000000000000000000.0 7000000000000000000.0
+        === 42857142857142857142.0
+
+-- mulDivDown: safeRemainderDiv path (ra*rb overflows Numeric 0)
+-- Requires c large enough that c^2 > 1e38, i.e., c > ~3.16e19.
+-- With c = 1e20, remainders can be up to ~1e20, and 1e20 * 1e20 = 1e40 > 1e38.
+
+testMulDivDown_SafeRemainderDiv = script do
+    -- floor(3.5e20 * 2.5e20 / 1e20) = floor(8.75e20) = 875000000000000000000
+    -- ra = 5e19, rb = 5e19, ra*rb = 2.5e39 → overflow → safeRemainderDiv
+    Math.mulDivDown 350000000000000000000.0 250000000000000000000.0 100000000000000000000.0
+        === 875000000000000000000.0
+
+testMulDivDown_SafeRemainderDiv_WithRemainder = script do
+    -- floor(3.7e20 * 2.3e20 / 1e20) = floor(8.51e20) = 851000000000000000000
+    -- ra = 7e19, rb = 3e19, ra*rb = 2.1e39 → overflow → safeRemainderDiv
+    Math.mulDivDown 370000000000000000000.0 230000000000000000000.0 100000000000000000000.0
+        === 851000000000000000000.0
+
+testMulDivDown_SafeRemainderDiv_NonCleanDivision = script do
+    -- floor(3.5e20 * 2.5e20 / 3e20)
+    -- exact: 8.75e40 / 3e20 = 291666666666666666666.666... → floor = 291666666666666666666
+    -- ra = 5e19, rb = 5e19, ra*rb = 2.5e39 → overflow → safeRemainderDiv
+    Math.mulDivDown 350000000000000000000.0 250000000000000000000.0 300000000000000000000.0
+        === 291666666666666666666.0
+
+testMulDivDown_SafeRemainderDiv_Commutativity = script do
+    -- Verify commutativity holds on the safeRemainderDiv path
+    let a = 370000000000000000000.0
+    let b = 230000000000000000000.0
+    let c = 100000000000000000000.0
+    Math.mulDivDown a b c === Math.mulDivDown b a c
+
+testMulDivDown_SafeRemainderDiv_LargeC = script do
+    -- c = 7e20, pushing remainders even higher
+    -- floor(9e20 * 8e20 / 7e20) = floor(72e40 / 7e20) = floor(1028571428571428571428.571...) = 1028571428571428571428
+    -- ra = 2e20, rb = 1e20, ra*rb = 2e40 → overflow → safeRemainderDiv
+    Math.mulDivDown 900000000000000000000.0 800000000000000000000.0 700000000000000000000.0
+        === 1028571428571428571428.0
+
+-- normalizedFeeWithinCap
+
+testNormalizedFeeWithinCapBoundary = script do
+    let feeTokenAmount : Numeric 0 = 1000000000000000000.0
+    let feeTokenPrice : Numeric 0 = 2000000000000000000000.0
+    let linkTokenPrice : Numeric 0 = 15000000000000000000.0
+
+    -- floor(1e18 * 2e21 / 1.5e19) = 133333333333333333333
+    assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice 133333333333333333333.0)
+    assert (not (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice 133333333333333333332.0))
+
+-- Verifies mulDivDown accepts a fee that a naive divide-first Decimal
+-- approach would falsely reject due to rounding (feeTokenPrice exceeds Int64
+-- so the naive Decimal comparison is omitted).
+testNormalizedFeeWithinCapAvoidsFalseReject = script do
+    let feeTokenAmount : Numeric 0 = 1000000000000000000.0
+    let feeTokenPrice : Numeric 0 = 2000000000000000000000.0
+    let linkTokenPrice : Numeric 0 = 15000000000000000000.0
+    let cap : Numeric 0 = 133333333350000000000.0
+
+    -- Exact: floor(1e18 * 2e21 / 1.5e19) = 133333333333333333333 <= cap
+    assert (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice cap)
+
+-- Verifies mulDivDown rejects a fee that a naive divide-first Decimal
+-- approach would falsely accept due to precision loss.
+testNormalizedFeeWithinCapAvoidsFalseAccept = script do
+    let feeTokenAmount : Numeric 0 = 500000000000000.0
+    let feeTokenPrice : Numeric 0 = 2000000000000000000000.0
+    let linkTokenPrice : Numeric 0 = 15000000000000000000.0
+    let cap : Numeric 0 = 66666630000000000.0
+
+    -- Exact: floor(5e14 * 2e21 / 1.5e19) = 66666666666666666 > cap
+    assert (not (Math.normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice cap))
+
+-- integerAmountWithinCap
+
+testIntegerAmountWithinCap = script do
+    assert (Math.integerAmountWithinCap 100.0 100.0)
+    assert (Math.integerAmountWithinCap 99.0 100.0)
+    assert (not (Math.integerAmountWithinCap 101.0 100.0))
+    assert (Math.integerAmountWithinCap 0.0 0.0)
+
+-- canFitInDecimal
+
+testCanFitInDecimal = script do
+    assert (Math.canFitInDecimal 0.0)
+    assert (Math.canFitInDecimal 9999999999999999999999999999.0)
+    assert (not (Math.canFitInDecimal 10000000000000000000000000000.0))
+    assert (not (Math.canFitInDecimal (-1.0)))
+
+-- numeric0ToDecimalChecked
+
+testNumeric0ToDecimalChecked = script do
+    Math.numeric0ToDecimalChecked "test" 0.0 === 0.0
+    Math.numeric0ToDecimalChecked "test" 1000000000000000000.0 === 1000000000000000000.0
+    Math.numeric0ToDecimalChecked "test" 9999999999999999999999999999.0 === 9999999999999999999999999999.0

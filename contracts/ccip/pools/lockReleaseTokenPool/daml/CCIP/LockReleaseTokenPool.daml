@@ -32,6 +32,7 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.Math
 import qualified CCIP.RateLimiter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
@@ -60,7 +61,7 @@ data TransferTimeout
 data PoolFeeConfig = PoolFeeConfig
     with
         isEnabled : Bool
-        feeUSDCents : Decimal
+        feeUSDCents : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
@@ -379,8 +380,11 @@ template LockReleaseTokenPool
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
                 let sourceDecimals = parseSourcePoolDecimals decimals ticket.sourcePoolData
+                let remoteAmountDecimal = CCIP.Math.numeric0ToDecimalChecked
+                        "ReleaseFromTicket.ticket.amount"
+                        ticket.amount
                 let amountDecimal = calculateLocalAmountDecimal
-                        (intToDecimal (truncate ticket.amount))
+                        remoteAmountDecimal
                         sourceDecimals
                         decimals
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -518,7 +522,9 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = intToDecimal (truncate amount)
+                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimalChecked
+                        "LockOrBurn.amount"
+                        amount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner

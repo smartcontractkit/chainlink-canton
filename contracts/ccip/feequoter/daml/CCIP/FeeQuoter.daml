@@ -11,6 +11,7 @@ import Splice.Api.Token.HoldingV1
 
 import CCIP.Common qualified as Common
 import qualified CCIP.Context
+import qualified CCIP.Math as Math
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -34,14 +35,14 @@ template FeeQuoter
 
         -- | Set of fee tokens that can be used to pay for fees. Values are EVM-style
         -- | multipliers with 1e18 precision, so 1e18 = 1.0x.
-        feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId Decimal
+        feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId (Numeric 0)
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
         tokenTransferFeeConfigs : Map.Map (Numeric 0) (Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig)
 
         usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
         linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        maxFeeJuelsPerMsg : Decimal -- Max fee in LINK smallest units (juels).
+        maxFeeJuelsPerMsg : Numeric 0 -- Max fee in LINK smallest units (juels).
         -- | Token prices are stored in EVM units: 18-decimal USD price for 1e18
         -- | smallest fee-token units. This matches EVM FeeQuoter scaling.
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
@@ -90,7 +91,7 @@ template FeeQuoter
         -- │                         Fee Quoting                          │
         -- ================================================================
 
-        nonconsuming choice FeeQuoter_GetTokenTransferFee : (Decimal, Int, Int)
+        nonconsuming choice FeeQuoter_GetTokenTransferFee : (Numeric 0, Int, Int)
             with
                 destChainSelector : Numeric 0
                 token : Splice.Api.Token.HoldingV1.InstrumentId
@@ -147,14 +148,10 @@ template FeeQuoter
                 finalizedFeeTokenAmount <- exercise finalizedCid
                     CCIP.SendingMessageV1.FeeTokenAmount with
                         caller
-                let finalizedFeeTokenAmountDecimal =
-                        intToDecimal (truncate finalizedFeeTokenAmount)
-                let finalizedFeeJuels =
-                        if sm.feeToken == linkTokenInstrumentId
-                        then finalizedFeeTokenAmountDecimal
-                        else finalizedFeeTokenAmountDecimal * tokenPrice.price / linkTokenPrice.price
                 assertMsg "feequoter: message fee exceeds maxFeeJuelsPerMsg"
-                    (finalizedFeeJuels <= maxFeeJuelsPerMsg)
+                    (if sm.feeToken == linkTokenInstrumentId
+                     then Math.integerAmountWithinCap finalizedFeeTokenAmount maxFeeJuelsPerMsg
+                     else Math.normalizedFeeWithinCap finalizedFeeTokenAmount tokenPrice.price linkTokenPrice.price maxFeeJuelsPerMsg)
                 pure finalizedCid
 
         -- ================================================================
@@ -170,7 +167,7 @@ template FeeQuoter
                 return (Map.keys feeTokens)
 
         -- | Get the premium multiplier for a given fee token.
-        nonconsuming choice GetPremiumMultiplierWeiPerEth : Decimal
+        nonconsuming choice GetPremiumMultiplierWeiPerEth : Numeric 0
             with
                 token : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
@@ -254,14 +251,16 @@ template FeeQuoter
 data TokenTransferFeeConfig = TokenTransferFeeConfig
     with
         isEnabled : Bool
-        feeUSD : Decimal
+        -- Legacy field name retained; value is integer USD cents.
+        feeUSD : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
 
 data TimestampedPrice = TimestampedPrice
     with
-        price : Decimal
+        -- EVM-style 18-decimal USD price for 1e18 smallest units of the token/gas asset.
+        price : Numeric 0
         timestamp : Time
     deriving (Eq, Show)
 
@@ -275,13 +274,15 @@ data PriceUpdates = PriceUpdates
 data TokenPriceUpdate = TokenPriceUpdate
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        usdPerToken : Decimal
+        -- EVM-style 18-decimal USD price for 1e18 smallest token units.
+        usdPerToken : Numeric 0
     deriving (Eq, Show)
 
 data GasPriceUpdate = GasPriceUpdate
     with
         destChainSelector : Numeric 0
-        usdPerUnitGas : Decimal
+        -- EVM-style 18-decimal USD price per gas unit.
+        usdPerUnitGas : Numeric 0
     deriving (Eq, Show)
 
 

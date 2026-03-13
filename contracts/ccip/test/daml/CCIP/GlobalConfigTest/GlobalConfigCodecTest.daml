@@ -8,6 +8,9 @@ import CCIP.GlobalConfigCodec
 import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), SourceChainConfigArgs(..))
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
+
 -- ===========================================================================
 -- DEST CHAIN CONFIG ENCODING/DECODING TESTS
 -- ===========================================================================
@@ -21,15 +24,15 @@ testApplyDestChainConfigUpdateParamsRoundtrip = do
           offRampAddress = "1234567890abcdef"
           laneMandatedCCVs = [RawInstanceAddress "ccv1@party1", RawInstanceAddress "ccv2@party2"]
           defaultCCVs = [RawInstanceAddress "default-ccv@party3"]
-          messageNetworkFeeUSDCents = 10.5
-          tokenNetworkFeeUSDCents = 5.25
+          messageNetworkFeeUSDCents = 10.0
+          tokenNetworkFeeUSDCents = 5.0
         ,DestChainConfigArgs with
           destChainSelector = 18446744073709551615.0 -- max uint64
           isEnabled = False
           offRampAddress = "deadbeef"
           laneMandatedCCVs = [RawInstanceAddress "ccv2@party2"]
           defaultCCVs = []
-          messageNetworkFeeUSDCents = 0.5
+          messageNetworkFeeUSDCents = 1.0
           tokenNetworkFeeUSDCents = 1000.0
         ,DestChainConfigArgs with
           destChainSelector = 0.0 -- edge case: zero selector
@@ -37,7 +40,7 @@ testApplyDestChainConfigUpdateParamsRoundtrip = do
           offRampAddress = "deadbeef"
           laneMandatedCCVs = [RawInstanceAddress "ccv2@party2"]
           defaultCCVs = []
-          messageNetworkFeeUSDCents = 0.5
+          messageNetworkFeeUSDCents = 1.0
           tokenNetworkFeeUSDCents = 1000.0
         ]
 

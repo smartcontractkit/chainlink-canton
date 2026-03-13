@@ -29,6 +29,18 @@ import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 import TestToken qualified
 
+usd : Decimal -> Numeric 0
+usd d = intToNumeric (truncate (d * 1000000000000000000.0))
+
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
+
+usdToCents : Decimal -> Numeric 0
+usdToCents d = intToNumeric (truncate (d * 100.0))
+
+mult : Decimal -> Numeric 0
+mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+
 mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
@@ -198,7 +210,7 @@ testLockOrBurn = script do
             encodedMessage = ""
             messageId = ""
             feeToken = testInstrumentId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -609,7 +621,7 @@ testExecutionGasLimitAggregation = script do
             encodedMessage = ""
             messageId = ""
             feeToken = testInstrumentId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -630,7 +642,7 @@ testExecutionGasLimitAggregation = script do
     sendingMessageCid <- submit (actAs ccvOwner1 <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-1"
-            feeUSDCents = 1.0
+            feeUSDCents = cents 1.0
             destGasLimit = 12345
             destBytesOverhead = 0
             caller = ccvOwner1
@@ -639,7 +651,7 @@ testExecutionGasLimitAggregation = script do
     sendingMessageCid <- submit (actAs ccvOwner2 <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-2"
-            feeUSDCents = 2.0
+            feeUSDCents = cents 2.0
             destGasLimit = 23456
             destBytesOverhead = 0
             caller = ccvOwner2
@@ -650,7 +662,7 @@ testExecutionGasLimitAggregation = script do
             executorInstanceId = "executor-gas"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 3.0
+            feeUSDCents = cents 3.0
             destGasLimit = 34567
             destBytesOverhead = 0
             caller = executorOwner
@@ -743,7 +755,7 @@ testExecutionGasLimitWithTokenSendFee = script do
             encodedMessage = ""
             messageId = ""
             feeToken = testInstrumentId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testTokenInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -765,7 +777,7 @@ testExecutionGasLimitWithTokenSendFee = script do
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-pool"
-            feeUSDCents = 1.0
+            feeUSDCents = cents 1.0
             destGasLimit = 10000
             destBytesOverhead = 0
             caller = ccvOwner
@@ -776,7 +788,7 @@ testExecutionGasLimitWithTokenSendFee = script do
         exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
             poolInstanceId = "pool-gas"
             poolOwner = poolOwner
-            feeUSDCents = 2.0
+            feeUSDCents = cents 2.0
             destGasOverhead = 50000
             destBytesOverhead = 0
             caller = poolOwner
@@ -805,7 +817,7 @@ testExecutionGasLimitWithTokenSendFee = script do
             executorInstanceId = "executor-gas-pool"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 3.0
+            feeUSDCents = cents 3.0
             destGasLimit = 30000
             destBytesOverhead = 0
             caller = executorOwner
@@ -1218,12 +1230,12 @@ testCalculateFeeFallsBackToFeeQuoter = script do
                 destGasPerPayloadByteBase = 0
                 chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
-                networkFeeUSD = 0.0
-                defaultTokenFeeUSD = 0.5
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
             tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
                 isEnabled = True
-                feeUSD = 3.0
+                feeUSD = usdToCents 3.0
                 destGasOverhead = 70000
                 destBytesOverhead = 64)])]
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -1279,7 +1291,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             encodedMessage = ""
             messageId = ""
             feeToken = feeTokenId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -1296,7 +1308,10 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             observingParties = [sender]
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit sender do
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
                 sendingMessageCid = sendingMessageCid
@@ -1306,7 +1321,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     let tokenSendFee = fromSome sm.tokenSendFee
-    tokenSendFee.feeUSDCents === 3.0
+    tokenSendFee.feeUSDCents === usdToCents 3.0
     tokenSendFee.destGasOverhead === 70000
     tokenSendFee.destBytesOverhead === 64
 
@@ -1340,12 +1355,12 @@ testCalculateFeePrefersPoolOverride = script do
                 destGasPerPayloadByteBase = 0
                 chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
-                networkFeeUSD = 0.0
-                defaultTokenFeeUSD = 0.5
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
             tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
                 isEnabled = True
-                feeUSD = 9.0
+                feeUSD = usdToCents 9.0
                 destGasOverhead = 90000
                 destBytesOverhead = 96)])]
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -1364,7 +1379,7 @@ testCalculateFeePrefersPoolOverride = script do
             chainPoolConfigs = Map.empty
             chainFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.PoolFeeConfig with
                 isEnabled = True
-                feeUSDCents = 2.0
+                feeUSDCents = cents 2.0
                 destGasOverhead = 50000
                 destBytesOverhead = 32)]
             remoteTokens = Map.empty
@@ -1405,7 +1420,7 @@ testCalculateFeePrefersPoolOverride = script do
             encodedMessage = ""
             messageId = ""
             feeToken = feeTokenId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -1422,7 +1437,10 @@ testCalculateFeePrefersPoolOverride = script do
             observingParties = [sender]
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit sender do
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
                 sendingMessageCid = sendingMessageCid
@@ -1432,7 +1450,7 @@ testCalculateFeePrefersPoolOverride = script do
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     let tokenSendFee = fromSome sm.tokenSendFee
-    tokenSendFee.feeUSDCents === 2.0
+    tokenSendFee.feeUSDCents === cents 2.0
     tokenSendFee.destGasOverhead === 50000
     tokenSendFee.destBytesOverhead === 32
 
@@ -1466,12 +1484,12 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
                 destGasPerPayloadByteBase = 0
                 chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
-                networkFeeUSD = 0.0
-                defaultTokenFeeUSD = 0.5
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
             tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
                 isEnabled = True
-                feeUSD = 4.0
+                feeUSD = usdToCents 4.0
                 destGasOverhead = 71000
                 destBytesOverhead = 65)])]
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -1490,7 +1508,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             chainPoolConfigs = Map.empty
             chainFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.PoolFeeConfig with
                 isEnabled = False
-                feeUSDCents = 2.0
+                feeUSDCents = cents 2.0
                 destGasOverhead = 50000
                 destBytesOverhead = 32)]
             remoteTokens = Map.empty
@@ -1531,7 +1549,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             encodedMessage = ""
             messageId = ""
             feeToken = feeTokenId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -1548,7 +1566,10 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             observingParties = [sender]
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit sender do
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq <> disclose disclosedSm) do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
                 sendingMessageCid = sendingMessageCid
@@ -1558,7 +1579,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
     let tokenSendFee = fromSome sm.tokenSendFee
-    tokenSendFee.feeUSDCents === 4.0
+    tokenSendFee.feeUSDCents === usdToCents 4.0
     tokenSendFee.destGasOverhead === 71000
     tokenSendFee.destBytesOverhead === 65
 
@@ -1589,8 +1610,8 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
                 destGasPerPayloadByteBase = 0
                 chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
-                networkFeeUSD = 0.0
-                defaultTokenFeeUSD = 0.75
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.75
                 defaultTokenDestGasOverhead = 12345)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -1605,7 +1626,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
             token = testInstrumentId
             caller = owner
 
-    feeUSD === 0.75
+    feeUSD === usdToCents 0.75
     destGasOverhead === 12345
     destBytesOverhead === 32
 
@@ -1633,12 +1654,12 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
             tokenTransferFeeConfigs = Map.fromList
                 [ (destChainSelector1, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
                     isEnabled = True
-                    feeUSD = 1.0
+                    feeUSD = usdToCents 1.0
                     destGasOverhead = 10000
                     destBytesOverhead = 32)])
                 , (destChainSelector2, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
                     isEnabled = True
-                    feeUSD = 2.0
+                    feeUSD = usdToCents 2.0
                     destGasOverhead = 20000
                     destBytesOverhead = 64)])
                 ]
@@ -1659,10 +1680,10 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
             token = testInstrumentId
             caller = owner
 
-    fee1 === 1.0
+    fee1 === usdToCents 1.0
     gas1 === 10000
     bytes1 === 32
-    fee2 === 2.0
+    fee2 === usdToCents 2.0
     gas2 === 20000
     bytes2 === 64
 

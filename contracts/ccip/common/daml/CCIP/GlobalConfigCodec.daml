@@ -16,8 +16,6 @@ import MCMS.Codec
   , decodeBytesHexAt
   , encodeBytesHexList
   , decodeBytesHexList
-  , encodeDecimal
-  , decodeDecimalAt
   , encodeList
   , decodeList
   )
@@ -64,8 +62,8 @@ encodeApplySourceChainConfigUpdatesParams sourceChainConfigUpdates =
 -- ===========================================================================
 -- DEST CHAIN CONFIG ENCODING/DECODING
 -- Format: [bool isEnabled][bytesHex offRampAddress][rawInstanceAddressList laneMandatedCCVs]
---         [rawInstanceAddressList defaultCCVs][decimal messageNetworkFeeUSDCents]
---         [decimal tokenNetworkFeeUSDCents]
+--         [rawInstanceAddressList defaultCCVs][numeric0 messageNetworkFeeUSDCents]
+--         [numeric0 tokenNetworkFeeUSDCents]
 -- ===========================================================================
 
 encodeDestChainConfigArgs : DestChainConfigArgs -> BytesHex
@@ -75,8 +73,8 @@ encodeDestChainConfigArgs dcc =
   encodeBytesHex dcc.offRampAddress <>
   encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
   encodeRawInstanceAddressList dcc.defaultCCVs <>
-  encodeDecimal dcc.messageNetworkFeeUSDCents <>
-  encodeDecimal dcc.tokenNetworkFeeUSDCents
+  encodeNumeric0 dcc.messageNetworkFeeUSDCents <>
+  encodeNumeric0 dcc.tokenNetworkFeeUSDCents
 
 decodeDestChainConfigArgsAt : BytesHex -> Int -> Optional (DestChainConfigArgs, Int)
 decodeDestChainConfigArgsAt encoded offset = do
@@ -85,9 +83,9 @@ decodeDestChainConfigArgsAt encoded offset = do
   (offRampAddress, offset3) <- decodeBytesHexAt encoded offset2
   (laneMandatedCCVs, offset4) <- decodeRawInstanceAddressList encoded offset3
   (defaultCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
-  (messageNetworkFeeUSDCents, offset6) <- decodeDecimalAt encoded offset5
-  (tokenNetworkFeeUSDCents, offset7) <- decodeDecimalAt encoded offset6
-  Some 
+  (messageNetworkFeeUSDCents, offset6) <- decodeNumeric0At encoded offset5
+  (tokenNetworkFeeUSDCents, offset7) <- decodeNumeric0At encoded offset6
+  Some
     ( DestChainConfigArgs with
         destChainSelector = destChainSelector
         isEnabled = isEnabled

@@ -14,6 +14,18 @@ import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 import Splice.Api.Token.HoldingV1
 
+usd : Decimal -> Numeric 0
+usd d = intToNumeric (truncate (d * 1000000000000000000.0))
+
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
+
+usdToCents : Decimal -> Numeric 0
+usdToCents d = intToNumeric (truncate (d * 100.0))
+
+mult : Decimal -> Numeric 0
+mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+
 setup = script do
     owner <- allocateParty "owner"
 
@@ -48,12 +60,12 @@ setup = script do
                 tokenPriceUpdates = [ 
                         TokenPriceUpdate with
                             instrumentId = instrumentIdLINK
-                            usdPerToken = 17.77
+                            usdPerToken = 17770000000000000000.0
                     ]
                 gasPriceUpdates = [
                         GasPriceUpdate with
                             destChainSelector = destChainSelector1
-                            usdPerUnitGas = 0.045
+                            usdPerUnitGas = 45000000000000000.0
                     ]
             caller = owner
 
@@ -63,14 +75,14 @@ setup = script do
             instrumentId = instrumentIdLINK
             caller = owner
     debug result
-    result.price === 17.77
+    result.price === 17770000000000000000.0
 
     result <- submit owner do
         exerciseCmd fq GetDestinationChainGasPrice with
             destChainSelector = destChainSelector1
             caller = owner
     debug result
-    result.price === 0.045
+    result.price === 45000000000000000.0
 
     -- Apply prices again, this time for two chains and two instruments
     fq <- submit owner do
@@ -79,18 +91,18 @@ setup = script do
                 tokenPriceUpdates = [ 
                         (TokenPriceUpdate with
                             instrumentId = instrumentIdLINK
-                            usdPerToken = 20.00),
+                            usdPerToken = 20000000000000000000.0),
                         (TokenPriceUpdate with
                             instrumentId = instrumentIdUSDC
-                            usdPerToken = 1.00)
+                            usdPerToken = 1000000000000000000.0)
                     ]
                 gasPriceUpdates = [
                         (GasPriceUpdate with
                             destChainSelector = destChainSelector1
-                            usdPerUnitGas = 0.050),
+                            usdPerUnitGas = 50000000000000000.0),
                         (GasPriceUpdate with
                             destChainSelector = destChainSelector2
-                            usdPerUnitGas = 0.075)
+                            usdPerUnitGas = 75000000000000000.0)
                     ]
             caller = owner
 
@@ -100,28 +112,28 @@ setup = script do
             instrumentId = instrumentIdLINK
             caller = owner
     debug result
-    result.price === 20.00
+    result.price === 20000000000000000000.0
     
     result <- submit owner do 
         exerciseCmd fq GetTokenPrice with
             instrumentId = instrumentIdUSDC
             caller = owner
     debug result
-    result.price === 1.00
+    result.price === 1000000000000000000.0
 
     result <- submit owner do
         exerciseCmd fq GetDestinationChainGasPrice with
             destChainSelector = destChainSelector1
             caller = owner
     debug result
-    result.price === 0.05
+    result.price === 50000000000000000.0
 
     result <- submit owner do
         exerciseCmd fq GetDestinationChainGasPrice with
             destChainSelector = destChainSelector2
             caller = owner
     debug result
-    result.price === 0.075
+    result.price === 75000000000000000.0
 
     -- test ApplyDestChainConfigUpdates
     let destChainConfig1 = DestChainConfig with
@@ -132,8 +144,8 @@ setup = script do
             defaultTxGasLimit = 500000
             maxPerMsgGasLimit = 2000000
             chainFamilySelector = "2812d52c"
-            networkFeeUSD = 1.0
-            defaultTokenFeeUSD = 0.50
+            networkFeeUSD = usdToCents 1.0
+            defaultTokenFeeUSD = usdToCents 0.50
             defaultTokenDestGasOverhead = 0
     let destChainConfig2 = DestChainConfig with
             isEnabled = True
@@ -143,8 +155,8 @@ setup = script do
             defaultTxGasLimit = 800000
             maxPerMsgGasLimit = 3000000
             chainFamilySelector = "ac77ffec"
-            networkFeeUSD = 0.5
-            defaultTokenFeeUSD = 0.25
+            networkFeeUSD = usdToCents 0.5
+            defaultTokenFeeUSD = usdToCents 0.25
             defaultTokenDestGasOverhead = 0
     fq <- submit owner do
         exerciseCmd fq ApplyDestChainConfigUpdates with
@@ -242,7 +254,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = feeToken
-            networkFeeUSDCents = 100.0
+            networkFeeUSDCents = cents 100.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -285,7 +297,7 @@ testFinalizeFee_PremiumAndExecutor = script do
             admin = owner
             id = "LINK"
 
-    -- premiumMultiplier = 0.9e18 means 90% (10% LINK discount)
+    -- premiumMultiplier = mult 0.9e18 means 90% (10% LINK discount)
     -- feeTokenPrice = 20e18 (20 USD per LINK in 18-decimal format)
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
@@ -330,7 +342,7 @@ testFinalizeFee_PremiumAndExecutor = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = feeToken
-            networkFeeUSDCents = 100.0
+            networkFeeUSDCents = cents 100.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -355,7 +367,7 @@ testFinalizeFee_PremiumAndExecutor = script do
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-premium"
-            feeUSDCents = 200.0
+            feeUSDCents = cents 200.0
             destGasLimit = 10000
             destBytesOverhead = 0
             caller = ccvOwner
@@ -368,7 +380,7 @@ testFinalizeFee_PremiumAndExecutor = script do
             executorInstanceId = "executor-premium"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 300.0
+            feeUSDCents = cents 300.0
             destGasLimit = 50000
             destBytesOverhead = 0
             caller = executorOwner
@@ -407,7 +419,7 @@ testFinalizeFee_SmallFee = script do
             admin = owner
             id = "LINK"
 
-    -- feeTokenPrice = 20e18, premiumMultiplier = 1e18 (100%)
+    -- feeTokenPrice = 20e18, premiumMultiplier = mult 1e18 (100%)
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
@@ -449,7 +461,7 @@ testFinalizeFee_SmallFee = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = feeToken
-            networkFeeUSDCents = 1.0
+            networkFeeUSDCents = cents 1.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -475,7 +487,7 @@ testFinalizeFee_SmallFee = script do
             executorInstanceId = "executor-small"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 1.0
+            feeUSDCents = cents 1.0
             destGasLimit = 10000
             destBytesOverhead = 0
             caller = executorOwner
@@ -555,7 +567,7 @@ testFinalizeFee_LinkCapAfterConversion = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = feeToken
-            networkFeeUSDCents = 150.0
+            networkFeeUSDCents = cents 150.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -624,7 +636,7 @@ testFinalizeFee_LinkCapAfterConversion = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = feeToken
-            networkFeeUSDCents = 150.0
+            networkFeeUSDCents = cents 150.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -707,7 +719,7 @@ testFinalizeFee_LinkCapDirect = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = linkToken
-            networkFeeUSDCents = 150.0
+            networkFeeUSDCents = cents 150.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -757,7 +769,7 @@ testFinalizeFee_LinkCapMixedFees = script do
             usdPerToken = Map.fromList
                 [ (linkToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
             linkTokenInstrumentId = linkToken
-            maxFeeJuelsPerMsg = 299999999999999999.0
+            maxFeeJuelsPerMsg = 199999999999999999.0
             priceUpdaters = [owner]
 
     sendingMessageCid <- submit owner do
@@ -788,7 +800,7 @@ testFinalizeFee_LinkCapMixedFees = script do
             tokenReceiver = ""
             tokenArgs = ""
             feeToken = linkToken
-            networkFeeUSDCents = 100.0
+            networkFeeUSDCents = cents 100.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -812,7 +824,7 @@ testFinalizeFee_LinkCapMixedFees = script do
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-link-mixed-cap"
-            feeUSDCents = 100.0
+            feeUSDCents = cents 100.0
             destGasLimit = 10000
             destBytesOverhead = 0
             caller = ccvOwner
@@ -822,7 +834,7 @@ testFinalizeFee_LinkCapMixedFees = script do
         exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
             poolInstanceId = "pool-link-mixed-cap"
             poolOwner = poolOwner
-            feeUSDCents = 100.0
+            feeUSDCents = cents 100.0
             destGasOverhead = 50000
             destBytesOverhead = 0
             caller = poolOwner
@@ -833,14 +845,13 @@ testFinalizeFee_LinkCapMixedFees = script do
             executorInstanceId = "executor-link-mixed-cap"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 100.0
+            feeUSDCents = cents 100.0
             destGasLimit = 20000
             destBytesOverhead = 0
             caller = executorOwner
 
-    -- Total = 4 * (100 * 1e18 / 20e18 * 1e16) = 4 * 5e16 = 2e17 for premium fees
-    -- plus executor direct path 5e16 => 2e17 total? Let's instead cap below expected 2e17.
-    -- The chosen cap below should force failure based on aggregate fees.
+    -- Total = 4 * (100 * 1e18 / 20e18 * 1e16) = 4 * 5e16 = 2e17 juels.
+    -- Cap of ~2e17 - 1 forces failure.
     submitMustFail owner do
         exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
             sendingMessageCid = sendingMessageCid

@@ -30,6 +30,11 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified TestExecutor
 import qualified TestToken
 
+mult : Decimal -> Numeric 0
+mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
 
 -- | Test CCIP send via PerPartyRouter (message-only, no fees collected).
 testCCIPSend = script do
@@ -68,8 +73,8 @@ testCCIPSend = script do
                 offRampAddress = "0000000000000000000000000000000000000003"
                 laneMandatedCCVs = []
                 defaultCCVs = []
-                messageNetworkFeeUSDCents = 0.0
-                tokenNetworkFeeUSDCents = 0.0)]
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
             sourceChainConfigs = Map.empty
 
     -- Deploy RMNRemote
@@ -93,13 +98,13 @@ testCCIPSend = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, 1.0)]
+            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
-                    price = 1.0
+                    price = 1000000000000000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
@@ -462,8 +467,8 @@ testPrepareSendExtraArgs = script do
                 offRampAddress = "0000000000000000000000000000000000000003"
                 laneMandatedCCVs = []
                 defaultCCVs = [defaultCCV]
-                messageNetworkFeeUSDCents = 0.0
-                tokenNetworkFeeUSDCents = 0.0)]
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
             sourceChainConfigs = Map.empty
 
     rmnRemote <- submit rmnOwner do
@@ -484,13 +489,13 @@ testPrepareSendExtraArgs = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
             owner = ccipOwner
-            feeTokens = Map.fromList [(feeTokenId, 1.0)]
+            feeTokens = Map.fromList [(feeTokenId, mult 1.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(feeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
-                    price = 1.0
+                    price = 1000000000000000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = feeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0

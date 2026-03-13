@@ -1,0 +1,144 @@
+-- | Exact-arithmetic helpers for CCIP's EVM-style fee math.
+--
+-- CCIP fee math uses `floor(a * b / c)` and cap comparisons. In Solidity
+-- `uint256` provides enough headroom, but Daml `Numeric 0` maxes out at
+-- ~1e38, so naive `a * b` can overflow for 18-digit EVM-scaled values.
+--
+-- We decompose via quotients and remainders to keep all intermediates
+-- within Numeric 0 range:
+--
+--   mulDivDown(a, b, c) = qa*qb*c + qa*rb + ra*qb + floor(ra*rb/c)
+--     where qa = a/c, ra = a%c, qb = b/c, rb = b%c
+--
+-- Since ra < c and rb < c, the largest intermediate is ra*rb < c^2.
+-- For CCIP fee math, c is a token price (~1e18-1e21), so c^2 < 1e42
+-- which can overflow. When that happens, we apply a further split on
+-- the ra*rb term.
+--
+-- Splice boundary helpers included for conversion from Numeric 0 into Decimal
+-- Splice holdings with range checks.
+module CCIP.Math
+  ( integerAmountWithinCap
+  , normalizedFeeWithinCap
+  , mulDivDown
+  , maxDecimalIntegerValue
+  , canFitInDecimal
+  , numeric0ToDecimalChecked
+  ) where
+
+-- Numeric 0 max is 38 digits ~ 1e38. Products above this overflow.
+numeric0Max : Numeric 0
+numeric0Max = 99999999999999999999999999999999999999.0
+
+-- Int64 max. Values above this cannot be passed to truncate/intToDecimal.
+int64Max : Numeric 0
+int64Max = 9223372036854775807.0
+
+-- Approximate Decimal max, off by < 1
+maxDecimalIntegerValue : Numeric 0
+maxDecimalIntegerValue = 9999999999999999999999999999.0
+
+canFitInDecimal : Numeric 0 -> Bool
+canFitInDecimal n = n >= 0.0 && n <= maxDecimalIntegerValue
+
+-- | Convert a Numeric 0 integer to Decimal, failing if out of range.
+-- Splits via 1e18 to avoid Int64 overflow for values above ~9.2e18.
+numeric0ToDecimalChecked : Text -> Numeric 0 -> Decimal
+numeric0ToDecimalChecked label n =
+    if n < 0.0 then error (label <> ": negative amount")
+    else if not (canFitInDecimal n) then error (label <> ": amount exceeds Decimal range")
+    else if n <= int64Max then intToDecimal (truncate n)
+    else
+        let scale : Numeric 0 = 1000000000000000000.0
+            hi = floorDiv n scale
+            lo = floorMod n scale
+        in intToDecimal (truncate hi) * 1000000000000000000.0 + intToDecimal (truncate lo)
+
+-- | Integer floor division for Numeric 0 values.
+-- Numeric 0 `/` uses banker's rounding, which can round up when the
+-- fractional part is >= 0.5. Computes the remainder via split
+-- multiplication to avoid overflow when a is near numeric0Max.
+floorDiv : Numeric 0 -> Numeric 0 -> Numeric 0
+floorDiv a b =
+    let q = a / b
+    in if q == 0.0 then 0.0
+       else
+        -- Compute a - q*b without overflow. Split b into two halves so
+        -- each partial product stays under numeric0Max.
+        let half = b / 2.0
+            other = b - half
+            r = a - q * half - q * other
+        in if r < 0.0 then q - 1.0 else q
+
+-- | Integer modulus for Numeric 0 values.
+floorMod : Numeric 0 -> Numeric 0 -> Numeric 0
+floorMod a b = a - floorDiv a b * b
+
+-- | Whether the product a * b would overflow Numeric 0.
+wouldOverflow : Numeric 0 -> Numeric 0 -> Bool
+wouldOverflow a b =
+    a > 0.0 && b > 0.0 && a > numeric0Max / b
+
+-- | Exact floor(a * b / c) without intermediate overflow.
+--
+-- Decomposes a and b by c so all intermediate products stay within
+-- Numeric 0 range. The identity:
+--   a*b/c = qa*qb*c + qa*rb + ra*qb + floor(ra*rb/c)
+-- where qa=a/c, ra=a%c, qb=b/c, rb=b%c.
+--
+-- ra < c and rb < c, so ra*rb < c^2. If c^2 still overflows Numeric 0,
+-- the ra*rb term is further decomposed by splitting ra.
+mulDivDown : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
+mulDivDown a b c =
+    if c <= 0.0 then error "mulDivDown: denominator must be positive"
+    else if a < 0.0 || b < 0.0 then error "mulDivDown: negative input"
+    else if a == 0.0 || b == 0.0 then 0.0
+    else
+        let qa = floorDiv a c
+            ra = floorMod a c
+            qb = floorDiv b c
+            rb = floorMod b c
+            -- qa*qb*c: rewrite as qa*(b - rb) to avoid qb*c overflow
+            term1 = qa * (b - rb)
+            -- qa*rb: qa ≈ a/c, rb < c, so qa*rb < a (always fits)
+            term2 = qa * rb
+            -- ra*qb: ra < c, qb ≈ b/c, so ra*qb < b (always fits)
+            term3 = ra * qb
+            -- ra*rb/c: both ra,rb < c. If ra*rb overflows, decompose further.
+            term4 = if wouldOverflow ra rb
+                    then safeRemainderDiv ra rb c
+                    else floorDiv (ra * rb) c
+        in term1 + term2 + term3 + term4
+
+-- | Compute floor(ra * rb / c) when ra*rb would overflow Numeric 0.
+-- Splits ra by d = floor(numeric0Max / rb) so that raH*rb fits.
+-- Uses floor((A+B)/c) = floor(A/c) + floor(B/c) + floor((A%c + B%c)/c)
+-- to avoid summing terms that could overflow.
+safeRemainderDiv : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
+safeRemainderDiv ra rb c =
+    let d = floorDiv numeric0Max rb
+        qaH = floorDiv ra d
+        raH = floorMod ra d
+        dTimesRb = d * rb
+        term1 = qaH * floorDiv dTimesRb c
+        r2 = floorMod dTimesRb c
+        raHTimesRb = raH * rb
+        -- floor((qaH*r2 + raHTimesRb) / c) split to avoid overflow
+        qA = floorDiv (qaH * r2) c
+        rA = floorMod (qaH * r2) c
+        qB = floorDiv raHTimesRb c
+        rB = floorMod raHTimesRb c
+        term2 = qA + qB + floorDiv (rA + rB) c
+    in term1 + term2
+
+-- | Check whether a fee (expressed in a non-LINK token) is within the
+-- LINK-denominated cap. Equivalent to:
+--   floor(feeTokenAmount * feeTokenPrice / linkTokenPrice) <= maxFeeJuelsPerMsg
+normalizedFeeWithinCap : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0 -> Bool
+normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice maxFeeJuelsPerMsg =
+    mulDivDown feeTokenAmount feeTokenPrice linkTokenPrice <= maxFeeJuelsPerMsg
+
+-- | Check whether a fee amount (already in LINK units) is within the cap.
+integerAmountWithinCap : Numeric 0 -> Numeric 0 -> Bool
+integerAmountWithinCap feeAmount maxFeeJuelsPerMsg =
+    feeAmount <= maxFeeJuelsPerMsg
