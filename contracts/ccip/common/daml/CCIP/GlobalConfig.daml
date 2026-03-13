@@ -78,7 +78,7 @@ template GlobalConfig
               -- Validate
               forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, offRampAddress, defaultCCVs, laneMandatedCCVs} -> do
                 assertMsg "ZeroChainSelectorNotAllowed: destination chain selector must be non-zero" (destChainSelector /= 0.0)
-                assertMsg "InvalidAddressByteLength: address byte length must be positive" (addressBytesLength >= 0)
+                assertMsg "InvalidAddressByteLength: address byte length must be greater than zero" (addressBytesLength > 0)
                 assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
