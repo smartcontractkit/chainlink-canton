@@ -597,12 +597,12 @@ parseDecimal text = Some (parseDecimalUnsafe text)
 
 parseDecimalUnsafe : Text -> Decimal
 parseDecimalUnsafe text =
-  let parts = DA.Text.splitOn "." text
+  let parts = Text.splitOn "." text
   in case parts of
     [intPart] -> intToDecimal (parseIntUnsafe intPart)
     [intPart, fracPart] ->
       let intVal = parseIntUnsafe intPart
-          fracLen = DA.Text.length fracPart
+          fracLen = Text.length fracPart
           fracVal = parseIntUnsafe fracPart
           divisor = pow10 fracLen
       in intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor)
@@ -610,21 +610,21 @@ parseDecimalUnsafe text =
 
 parseIntUnsafe : Text -> Int
 parseIntUnsafe text =
-  if DA.Text.length text == 0 then 0
+  if Text.length text == 0 then 0
   else
     let (negative, digits) =
-          if DA.Text.take 1 text == "-"
-          then (True, DA.Text.drop 1 text)
+          if Text.take 1 text == "-"
+          then (True, Text.drop 1 text)
           else (False, text)
         value = parseDigitsUnsafe digits 0
     in if negative then negate value else value
 
 parseDigitsUnsafe : Text -> Int -> Int
 parseDigitsUnsafe text acc =
-  if DA.Text.length text == 0 then acc
+  if Text.length text == 0 then acc
   else
-    let c = DA.Text.take 1 text
-        rest = DA.Text.drop 1 text
+    let c = Text.take 1 text
+        rest = Text.drop 1 text
         digit = charToDigitInt c
     in parseDigitsUnsafe rest (acc * 10 + digit)
 
