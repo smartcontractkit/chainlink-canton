@@ -5,7 +5,7 @@ module CCIP.GlobalConfig
   ) where
 
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
 
 import qualified CCIP.Context
@@ -19,7 +19,6 @@ template GlobalConfig
         ccipOwner : Party
 
         chainSelector : Numeric 0
-        onRampAddress : BytesHex
 
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
         sourceChainConfigs : Map.Map (Numeric 0) SourceChainConfig
@@ -76,14 +75,16 @@ template GlobalConfig
             controller ccipOwner
             do
               -- Validate
-              forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, defaultCCVs, laneMandatedCCVs} -> do
-                assertMsg "ZeroChainSelectorNotAllowed: destination chain selector must be non-zero" (destChainSelector /= 0.0)
+              forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, offRampAddress, defaultCCVs, laneMandatedCCVs} -> do
+                assertMsg "InvalidChainSelector: destination chain selector must be greater than zero" (destChainSelector > 0.0)
+                assertMsg "InvalidAddressByteLength: address byte length must be greater than zero" (addressBytesLength > 0)
+                assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
               -- Update
               let newConfigs = foldl
-                    (\configs DestChainConfigArgs{destChainSelector, isEnabled, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
-                      Map.insert destChainSelector DestChainConfig{isEnabled, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
+                    (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
+                      Map.insert destChainSelector DestChainConfig{isEnabled, addressBytesLength, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
                     destChainConfigs
                     destChainConfigUpdates
               create this with destChainConfigs = newConfigs
@@ -95,7 +96,7 @@ template GlobalConfig
             do
               -- Validate
               forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
-                assertMsg "ZeroChainSelectorNotAllowed: source chain selector must be non-zero" (sourceChainSelector /= 0.0)
+                assertMsg "InvalidChainSelector: source chain selector must be greater than zero" (sourceChainSelector > 0.0)
                 -- Allow for empty onRampAddresses
                 -- This list could be empty, which would mean no onRamps are allowed and the lane is disabled, even for existing messages
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
@@ -107,7 +108,6 @@ template GlobalConfig
                     sourceChainConfigs
                     sourceChainConfigUpdates
               create this with sourceChainConfigs = newConfigs
-
 
 globalConfigKey : Text
 globalConfigKey = "global-config"

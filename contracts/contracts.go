@@ -32,6 +32,7 @@ const (
 	CCIPPoolInterfaces       = Package("ccip-tokenpool-interfaces")
 	CCIPLockReleaseTokenPool = Package("ccip-lockreleasetokenpool")
 	CCIPPerPartyRouter       = Package("ccip-perpartyrouter")
+	CCIPFactory              = Package("ccip-factory")
 	CCIPRMN                  = Package("ccip-rmn")
 	CCIPTest                 = Package("ccip-test")
 
@@ -61,6 +62,7 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPPoolInterfaces:       []string{"0.0.1", CurrentVersion},
 	CCIPLockReleaseTokenPool: []string{"0.0.1", CurrentVersion},
 	CCIPPerPartyRouter:       []string{"0.0.1", CurrentVersion},
+	CCIPFactory:              []string{"0.0.1", CurrentVersion},
 	CCIPRMN:                  []string{"0.0.1", CurrentVersion},
 	CCIPTest:                 []string{"0.0.1", CurrentVersion},
 
@@ -108,6 +110,7 @@ var OutputDirs = map[Package][]string{
 	CCIPOffRamp:              []string{"ccip", "offramp"},
 	CCIPOnRamp:               []string{"ccip", "onramp"},
 	CCIPPerPartyRouter:       []string{"ccip", "perpartyrouter"},
+	CCIPFactory:              []string{"ccip", "factory"},
 	CCIPRMN:                  []string{"ccip", "rmn"},
 	CCIPTokenAdminRegistry:   []string{"ccip", "tokenadminregistry"},
 

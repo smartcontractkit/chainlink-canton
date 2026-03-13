@@ -21,7 +21,7 @@ template TestExecutor
         maxCCVsPerMsg : Int
         ccvAllowlistEnabled : Bool
         allowedCCVs : [RawInstanceAddress]
-        remoteChainFeeUSDCents : Map.Map (Numeric 0) Decimal
+        remoteChainFeeUSDCents : Map.Map (Numeric 0) (Numeric 0)
     where
         signatory owner
 

@@ -25,3 +25,6 @@ dependencies:
   - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-0.0.1.dar
   - ../../mcms/.daml/dist/mcms-0.0.1.dar
   - ../pools/interfaces/.daml/dist/ccip-tokenpool-interfaces-0.0.1.dar
+  - ../ccipreceiver/.daml/dist/ccip-receiver-0.0.1.dar
+  - ../ccipsender/.daml/dist/ccip-sender-0.0.1.dar
+  - ../factory/.daml/dist/ccip-factory-0.0.1.dar

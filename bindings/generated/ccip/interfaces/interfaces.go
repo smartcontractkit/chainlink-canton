@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "97b8c79098a5d5032b129144b83434297f7e6226afa62f90b2fb56548eabcfd8"
+	PackageID   = "4b9c1ea4ecbf025037f04906df4e50125815c4829485b9ad80e381fbfb5adb72"
 	SDKVersion  = "3.4.10"
 )
 
@@ -444,8 +444,10 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	Caller            types.PARTY       `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller            types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts TokenPoolCalculateFee to a map for DAML arguments
@@ -458,6 +460,22 @@ func (t TokenPoolCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
+	}()
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
 	}()
 
 	m["caller"] = t.Caller.ToMap()
