@@ -209,9 +209,10 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId   types.TEXT                  `json:"instanceId"`
-	Owner        types.PARTY                 `json:"owner"`
-	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId    types.TEXT                  `json:"instanceId"`
+	Owner         types.PARTY                 `json:"owner"`
+	RequiredCCVs  []common.RawInstanceAddress `json:"requiredCCVs"`
+	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -248,6 +249,8 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	args["minBlockDepth"] = int64(t.MinBlockDepth)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -277,6 +280,8 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 		}
 		return res
 	}()
+
+	args["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

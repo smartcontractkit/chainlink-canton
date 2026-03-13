@@ -96,8 +96,9 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contrac
 		Qualifier:     nil,
 		ActAs:         []string{participant.PartyID},
 		Template: ccipreceiver.CCIPReceiver{
-			Owner:        types.PARTY(participant.PartyID),
-			RequiredCCVs: nil,
+			Owner:         types.PARTY(participant.PartyID),
+			RequiredCCVs:  nil,
+			MinBlockDepth: types.INT64(0),
 		},
 		OwnerParty: types.PARTY(participant.PartyID),
 	})
