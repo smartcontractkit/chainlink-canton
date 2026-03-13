@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "5446777c49e37d326edfeaea9a9dc13ae7cd1cb65222892ac0ac665d86ccc19f"
+	PackageID   = "70ade8f9e8e58049d912afd60bb752bf04643803a7aa52a1e6ddd49d99dc994e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -271,16 +271,16 @@ func (t *DestChainConfigArgs2) UnmarshalHex(data string) error {
 
 // FeeQuoter is a Template type
 type FeeQuoter struct {
-	InstanceId                       types.TEXT    `json:"instanceId"`
-	Owner                            types.PARTY   `json:"owner"`
-	FeeTokens                        types.GENMAP  `json:"feeTokens"`
-	DestChainConfigs                 types.GENMAP  `json:"destChainConfigs"`
-	TokenTransferFeeConfigs          types.GENMAP  `json:"tokenTransferFeeConfigs"`
-	UsdPerUnitGasByDestChainSelector types.GENMAP  `json:"usdPerUnitGasByDestChainSelector"`
-	UsdPerToken                      types.GENMAP  `json:"usdPerToken"`
+	InstanceId                       types.TEXT                               `json:"instanceId"`
+	Owner                            types.PARTY                              `json:"owner"`
+	FeeTokens                        types.GENMAP                             `json:"feeTokens"`
+	DestChainConfigs                 types.GENMAP                             `json:"destChainConfigs"`
+	TokenTransferFeeConfigs          types.GENMAP                             `json:"tokenTransferFeeConfigs"`
+	UsdPerUnitGasByDestChainSelector types.GENMAP                             `json:"usdPerUnitGasByDestChainSelector"`
+	UsdPerToken                      types.GENMAP                             `json:"usdPerToken"`
 	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
-	MaxFeeJuelsPerMsg                types.NUMERIC `json:"maxFeeJuelsPerMsg"`
-	PriceUpdaters                    []types.PARTY `json:"priceUpdaters"`
+	MaxFeeJuelsPerMsg                types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
+	PriceUpdaters                    []types.PARTY                            `json:"priceUpdaters"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -343,6 +343,7 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["linkTokenInstrumentId"] = func() any {
 		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
@@ -351,7 +352,9 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 		return t.LinkTokenInstrumentId
 	}()
 
-	args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
+	if t.MaxFeeJuelsPerMsg != "" {
+		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -418,6 +421,7 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["linkTokenInstrumentId"] = func() any {
 		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
@@ -426,7 +430,9 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 		return t.LinkTokenInstrumentId
 	}()
 
-	args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
+	if t.MaxFeeJuelsPerMsg != "" {
+		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -526,6 +532,27 @@ func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "UpdatePrices",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetTokenTransferFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -632,27 +659,6 @@ func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *mo
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
-	}
-}
-
-// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
 	}
 }
 
@@ -1377,6 +1383,7 @@ func (t *TokenPriceUpdate) UnmarshalHex(data string) error {
 
 // TokenTransferFeeConfig is a Record type
 type TokenTransferFeeConfig struct {
+	IsEnabled         types.BOOL    `json:"isEnabled"`
 	FeeUSD            types.NUMERIC `json:"feeUSD"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
@@ -1385,6 +1392,8 @@ type TokenTransferFeeConfig struct {
 // ToMap converts TokenTransferFeeConfig to a map for DAML arguments
 func (t TokenTransferFeeConfig) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["isEnabled"] = bool(t.IsEnabled)
 
 	m["feeUSD"] = t.FeeUSD
 
