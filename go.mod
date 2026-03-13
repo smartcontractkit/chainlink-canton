@@ -50,7 +50,7 @@ require (
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.48.0
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
-	golang.org/x/oauth2 v0.35.0
+	golang.org/x/oauth2 v0.36.0
 	google.golang.org/grpc v1.79.1
 	gopkg.in/yaml.v3 v3.0.1
 )
