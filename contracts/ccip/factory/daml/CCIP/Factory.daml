@@ -1,7 +1,28 @@
 module CCIP.Factory where
 
 import DA.Map qualified as Map
+import DA.Crypto.Text (BytesHex)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Codec
+  ( decodeTextAt
+  , decodePartyAt
+  , decodePartyList
+  , decodeNumeric0At
+  , decodeBytesHexAt
+  , decodeBytesHexList
+  , decodeList
+  , decodeBoolAt
+  , decodeInt64At
+  , decodeUint8
+  , extractBytes
+  )
+import CCIP.Codec
+  ( decodeRawInstanceAddressAt
+  , decodeInstrumentId
+  )
+import qualified CCIP.Context
+import qualified CCIP.RawInstanceAddress
+import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.GlobalConfig
 import qualified CCIP.FeeQuoter
@@ -21,7 +42,7 @@ import qualified CCIP.CCIPReceiver
 -- Security/flow constraints:
 -- 1. Contract may be created by an arbitrary bootstrap party.
 -- 2. No deployment is possible until ownership is handed over to `mcmsParty`
---    and `isMCMSControlled` is true.
+--    (owner == mcmsParty).
 -- 3. Every deployed component instanceId is tracked in `usedInstanceIds` and
 --    cannot be reused.
 -- 4. All deploy choices are consuming; each recreates CCIPFactory with
@@ -32,7 +53,6 @@ template CCIPFactory
         instanceId : Text
         owner : Party
         mcmsParty : Party
-        isMCMSControlled : Bool
         usedInstanceIds : Map.Map Text Bool
         deployedContracts : Map.Map Text (ContractId ())
     where
@@ -44,7 +64,7 @@ template CCIPFactory
             mcmsController = owner
             instanceId
 
-          mcmsEntrypoint functionName _operationData contractIds = do
+          mcmsEntrypoint functionName operationData contractIds = do
             let selfAddress = instanceId <> "@" <> partyToText owner
             selfCid <- case Map.lookup selfAddress contractIds of
               None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> selfAddress
@@ -53,7 +73,82 @@ template CCIPFactory
             case functionName of
               "SetOwnerToMCMS" -> do
                 newCid <- exercise selfCid SetOwnerToMCMS
-                pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
+                let newAddress = instanceId <> "@" <> partyToText mcmsParty
+                pure (Map.insert newAddress (coerceContractId newCid) (Map.delete selfAddress contractIds))
+
+              "DeployGlobalConfig" -> do
+                params <- requireDecoded "DeployGlobalConfig" (decodeDeployGlobalConfigParams operationData)
+                deployResult <- exercise selfCid DeployGlobalConfig with
+                  contract = mkGlobalConfigContract owner params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployFeeQuoter" -> do
+                params <- requireDecoded "DeployFeeQuoter" (decodeDeployFeeQuoterParams operationData)
+                deployResult <- exercise selfCid DeployFeeQuoter with
+                  contract = mkFeeQuoterContract owner params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployTokenAdminRegistry" -> do
+                params <- requireDecoded "DeployTokenAdminRegistry" (decodeDeployTokenAdminRegistryParams operationData)
+                deployResult <- exercise selfCid DeployTokenAdminRegistry with
+                  contract = mkTokenAdminRegistryContract owner params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployOnRamp" -> do
+                params <- requireDecoded "DeployOnRamp" (decodeDeployOnRampParams operationData)
+                deployResult <- exercise selfCid DeployOnRamp with
+                  contract = mkOnRampContract owner params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployOffRamp" -> do
+                params <- requireDecoded "DeployOffRamp" (decodeDeployOffRampParams operationData)
+                deployResult <- exercise selfCid DeployOffRamp with
+                  contract = mkOffRampContract owner params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployPerPartyRouterFactory" -> do
+                params <- requireDecoded "DeployPerPartyRouterFactory" (decodeDeployPerPartyRouterFactoryParams operationData)
+                deployResult <- exercise selfCid DeployPerPartyRouterFactory with
+                  contract = mkPerPartyRouterFactoryContract owner params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployRMNRemote" -> do
+                params <- requireDecoded "DeployRMNRemote" (decodeDeployRMNRemoteParams operationData)
+                deployResult <- exercise selfCid DeployRMNRemote with
+                  contract = mkRMNRemoteContract params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployCommitteeVerifier" -> do
+                params <- requireDecoded "DeployCommitteeVerifier" (decodeDeployCommitteeVerifierParams operationData)
+                deployResult <- exercise selfCid DeployCommitteeVerifier with
+                  contract = mkCommitteeVerifierContract params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployLockReleaseTokenPool" -> do
+                params <- requireDecoded "DeployLockReleaseTokenPool" (decodeDeployLockReleaseTokenPoolParams operationData)
+                deployResult <- exercise selfCid DeployLockReleaseTokenPool with
+                  contract = mkLockReleaseTokenPoolContract params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployRateLimiter" -> do
+                params <- requireDecoded "DeployRateLimiter" (decodeDeployRateLimiterParams operationData)
+                rateLimiterContract <- mkRateLimiterContract params
+                deployResult <- exercise selfCid DeployRateLimiter with
+                  contract = rateLimiterContract
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployCCIPSender" -> do
+                params <- requireDecoded "DeployCCIPSender" (decodeDeployCCIPSenderParams operationData)
+                deployResult <- exercise selfCid DeployCCIPSender with
+                  contract = mkCCIPSenderContract params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
+              "DeployCCIPReceiver" -> do
+                params <- requireDecoded "DeployCCIPReceiver" (decodeDeployCCIPReceiverParams operationData)
+                deployResult <- exercise selfCid DeployCCIPReceiver with
+                  contract = mkCCIPReceiverContract params
+                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
         -- | One-time ownership handover from bootstrap owner to MCMS party.
@@ -61,10 +156,9 @@ template CCIPFactory
         choice SetOwnerToMCMS : ContractId CCIPFactory
             controller owner
             do
-                assertMsg "factory already MCMS controlled" (not isMCMSControlled)
+                assertMsg "factory already MCMS controlled" (owner /= mcmsParty)
                 create this with
                     owner = mcmsParty
-                    isMCMSControlled = True
 
         nonconsuming choice GetFactoryState : FactoryState
             with
@@ -75,7 +169,6 @@ template CCIPFactory
                     instanceId
                     owner
                     mcmsParty
-                    isMCMSControlled
                     usedInstanceIds
                     deployedContracts
 
@@ -312,15 +405,422 @@ data FactoryState = FactoryState
         instanceId : Text
         owner : Party
         mcmsParty : Party
-        isMCMSControlled : Bool
         usedInstanceIds : Map.Map Text Bool
         deployedContracts : Map.Map Text (ContractId ())
     deriving (Eq, Show)
 
+data DeployGlobalConfigParams = DeployGlobalConfigParams
+    with
+        instanceId : Text
+        chainSelector : Numeric 0
+        onRampAddress : BytesHex
+    deriving (Eq, Show)
+
+data DeployFeeQuoterParams = DeployFeeQuoterParams
+    with
+        instanceId : Text
+    deriving (Eq, Show)
+
+data DeployTokenAdminRegistryParams = DeployTokenAdminRegistryParams
+    with
+        instanceId : Text
+    deriving (Eq, Show)
+
+data DeployOnRampParams = DeployOnRampParams
+    with
+        instanceId : Text
+        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+data DeployOffRampParams = DeployOffRampParams
+    with
+        instanceId : Text
+        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+data DeployPerPartyRouterFactoryParams = DeployPerPartyRouterFactoryParams
+    with
+        instanceId : Text
+        onRamp : CCIP.RawInstanceAddress.RawInstanceAddress
+        offRamp : CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+data DeployRMNRemoteParams = DeployRMNRemoteParams
+    with
+        instanceId : Text
+        rmnOwner : Party
+        ccipOwner : Party
+        customObservers : [Party]
+        cursedSubjects : [BytesHex]
+    deriving (Eq, Show)
+
+data DeployCommitteeVerifierParams = DeployCommitteeVerifierParams
+    with
+        instanceId : Text
+        owner : Party
+        ccipOwner : Party
+        versionTag : BytesHex
+        messageSentObserver : Party
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        storageLocations : [Text]
+        storageLocationsAdmin : Party
+        pendingStorageLocationsAdmin : Party
+    deriving (Eq, Show)
+
+data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
+    with
+        instanceId : Text
+        ccipOwner : Party
+        poolOwner : Party
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        decimals : Int
+    deriving (Eq, Show)
+
+data DeployRateLimiterParams = DeployRateLimiterParams
+    with
+        instanceId : Text
+        poolInstanceId : Text
+        poolOwner : Party
+        remoteChainSelector : Numeric 0
+        direction : CCIP.RateLimiter.RateLimitDirection
+        mode : CCIP.RateLimiter.RateLimitMode
+        isEnabled : Bool
+        capacity : Numeric 0
+        rate : Numeric 0
+    deriving (Eq, Show)
+
+data DeployCCIPSenderParams = DeployCCIPSenderParams
+    with
+        instanceId : Text
+        owner : Party
+    deriving (Eq, Show)
+
+data DeployCCIPReceiverParams = DeployCCIPReceiverParams
+    with
+        instanceId : Text
+        owner : Party
+        requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+    deriving (Eq, Show)
+
+requireDecoded : Text -> Optional a -> Update a
+requireDecoded functionName decoded =
+    case decoded of
+        None -> abort ("E_INVALID_PARAMS: " <> functionName)
+        Some value -> pure value
+
+mkGlobalConfigContract : Party -> DeployGlobalConfigParams -> CCIP.GlobalConfig.GlobalConfig
+mkGlobalConfigContract ccipOwner params = CCIP.GlobalConfig.GlobalConfig with
+    instanceId = params.instanceId
+    ccipOwner
+    chainSelector = params.chainSelector
+    onRampAddress = params.onRampAddress
+    destChainConfigs = Map.empty
+    sourceChainConfigs = Map.empty
+
+mkFeeQuoterContract : Party -> DeployFeeQuoterParams -> CCIP.FeeQuoter.FeeQuoter
+mkFeeQuoterContract owner params = CCIP.FeeQuoter.FeeQuoter with
+    instanceId = params.instanceId
+    owner
+    feeTokens = Map.empty
+    destChainConfigs = Map.empty
+    tokenTransferFeeConfigs = Map.empty
+    usdPerUnitGasByDestChainSelector = Map.empty
+    usdPerToken = Map.empty
+    priceUpdaters = []
+
+mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
+mkTokenAdminRegistryContract owner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with
+    instanceId = params.instanceId
+    owner
+    tokenConfigs = Map.empty
+
+mkOnRampContract : Party -> DeployOnRampParams -> CCIP.OnRamp.OnRamp
+mkOnRampContract ccipOwner params = CCIP.OnRamp.OnRamp with
+    instanceId = params.instanceId
+    ccipOwner
+    deps = CCIP.OnRamp.OnRampDeps with
+        globalConfig = params.globalConfig
+        rmnRemote = params.rmnRemote
+        tokenAdminRegistry = params.tokenAdminRegistry
+        feeQuoter = params.feeQuoter
+        ccvRegistry = params.ccvRegistry
+
+mkOffRampContract : Party -> DeployOffRampParams -> CCIP.OffRamp.OffRamp
+mkOffRampContract ccipOwner params = CCIP.OffRamp.OffRamp with
+    instanceId = params.instanceId
+    ccipOwner
+    deps = CCIP.OffRamp.OffRampDeps with
+        globalConfig = params.globalConfig
+        rmnRemote = params.rmnRemote
+        tokenAdminRegistry = params.tokenAdminRegistry
+
+mkPerPartyRouterFactoryContract : Party -> DeployPerPartyRouterFactoryParams -> CCIP.PerPartyRouter.PerPartyRouterFactory
+mkPerPartyRouterFactoryContract ccipOwner params = CCIP.PerPartyRouter.PerPartyRouterFactory with
+    instanceId = params.instanceId
+    ccipOwner
+    deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+        onRamp = params.onRamp
+        offRamp = params.offRamp
+        globalConfig = params.globalConfig
+        tokenAdminRegistry = params.tokenAdminRegistry
+        feeQuoter = params.feeQuoter
+        rmnRemote = params.rmnRemote
+    registeredRouters = Map.empty
+
+mkRMNRemoteContract : DeployRMNRemoteParams -> CCIP.RMNRemote.RMNRemote
+mkRMNRemoteContract params = CCIP.RMNRemote.RMNRemote with
+    instanceId = params.instanceId
+    rmnOwner = params.rmnOwner
+    ccipOwner = params.ccipOwner
+    customObservers = params.customObservers
+    cursedSubjects = params.cursedSubjects
+
+mkCommitteeVerifierContract : DeployCommitteeVerifierParams -> CCIP.CommitteeVerifier.CommitteeVerifier
+mkCommitteeVerifierContract params = CCIP.CommitteeVerifier.CommitteeVerifier with
+    instanceId = params.instanceId
+    owner = params.owner
+    ccipOwner = params.ccipOwner
+    versionTag = params.versionTag
+    messageSentObserver = params.messageSentObserver
+    storageLocations = params.storageLocations
+    storageLocationsAdmin = params.storageLocationsAdmin
+    pendingStorageLocationsAdmin = params.pendingStorageLocationsAdmin
+    signerConfigs = Map.empty
+    deps = CCIP.CommitteeVerifier.CommitteeVerifierDeps with
+        rmnRemote = params.rmnRemote
+    remoteChainFeeConfigs = Map.empty
+
+mkLockReleaseTokenPoolContract : DeployLockReleaseTokenPoolParams -> CCIP.LockReleaseTokenPool.LockReleaseTokenPool
+mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTokenPool with
+    instanceId = params.instanceId
+    ccipOwner = params.ccipOwner
+    poolOwner = params.poolOwner
+    instrumentId = params.instrumentId
+    decimals = params.decimals
+    chainPoolConfigs = Map.empty
+    chainFeeConfigs = Map.empty
+    remoteTokens = Map.empty
+    outboundRateLimiters = Map.empty
+    inboundRateLimiters = Map.empty
+    poolReceiveContext = CCIP.Context.emptyCCIPContext
+    transferTimeout = CCIP.LockReleaseTokenPool.Indefinite
+
+mkRateLimiterContract : DeployRateLimiterParams -> Update CCIP.RateLimiter.RateLimiter
+mkRateLimiterContract params = do
+    now <- getTime
+    pure (CCIP.RateLimiter.RateLimiter with
+        instanceId = params.instanceId
+        poolInstanceId = params.poolInstanceId
+        poolOwner = params.poolOwner
+        remoteChainSelector = params.remoteChainSelector
+        direction = params.direction
+        mode = params.mode
+        isEnabled = params.isEnabled
+        capacity = params.capacity
+        rate = params.rate
+        tokens = params.capacity
+        lastUpdated = now
+      )
+
+mkCCIPSenderContract : DeployCCIPSenderParams -> CCIP.CCIPSender.CCIPSender
+mkCCIPSenderContract params = CCIP.CCIPSender.CCIPSender with
+    instanceId = params.instanceId
+    owner = params.owner
+
+mkCCIPReceiverContract : DeployCCIPReceiverParams -> CCIP.CCIPReceiver.CCIPReceiver
+mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
+    instanceId = params.instanceId
+    owner = params.owner
+    requiredCCVs = params.requiredCCVs
+
+decodeDeployGlobalConfigParams : BytesHex -> Optional DeployGlobalConfigParams
+decodeDeployGlobalConfigParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (chainSelector, offset2) <- decodeNumeric0At encoded offset1
+    (onRampAddress, _) <- decodeBytesHexAt encoded offset2
+    Some DeployGlobalConfigParams with
+        instanceId
+        chainSelector
+        onRampAddress
+
+decodeDeployFeeQuoterParams : BytesHex -> Optional DeployFeeQuoterParams
+decodeDeployFeeQuoterParams encoded = do
+    (instanceId, _) <- decodeTextAt encoded 0
+    Some DeployFeeQuoterParams with instanceId
+
+decodeDeployTokenAdminRegistryParams : BytesHex -> Optional DeployTokenAdminRegistryParams
+decodeDeployTokenAdminRegistryParams encoded = do
+    (instanceId, _) <- decodeTextAt encoded 0
+    Some DeployTokenAdminRegistryParams with instanceId
+
+decodeDeployOnRampParams : BytesHex -> Optional DeployOnRampParams
+decodeDeployOnRampParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (globalConfig, offset2) <- decodeRawInstanceAddressAt encoded offset1
+    (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
+    (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
+    (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
+    (ccvRegistry, _) <- decodeRawInstanceAddressAt encoded offset5
+    Some DeployOnRampParams with
+        instanceId
+        globalConfig
+        rmnRemote
+        tokenAdminRegistry
+        feeQuoter
+        ccvRegistry
+
+decodeDeployOffRampParams : BytesHex -> Optional DeployOffRampParams
+decodeDeployOffRampParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (globalConfig, offset2) <- decodeRawInstanceAddressAt encoded offset1
+    (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
+    (tokenAdminRegistry, _) <- decodeRawInstanceAddressAt encoded offset3
+    Some DeployOffRampParams with
+        instanceId
+        globalConfig
+        rmnRemote
+        tokenAdminRegistry
+
+decodeDeployPerPartyRouterFactoryParams : BytesHex -> Optional DeployPerPartyRouterFactoryParams
+decodeDeployPerPartyRouterFactoryParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (onRamp, offset2) <- decodeRawInstanceAddressAt encoded offset1
+    (offRamp, offset3) <- decodeRawInstanceAddressAt encoded offset2
+    (globalConfig, offset4) <- decodeRawInstanceAddressAt encoded offset3
+    (tokenAdminRegistry, offset5) <- decodeRawInstanceAddressAt encoded offset4
+    (feeQuoter, offset6) <- decodeRawInstanceAddressAt encoded offset5
+    (rmnRemote, _) <- decodeRawInstanceAddressAt encoded offset6
+    Some DeployPerPartyRouterFactoryParams with
+        instanceId
+        onRamp
+        offRamp
+        globalConfig
+        tokenAdminRegistry
+        feeQuoter
+        rmnRemote
+
+decodeDeployRMNRemoteParams : BytesHex -> Optional DeployRMNRemoteParams
+decodeDeployRMNRemoteParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (rmnOwner, offset2) <- decodePartyAt encoded offset1
+    (ccipOwner, offset3) <- decodePartyAt encoded offset2
+    (customObservers, offset4) <- decodePartyList encoded offset3
+    (cursedSubjects, _) <- decodeBytesHexList encoded offset4
+    Some DeployRMNRemoteParams with
+        instanceId
+        rmnOwner
+        ccipOwner
+        customObservers
+        cursedSubjects
+
+decodeDeployCommitteeVerifierParams : BytesHex -> Optional DeployCommitteeVerifierParams
+decodeDeployCommitteeVerifierParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (owner, offset2) <- decodePartyAt encoded offset1
+    (ccipOwner, offset3) <- decodePartyAt encoded offset2
+    (versionTag, offset4) <- decodeBytesHexAt encoded offset3
+    (messageSentObserver, offset5) <- decodePartyAt encoded offset4
+    (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
+    (storageLocations, offset7) <- decodeList encoded offset6 decodeTextAt
+    (storageLocationsAdmin, offset8) <- decodePartyAt encoded offset7
+    (pendingStorageLocationsAdmin, _) <- decodePartyAt encoded offset8
+    Some DeployCommitteeVerifierParams with
+        instanceId
+        owner
+        ccipOwner
+        versionTag
+        messageSentObserver
+        rmnRemote
+        storageLocations
+        storageLocationsAdmin
+        pendingStorageLocationsAdmin
+
+decodeDeployLockReleaseTokenPoolParams : BytesHex -> Optional DeployLockReleaseTokenPoolParams
+decodeDeployLockReleaseTokenPoolParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (ccipOwner, offset2) <- decodePartyAt encoded offset1
+    (poolOwner, offset3) <- decodePartyAt encoded offset2
+    (instrumentId, offset4) <- decodeInstrumentId encoded offset3
+    (decimals, _) <- decodeInt64At encoded offset4
+    Some DeployLockReleaseTokenPoolParams with
+        instanceId
+        ccipOwner
+        poolOwner
+        instrumentId
+        decimals
+
+decodeRateLimitDirectionAt : BytesHex -> Int -> Optional (CCIP.RateLimiter.RateLimitDirection, Int)
+decodeRateLimitDirectionAt encoded offset = do
+    directionHex <- extractBytes encoded offset 1
+    direction <- decodeUint8 directionHex
+    case direction of
+        0 -> Some (CCIP.RateLimiter.RateLimitDirection_Outbound, offset + 1)
+        1 -> Some (CCIP.RateLimiter.RateLimitDirection_Inbound, offset + 1)
+        _ -> None
+
+decodeRateLimitModeAt : BytesHex -> Int -> Optional (CCIP.RateLimiter.RateLimitMode, Int)
+decodeRateLimitModeAt encoded offset = do
+    modeHex <- extractBytes encoded offset 1
+    mode <- decodeUint8 modeHex
+    case mode of
+        0 -> Some (CCIP.RateLimiter.RateLimitMode_DefaultFinality, offset + 1)
+        1 -> Some (CCIP.RateLimiter.RateLimitMode_CustomFinality, offset + 1)
+        _ -> None
+
+decodeDeployRateLimiterParams : BytesHex -> Optional DeployRateLimiterParams
+decodeDeployRateLimiterParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (poolInstanceId, offset2) <- decodeTextAt encoded offset1
+    (poolOwner, offset3) <- decodePartyAt encoded offset2
+    (remoteChainSelector, offset4) <- decodeNumeric0At encoded offset3
+    (direction, offset5) <- decodeRateLimitDirectionAt encoded offset4
+    (mode, offset6) <- decodeRateLimitModeAt encoded offset5
+    (isEnabled, offset7) <- decodeBoolAt encoded offset6
+    (capacity, offset8) <- decodeNumeric0At encoded offset7
+    (rate, _) <- decodeNumeric0At encoded offset8
+    Some DeployRateLimiterParams with
+        instanceId
+        poolInstanceId
+        poolOwner
+        remoteChainSelector
+        direction
+        mode
+        isEnabled
+        capacity
+        rate
+
+decodeDeployCCIPSenderParams : BytesHex -> Optional DeployCCIPSenderParams
+decodeDeployCCIPSenderParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (owner, _) <- decodePartyAt encoded offset1
+    Some DeployCCIPSenderParams with
+        instanceId
+        owner
+
+decodeDeployCCIPReceiverParams : BytesHex -> Optional DeployCCIPReceiverParams
+decodeDeployCCIPReceiverParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (owner, offset2) <- decodePartyAt encoded offset1
+    (requiredCCVs, _) <- decodeList encoded offset2 decodeRawInstanceAddressAt
+    Some DeployCCIPReceiverParams with
+        instanceId
+        owner
+        requiredCCVs
+
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =
     assertMsg "factory is not MCMS controlled"
-        factory.isMCMSControlled
+        (factory.owner == factory.mcmsParty)
 
 assertComponentNotDeployed : Text -> Map.Map Text (ContractId ()) -> Update ()
 assertComponentNotDeployed componentKey deployedContracts =
