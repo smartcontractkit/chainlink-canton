@@ -413,12 +413,13 @@ data DeployGlobalConfigParams = DeployGlobalConfigParams
     with
         instanceId : Text
         chainSelector : Numeric 0
-        onRampAddress : BytesHex
     deriving (Eq, Show)
 
 data DeployFeeQuoterParams = DeployFeeQuoterParams
     with
         instanceId : Text
+        linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        maxFeeJuelsPerMsg : Numeric 0
     deriving (Eq, Show)
 
 data DeployTokenAdminRegistryParams = DeployTokenAdminRegistryParams
@@ -523,7 +524,6 @@ mkGlobalConfigContract ccipOwner params = CCIP.GlobalConfig.GlobalConfig with
     instanceId = params.instanceId
     ccipOwner
     chainSelector = params.chainSelector
-    onRampAddress = params.onRampAddress
     destChainConfigs = Map.empty
     sourceChainConfigs = Map.empty
 
@@ -536,6 +536,8 @@ mkFeeQuoterContract owner params = CCIP.FeeQuoter.FeeQuoter with
     tokenTransferFeeConfigs = Map.empty
     usdPerUnitGasByDestChainSelector = Map.empty
     usdPerToken = Map.empty
+    linkTokenInstrumentId = params.linkTokenInstrumentId
+    maxFeeJuelsPerMsg = params.maxFeeJuelsPerMsg
     priceUpdaters = []
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -646,17 +648,20 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
 decodeDeployGlobalConfigParams : BytesHex -> Optional DeployGlobalConfigParams
 decodeDeployGlobalConfigParams encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
-    (chainSelector, offset2) <- decodeNumeric0At encoded offset1
-    (onRampAddress, _) <- decodeBytesHexAt encoded offset2
+    (chainSelector, _) <- decodeNumeric0At encoded offset1
     Some DeployGlobalConfigParams with
         instanceId
         chainSelector
-        onRampAddress
 
 decodeDeployFeeQuoterParams : BytesHex -> Optional DeployFeeQuoterParams
 decodeDeployFeeQuoterParams encoded = do
-    (instanceId, _) <- decodeTextAt encoded 0
-    Some DeployFeeQuoterParams with instanceId
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (linkTokenInstrumentId, offset2) <- decodeInstrumentId encoded offset1
+    (maxFeeJuelsPerMsg, _) <- decodeNumeric0At encoded offset2
+    Some DeployFeeQuoterParams with
+        instanceId
+        linkTokenInstrumentId
+        maxFeeJuelsPerMsg
 
 decodeDeployTokenAdminRegistryParams : BytesHex -> Optional DeployTokenAdminRegistryParams
 decodeDeployTokenAdminRegistryParams encoded = do
