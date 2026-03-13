@@ -46,6 +46,14 @@ mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
         [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
 
+
+mkPoolDeps : Text -> Text -> Text -> Party -> LockReleaseTokenPool.LockReleaseTokenPoolDeps
+mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner =
+    LockReleaseTokenPool.LockReleaseTokenPoolDeps with
+        tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+        rmnRemote = RawInstanceAddress.make rmnInstanceId ccipOwner
+        feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+
 createRateLimiter
     : Party
     -> Text
@@ -175,6 +183,7 @@ testLockOrBurn = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter" ccipOwner
 
     -- Create SendingMessageV1 with token transfer fields.
     -- LockOrBurn reads dest chain, token amount, and receiver from here.
@@ -373,6 +382,7 @@ testReleaseFromTicket = script do
             inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release" "test-feequoter-release" ccipOwner
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates via finalize)
     tokenReceiveTicket <- submit ccipOwner do
@@ -528,6 +538,7 @@ testReleaseFromTicketDecimalConversion = script do
             inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals" ccipOwner
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
     tokenReceiveTicket <- submit ccipOwner do
@@ -894,6 +905,7 @@ testVerifyInboundMessage = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify" "test-feequoter-verify" ccipOwner
 
     -- Build message with token transfer from allowed source pool
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1022,6 +1034,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-invalid" "test-feequoter-verify-invalid" ccipOwner
 
     -- Build message with disallowed source pool
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1142,6 +1155,7 @@ testVerifyInboundMessageMissingChainConfig = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-nochain" "test-feequoter-verify-nochain" ccipOwner
 
     -- Build message from an unconfigured source chain
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1258,6 +1272,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-fallback" "test-rmn-fallback" "test-feequoter-fallback" ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1387,6 +1402,7 @@ testCalculateFeePrefersPoolOverride = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-override" "test-rmn-override" "test-feequoter-pool-override" ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1516,6 +1532,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-disabled" "test-rmn-disabled" "test-feequoter-pool-disabled" ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do

@@ -150,15 +150,6 @@ template RMNRemote
                 pure (globalCurseSubject `elem` cursedSubjects
                       || chainSubject `elem` cursedSubjects)
 
-        -- Returns (instanceId, owner) so callers can verify the address.
-        -- TODO: ccip-rmn cannot depend on ccip-common (cycle), so callers
-        -- must do the RawInstanceAddress comparison themselves.
-        nonconsuming choice FetchRawInstanceAddress : (Text, Party)
-            with
-                caller : Party
-            controller caller
-            do pure (instanceId, rmnOwner)
-
         -- Get all cursed subjects
         nonconsuming choice GetCursedSubjects : [BytesHex]
             with
