@@ -12,6 +12,9 @@ import CCIP.GlobalConfig
 import CCIP.GlobalConfigCodec
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
+
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - APPLY DEST CHAIN CONFIG UPDATES
 -- ===========================================================================
@@ -30,7 +33,6 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
       instanceId
       ccipOwner
       chainSelector = 123.0  -- Local chain
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -42,7 +44,8 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
         DestChainConfigArgs with
           destChainSelector = 456.0
           isEnabled = True
-          offRampAddress = "abcdef1234567890"
+          addressBytesLength = 20
+          offRampAddress = "d589cf1d9ddc38d0aff8f324ed5d16d220f0fdbe"
           laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
           defaultCCVs = []
           messageNetworkFeeUSDCents = 10.0
@@ -77,7 +80,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-replace-test"
-      existingConfig = DestChainConfig True "abcd" [] [] 1.0 1.0
+      existingConfig = DestChainConfig True 20 "abcd" [] [] (cents 1.0) (cents 1.0)
 
   -- Create GlobalConfig with existing dest chain config
   gcCid <- submit ccipOwner do
@@ -85,7 +88,6 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
       instanceId
       ccipOwner
       chainSelector = 123.0
-      onRampAddress = "1234"
       destChainConfigs = Map.fromList [(456.0, existingConfig)]
       sourceChainConfigs = Map.empty
 
@@ -97,7 +99,8 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
         DestChainConfigArgs with
           destChainSelector = 456.0
           isEnabled = False
-          offRampAddress = "deadbeef12345678"
+          addressBytesLength = 20
+          offRampAddress = "b70fd68ac42892c71b3f9df7dde8efcafcfa82fe"
           laneMandatedCCVs = []
           defaultCCVs = [RawInstanceAddress "default@party"]
           messageNetworkFeeUSDCents = 20.0
@@ -105,7 +108,8 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
         ,DestChainConfigArgs with
           destChainSelector = 789.0
           isEnabled = True
-          offRampAddress = "cafe1234"
+          addressBytesLength = 32
+          offRampAddress = "fdd0a23462dbe0f8cd1dfb5afdb61ffa9dccdfab1dcfcb0ee87aec14269fe8b5"
           laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
           defaultCCVs = [RawInstanceAddress "default@party"]
           messageNetworkFeeUSDCents = 300.0
@@ -155,7 +159,6 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       instanceId
       ccipOwner
       chainSelector = 123.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -200,7 +203,6 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       instanceId
       ccipOwner
       chainSelector = 123.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.fromList [(456.0, SourceChainConfig True ["abcd"] [] [])]
 
@@ -266,7 +268,6 @@ testGlobalConfigMCMSEntrypoint_UnknownFunction = script do
       instanceId
       ccipOwner
       chainSelector = 1.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -294,7 +295,6 @@ testGlobalConfigMCMSEntrypoint_InvalidParams = script do
       instanceId
       ccipOwner
       chainSelector = 1.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -322,7 +322,6 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
       instanceId
       ccipOwner
       chainSelector = 1.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -333,6 +332,7 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
         DestChainConfigArgs with
           destChainSelector = 456.0
           isEnabled = True
+          addressBytesLength = 20
           offRampAddress = "abcdef1234567890"
           laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
           defaultCCVs = []

@@ -16,7 +16,7 @@ template DummyCommitteeVerifier
         owner : Party
         ccipOwner : Party
         versionTag : BytesHex
-        feeUSDCents : Decimal
+        feeUSDCents : Numeric 0
         destGasLimit : Int
         destBytesOverhead : Int
     where

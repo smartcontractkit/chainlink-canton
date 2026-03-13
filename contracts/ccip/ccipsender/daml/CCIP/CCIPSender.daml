@@ -123,6 +123,8 @@ template CCIPSender
                     Some tt -> exercise tt.tokenPoolCid
                         CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
                             sendingMessageCid = smCid
+                            feeQuoterCid = feeQuoterCid
+                            tokenInstrumentId = tt.tokenInstrumentId
                             caller = owner
 
                 -- Outbound pool CCV verification via TAR

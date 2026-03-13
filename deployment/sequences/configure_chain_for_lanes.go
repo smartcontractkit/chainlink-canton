@@ -119,6 +119,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.DestChainConfigArgs{
 				DestChainSelector:         types.NUMERIC(remoteSelectorStr),
 				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
+				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
 				OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
 				LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 				DefaultCCVs:               defaultOutboundCCVs,

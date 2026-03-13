@@ -1,10 +1,12 @@
 package adapters
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -13,7 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 var (
@@ -38,7 +43,8 @@ func NewTokenAdapter(base tokenadapters.TokenAdapter) *CantonTokenAdapter {
 
 // AddressRefToBytes implements tokens.TokenAdapter.
 func (t *CantonTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return t.base.AddressRefToBytes(ref)
+	// Canton "addresses" are 32-byte instance addresses, not 20-byte EVM addresses.
+	return contracts.HexToInstanceAddress(ref.Address).Bytes(), nil
 }
 
 // ConfigureTokenForTransfersSequence implements tokens.TokenAdapter.
@@ -91,15 +97,61 @@ func (t *CantonTokenAdapter) SetTokenPoolRateLimits() *operations.Sequence[token
 }
 
 func (t *CantonTokenAdapter) DeriveTokenAddress(e deployment.Environment, chainSelector uint64, ref datastore.AddressRef) ([]byte, error) {
+	if tokenAddress, err := deriveInstrumentTokenAddress(e, chainSelector, ref); err == nil {
+		return tokenAddress, nil
+	}
+
 	addr, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, ref.Type, ref.Version, ref.Qualifier))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address for %v on chain %d: %w", ref, chainSelector, err)
 	}
-	// Address is stored as hex string
-	// Remove 0x prefix if present
-	cleanAddr := strings.TrimPrefix(addr.Address, "0x")
+	// Raw Canton instance addresses are "<instance-id>@<party-id>" and must be keccak256 hashed.
+	if rawAddr, rawErr := contracts.RawInstanceAddressFromString(addr.Address); rawErr == nil {
+		return rawAddr.InstanceAddress().Bytes(), nil
+	}
 
-	return hex.DecodeString(cleanAddr)
+	// Hex-encoded addresses must be Keccak256 hashed to derive the canonical token address.
+	cleanAddr := strings.TrimPrefix(addr.Address, "0x")
+	addrBytes, err := hex.DecodeString(cleanAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode token address %q: %w", addr.Address, err)
+	}
+
+	return crypto.Keccak256(addrBytes), nil
+}
+
+func deriveInstrumentTokenAddress(e deployment.Environment, chainSelector uint64, ref datastore.AddressRef) ([]byte, error) {
+	cantonChain, ok := e.BlockChains.CantonChains()[chainSelector]
+	if !ok || len(cantonChain.Participants) == 0 {
+		return nil, fmt.Errorf("canton chain %d not found", chainSelector)
+	}
+	addr, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(chainSelector, ref.Type, ref.Version, ref.Qualifier))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get address for %v on chain %d: %w", ref, chainSelector, err)
+	}
+	instanceAddress := contracts.HexToInstanceAddress(addr.Address)
+	participant := cantonChain.Participants[0]
+	ctx := context.Background()
+	if e.GetContext != nil {
+		ctx = e.GetContext()
+	}
+	activePool, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+		instanceAddress,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("resolve lock/release token pool at %s: %w", addr.Address, err)
+	}
+	pool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+	if err != nil {
+		return nil, fmt.Errorf("parse lock/release token pool at %s: %w", addr.Address, err)
+	}
+	instrumentCombined := string(pool.InstrumentId.Id) + "@" + string(pool.InstrumentId.Admin)
+
+	return crypto.Keccak256([]byte(instrumentCombined)), nil
 }
 
 // CantonAdapter is an implementation of the ChainFamily interface for Canton.
