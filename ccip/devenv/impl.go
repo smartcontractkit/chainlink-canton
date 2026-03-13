@@ -295,7 +295,6 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(selector, 10)),
-						OnRampAddress: "", // TODO ?
 					},
 				},
 				FeeQuoterConfig: sequences.FeeQuoterParams{

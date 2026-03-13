@@ -5,7 +5,7 @@ module CCIP.GlobalConfig
   ) where
 
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
 
 import qualified CCIP.Context
@@ -19,7 +19,6 @@ template GlobalConfig
         ccipOwner : Party
 
         chainSelector : Numeric 0
-        onRampAddress : BytesHex
 
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
         sourceChainConfigs : Map.Map (Numeric 0) SourceChainConfig

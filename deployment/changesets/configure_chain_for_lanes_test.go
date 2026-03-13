@@ -127,7 +127,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainSelector, 10)),
-						OnRampAddress: "", // TODO ?
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{

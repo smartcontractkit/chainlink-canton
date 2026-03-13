@@ -305,7 +305,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
-						OnRampAddress: "", // TODO ?
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{

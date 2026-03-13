@@ -30,7 +30,6 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
       instanceId
       ccipOwner
       chainSelector = 123.0  -- Local chain
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -86,7 +85,6 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
       instanceId
       ccipOwner
       chainSelector = 123.0
-      onRampAddress = "1234"
       destChainConfigs = Map.fromList [(456.0, existingConfig)]
       sourceChainConfigs = Map.empty
 
@@ -158,7 +156,6 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       instanceId
       ccipOwner
       chainSelector = 123.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -203,7 +200,6 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       instanceId
       ccipOwner
       chainSelector = 123.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.fromList [(456.0, SourceChainConfig True ["abcd"] [] [])]
 
@@ -269,7 +265,6 @@ testGlobalConfigMCMSEntrypoint_UnknownFunction = script do
       instanceId
       ccipOwner
       chainSelector = 1.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -297,7 +292,6 @@ testGlobalConfigMCMSEntrypoint_InvalidParams = script do
       instanceId
       ccipOwner
       chainSelector = 1.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
@@ -325,7 +319,6 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
       instanceId
       ccipOwner
       chainSelector = 1.0
-      onRampAddress = "1234"
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 

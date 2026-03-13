@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "74036f0d4adf6413365aff02a6e0c192feb9faf3206fd0f98bb78d5a46703ff9"
+	PackageID   = "96783e7f5253f0b407212397e186ba0e9cff83a43f78744e3cb8d48175622613"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2883,7 +2883,6 @@ type GlobalConfig struct {
 	InstanceId         types.TEXT    `json:"instanceId"`
 	CcipOwner          types.PARTY   `json:"ccipOwner"`
 	ChainSelector      types.NUMERIC `json:"chainSelector"`
-	OnRampAddress      types.TEXT    `json:"onRampAddress"`
 	DestChainConfigs   types.GENMAP  `json:"destChainConfigs"`
 	SourceChainConfigs types.GENMAP  `json:"sourceChainConfigs"`
 }
@@ -2911,9 +2910,6 @@ func (t GlobalConfig) CreateCommand() *model.CreateCommand {
 	if t.ChainSelector != "" {
 		args["chainSelector"] = t.ChainSelector
 	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["onRampAddress"] = string(t.OnRampAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["destChainConfigs"] = func() any {
@@ -2950,9 +2946,6 @@ func (t GlobalConfig) CreateCommandWithPackageID(packageID string) *model.Create
 	if t.ChainSelector != "" {
 		args["chainSelector"] = t.ChainSelector
 	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["onRampAddress"] = string(t.OnRampAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["destChainConfigs"] = func() any {

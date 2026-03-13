@@ -21,7 +21,6 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             instanceId = instanceId
             ccipOwner = owner
             chainSelector = 123.0
-            onRampAddress = "0x1234567890abcdef"
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.empty
 
@@ -183,7 +182,6 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
             instanceId = instanceId
             ccipOwner = owner
             chainSelector = 123.0
-            onRampAddress = "0x1234567890abcdef"
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.empty
 
