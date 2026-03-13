@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -152,7 +153,6 @@ func TestCCIPSend(t *testing.T) {
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
-						OnRampAddress: "", // populated by the sequence
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
@@ -211,8 +211,8 @@ func TestCCIPSend(t *testing.T) {
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					remoteSelector: {
 						AllowTrafficFrom:         true,
-						OnRamps:                  [][]byte{[]byte("0000000000000000000000000000000000000001")}, // remote chain onRamp
-						OffRamp:                  nil,
+						OnRamps:                  [][]byte{[]byte("0x2e8bbc8db4217b3ab527fd5ea2cfa5cd1bd6cea0")},
+						OffRamp:                  hexutil.MustDecode("0xade37fcfcb5fff70eeea7dc9cc3eab19659cfc7c"),
 						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedInboundCCVs:  nil,
 						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
@@ -223,7 +223,7 @@ func TestCCIPSend(t *testing.T) {
 							DefaultTokenFeeUSDCents: 0,
 						},
 						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
-						AddressBytesLength:      0,
+						AddressBytesLength:      20,
 						BaseExecutionGasCost:    0,
 					},
 				},
@@ -470,9 +470,8 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 
 	// Prepare receiver address (destination party encoded as keccak256)
-	receiverPartyID := "receiver-party"
-	receiverBytes := EncodePartyID(receiverPartyID)
-	receiverHex := hex.EncodeToString(receiverBytes)
+	receiver := hexutil.MustDecode("0xcf8def9adfe3dd90b3dffe42c8eabbf7cd4ee6ca")
+	receiverHex := hex.EncodeToString(receiver)
 
 	require.NotEmpty(t, disclosedOnRamp.ContractId, "OnRamp disclosure missing/empty")
 	require.NotEmpty(t, disclosedGlobalConfig.ContractId, "GlobalConfig disclosure missing/empty")

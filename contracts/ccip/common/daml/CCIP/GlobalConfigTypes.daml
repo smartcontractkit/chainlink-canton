@@ -10,6 +10,7 @@ data DestChainConfigArgs = DestChainConfigArgs
     with
         destChainSelector : Numeric 0           -- Destination chain selector of the config to update.
         isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
+        addressBytesLength : Int                -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
@@ -21,6 +22,7 @@ data DestChainConfigArgs = DestChainConfigArgs
 data DestChainConfig = DestChainConfig
     with
         isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
+        addressBytesLength : Int                -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
