@@ -12,6 +12,7 @@ packages:
   - ccip/pools/interfaces
   - ccip/pools/lockReleaseTokenPool
   - ccip/perpartyrouter
+  - ccip/factory
   - ccip/test
 
   - mcms

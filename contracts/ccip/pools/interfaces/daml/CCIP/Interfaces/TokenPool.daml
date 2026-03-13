@@ -8,6 +8,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FeeQuoter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
@@ -96,6 +97,8 @@ interface ITokenPool where
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+            tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
             caller : Party
         controller caller
         do tokenPool_calculateFeeImpl this self arg

@@ -11,6 +11,7 @@ import Splice.Api.Token.HoldingV1
 
 import CCIP.Common qualified as Common
 import qualified CCIP.Context
+import qualified CCIP.Math as Math
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -32,16 +33,18 @@ template FeeQuoter
         instanceId : Text
         owner : Party
 
-        -- | Set of fee tokens that can be used to pay for fees. Values are EVM-style
-        -- | multipliers with 1e18 precision, so 1e18 = 1.0x.
-        feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId Decimal
+        -- | Set of fee tokens that can be used to pay for fees. Values are
+        -- | 1e8-scaled premium multipliers, so 1e8 = 1.0x.
+        feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId (Numeric 0)
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
-        tokenTransferFeeConfigs : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig
+        tokenTransferFeeConfigs : Map.Map (Numeric 0) (Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig)
 
         usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
-        -- | Token prices are stored in EVM units: 18-decimal USD price for 1e18
-        -- | smallest fee-token units. This matches EVM FeeQuoter scaling.
+        linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        maxFeeJuelsPerMsg : Numeric 0 -- Max fee in LINK smallest units (juels).
+        -- | Token prices are stored as usd8 integers: 8-decimal USD price for
+        -- | 1e8 local smallest units of the token/gas asset.
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
         priceUpdaters : [Party]
     where
@@ -88,20 +91,29 @@ template FeeQuoter
         -- │                         Fee Quoting                          │
         -- ================================================================
 
-        nonconsuming choice FeeQuoter_GetTokenTransferFee : (Decimal, Int, Int)
+        nonconsuming choice FeeQuoter_GetTokenTransferFee : (Numeric 0, Int, Int)
             with
                 destChainSelector : Numeric 0
                 token : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
             do
-                case Map.lookup token tokenTransferFeeConfigs of
-                    Some config -> return (config.feeUSD, config.destGasOverhead, config.destBytesOverhead)
+                let tokenConfig = do
+                        perChain <- Map.lookup destChainSelector tokenTransferFeeConfigs
+                        Map.lookup token perChain
+                case tokenConfig of
+                    Some config | config.isEnabled ->
+                        return (config.feeUSD, config.destGasOverhead, config.destBytesOverhead)
                     None -> do
                         -- Use default fee from dest chain config
-                        -- For simplicity, we assume a single default dest chain config here.
-                        -- In a real implementation, you might want to pass the destChainSelector as an argument.
-                        let defaultConfig = fromSomeNote "No dest chain configs available" (Map.lookup destChainSelector destChainConfigs)
+                        let defaultConfig = fromSomeNote
+                                ("No dest chain config found for " <> show destChainSelector)
+                                (Map.lookup destChainSelector destChainConfigs)
+                        return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
+                    Some _ -> do
+                        let defaultConfig = fromSomeNote
+                                ("No dest chain config found for " <> show destChainSelector)
+                                (Map.lookup destChainSelector destChainConfigs)
                         return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
 
         -- Looks up the fee token price and premium multiplier from
@@ -121,13 +133,26 @@ template FeeQuoter
                 let tokenPrice = fromSomeNote
                         ("No price found for " <> sm.feeToken.id)
                         (Map.lookup sm.feeToken usdPerToken)
+                let linkTokenPrice = fromSomeNote
+                        ("No price found for LINK token " <> linkTokenInstrumentId.id)
+                        (Map.lookup linkTokenInstrumentId usdPerToken)
+                assertMsg "feequoter: LINK token price must be positive"
+                    (linkTokenPrice.price > 0.0)
                 let premiumMultiplier = fromSomeNote
                         ("Fee token not configured: " <> sm.feeToken.id)
                         (Map.lookup sm.feeToken feeTokens)
-                exercise sendingMessageCid
+                finalizedCid <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.FinalizeFee with
                         feeTokenPrice = tokenPrice.price
                         premiumMultiplier
+                finalizedFeeTokenAmount <- exercise finalizedCid
+                    CCIP.SendingMessageV1.FeeTokenAmount with
+                        caller
+                assertMsg "feequoter: message fee exceeds maxFeeJuelsPerMsg"
+                    (if sm.feeToken == linkTokenInstrumentId
+                     then Math.integerAmountWithinCap finalizedFeeTokenAmount maxFeeJuelsPerMsg
+                     else Math.normalizedFeeWithinCap finalizedFeeTokenAmount tokenPrice.price linkTokenPrice.price maxFeeJuelsPerMsg)
+                pure finalizedCid
 
         -- ================================================================
         -- │                         Fee Tokens                           │
@@ -142,7 +167,7 @@ template FeeQuoter
                 return (Map.keys feeTokens)
 
         -- | Get the premium multiplier for a given fee token.
-        nonconsuming choice GetPremiumMultiplierWeiPerEth : Decimal
+        nonconsuming choice GetPremiumMultiplierWeiPerEth : Numeric 0
             with
                 token : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
@@ -176,11 +201,11 @@ template FeeQuoter
                 destChainConfigArgs : [DestChainConfigArgs]
             controller owner
             do
-                -- destChainSelector must be non-zero
+                -- destChainSelector must be greater than zero
                 -- defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
                 -- chainFamilySelector must be known
                 Foldable.mapA_ (\dcca -> do
-                        assertMsg ("destChainSelector must be non-zero: " <> show dcca.destChainSelector) (dcca.destChainSelector /= 0.0)
+                        assertMsg ("destChainSelector must be greater than zero: " <> show dcca.destChainSelector) (dcca.destChainSelector > 0.0)
                         assertMsg ("defaultTxGasLimit must be set (> 0) for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit > 0)
                         assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
                         assertMsg ("unknown chainFamilySelector for destChainSelector: " <> show dcca.destChainSelector) (Common.isKnownChainFamilySelector dcca.destChainConfig.chainFamilySelector)
@@ -225,14 +250,17 @@ template FeeQuoter
 
 data TokenTransferFeeConfig = TokenTransferFeeConfig
     with
-        feeUSD : Decimal
+        isEnabled : Bool
+        -- Legacy field name retained; value is integer USD cents.
+        feeUSD : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
 
 data TimestampedPrice = TimestampedPrice
     with
-        price : Decimal
+        -- 8-decimal USD price for 1e8 smallest units of the token/gas asset.
+        price : Numeric 0
         timestamp : Time
     deriving (Eq, Show)
 
@@ -246,13 +274,15 @@ data PriceUpdates = PriceUpdates
 data TokenPriceUpdate = TokenPriceUpdate
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        usdPerToken : Decimal
+        -- 8-decimal USD price for 1e8 smallest token units.
+        usdPerToken : Numeric 0
     deriving (Eq, Show)
 
 data GasPriceUpdate = GasPriceUpdate
     with
         destChainSelector : Numeric 0
-        usdPerUnitGas : Decimal
+        -- 8-decimal USD price per gas unit.
+        usdPerUnitGas : Numeric 0
     deriving (Eq, Show)
 
 

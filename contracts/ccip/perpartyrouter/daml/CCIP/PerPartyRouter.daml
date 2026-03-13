@@ -12,6 +12,7 @@ import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.Math
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress)
@@ -293,7 +294,7 @@ template PerPartyRouter
                                 Splice.Api.Token.TransferInstructionV1.Transfer with
                                     sender = partyOwner
                                     receiver = ccipOwner
-                                    amount = intToDecimal (truncate totalFee)
+                                    amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.totalFee" totalFee
                                     instrumentId = sendingMsg.feeToken
                                     requestedAt = now
                                     executeBefore = addRelTime now (hours 1)

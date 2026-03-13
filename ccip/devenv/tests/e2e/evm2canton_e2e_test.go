@@ -1,7 +1,9 @@
 package canton
 
 import (
+	"context"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -27,6 +29,72 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
+const (
+	evmToCantonBasicPayload = "Hello from EVM!"
+	evmToCantonTokenPayload = "Hello token transfer from EVM!"
+
+	evmToCantonTokenQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+	evmToCantonTransferAmount = int64(1000)
+)
+
+func mustGetBlockchainInputByType(t *testing.T, cfg *ccv.Cfg, chainType string) *blockchain.Input {
+	t.Helper()
+	for _, bc := range cfg.Blockchains {
+		if bc.Type == chainType {
+			return bc
+		}
+	}
+	require.FailNowf(t, "missing chain", "need at least one %s chain for this test", chainType)
+
+	return nil
+}
+
+func newAggregatorClients(
+	t *testing.T,
+	ctx context.Context,
+	cfg *ccv.Cfg,
+) map[string]*ccv.AggregatorClient {
+	t.Helper()
+	clients := make(map[string]*ccv.AggregatorClient)
+	for qualifier := range cfg.AggregatorEndpoints {
+		client, err := cfg.NewAggregatorClientForCommittee(
+			zerolog.Ctx(ctx).With().Str("component", fmt.Sprintf("aggregator-client-%s", qualifier)).Logger(),
+			qualifier,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		clients[qualifier] = client
+		t.Cleanup(func() {
+			client.Close()
+		})
+	}
+
+	return clients
+}
+
+func defaultEVMToCantonMessageOptions(
+	defaultCCVAddress protocol.UnknownAddress,
+	executorAddress protocol.UnknownAddress,
+	executionGasLimit uint32,
+) cciptestinterfaces.MessageOptions {
+	return cciptestinterfaces.MessageOptions{
+		Version:             3,
+		ExecutionGasLimit:   executionGasLimit,
+		OutOfOrderExecution: false,
+		CCVs: []protocol.CCV{
+			{
+				CCVAddress: defaultCCVAddress,
+				Args:       []byte{},
+				ArgsLen:    0,
+			},
+		},
+		FinalityConfig: 0,
+		Executor:       executorAddress,
+		ExecutorArgs:   nil,
+		TokenArgs:      nil,
+	}
+}
+
 //nolint:paralleltest // we won't run this in parallel.
 func TestEVM2Canton_Basic(t *testing.T) {
 	if testing.Short() {
@@ -43,23 +111,8 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
 	require.NoError(t, err)
 
-	var cantonChain *blockchain.Input
-	for _, bc := range in.Blockchains {
-		if bc.Type == blockchain.TypeCanton {
-			cantonChain = bc
-			break
-		}
-	}
-	require.NotNil(t, cantonChain, "need at least one canton chain for this test")
-
-	var evmChain *blockchain.Input
-	for _, bc := range in.Blockchains {
-		if bc.Type == blockchain.TypeAnvil {
-			evmChain = bc
-			break
-		}
-	}
-	require.NotNil(t, evmChain, "need at least one evm chain for this test")
+	cantonChain := mustGetBlockchainInputByType(t, in, blockchain.TypeCanton)
+	evmChain := mustGetBlockchainInputByType(t, in, blockchain.TypeAnvil)
 
 	cantonDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(cantonChain.ChainID, chainsel.FamilyCanton)
 	require.NoError(t, err)
@@ -90,12 +143,13 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	})
 
 	chain := e.BlockChains.CantonChains()[cantonDetails.ChainSelector]
-	participant := chain.Participants[0]
-	party := participant.PartyID
+	poolOwnerParty := chain.Participants[0].PartyID
+	require.GreaterOrEqual(t, len(chain.Participants), 2, "Canton chain must have at least 2 participants")
+	receiverParty := chain.Participants[1].PartyID
+	require.NotEqual(t, poolOwnerParty, receiverParty, "receiver party must differ from pool owner party")
 
-	// Hash receiver party
-	receiver := contracts.HashedPartyFromString(party)
-	t.Logf("Message receiver: %s", receiver.Hex())
+	receiver := contracts.HashedPartyFromString(receiverParty)
+	t.Logf("Message receiver: %s (party=%s)", receiver.Hex(), receiverParty)
 
 	// Get EVM CCV
 	ref, err := in.CLDF.DataStore.Addresses().Get(
@@ -112,38 +166,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	// No-execution tag
 	executorAddress := protocol.UnknownAddress(gethcommon.HexToAddress("0xEBa517d200000000000000000000000000000000").Bytes())
 
-	// Send message
-	seqNo, err := srcChain.GetExpectedNextSequenceNumber(ctx, dstSelector)
-	require.NoError(t, err)
-	l.Info().Uint64("SeqNo", seqNo).Msg("Expecting sequence number")
-	sendMessageResult, err := srcChain.SendMessage(ctx, dstSelector, cciptestinterfaces.MessageFields{
-		Receiver:    receiver.Bytes(),
-		Data:        []byte("Hello from EVM!"),
-		TokenAmount: cciptestinterfaces.TokenAmount{},
-		FeeToken:    nil,
-	}, cciptestinterfaces.MessageOptions{
-		Version:             3,
-		ExecutionGasLimit:   100_000,
-		OutOfOrderExecution: false,
-		CCVs: []protocol.CCV{
-			{
-				CCVAddress: defaultCCVAddress,
-				Args:       []byte{},
-				ArgsLen:    0,
-			},
-		},
-		FinalityConfig: 0,
-		Executor:       executorAddress,
-		ExecutorArgs:   nil,
-		TokenArgs:      nil,
-	})
-	require.NoError(t, err, "failed to send message from EVM chain")
-	require.Lenf(t, sendMessageResult.ReceiptIssuers, 3, "expected 3 receipt issuers for the message")
-	sentEvent, err := srcChain.WaitOneSentEventBySeqNo(ctx, dstSelector, seqNo, time.Second*10)
-	require.NoError(t, err)
-	messageID := sentEvent.MessageID
-	t.Logf("Message sent with ID: %s", hexutil.Encode(messageID[:]))
-
 	var indexerMonitor *ccv.IndexerMonitor
 	indexerClient, err := lib.Indexer()
 	require.NoError(t, err)
@@ -153,40 +175,146 @@ func TestEVM2Canton_Basic(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, indexerMonitor)
 
-	aggregatorClients := make(map[string]*ccv.AggregatorClient)
-	for qualifier := range in.AggregatorEndpoints {
-		client, err := in.NewAggregatorClientForCommittee(
-			zerolog.Ctx(ctx).With().Str("component", fmt.Sprintf("aggregator-client-%s", qualifier)).Logger(),
-			qualifier)
-		require.NoError(t, err)
-		require.NotNil(t, client)
-		aggregatorClients[qualifier] = client
-		t.Cleanup(func() {
-			client.Close()
-		})
-	}
+	aggregatorClients := newAggregatorClients(t, ctx, in)
 	defaultAggregatorClient := aggregatorClients[common.DefaultCommitteeVerifierQualifier]
+	assertSingleVerifier := func(t *testing.T, messageID [32]byte) (protocol.Message, protocol.UnknownAddress, []byte) {
+		t.Helper()
+		testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)
+		res, err := testCtx.AssertMessage(messageID, e2e.AssertMessageOptions{
+			TickInterval:            time.Second,
+			Timeout:                 tests.WaitTimeout(t),
+			ExpectedVerifierResults: 1,
+			AssertVerifierLogs:      false,
+			AssertExecutorLogs:      false,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, res.AggregatedResult)
+		require.Len(t, res.IndexedVerifications.Results, 1)
+		vr := res.IndexedVerifications.Results[0].VerifierResult
 
-	testCtx := e2e.NewTestingContext(t, t.Context(), chainMap, defaultAggregatorClient, indexerMonitor)
-	result, err := testCtx.AssertMessage(messageID, e2e.AssertMessageOptions{
-		TickInterval:            time.Second,
-		Timeout:                 tests.WaitTimeout(t),
-		ExpectedVerifierResults: 1,
-		AssertVerifierLogs:      false,
-		AssertExecutorLogs:      false,
+		return vr.Message, vr.VerifierDestAddress, vr.CCVData
+	}
+
+	t.Run("message transfer", func(t *testing.T) {
+		subtestCtx := ccv.Plog.WithContext(t.Context())
+		seqNo, err := srcChain.GetExpectedNextSequenceNumber(subtestCtx, dstSelector)
+		require.NoError(t, err)
+		l.Info().Uint64("SeqNo", seqNo).Msg("Expecting sequence number")
+
+		sendMessageResult, err := srcChain.SendMessage(subtestCtx, dstSelector, cciptestinterfaces.MessageFields{
+			Receiver:    receiver.Bytes(),
+			Data:        []byte(evmToCantonBasicPayload),
+			TokenAmount: cciptestinterfaces.TokenAmount{},
+			FeeToken:    nil,
+		}, defaultEVMToCantonMessageOptions(defaultCCVAddress, executorAddress, 100_000))
+		require.NoError(t, err, "failed to send message from EVM chain")
+		require.Lenf(t, sendMessageResult.ReceiptIssuers, 3, "expected 3 receipt issuers for the message")
+		require.NotNil(t, sendMessageResult.Message, "expected send message result to include message payload")
+		t.Logf(
+			"SendMessage accepted (basic): srcSelector=%d dstSelector=%d seqNo=%d receipts=%d issuers=%x",
+			srcSelector,
+			dstSelector,
+			sendMessageResult.Message.SequenceNumber,
+			len(sendMessageResult.ReceiptIssuers),
+			sendMessageResult.ReceiptIssuers,
+		)
+
+		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(subtestCtx, dstSelector, seqNo, time.Second*10)
+		require.NoError(t, err)
+		messageID := sentEvent.MessageID
+		t.Logf("Message sent with ID: %s", hexutil.Encode(messageID[:]))
+
+		message, verifierDestAddress, ccvData := assertSingleVerifier(t, messageID)
+		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
+		require.NoError(t, err, "failed to manually execute message on Canton chain")
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected message execution to succeed")
+		require.EqualValues(t, srcSelector, executionStateChangedEvent.SourceChainSelector, "expected source chain selector to match")
+		require.Equal(t, messageID, executionStateChangedEvent.MessageID, "expected message ID to match")
+		require.Equal(t, seqNo, executionStateChangedEvent.MessageNumber, "expected message number to match")
+		require.Equal(t, []byte{}, executionStateChangedEvent.ReturnData, "expected empty return data from message execution")
 	})
-	require.NoError(t, err)
-	require.NotNil(t, result.AggregatedResult)
-	require.Len(t, result.IndexedVerifications.Results, 1)
 
-	message := result.IndexedVerifications.Results[0].VerifierResult.Message
+	t.Run("token transfer", func(t *testing.T) {
+		subtestCtx := ccv.Plog.WithContext(t.Context())
+		tokenRef, err := in.CLDF.DataStore.Addresses().Get(
+			datastore.NewAddressRefKey(
+				srcSelector,
+				datastore.ContractType("BurnMintERC20WithDrip"),
+				semver.MustParse("1.5.0"),
+				evmToCantonTokenQualifier,
+			),
+		)
+		require.NoError(t, err, "failed to resolve source token address for token transfer e2e")
+		srcToken := protocol.UnknownAddress(gethcommon.HexToAddress(tokenRef.Address).Bytes())
+		cantonReceiver := protocol.UnknownAddress(receiver.Bytes())
+		receiverBalanceBefore, err := dstChain.GetTokenBalance(subtestCtx, cantonReceiver, srcToken)
+		require.NoError(t, err, "failed to read receiver token balance on Canton before execution")
+		require.NotNil(t, receiverBalanceBefore)
+		t.Logf(
+			"Receiver balance before token execution (Canton): receiver=%s token=%x balance=%s",
+			receiverParty,
+			srcToken,
+			receiverBalanceBefore.String(),
+		)
 
-	// Manually execute
-	executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(ctx, message, 0, []protocol.UnknownAddress{result.IndexedVerifications.Results[0].VerifierResult.VerifierDestAddress}, [][]byte{result.IndexedVerifications.Results[0].VerifierResult.CCVData})
-	require.NoError(t, err, "failed to manually execute message on Canton chain")
-	require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected message execution to succeed")
-	require.EqualValues(t, srcSelector, executionStateChangedEvent.SourceChainSelector, "expected source chain selector to match")
-	require.Equal(t, messageID, executionStateChangedEvent.MessageID, "expected message ID to match")
-	require.Equal(t, seqNo, executionStateChangedEvent.MessageNumber, "expected message number to match")
-	require.Equal(t, []byte{}, executionStateChangedEvent.ReturnData, "expected empty return data from message execution")
+		seqNo, err := srcChain.GetExpectedNextSequenceNumber(subtestCtx, dstSelector)
+		require.NoError(t, err)
+		sendMessageResult, err := srcChain.SendMessage(
+			subtestCtx,
+			dstSelector,
+			cciptestinterfaces.MessageFields{
+				Receiver: receiver.Bytes(),
+				Data:     []byte(evmToCantonTokenPayload),
+				TokenAmount: cciptestinterfaces.TokenAmount{
+					Amount:       big.NewInt(evmToCantonTransferAmount),
+					TokenAddress: srcToken,
+				},
+			},
+			defaultEVMToCantonMessageOptions(defaultCCVAddress, executorAddress, 200_000),
+		)
+		require.NoError(t, err, "failed to send token transfer message from EVM chain")
+		require.NotNil(t, sendMessageResult.Message)
+		require.NotNil(t, sendMessageResult.Message.TokenTransfer, "token transfer should be populated in sent message")
+		require.Lenf(t, sendMessageResult.ReceiptIssuers, 4, "expected 4 receipt issuers for token transfer message")
+		t.Logf(
+			"SendMessage accepted (token transfer): srcSelector=%d dstSelector=%d seqNo=%d receipts=%d issuers=%x tokenTransferPresent=%t",
+			srcSelector,
+			dstSelector,
+			sendMessageResult.Message.SequenceNumber,
+			len(sendMessageResult.ReceiptIssuers),
+			sendMessageResult.ReceiptIssuers,
+			sendMessageResult.Message.TokenTransfer != nil,
+		)
+
+		sentEvent, err := srcChain.WaitOneSentEventBySeqNo(subtestCtx, dstSelector, seqNo, time.Second*15)
+		require.NoError(t, err)
+		require.NotNil(t, sentEvent.Message)
+		require.NotNil(t, sentEvent.Message.TokenTransfer, "token transfer should be present in sent event")
+
+		message, verifierDestAddress, ccvData := assertSingleVerifier(t, sentEvent.MessageID)
+		require.NotNil(t, message.TokenTransfer, "indexed message should include token transfer")
+		require.EqualValues(t, receiver.Bytes(), message.TokenTransfer.TokenReceiver, "token transfer receiver should match Canton message receiver")
+		// Assert the receiver's token amount (amount credited to receiver on Canton) matches the EVM->Canton transfer amount.
+		require.Equal(t, 0, message.TokenTransfer.Amount.Cmp(big.NewInt(evmToCantonTransferAmount)), "receiver token amount should match transfer amount")
+
+		// Note: verifierDestAddress is the canton verifier not EVM.
+		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
+		require.NoError(t, err, "failed to manually execute token transfer message on Canton chain")
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected token transfer message execution to succeed")
+
+		receiverBalanceAfter, err := dstChain.GetTokenBalance(subtestCtx, cantonReceiver, srcToken)
+		require.NoError(t, err, "failed to read receiver token balance on Canton after execution")
+		require.NotNil(t, receiverBalanceAfter)
+		transferred := new(big.Int).Sub(receiverBalanceAfter, receiverBalanceBefore)
+		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), big.NewInt(evmToCantonTransferAmount))
+		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter, "receiver final token balance should equal initial balance plus transfer amount")
+		require.Equal(t, big.NewInt(evmToCantonTransferAmount), transferred, "receiver token balance should increase by transfer amount")
+		t.Logf(
+			"Receiver balance after token execution (Canton): receiver=%s before=%s after=%s delta=%s",
+			receiverParty,
+			receiverBalanceBefore.String(),
+			receiverBalanceAfter.String(),
+			transferred.String(),
+		)
+	})
 }
