@@ -94,12 +94,13 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contrac
 	out, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, deps, contract.DeployInput[ccipreceiver.CCIPReceiver]{
 		ChainSelector: c.chainDetails.ChainSelector,
 		Qualifier:     nil,
-		ActAs:         []string{participant.PartyID},
+		ActAs:         []string{partyId},
 		Template: ccipreceiver.CCIPReceiver{
-			Owner:        types.PARTY(participant.PartyID),
-			RequiredCCVs: nil,
+			Owner:         types.PARTY(partyId),
+			RequiredCCVs:  nil,
+			MinBlockDepth: types.INT64(0),
 		},
-		OwnerParty: types.PARTY(participant.PartyID),
+		OwnerParty: types.PARTY(partyId),
 	})
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy receiver contract: %w", err)

@@ -598,6 +598,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+						{Label: "minBlockDepth", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 					}},
 				}},
 			}},
