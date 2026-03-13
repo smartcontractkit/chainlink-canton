@@ -1396,6 +1396,7 @@ func canonicalCantonRemotePoolHex(remotePoolHex string) string {
 	if len(clean) < 64 {
 		return strings.Repeat("0", 64-len(clean)) + clean
 	}
+
 	return clean
 }
 
@@ -1506,8 +1507,10 @@ func resolveRateLimiterForSend(
 				continue
 			}
 		}
+
 		return types.CONTRACT_ID(entry.ActiveContract.GetCreatedEvent().GetContractId()), convertToDisclosedContract(entry.ActiveContract), nil
 	}
+
 	return "", nil, fmt.Errorf("missing outbound rate limiter for destination selector %s", destSelectorKey)
 }
 
@@ -2755,6 +2758,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						if normalizeNumericForCompare(keyNumeric) == normalizeNumericForCompare(tokenDestSelectorKey) {
 							e.Value = ledger.MapToValue(outboundFallback)
 							updated = true
+
 							break
 						}
 					}
@@ -2780,6 +2784,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						if normalizeNumericForCompare(keyNumeric) == normalizeNumericForCompare(tokenDestSelectorKey) {
 							e.Value = ledger.MapToValue(inboundFallback)
 							updated = true
+
 							break
 						}
 					}

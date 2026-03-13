@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/big"
 	"net/http"
 	"strings"
@@ -1057,6 +1058,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 			selectedPoolPackageID = tid.GetPackageId()
 		}
 		selectedInstrumentFromCreateArgs = extractInstrumentCombinedFromCreateArgs(entry.ActiveContract.GetCreatedEvent())
+
 		break
 	}
 	if selectedPool == nil && tokenMatchedPool != nil && !requireInstrumentMatch {
@@ -1602,9 +1604,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 	}
 
 	updatedInbound := types.GENMAP{}
-	for k, v := range pool.InboundRateLimiters {
-		updatedInbound[k] = v
-	}
+	maps.Copy(updatedInbound, pool.InboundRateLimiters)
 	updatedInbound[sourceSelectorKey] = replacementRaw
 	updatedInbound[sourceSelectorNumericKey] = replacementRaw
 	updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateRateLimiters{
@@ -1929,9 +1929,7 @@ func ensureManualExecuteSourcePoolAllowed(
 	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
 ) (*lockreleasetokenpool.LockReleaseTokenPool, string, error) {
 	updatedChainPoolConfigs := types.GENMAP{}
-	for k, v := range pool.ChainPoolConfigs {
-		updatedChainPoolConfigs[k] = v
-	}
+	maps.Copy(updatedChainPoolConfigs, pool.ChainPoolConfigs)
 	existingCfgAny, _ := findChainPoolConfigBySelector(pool.ChainPoolConfigs, sourceSelectorKey)
 	existingCfg, ok := chainPoolConfigFromAny(existingCfgAny)
 	if !ok {
