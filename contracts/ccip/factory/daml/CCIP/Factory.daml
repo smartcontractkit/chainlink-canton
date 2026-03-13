@@ -1,0 +1,340 @@
+module CCIP.Factory where
+
+import DA.Map qualified as Map
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import qualified CCIP.GlobalConfig
+import qualified CCIP.FeeQuoter
+import qualified CCIP.TokenAdminRegistry
+import qualified CCIP.OnRamp
+import qualified CCIP.OffRamp
+import qualified CCIP.PerPartyRouter
+import qualified CCIP.LockReleaseTokenPool
+import qualified CCIP.CommitteeVerifier
+import qualified CCIP.RMNRemote
+import qualified CCIP.RateLimiter
+import qualified CCIP.CCIPSender
+import qualified CCIP.CCIPReceiver
+
+-- | Stable contract for CCIP system deployment orchestration.
+--
+-- Security/flow constraints:
+-- 1. Contract may be created by an arbitrary bootstrap party.
+-- 2. No deployment is possible until ownership is handed over to `mcmsParty`
+--    and `isMCMSControlled` is true.
+-- 3. Every deployed component instanceId is tracked in `usedInstanceIds` and
+--    cannot be reused.
+-- 4. All deploy choices are consuming; each recreates CCIPFactory with
+--    updated state and returns both the new factory CID and deployed CID.
+
+template CCIPFactory
+    with
+        instanceId : Text
+        owner : Party
+        mcmsParty : Party
+        isMCMSControlled : Bool
+        usedInstanceIds : Map.Map Text Bool
+        deployedContracts : Map.Map Text (ContractId ())
+    where
+        signatory owner
+        observer mcmsParty
+
+        interface instance MCMSReceiver for CCIPFactory where
+          view = MCMSReceiverView with
+            mcmsController = owner
+            instanceId
+
+          mcmsEntrypoint functionName _operationData contractIds = do
+            let selfAddress = instanceId <> "@" <> partyToText owner
+            selfCid <- case Map.lookup selfAddress contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> selfAddress
+              Some cid -> pure (coerceContractId cid : ContractId CCIPFactory)
+
+            case functionName of
+              "SetOwnerToMCMS" -> do
+                newCid <- exercise selfCid SetOwnerToMCMS
+                pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+        -- | One-time ownership handover from bootstrap owner to MCMS party.
+        -- This is consuming because signatory changes.
+        choice SetOwnerToMCMS : ContractId CCIPFactory
+            controller owner
+            do
+                assertMsg "factory already MCMS controlled" (not isMCMSControlled)
+                create this with
+                    owner = mcmsParty
+                    isMCMSControlled = True
+
+        nonconsuming choice GetFactoryState : FactoryState
+            with
+                caller : Party
+            controller caller
+            do
+                pure FactoryState with
+                    instanceId
+                    owner
+                    mcmsParty
+                    isMCMSControlled
+                    usedInstanceIds
+                    deployedContracts
+
+        choice DeployGlobalConfig : DeployResult
+            with
+                contract : CCIP.GlobalConfig.GlobalConfig
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "global-config" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "global-config" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployFeeQuoter : DeployResult
+            with
+                contract : CCIP.FeeQuoter.FeeQuoter
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "fee-quoter" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "fee-quoter" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployTokenAdminRegistry : DeployResult
+            with
+                contract : CCIP.TokenAdminRegistry.TokenAdminRegistry
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "token-admin-registry" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "token-admin-registry" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployOnRamp : DeployResult
+            with
+                contract : CCIP.OnRamp.OnRamp
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "on-ramp" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "on-ramp" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployOffRamp : DeployResult
+            with
+                contract : CCIP.OffRamp.OffRamp
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "off-ramp" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "off-ramp" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployPerPartyRouterFactory : DeployResult
+            with
+                contract : CCIP.PerPartyRouter.PerPartyRouterFactory
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "per-party-router-factory" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "per-party-router-factory" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployRMNRemote : DeployResult
+            with
+                contract : CCIP.RMNRemote.RMNRemote
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "rmn-remote" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "rmn-remote" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployCommitteeVerifier : DeployResult
+            with
+                contract : CCIP.CommitteeVerifier.CommitteeVerifier
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                let componentKey = "committee-verifier:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployLockReleaseTokenPool : DeployResult
+            with
+                contract : CCIP.LockReleaseTokenPool.LockReleaseTokenPool
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                let componentKey = "lock-release-token-pool:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployRateLimiter : DeployResult
+            with
+                contract : CCIP.RateLimiter.RateLimiter
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                let componentKey = "rate-limiter:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployCCIPSender : DeployResult
+            with
+                contract : CCIP.CCIPSender.CCIPSender
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                let componentKey = "ccip-sender:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployCCIPReceiver : DeployResult
+            with
+                contract : CCIP.CCIPReceiver.CCIPReceiver
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                let componentKey = "ccip-receiver:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+
+data DeployResult = DeployResult
+    with
+        factoryCid : ContractId CCIPFactory
+        deployedCid : ContractId ()
+    deriving (Eq, Show)
+
+data FactoryState = FactoryState
+    with
+        instanceId : Text
+        owner : Party
+        mcmsParty : Party
+        isMCMSControlled : Bool
+        usedInstanceIds : Map.Map Text Bool
+        deployedContracts : Map.Map Text (ContractId ())
+    deriving (Eq, Show)
+
+assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
+assertFactoryIsMCMSControlled factory =
+    assertMsg "factory is not MCMS controlled"
+        factory.isMCMSControlled
+
+assertComponentNotDeployed : Text -> Map.Map Text (ContractId ()) -> Update ()
+assertComponentNotDeployed componentKey deployedContracts =
+    assertMsg ("component already deployed: " <> componentKey)
+        (Map.lookup componentKey deployedContracts == None)
+
+assertSingletonNotDeployed : Text -> Map.Map Text (ContractId ()) -> Update ()
+assertSingletonNotDeployed = assertComponentNotDeployed
+
+assertInstanceIdUnused : Text -> Map.Map Text Bool -> Update ()
+assertInstanceIdUnused newInstanceId usedInstanceIds =
+    assertMsg ("instanceId already used: " <> newInstanceId)
+        (Map.lookup newInstanceId usedInstanceIds == None)
+
+reserveInstanceId : Text -> Map.Map Text Bool -> Map.Map Text Bool
+reserveInstanceId instanceId usedInstanceIds =
+    Map.insert instanceId True usedInstanceIds
