@@ -274,8 +274,8 @@ func TestCCIPSend(t *testing.T) {
 
 	// Configure FeeToken: Add FeeToken to FeeQuoter
 
-	// ApplyFeeTokenUpdates: Add the fee token with premium multiplier of 1.0 (no premium)
-	premiumMultiplier := "1.0" // 1.0 means no premium/discount
+	// ApplyFeeTokenUpdates: Add the fee token with Canton E8 premium multiplier (1.0x)
+	premiumMultiplier := "100000000"
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -314,7 +314,7 @@ func TestCCIPSend(t *testing.T) {
 		Admin: types.PARTY(partyCCIP),
 		Id:    types.TEXT("link-token"),
 	}
-	usdPerToken := "1.00"
+	usdPerToken := "100000000"
 	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -332,7 +332,7 @@ func TestCCIPSend(t *testing.T) {
 								},
 								{
 									InstrumentId: linkTokenInstrumentId,
-									UsdPerToken:  types.NUMERIC("15.00"),
+									UsdPerToken:  types.NUMERIC("1500000000"),
 								},
 							},
 							GasPriceUpdates: []feequoter.GasPriceUpdate{},
