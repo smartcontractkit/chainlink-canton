@@ -30,7 +30,7 @@ import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 import TestToken qualified
 
 usd : Decimal -> Numeric 0
-usd d = intToNumeric (truncate (d * 1000000000000000000.0))
+usd d = intToNumeric (truncate (d * 100000000.0))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -39,7 +39,7 @@ usdToCents : Decimal -> Numeric 0
 usdToCents d = intToNumeric (truncate (d * 100.0))
 
 mult : Decimal -> Numeric 0
-mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+mult m = intToNumeric (truncate (m * 100000000.0))
 
 mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
@@ -1221,7 +1221,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = ccipOwner
             instanceId = "test-feequoter-fallback"
-            feeTokens = Map.fromList [(feeTokenId, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -1239,7 +1239,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
                 destGasOverhead = 70000
                 destBytesOverhead = 64)])]
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = feeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [ccipOwner]
@@ -1346,7 +1346,7 @@ testCalculateFeePrefersPoolOverride = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = ccipOwner
             instanceId = "test-feequoter-pool-override"
-            feeTokens = Map.fromList [(feeTokenId, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -1364,7 +1364,7 @@ testCalculateFeePrefersPoolOverride = script do
                 destGasOverhead = 90000
                 destBytesOverhead = 96)])]
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = feeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [ccipOwner]
@@ -1475,7 +1475,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = ccipOwner
             instanceId = "test-feequoter-pool-disabled"
-            feeTokens = Map.fromList [(feeTokenId, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -1493,7 +1493,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
                 destGasOverhead = 71000
                 destBytesOverhead = 65)])]
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = feeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [ccipOwner]
@@ -1601,7 +1601,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-defaults"
-            feeTokens = Map.fromList [(linkToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(linkToken, 100000000.0)]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -1615,7 +1615,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
                 defaultTokenDestGasOverhead = 12345)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = linkToken
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
@@ -1649,7 +1649,7 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-per-dest"
-            feeTokens = Map.fromList [(linkToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(linkToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.fromList
                 [ (destChainSelector1, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
@@ -1664,7 +1664,7 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
                     destBytesOverhead = 64)])
                 ]
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = linkToken
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]

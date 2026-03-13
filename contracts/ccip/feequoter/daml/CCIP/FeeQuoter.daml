@@ -33,8 +33,8 @@ template FeeQuoter
         instanceId : Text
         owner : Party
 
-        -- | Set of fee tokens that can be used to pay for fees. Values are EVM-style
-        -- | multipliers with 1e18 precision, so 1e18 = 1.0x.
+        -- | Set of fee tokens that can be used to pay for fees. Values are
+        -- | 1e8-scaled premium multipliers, so 1e8 = 1.0x.
         feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId (Numeric 0)
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
         tokenTransferFeeConfigs : Map.Map (Numeric 0) (Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig)
@@ -43,8 +43,8 @@ template FeeQuoter
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
         linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         maxFeeJuelsPerMsg : Numeric 0 -- Max fee in LINK smallest units (juels).
-        -- | Token prices are stored in EVM units: 18-decimal USD price for 1e18
-        -- | smallest fee-token units. This matches EVM FeeQuoter scaling.
+        -- | Token prices are stored as usd8 integers: 8-decimal USD price for
+        -- | 1e8 local smallest units of the token/gas asset.
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
         priceUpdaters : [Party]
     where
@@ -259,7 +259,7 @@ data TokenTransferFeeConfig = TokenTransferFeeConfig
 
 data TimestampedPrice = TimestampedPrice
     with
-        -- EVM-style 18-decimal USD price for 1e18 smallest units of the token/gas asset.
+        -- 8-decimal USD price for 1e8 smallest units of the token/gas asset.
         price : Numeric 0
         timestamp : Time
     deriving (Eq, Show)
@@ -274,14 +274,14 @@ data PriceUpdates = PriceUpdates
 data TokenPriceUpdate = TokenPriceUpdate
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        -- EVM-style 18-decimal USD price for 1e18 smallest token units.
+        -- 8-decimal USD price for 1e8 smallest token units.
         usdPerToken : Numeric 0
     deriving (Eq, Show)
 
 data GasPriceUpdate = GasPriceUpdate
     with
         destChainSelector : Numeric 0
-        -- EVM-style 18-decimal USD price per gas unit.
+        -- 8-decimal USD price per gas unit.
         usdPerUnitGas : Numeric 0
     deriving (Eq, Show)
 

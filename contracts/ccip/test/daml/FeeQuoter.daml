@@ -15,7 +15,7 @@ import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import Splice.Api.Token.HoldingV1
 
 usd : Decimal -> Numeric 0
-usd d = intToNumeric (truncate (d * 1000000000000000000.0))
+usd d = intToNumeric (truncate (d * 100000000.0))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -24,7 +24,7 @@ usdToCents : Decimal -> Numeric 0
 usdToCents d = intToNumeric (truncate (d * 100.0))
 
 mult : Decimal -> Numeric 0
-mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+mult m = intToNumeric (truncate (m * 100000000.0))
 
 setup = script do
     owner <- allocateParty "owner"
@@ -60,12 +60,12 @@ setup = script do
                 tokenPriceUpdates = [ 
                         TokenPriceUpdate with
                             instrumentId = instrumentIdLINK
-                            usdPerToken = 17770000000000000000.0
+                            usdPerToken = 1777000000.0
                     ]
                 gasPriceUpdates = [
                         GasPriceUpdate with
                             destChainSelector = destChainSelector1
-                            usdPerUnitGas = 45000000000000000.0
+                            usdPerUnitGas = 4500000.0
                     ]
             caller = owner
 
@@ -75,14 +75,14 @@ setup = script do
             instrumentId = instrumentIdLINK
             caller = owner
     debug result
-    result.price === 17770000000000000000.0
+    result.price === 1777000000.0
 
     result <- submit owner do
         exerciseCmd fq GetDestinationChainGasPrice with
             destChainSelector = destChainSelector1
             caller = owner
     debug result
-    result.price === 45000000000000000.0
+    result.price === 4500000.0
 
     -- Apply prices again, this time for two chains and two instruments
     fq <- submit owner do
@@ -91,18 +91,18 @@ setup = script do
                 tokenPriceUpdates = [ 
                         (TokenPriceUpdate with
                             instrumentId = instrumentIdLINK
-                            usdPerToken = 20000000000000000000.0),
+                            usdPerToken = 2000000000.0),
                         (TokenPriceUpdate with
                             instrumentId = instrumentIdUSDC
-                            usdPerToken = 1000000000000000000.0)
+                            usdPerToken = 100000000.0)
                     ]
                 gasPriceUpdates = [
                         (GasPriceUpdate with
                             destChainSelector = destChainSelector1
-                            usdPerUnitGas = 50000000000000000.0),
+                            usdPerUnitGas = 5000000.0),
                         (GasPriceUpdate with
                             destChainSelector = destChainSelector2
-                            usdPerUnitGas = 75000000000000000.0)
+                            usdPerUnitGas = 7500000.0)
                     ]
             caller = owner
 
@@ -112,28 +112,28 @@ setup = script do
             instrumentId = instrumentIdLINK
             caller = owner
     debug result
-    result.price === 20000000000000000000.0
+    result.price === 2000000000.0
     
     result <- submit owner do 
         exerciseCmd fq GetTokenPrice with
             instrumentId = instrumentIdUSDC
             caller = owner
     debug result
-    result.price === 1000000000000000000.0
+    result.price === 100000000.0
 
     result <- submit owner do
         exerciseCmd fq GetDestinationChainGasPrice with
             destChainSelector = destChainSelector1
             caller = owner
     debug result
-    result.price === 50000000000000000.0
+    result.price === 5000000.0
 
     result <- submit owner do
         exerciseCmd fq GetDestinationChainGasPrice with
             destChainSelector = destChainSelector2
             caller = owner
     debug result
-    result.price === 75000000000000000.0
+    result.price === 7500000.0
 
     -- test ApplyDestChainConfigUpdates
     let destChainConfig1 = DestChainConfig with
@@ -217,11 +217,11 @@ testFinalizeFeeUsesEVMScaledPrices = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-finalize"
-            feeTokens = Map.fromList [(feeToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(feeToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(feeToken, TimestampedPrice 2000000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = feeToken
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
@@ -281,7 +281,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
 
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
-    sm.networkFeeTokenAmount === 50000000000000000.0
+    sm.networkFeeTokenAmount === 5000000.0
 
     debug "testFinalizeFeeUsesEVMScaledPrices: PASSED"
 
@@ -297,17 +297,17 @@ testFinalizeFee_PremiumAndExecutor = script do
             admin = owner
             id = "LINK"
 
-    -- premiumMultiplier = mult 0.9e18 means 90% (10% LINK discount)
-    -- feeTokenPrice = 20e18 (20 USD per LINK in 18-decimal format)
+    -- premiumMultiplier = mult 0.9 means 90% (10% LINK discount) in the E8 scale
+    -- feeTokenPrice = usd 20.0 (20 USD per LINK in the usd8 format)
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-premium"
-            feeTokens = Map.fromList [(feeToken, 900000000000000000.0)]
+            feeTokens = Map.fromList [(feeToken, 90000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(feeToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(feeToken, TimestampedPrice 2000000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = feeToken
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
@@ -394,17 +394,17 @@ testFinalizeFee_PremiumAndExecutor = script do
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
 
-    -- Network fee (premium path): 100 * 0.9e18 / 20e18 * 1e16 = 4.5e16
-    sm.networkFeeTokenAmount === 45000000000000000.0
+    -- Network fee (premium path): 100 cents -> 1e8 usd8, then 1e8 * 0.9e8 / 20e8 = 4.5e6
+    sm.networkFeeTokenAmount === 4500000.0
 
-    -- CCV fee (premium path): 200 * 0.9e18 / 20e18 * 1e16 = 9e16
+    -- CCV fee (premium path): 200 cents -> 2e8 usd8, then 2e8 * 0.9e8 / 20e8 = 9e6
     let ccvAmount = case sm.ccvFeeTokenAmounts of
             [a] -> a
             _ -> error "Expected exactly one CCV fee amount"
-    ccvAmount === 90000000000000000.0
+    ccvAmount === 9000000.0
 
-    -- Executor fee (direct path, NO premium): 300 * 1e18 / 20e18 * 1e16 = 1.5e17
-    sm.executorFeeTokenAmount === 150000000000000000.0
+    -- Executor fee (direct path, NO premium): 300 cents -> 3e8 usd8, then 3e8 * 1e8 / 20e8 = 1.5e7
+    sm.executorFeeTokenAmount === 15000000.0
 
     debug "testFinalizeFee_PremiumAndExecutor: PASSED"
 
@@ -419,16 +419,16 @@ testFinalizeFee_SmallFee = script do
             admin = owner
             id = "LINK"
 
-    -- feeTokenPrice = 20e18, premiumMultiplier = mult 1e18 (100%)
+    -- feeTokenPrice = usd 20.0, premiumMultiplier = mult 1.0 (100%)
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-small"
-            feeTokens = Map.fromList [(feeToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(feeToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            usdPerToken = Map.fromList [(feeToken, TimestampedPrice 2000000000.0 (time (date 2026 Jan 1) 0 0 0))]
             linkTokenInstrumentId = feeToken
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [owner]
@@ -500,14 +500,14 @@ testFinalizeFee_SmallFee = script do
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
 
-    -- 1 * 1e18 / 20e18 * 1e16 = 5e14
-    sm.networkFeeTokenAmount === 500000000000000.0
-    -- 1 * 1e18 / 20e18 * 1e16 = 5e14
-    sm.executorFeeTokenAmount === 500000000000000.0
+    -- 1 cent -> 1e6 usd8, then 1e6 * 1e8 / 20e8 = 5e4
+    sm.networkFeeTokenAmount === 50000.0
+    -- 1 cent -> 1e6 usd8, then 1e6 * 1e8 / 20e8 = 5e4
+    sm.executorFeeTokenAmount === 50000.0
 
     debug "testFinalizeFee_SmallFee: PASSED"
 
--- L-1: Finalized fee is converted into LINK juels before the cap check.
+-- L-1: Finalized fee is converted into local LINK units, then compared to the juels cap boundary.
 testFinalizeFee_LinkCapAfterConversion = script do
     owner <- allocateParty "owner-link-cap"
     sender <- allocateParty "sender-link-cap"
@@ -520,20 +520,20 @@ testFinalizeFee_LinkCapAfterConversion = script do
             admin = owner
             id = "USDC"
 
-    -- feeToken price = 1e18 ($1 per token)
-    -- LINK price = 15e18 ($15 per token)
+    -- feeToken price = usd 1.0 ($1 per token in usd8)
+    -- LINK price = usd 15.0 ($15 per token in usd8)
     -- network fee = $1.50 -> 1.5 fee tokens -> 0.1 LINK
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-cap"
-            feeTokens = Map.fromList [(feeToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList
-                [ (feeToken, TimestampedPrice 1000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
-                , (linkToken, TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
+                [ (feeToken, TimestampedPrice 100000000.0 (time (date 2026 Jan 1) 0 0 0))
+                , (linkToken, TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))
                 ]
             linkTokenInstrumentId = linkToken
             maxFeeJuelsPerMsg = 99999999999999999.0
@@ -596,13 +596,13 @@ testFinalizeFee_LinkCapAfterConversion = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-cap-pass"
-            feeTokens = Map.fromList [(feeToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(feeToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList
-                [ (feeToken, TimestampedPrice 1000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
-                , (linkToken, TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0))
+                [ (feeToken, TimestampedPrice 100000000.0 (time (date 2026 Jan 1) 0 0 0))
+                , (linkToken, TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))
                 ]
             linkTokenInstrumentId = linkToken
             maxFeeJuelsPerMsg = 100000000000000000.0
@@ -662,7 +662,7 @@ testFinalizeFee_LinkCapAfterConversion = script do
             caller = owner
 
     Some sm <- queryContractId owner sendingMessageCid
-    sm.networkFeeTokenAmount === 1500000000000000000.0
+    sm.networkFeeTokenAmount === 150000000.0
 
     debug "testFinalizeFee_LinkCapAfterConversion: PASSED"
 
@@ -676,17 +676,17 @@ testFinalizeFee_LinkCapDirect = script do
             admin = owner
             id = "LINK"
 
-    -- $1.50 fee at $15/LINK -> 0.1 LINK = 1e17 juels
+    -- $1.50 fee at $15/LINK -> 0.1 LINK = 1e7 local LINK units = 1e17 juels
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-direct-cap"
-            feeTokens = Map.fromList [(linkToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(linkToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList
-                [ (linkToken, TimestampedPrice 15000000000000000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
+                [ (linkToken, TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
             linkTokenInstrumentId = linkToken
             maxFeeJuelsPerMsg = 99999999999999999.0
             priceUpdaters = [owner]
@@ -762,12 +762,12 @@ testFinalizeFee_LinkCapMixedFees = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-mixed-cap"
-            feeTokens = Map.fromList [(linkToken, 1000000000000000000.0)]
+            feeTokens = Map.fromList [(linkToken, 100000000.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList
-                [ (linkToken, TimestampedPrice 20000000000000000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
+                [ (linkToken, TimestampedPrice 2000000000.0 (time (date 2026 Jan 1) 0 0 0)) ]
             linkTokenInstrumentId = linkToken
             maxFeeJuelsPerMsg = 199999999999999999.0
             priceUpdaters = [owner]
@@ -850,8 +850,8 @@ testFinalizeFee_LinkCapMixedFees = script do
             destBytesOverhead = 0
             caller = executorOwner
 
-    -- Total = 4 * (100 * 1e18 / 20e18 * 1e16) = 4 * 5e16 = 2e17 juels.
-    -- Cap of ~2e17 - 1 forces failure.
+    -- Total = 4 * (100 cents -> 5e6 local LINK units) = 2e7 local LINK units = 2e17 juels.
+    -- Cap of ~2e17 - 1 juels converts to 19,999,999 local LINK units, so this must fail.
     submitMustFail owner do
         exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
             sendingMessageCid = sendingMessageCid

@@ -8,7 +8,7 @@ import Splice.Api.Token.HoldingV1
 data FeeTokenArgs = FeeTokenArgs
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        -- EVM-style multiplier with 1e18 precision: 1e18 = 1.0x.
+        -- 1e8-scaled premium multiplier: 1e8 = 1.0x.
         premiumMultiplier : Numeric 0
     deriving (Eq, Show)
 

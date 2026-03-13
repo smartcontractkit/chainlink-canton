@@ -31,7 +31,7 @@ import qualified TestExecutor
 import qualified TestToken
 
 mult : Decimal -> Numeric 0
-mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+mult m = intToNumeric (truncate (m * 100000000.0))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -104,7 +104,7 @@ testCCIPSend = script do
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
-                    price = 1000000000000000000.0
+                    price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
@@ -495,7 +495,7 @@ testPrepareSendExtraArgs = script do
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(feeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
-                    price = 1000000000000000000.0
+                    price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = feeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0

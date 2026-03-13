@@ -1,22 +1,32 @@
--- | Exact-arithmetic helpers for CCIP's EVM-style fee math.
+-- | Exact arithmetic helpers for CCIP fee math and Splice boundary conversions.
 --
--- CCIP fee math uses `floor(a * b / c)` and cap comparisons. In Solidity
--- `uint256` provides enough headroom, but Daml `Numeric 0` maxes out at
--- ~1e38, so naive `a * b` can overflow for 18-digit EVM-scaled values.
+-- CCIP fee quoting needs exact integer semantics for operations such as:
 --
--- We decompose via quotients and remainders to keep all intermediates
--- within Numeric 0 range:
+--   floor(feeUsdScale * premiumMultiplier / feeTokenPrice)
 --
---   mulDivDown(a, b, c) = qa*qb*c + qa*rb + ra*qb + floor(ra*rb/c)
---     where qa = a/c, ra = a%c, qb = b/c, rb = b%c
+-- and cap checks such as:
 --
--- Since ra < c and rb < c, the largest intermediate is ra*rb < c^2.
--- For CCIP fee math, c is a token price (~1e18-1e21), so c^2 < 1e42
--- which can overflow. When that happens, we apply a further split on
--- the ra*rb term.
+--   floor(feeTokenAmount * feeTokenPrice / linkTokenPrice) <= maxFeeJuelsPerMsg
 --
--- Splice boundary helpers included for conversion from Numeric 0 into Decimal
--- Splice holdings with range checks.
+-- Solidity uses uint256 for these operations. Daml's Numeric 0 has much less
+-- headroom, so naive `a * b / c` can overflow, and `a / c * b` is not parity
+-- safe because it rounds too early.
+--
+-- This module therefore performs exact integer arithmetic using base-1e8 limbs.
+-- A limb is one chunk of a larger integer. For example, the integer
+-- `12345678901234567890` is represented as little-endian limbs:
+--
+--   [34567890, 56789012, 1234]
+--
+-- Base-1e8 is a good fit here because:
+-- - it matches the fee path's E8 scale,
+-- - each limb product fits comfortably inside Int64,
+-- - a 38-digit Numeric 0 needs only about five limbs,
+-- - exact multiplication/division stays fast enough on-ledger.
+--
+-- This module is intentionally narrow. It exists to support CCIP's exact fee
+-- conversion and checked Numeric0 -> Decimal boundaries, not as a general math
+-- library.
 module CCIP.Math
   ( integerAmountWithinCap
   , normalizedFeeWithinCap
@@ -26,15 +36,19 @@ module CCIP.Math
   , numeric0ToDecimalChecked
   ) where
 
--- Numeric 0 max is 38 digits ~ 1e38. Products above this overflow.
-numeric0Max : Numeric 0
-numeric0Max = 99999999999999999999999999999999999999.0
+import DA.Text qualified as Text
 
--- Int64 max. Values above this cannot be passed to truncate/intToDecimal.
-int64Max : Numeric 0
-int64Max = 9223372036854775807.0
+baseInt : Int
+baseInt = 100000000
 
--- Approximate Decimal max, off by < 1
+baseNumeric : Numeric 0
+baseNumeric = 100000000.0
+
+juelsPerLocalLink : Numeric 0
+juelsPerLocalLink = 10000000000.0
+
+-- Approximate Decimal max, off by < 1. This is sufficient for converting
+-- integer-valued Numeric 0 amounts into Decimal at Splice boundaries.
 maxDecimalIntegerValue : Numeric 0
 maxDecimalIntegerValue = 9999999999999999999999999999.0
 
@@ -42,103 +56,220 @@ canFitInDecimal : Numeric 0 -> Bool
 canFitInDecimal n = n >= 0.0 && n <= maxDecimalIntegerValue
 
 -- | Convert a Numeric 0 integer to Decimal, failing if out of range.
--- Splits via 1e18 to avoid Int64 overflow for values above ~9.2e18.
 numeric0ToDecimalChecked : Text -> Numeric 0 -> Decimal
 numeric0ToDecimalChecked label n =
     if n < 0.0 then error (label <> ": negative amount")
     else if not (canFitInDecimal n) then error (label <> ": amount exceeds Decimal range")
-    else if n <= int64Max then intToDecimal (truncate n)
-    else
-        let scale : Numeric 0 = 1000000000000000000.0
-            hi = floorDiv n scale
-            lo = floorMod n scale
-        in intToDecimal (truncate hi) * 1000000000000000000.0 + intToDecimal (truncate lo)
+    else foldl
+        (\acc limb -> acc * 100000000.0 + intToDecimal limb)
+        0.0
+        (reverse (toLimbs label n))
 
--- | Integer floor division for Numeric 0 values.
--- Numeric 0 `/` uses banker's rounding, which can round up when the
--- fractional part is >= 0.5. Computes the remainder via split
--- multiplication to avoid overflow when a is near numeric0Max.
-floorDiv : Numeric 0 -> Numeric 0 -> Numeric 0
-floorDiv a b =
-    let q = a / b
-    in if q == 0.0 then 0.0
-       else
-        -- Compute a - q*b without overflow. Split b into two halves so
-        -- each partial product stays under numeric0Max.
-        let half = b / 2.0
-            other = b - half
-            r = a - q * half - q * other
-        in if r < 0.0 then q - 1.0 else q
+-- | Check whether a LINK-denominated fee amount in local LINK smallest units
+-- is within the juels-denominated cap.
+integerAmountWithinCap : Numeric 0 -> Numeric 0 -> Bool
+integerAmountWithinCap feeAmount maxFeeJuelsPerMsg =
+    feeAmount <= juelsCapToLocalLinkCap maxFeeJuelsPerMsg
 
--- | Integer modulus for Numeric 0 values.
-floorMod : Numeric 0 -> Numeric 0 -> Numeric 0
-floorMod a b = a - floorDiv a b * b
+-- | Check whether a fee amount in a non-LINK token is within the juels cap.
+-- The non-LINK amount is first converted into local LINK smallest units using
+-- exact floor(a*b/c), then compared against the juels cap converted into local
+-- LINK units.
+normalizedFeeWithinCap : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0 -> Bool
+normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice maxFeeJuelsPerMsg =
+    convertTokenAmountLocal feeTokenAmount feeTokenPrice linkTokenPrice
+        <= juelsCapToLocalLinkCap maxFeeJuelsPerMsg
 
--- | Whether the product a * b would overflow Numeric 0.
-wouldOverflow : Numeric 0 -> Numeric 0 -> Bool
-wouldOverflow a b =
-    a > 0.0 && b > 0.0 && a > numeric0Max / b
-
--- | Exact floor(a * b / c) without intermediate overflow.
---
--- Decomposes a and b by c so all intermediate products stay within
--- Numeric 0 range. The identity:
---   a*b/c = qa*qb*c + qa*rb + ra*qb + floor(ra*rb/c)
--- where qa=a/c, ra=a%c, qb=b/c, rb=b%c.
---
--- ra < c and rb < c, so ra*rb < c^2. If c^2 still overflows Numeric 0,
--- the ra*rb term is further decomposed by splitting ra.
+-- | Exact floor(a * b / c) over integer-valued Numeric 0 inputs.
 mulDivDown : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
 mulDivDown a b c =
     if c <= 0.0 then error "mulDivDown: denominator must be positive"
     else if a < 0.0 || b < 0.0 then error "mulDivDown: negative input"
     else if a == 0.0 || b == 0.0 then 0.0
     else
-        let qa = floorDiv a c
-            ra = floorMod a c
-            qb = floorDiv b c
-            rb = floorMod b c
-            -- qa*qb*c: rewrite as qa*(b - rb) to avoid qb*c overflow
-            term1 = qa * (b - rb)
-            -- qa*rb: qa ≈ a/c, rb < c, so qa*rb < a (always fits)
-            term2 = qa * rb
-            -- ra*qb: ra < c, qb ≈ b/c, so ra*qb < b (always fits)
-            term3 = ra * qb
-            -- ra*rb/c: both ra,rb < c. If ra*rb overflows, decompose further.
-            term4 = if wouldOverflow ra rb
-                    then safeRemainderDiv ra rb c
-                    else floorDiv (ra * rb) c
-        in term1 + term2 + term3 + term4
+        let numerator = mulLimbs (toLimbs "mulDivDown a" a) (toLimbs "mulDivDown b" b)
+            denominator = toLimbs "mulDivDown c" c
+            (quotient, _) = divModLimbs numerator denominator
+        in fromLimbs "mulDivDown result" quotient
 
--- | Compute floor(ra * rb / c) when ra*rb would overflow Numeric 0.
--- Splits ra by d = floor(numeric0Max / rb) so that raH*rb fits.
--- Uses floor((A+B)/c) = floor(A/c) + floor(B/c) + floor((A%c + B%c)/c)
--- to avoid summing terms that could overflow.
-safeRemainderDiv : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
-safeRemainderDiv ra rb c =
-    let d = floorDiv numeric0Max rb
-        qaH = floorDiv ra d
-        raH = floorMod ra d
-        dTimesRb = d * rb
-        term1 = qaH * floorDiv dTimesRb c
-        r2 = floorMod dTimesRb c
-        raHTimesRb = raH * rb
-        -- floor((qaH*r2 + raHTimesRb) / c) split to avoid overflow
-        qA = floorDiv (qaH * r2) c
-        rA = floorMod (qaH * r2) c
-        qB = floorDiv raHTimesRb c
-        rB = floorMod raHTimesRb c
-        term2 = qA + qB + floorDiv (rA + rB) c
-    in term1 + term2
+convertTokenAmountLocal : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
+convertTokenAmountLocal amount fromPrice toPrice = mulDivDown amount fromPrice toPrice
 
--- | Check whether a fee (expressed in a non-LINK token) is within the
--- LINK-denominated cap. Equivalent to:
---   floor(feeTokenAmount * feeTokenPrice / linkTokenPrice) <= maxFeeJuelsPerMsg
-normalizedFeeWithinCap : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0 -> Bool
-normalizedFeeWithinCap feeTokenAmount feeTokenPrice linkTokenPrice maxFeeJuelsPerMsg =
-    mulDivDown feeTokenAmount feeTokenPrice linkTokenPrice <= maxFeeJuelsPerMsg
+juelsCapToLocalLinkCap : Numeric 0 -> Numeric 0
+juelsCapToLocalLinkCap maxFeeJuelsPerMsg = mulDivDown maxFeeJuelsPerMsg 1.0 juelsPerLocalLink
 
--- | Check whether a fee amount (already in LINK units) is within the cap.
-integerAmountWithinCap : Numeric 0 -> Numeric 0 -> Bool
-integerAmountWithinCap feeAmount maxFeeJuelsPerMsg =
-    feeAmount <= maxFeeJuelsPerMsg
+-- -----------------------------------------------------------------------------
+-- Exact base-1e8 integer arithmetic
+-- -----------------------------------------------------------------------------
+
+-- Little-endian limbs: least-significant chunk first.
+toLimbs : Text -> Numeric 0 -> [Int]
+toLimbs label n =
+    if n < 0.0 then error (label <> ": negative integer")
+    else
+        let digits = numeric0IntegerText label n
+        in if digits == "0" then [] else normalizeLimbs (reverse (map parseChunk (chunkTexts digits)))
+
+fromLimbs : Text -> [Int] -> Numeric 0
+fromLimbs _ [] = 0.0
+fromLimbs label limbs =
+    foldl
+        (\acc limb -> acc * baseNumeric + intToNumeric limb)
+        0.0
+        (reverse (normalizeLimbs limbs))
+
+normalizeLimbs : [Int] -> [Int]
+normalizeLimbs [] = []
+normalizeLimbs xs = reverse (dropLeadingZeroInts (reverse xs))
+
+isZeroLimbs : [Int] -> Bool
+isZeroLimbs xs = case normalizeLimbs xs of
+    [] -> True
+    _ -> False
+
+compareLimbs : [Int] -> [Int] -> Ordering
+compareLimbs a b =
+    let na = normalizeLimbs a
+        nb = normalizeLimbs b
+        la = length na
+        lb = length nb
+    in if la < lb then LT
+       else if la > lb then GT
+       else compareBigEndian (reverse na) (reverse nb)
+
+compareBigEndian : [Int] -> [Int] -> Ordering
+compareBigEndian [] [] = EQ
+compareBigEndian (x :: xs) (y :: ys) =
+    if x < y then LT
+    else if x > y then GT
+    else compareBigEndian xs ys
+compareBigEndian _ _ = error "compareBigEndian: length mismatch"
+
+addLimbs : [Int] -> [Int] -> [Int]
+addLimbs a b = normalizeLimbs (addLimbsGo a b 0)
+
+addLimbsGo : [Int] -> [Int] -> Int -> [Int]
+addLimbsGo [] [] 0 = []
+addLimbsGo [] [] carry = [carry]
+addLimbsGo (x :: xs) [] carry =
+    let total = x + carry
+    in intMod total baseInt :: addLimbsGo xs [] (intDiv total baseInt)
+addLimbsGo [] (y :: ys) carry =
+    let total = y + carry
+    in intMod total baseInt :: addLimbsGo [] ys (intDiv total baseInt)
+addLimbsGo (x :: xs) (y :: ys) carry =
+    let total = x + y + carry
+    in intMod total baseInt :: addLimbsGo xs ys (intDiv total baseInt)
+
+subLimbs : [Int] -> [Int] -> [Int]
+subLimbs a b = normalizeLimbs (subLimbsGo (normalizeLimbs a) (normalizeLimbs b) 0)
+
+subLimbsGo : [Int] -> [Int] -> Int -> [Int]
+subLimbsGo [] [] 0 = []
+subLimbsGo [] [] _ = error "subLimbs: negative result"
+subLimbsGo (x :: xs) [] borrow =
+    let diff = x - borrow
+    in if diff < 0
+       then (diff + baseInt) :: subLimbsGo xs [] 1
+       else diff :: subLimbsGo xs [] 0
+subLimbsGo (x :: xs) (y :: ys) borrow =
+    let diff = x - y - borrow
+    in if diff < 0
+       then (diff + baseInt) :: subLimbsGo xs ys 1
+       else diff :: subLimbsGo xs ys 0
+subLimbsGo [] (_ :: _) _ = error "subLimbs: negative result"
+
+mulByDigit : [Int] -> Int -> [Int]
+mulByDigit _ 0 = []
+mulByDigit xs d = normalizeLimbs (mulByDigitGo (normalizeLimbs xs) d 0)
+
+mulByDigitGo : [Int] -> Int -> Int -> [Int]
+mulByDigitGo [] _ 0 = []
+mulByDigitGo [] _ carry = [carry]
+mulByDigitGo (x :: rest) d carry =
+    let total = x * d + carry
+    in intMod total baseInt :: mulByDigitGo rest d (intDiv total baseInt)
+
+shiftLimbs : Int -> [Int] -> [Int]
+shiftLimbs 0 xs = xs
+shiftLimbs n xs = 0 :: shiftLimbs (n - 1) xs
+
+mulLimbs : [Int] -> [Int] -> [Int]
+mulLimbs a b =
+    let na = normalizeLimbs a
+        nb = normalizeLimbs b
+    in if isZeroLimbs na || isZeroLimbs nb then []
+       else foldl
+            (\acc (offset, digit) -> addLimbs acc (shiftLimbs offset (mulByDigit na digit)))
+            []
+            (indexed nb 0)
+
+indexed : [a] -> Int -> [(Int, a)]
+indexed [] _ = []
+indexed (x :: xs) i = (i, x) :: indexed xs (i + 1)
+
+divModLimbs : [Int] -> [Int] -> ([Int], [Int])
+divModLimbs numerator denominator =
+    let den = normalizeLimbs denominator
+    in if isZeroLimbs den then error "divModLimbs: denominator must be positive"
+       else if compareLimbs numerator den == LT then ([], normalizeLimbs numerator)
+       else divModLimbsGo [] [] (reverse (normalizeLimbs numerator)) den
+
+divModLimbsGo : [Int] -> [Int] -> [Int] -> [Int] -> ([Int], [Int])
+divModLimbsGo quotientRev remainder [] _ = (normalizeLimbs quotientRev, normalizeLimbs remainder)
+divModLimbsGo quotientRev remainder (digit :: rest) den =
+    let remainder' = normalizeLimbs (digit :: remainder)
+        qDigit = quotientDigit remainder' den 0 (baseInt - 1)
+        remainder'' = subLimbs remainder' (mulByDigit den qDigit)
+    in divModLimbsGo (qDigit :: quotientRev) remainder'' rest den
+
+quotientDigit : [Int] -> [Int] -> Int -> Int -> Int
+quotientDigit remainder denominator low high =
+    if low > high then high
+    else
+        let mid = intDiv (low + high) 2
+            probe = mulByDigit denominator mid
+        in case compareLimbs probe remainder of
+            GT -> quotientDigit remainder denominator low (mid - 1)
+            _ -> quotientDigit remainder denominator (mid + 1) high
+
+numeric0IntegerText : Text -> Numeric 0 -> Text
+numeric0IntegerText label n =
+    let str = show n
+    in if Text.isSuffixOf ".0" str
+       then Text.take (Text.length str - 2) str
+       else error (label <> ": expected integer-valued Numeric 0")
+
+chunkTexts : Text -> [Text]
+chunkTexts digits =
+    let len = Text.length digits
+    in if len <= 8 then [digits]
+       else chunkTexts (Text.take (len - 8) digits) ++ [Text.drop (len - 8) digits]
+
+parseChunk : Text -> Int
+parseChunk = parseDigitsUnsafe 0
+
+parseDigitsUnsafe : Int -> Text -> Int
+parseDigitsUnsafe acc text =
+    if Text.length text == 0 then acc
+    else
+        let c = Text.take 1 text
+            rest = Text.drop 1 text
+        in parseDigitsUnsafe (acc * 10 + charToDigit c) rest
+
+charToDigit : Text -> Int
+charToDigit c = case c of
+  "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
+  "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
+  _ -> error ("Invalid digit: " <> c)
+
+dropLeadingZeroInts : [Int] -> [Int]
+dropLeadingZeroInts [] = []
+dropLeadingZeroInts (0 :: xs) = dropLeadingZeroInts xs
+dropLeadingZeroInts xs = xs
+
+intDiv : Int -> Int -> Int
+intDiv a b = a / b
+
+intMod : Int -> Int -> Int
+intMod a b = a - intDiv a b * b

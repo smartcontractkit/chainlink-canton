@@ -85,13 +85,13 @@ data SendingMessageState
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
 
--- 1e18: the "100%" identity value in EVM's wei-per-eth premium convention.
-evmPremiumIdentity : Numeric 0
-evmPremiumIdentity = 1000000000000000000.0
+-- 1e8: the "100%" identity value in the Canton E8 premium convention.
+premiumIdentity : Numeric 0
+premiumIdentity = 100000000.0
 
--- 1e16 converts integer USD cents into EVM's 18-decimal USD domain.
-evmUsd18PerUsdCent : Numeric 0
-evmUsd18PerUsdCent = 10000000000000000.0
+-- 1e6 converts integer USD cents into the Canton usd8 domain.
+usd8PerUsdCent : Numeric 0
+usd8PerUsdCent = 1000000.0
 
 sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
 sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
@@ -382,17 +382,17 @@ template SendingMessageV1
                 assertMsg "premium multiplier must be positive"
                     (premiumMultiplier > 0.0)
 
-                -- EVM stores fee config values in integer USD cents, then promotes
-                -- them into the 18-decimal USD pricing domain via * 1e16 before
-                -- converting into fee-token smallest units.
-                let promoteUsdCentsToUsd18 feeUSDCents =
-                        CCIP.Math.mulDivDown feeUSDCents evmUsd18PerUsdCent 1.0
+                -- Fee config values stay in integer USD cents. Canton promotes
+                -- them into the usd8 pricing domain via * 1e6 before converting
+                -- into fee-token local smallest units.
+                let promoteUsdCentsToUsd8 feeUSDCents =
+                        CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
                 let convertWithPremium feeUSDCents =
-                        let feeUsd18 = promoteUsdCentsToUsd18 feeUSDCents
-                        in CCIP.Math.mulDivDown feeUsd18 premiumMultiplier feeTokenPrice
+                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
+                        in CCIP.Math.mulDivDown feeUsd8 premiumMultiplier feeTokenPrice
                 let convertDirect feeUSDCents =
-                        let feeUsd18 = promoteUsdCentsToUsd18 feeUSDCents
-                        in CCIP.Math.mulDivDown feeUsd18 evmPremiumIdentity feeTokenPrice
+                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
+                        in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
 
                 let ccvAmounts = map
                         (\fee -> convertWithPremium fee.feeUSDCents) ccvFees

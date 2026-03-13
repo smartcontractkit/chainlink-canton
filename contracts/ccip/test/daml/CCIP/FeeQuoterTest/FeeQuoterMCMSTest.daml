@@ -12,13 +12,13 @@ import CCIP.FeeQuoter
 import CCIP.FeeQuoterCodec
 
 usd : Decimal -> Numeric 0
-usd d = intToNumeric (truncate (d * 1000000000000000000.0))
+usd d = intToNumeric (truncate (d * 100000000.0))
 
 usdToCents : Decimal -> Numeric 0
 usdToCents d = intToNumeric (truncate (d * 100.0))
 
 mult : Decimal -> Numeric 0
-mult m = intToNumeric (truncate (m * 1000000000000000000.0))
+mult m = intToNumeric (truncate (m * 100000000.0))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - APPLY FEE TOKEN UPDATES
