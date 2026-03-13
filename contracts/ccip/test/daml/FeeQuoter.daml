@@ -182,6 +182,24 @@ setup = script do
     debug result
     result === destChainConfig2
 
+    -- try setting an invalid config (destChainSelector = 0.0), should fail
+    submitMustFail owner do
+        exerciseCmd fq ApplyDestChainConfigUpdates with
+            destChainConfigArgs = [
+                    (DestChainConfigArgs with
+                        destChainSelector = 0.0
+                        destChainConfig = destChainConfig1)
+                ]
+
+    -- try setting an invalid config (destChainSelector = -123.0), should fail
+    submitMustFail owner do
+        exerciseCmd fq ApplyDestChainConfigUpdates with
+            destChainConfigArgs = [
+                    (DestChainConfigArgs with
+                        destChainSelector = -123.0
+                        destChainConfig = destChainConfig1)
+                ]
+
     -- try setting an invalid config (defaultTxGasLimit = 0), should fail
     let invalidDestChainConfig = destChainConfig1 with defaultTxGasLimit = 0
     submitMustFail owner do
