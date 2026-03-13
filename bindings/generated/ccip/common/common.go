@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "ffc99244c9d6aba9966e2246c49c43397042b590a08eb87d0e890771db832a6e"
+	PackageID   = "a67b41ae284755fd79dcce6816eceb8577ec35ce94355300d2a4beb610a0f746"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1464,6 +1464,7 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 // DestChainConfig is a Record type
 type DestChainConfig struct {
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
+	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -1476,6 +1477,8 @@ func (t DestChainConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
@@ -1538,6 +1541,7 @@ func (t *DestChainConfig) UnmarshalHex(data string) error {
 type DestChainConfigArgs struct {
 	DestChainSelector         types.NUMERIC        `json:"destChainSelector"`
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
+	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -1552,6 +1556,8 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
@@ -2877,7 +2883,6 @@ type GlobalConfig struct {
 	InstanceId         types.TEXT    `json:"instanceId"`
 	CcipOwner          types.PARTY   `json:"ccipOwner"`
 	ChainSelector      types.NUMERIC `json:"chainSelector"`
-	OnRampAddress      types.TEXT    `json:"onRampAddress"`
 	DestChainConfigs   types.GENMAP  `json:"destChainConfigs"`
 	SourceChainConfigs types.GENMAP  `json:"sourceChainConfigs"`
 }
@@ -2905,9 +2910,6 @@ func (t GlobalConfig) CreateCommand() *model.CreateCommand {
 	if t.ChainSelector != "" {
 		args["chainSelector"] = t.ChainSelector
 	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["onRampAddress"] = string(t.OnRampAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["destChainConfigs"] = func() any {
@@ -2944,9 +2946,6 @@ func (t GlobalConfig) CreateCommandWithPackageID(packageID string) *model.Create
 	if t.ChainSelector != "" {
 		args["chainSelector"] = t.ChainSelector
 	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["onRampAddress"] = string(t.OnRampAddress)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["destChainConfigs"] = func() any {
