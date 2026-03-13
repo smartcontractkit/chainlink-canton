@@ -110,6 +110,18 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
 
     let invalidSourceChainConfigUpdates = [
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = -123.0 -- Invalid negative chain selector
+                isEnabled = True
+                onRampAddresses = ["0x1111111111111111"]
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 123.0
                 isEnabled = True
                 onRampAddresses = ["0x1111111111111111"]
@@ -261,6 +273,21 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
                 destChainSelector = 0.0 -- Invalid zero chain selector
+                isEnabled = True
+                addressBytesLength = 20
+                offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+                messageNetworkFeeUSDCents = 10.0
+                tokenNetworkFeeUSDCents = 20.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+
+    let invalidDestChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.DestChainConfigArgs with
+                destChainSelector = -123.0 -- Invalid negative chain selector
                 isEnabled = True
                 addressBytesLength = 20
                 offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"

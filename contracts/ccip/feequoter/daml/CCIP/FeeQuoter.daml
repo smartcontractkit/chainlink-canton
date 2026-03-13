@@ -176,11 +176,11 @@ template FeeQuoter
                 destChainConfigArgs : [DestChainConfigArgs]
             controller owner
             do
-                -- destChainSelector must be non-zero
+                -- destChainSelector must be greater than zero
                 -- defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
                 -- chainFamilySelector must be known
                 Foldable.mapA_ (\dcca -> do
-                        assertMsg ("destChainSelector must be non-zero: " <> show dcca.destChainSelector) (dcca.destChainSelector /= 0.0)
+                        assertMsg ("destChainSelector must be greater than zero: " <> show dcca.destChainSelector) (dcca.destChainSelector > 0.0)
                         assertMsg ("defaultTxGasLimit must be set (> 0) for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit > 0)
                         assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
                         assertMsg ("unknown chainFamilySelector for destChainSelector: " <> show dcca.destChainSelector) (Common.isKnownChainFamilySelector dcca.destChainConfig.chainFamilySelector)
