@@ -40,7 +40,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv/deployments v0.0.0-20260305154844-97e629fb946e
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217084735-307a5770c4f6
 	github.com/smartcontractkit/chainlink-deployments-framework v0.85.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.3
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.6
 	github.com/smartcontractkit/go-daml v0.0.0-20260310180820-12a47a16bda1
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
@@ -50,7 +50,7 @@ require (
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.48.0
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
-	golang.org/x/oauth2 v0.35.0
+	golang.org/x/oauth2 v0.36.0
 	google.golang.org/grpc v1.79.1
 	gopkg.in/yaml.v3 v3.0.1
 )
