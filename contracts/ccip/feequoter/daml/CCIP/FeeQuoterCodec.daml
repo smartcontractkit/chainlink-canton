@@ -23,8 +23,6 @@ import MCMS.Codec
   , decodeInt64At
   , encodeBytesHex
   , decodeBytesHexAt
-  , encodeDecimal
-  , decodeDecimalAt
   )
 import CCIP.Codec
   ( encodeInstrumentId
@@ -76,7 +74,7 @@ encodeApplyDestChainConfigUpdatesParams configs =
 -- ===========================================================================
 -- FEE TOKEN ARGS ENCODING/DECODING
 -- Format: [uint8 count][feeTokenArgs...]
--- FeeTokenArgs: [instrumentId][decimal premiumMultiplier]
+-- FeeTokenArgs: [instrumentId][numeric0 premiumMultiplier]
 -- ===========================================================================
 
 encodeFeeTokenArgsList : [FeeTokenArgs] -> BytesHex
@@ -86,7 +84,7 @@ encodeFeeTokenArgsList args =
 
 encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
 encodeFeeTokenArgs fta =
-  encodeInstrumentId fta.instrumentId <> encodeDecimal fta.premiumMultiplier
+  encodeInstrumentId fta.instrumentId <> encodeNumeric0 fta.premiumMultiplier
 
 decodeFeeTokenArgsList : BytesHex -> Int -> Optional ([FeeTokenArgs], Int)
 decodeFeeTokenArgsList encoded offset = do
@@ -103,7 +101,7 @@ decodeFeeTokenArgsListHelper encoded offset remaining acc = do
 decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
 decodeFeeTokenArgsAt encoded offset = do
   (instrumentId, offset1) <- decodeInstrumentId encoded offset
-  (premiumMultiplier, offset2) <- decodeDecimalAt encoded offset1
+  (premiumMultiplier, offset2) <- decodeNumeric0At encoded offset1
   Some (FeeTokenArgs instrumentId premiumMultiplier, offset2)
 
 -- ===========================================================================
@@ -113,7 +111,7 @@ decodeFeeTokenArgsAt encoded offset = do
 -- DestChainConfig: [bool isEnabled][int maxDataBytes][int maxPerMsgGasLimit]
 --                  [int destGasOverhead][int destGasPerPayloadByteBase]
 --                  [bytesHex chainFamilySelector][int defaultTxGasLimit]
---                  [decimal networkFeeUSD][decimal defaultTokenFeeUSD]
+--                  [numeric0 networkFeeUSD cents][numeric0 defaultTokenFeeUSD cents]
 --                  [int defaultTokenDestGasOverhead]
 -- ===========================================================================
 
@@ -135,8 +133,8 @@ encodeDestChainConfig dcc =
   encodeInt dcc.destGasPerPayloadByteBase <>
   encodeBytesHex dcc.chainFamilySelector <>
   encodeInt dcc.defaultTxGasLimit <>
-  encodeDecimal dcc.networkFeeUSD <>
-  encodeDecimal dcc.defaultTokenFeeUSD <>
+  encodeNumeric0 dcc.networkFeeUSD <>
+  encodeNumeric0 dcc.defaultTokenFeeUSD <>
   encodeInt dcc.defaultTokenDestGasOverhead
 
 decodeDestChainConfigArgsList : BytesHex -> Int -> Optional ([DestChainConfigArgs], Int)
@@ -166,8 +164,8 @@ decodeDestChainConfigAt encoded offset = do
   (destGasPerPayloadByteBase, offset5) <- decodeIntAt encoded offset4
   (chainFamilySelector, offset6) <- decodeBytesHexAt encoded offset5
   (defaultTxGasLimit, offset7) <- decodeIntAt encoded offset6
-  (networkFeeUSD, offset8) <- decodeDecimalAt encoded offset7
-  (defaultTokenFeeUSD, offset9) <- decodeDecimalAt encoded offset8
+  (networkFeeUSD, offset8) <- decodeNumeric0At encoded offset7
+  (defaultTokenFeeUSD, offset9) <- decodeNumeric0At encoded offset8
   (defaultTokenDestGasOverhead, offset10) <- decodeIntAt encoded offset9
   Some (DestChainConfig isEnabled maxDataBytes maxPerMsgGasLimit destGasOverhead
                         destGasPerPayloadByteBase chainFamilySelector defaultTxGasLimit
@@ -184,4 +182,3 @@ encodeInt n = fromSome (encodeInt64 n)
 -- | Decode Int from 8 bytes big-endian (matches Go INT64 encoding)
 decodeIntAt : BytesHex -> Int -> Optional (Int, Int)
 decodeIntAt = decodeInt64At
-
