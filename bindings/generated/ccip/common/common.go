@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "53b30cdb4080627fc154f6c235be019106a5c704daed0c5aa300c536007ac350"
+	PackageID   = "74036f0d4adf6413365aff02a6e0c192feb9faf3206fd0f98bb78d5a46703ff9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1464,6 +1464,7 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 // DestChainConfig is a Record type
 type DestChainConfig struct {
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
+	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -1476,6 +1477,8 @@ func (t DestChainConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
@@ -1538,6 +1541,7 @@ func (t *DestChainConfig) UnmarshalHex(data string) error {
 type DestChainConfigArgs struct {
 	DestChainSelector         types.NUMERIC        `json:"destChainSelector"`
 	IsEnabled                 types.BOOL           `json:"isEnabled"`
+	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
 	OffRampAddress            types.TEXT           `json:"offRampAddress"`
 	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
@@ -1552,6 +1556,8 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["addressBytesLength"] = int64(t.AddressBytesLength)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
 
