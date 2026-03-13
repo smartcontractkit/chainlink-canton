@@ -1047,6 +1047,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 				selectedPoolPackageID = tid.GetPackageId()
 			}
 			selectedInstrumentFromCreateArgs = extractInstrumentCombinedFromCreateArgs(entry.ActiveContract.GetCreatedEvent())
+
 			break
 		}
 		if requireInstrumentMatch {
@@ -1559,6 +1560,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 			continue
 		}
 		replacementRaw = contracts.InstanceID(string(parsed.InstanceId)).RawInstanceAddress(parsed.PoolOwner).Binding()
+
 		break
 	}
 	if replacementRaw == (common.RawInstanceAddress{}) {

@@ -1526,6 +1526,7 @@ func resolveRateLimiterFromRawAddressForSend(
 	if err != nil {
 		return "", nil, fmt.Errorf("parse outbound rate limiter raw instance address: %w", err)
 	}
+
 	return resolveDisclosedByAddress(common.RateLimiter{}.GetTemplateID(), rawAddr.InstanceAddress())
 }
 
@@ -1542,6 +1543,7 @@ func extractRawRateLimiterAddress(outboundRateLimiterRaw any) (string, error) {
 		if !ok || unpack == "" {
 			return "", fmt.Errorf("missing unpack in outbound rate limiter map")
 		}
+
 		return unpack, nil
 	default:
 		return "", fmt.Errorf("unexpected outbound rate limiter type %T", outboundRateLimiterRaw)
@@ -1591,6 +1593,7 @@ func (c *Chain) participantIndexForParty(party string) int {
 			return i
 		}
 	}
+
 	return 0
 }
 
