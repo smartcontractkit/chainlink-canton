@@ -1038,7 +1038,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						FeeTokensToAdd: []feequoter.FeeTokenArgs{
 							{
 								InstrumentId:      feeTokenInstrument,
-								PremiumMultiplier: types.NUMERIC("1.0"),
+								PremiumMultiplier: types.NUMERIC("100000000"),
 							},
 						},
 					}),
@@ -1072,7 +1072,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
 						PriceUpdates: feequoter.PriceUpdates{
 							TokenPriceUpdates: []feequoter.TokenPriceUpdate{
-								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("1.0")},
+								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 							},
 							GasPriceUpdates: []feequoter.GasPriceUpdate{},
 						},
