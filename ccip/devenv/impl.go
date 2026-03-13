@@ -460,6 +460,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				if candidate.Qualifier == defaultBurnMintQualifier {
 					c := candidate
 					poolRef = &c
+
 					return
 				}
 			}
@@ -502,6 +503,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				return fmt.Errorf("retrieve participant token: %w", tokenErr)
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 			return nil
 		}),
 	); metadataErr == nil {
@@ -1379,6 +1381,7 @@ func normalizeNumericForCompare(v string) string {
 			}
 		}
 	}
+
 	return strings.TrimSuffix(v, ".")
 }
 
@@ -2385,18 +2388,12 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				DestBytesOverhead: types.INT64(0),
 			}
 			updatedRemoteTokens := types.GENMAP{}
-			for k, v := range parsedTokenPool.RemoteTokens {
-				updatedRemoteTokens[k] = v
-			}
+			maps.Copy(updatedRemoteTokens, parsedTokenPool.RemoteTokens)
 			updatedRemoteTokens[destSelectorKey] = types.TEXT(remoteTokenHex)
 			updatedOutboundRateLimiters := types.GENMAP{}
-			for k, v := range parsedTokenPool.OutboundRateLimiters {
-				updatedOutboundRateLimiters[k] = v
-			}
+			maps.Copy(updatedOutboundRateLimiters, parsedTokenPool.OutboundRateLimiters)
 			updatedInboundRateLimiters := types.GENMAP{}
-			for k, v := range parsedTokenPool.InboundRateLimiters {
-				updatedInboundRateLimiters[k] = v
-			}
+			maps.Copy(updatedInboundRateLimiters, parsedTokenPool.InboundRateLimiters)
 			hasDestOutboundRateLimiter := false
 			if _, ok := updatedOutboundRateLimiters[destSelectorKey]; ok {
 				hasDestOutboundRateLimiter = true
@@ -2521,11 +2518,13 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					continue
 				}
 				inboundFallback = v
+
 				break
 			}
 			if inboundFallback == nil {
 				for _, v := range parsedTokenPool.InboundRateLimiters {
 					inboundFallback = v
+
 					break
 				}
 			}
@@ -2555,6 +2554,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
 							e.Value = ledger.MapToValue(outboundFallback)
 							updated = true
+
 							break
 						}
 					}
@@ -2580,6 +2580,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
 							e.Value = ledger.MapToValue(inboundFallback)
 							updated = true
+
 							break
 						}
 					}
