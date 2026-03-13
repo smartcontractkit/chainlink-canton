@@ -23,7 +23,7 @@ signature_component_length : Int = 32
 -- Mirrors EVM's BaseVerifier.s_remoteChainConfigs.
 data CCVFeeConfig = CCVFeeConfig
     with
-        feeUSDCents : Decimal
+        feeUSDCents : Numeric 0
         gasForVerification : Int
         payloadSizeBytes : Int
     deriving (Eq, Show)

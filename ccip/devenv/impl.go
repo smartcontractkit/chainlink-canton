@@ -1024,6 +1024,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Admin: types.PARTY(party),
 		Id:    types.TEXT("devenv-fee-token"),
 	}
+	linkTokenInstrument := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(party),
+		Id:    types.TEXT("link-token"),
+	}
 	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
 		Commands: &ledgerv2.Commands{
 			CommandId: uuid.New().String(),
@@ -1037,7 +1041,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						FeeTokensToAdd: []feequoter.FeeTokenArgs{
 							{
 								InstrumentId:      feeTokenInstrument,
-								PremiumMultiplier: types.NUMERIC("1.0"),
+								PremiumMultiplier: types.NUMERIC("100000000"),
 							},
 						},
 					}),
@@ -1071,7 +1075,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					ChoiceArgument: ledger.MapToValue(feequoter.UpdatePrices{
 						PriceUpdates: feequoter.PriceUpdates{
 							TokenPriceUpdates: []feequoter.TokenPriceUpdate{
-								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("1.0")},
+								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
+								{InstrumentId: linkTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 							},
 							GasPriceUpdates: []feequoter.GasPriceUpdate{},
 						},

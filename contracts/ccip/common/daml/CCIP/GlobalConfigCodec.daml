@@ -19,8 +19,6 @@ import MCMS.Codec
   , decodeBytesHexAt
   , encodeBytesHexList
   , decodeBytesHexList
-  , encodeDecimal
-  , decodeDecimalAt
   , encodeInt64
   , decodeInt64At
   , encodeList
@@ -68,8 +66,8 @@ encodeApplySourceChainConfigUpdatesParams sourceChainConfigUpdates =
 -- ===========================================================================
 -- DEST CHAIN CONFIG ENCODING/DECODING
 -- Format: [bool isEnabled][bytesHex offRampAddress][rawInstanceAddressList laneMandatedCCVs]
---         [rawInstanceAddressList defaultCCVs][decimal messageNetworkFeeUSDCents]
---         [decimal tokenNetworkFeeUSDCents]
+--         [rawInstanceAddressList defaultCCVs][numeric0 messageNetworkFeeUSDCents]
+--         [numeric0 tokenNetworkFeeUSDCents]
 -- ===========================================================================
 
 encodeDestChainConfigArgs : DestChainConfigArgs -> BytesHex
@@ -80,8 +78,8 @@ encodeDestChainConfigArgs dcc =
   encodeBytesHex dcc.offRampAddress <>
   encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
   encodeRawInstanceAddressList dcc.defaultCCVs <>
-  encodeDecimal dcc.messageNetworkFeeUSDCents <>
-  encodeDecimal dcc.tokenNetworkFeeUSDCents
+  encodeNumeric0 dcc.messageNetworkFeeUSDCents <>
+  encodeNumeric0 dcc.tokenNetworkFeeUSDCents
 
 decodeDestChainConfigArgsAt : BytesHex -> Int -> Optional (DestChainConfigArgs, Int)
 decodeDestChainConfigArgsAt encoded offset = do
@@ -91,8 +89,8 @@ decodeDestChainConfigArgsAt encoded offset = do
   (offRampAddress, offset4) <- decodeBytesHexAt encoded offset3
   (laneMandatedCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
   (defaultCCVs, offset6) <- decodeRawInstanceAddressList encoded offset5
-  (messageNetworkFeeUSDCents, offset7) <- decodeDecimalAt encoded offset6
-  (tokenNetworkFeeUSDCents, offset8) <- decodeDecimalAt encoded offset7
+  (messageNetworkFeeUSDCents, offset7) <- decodeNumeric0At encoded offset6
+  (tokenNetworkFeeUSDCents, offset8) <- decodeNumeric0At encoded offset7
   Some 
     ( DestChainConfigArgs with
         destChainSelector = destChainSelector

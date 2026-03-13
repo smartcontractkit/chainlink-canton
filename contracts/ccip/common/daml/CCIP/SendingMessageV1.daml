@@ -11,6 +11,7 @@ import DA.List (dedup)
 import DA.Optional (isNone, fromOptional)
 
 import qualified CCIP.Events
+import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.Tickets
@@ -21,7 +22,8 @@ data CCVFee = CCVFee
     with
         ccvInstanceId : Text
         ccvOwner : Party
-        feeUSDCents : Decimal
+        -- Legacy field name retained; value is integer USD cents.
+        feeUSDCents : Numeric 0
         destGasLimit : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
@@ -30,7 +32,8 @@ data TokenSendFee = TokenSendFee
     with
         poolInstanceId : Text
         poolOwner : Party
-        feeUSDCents : Decimal
+        -- Legacy field name retained; value is integer USD cents.
+        feeUSDCents : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
@@ -58,7 +61,8 @@ data ExecutorFee = ExecutorFee
     with
         executorInstanceId : Text
         executorOwner : Party
-        feeUSDCents : Decimal
+        -- Legacy field name retained; value is integer USD cents.
+        feeUSDCents : Numeric 0
         destGasLimit : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
@@ -81,13 +85,13 @@ data SendingMessageState
     | SendingMessageState_FeeFinalized
     deriving (Eq, Show)
 
--- 1e16: EVM fee token scale factor per USD cent.
-evmFeeTokenScalePerUsdCent : Decimal
-evmFeeTokenScalePerUsdCent = 10000000000000000.0
+-- 1e8: the "100%" identity value in the Canton E8 premium convention.
+premiumIdentity : Numeric 0
+premiumIdentity = 100000000.0
 
--- 1e18: the "100%" identity value in EVM's wei-per-eth premium convention.
-evmPremiumIdentity : Decimal
-evmPremiumIdentity = 1000000000000000000.0
+-- 1e6 converts integer USD cents into the Canton usd8 domain.
+usd8PerUsdCent : Numeric 0
+usd8PerUsdCent = 1000000.0
 
 sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
 sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
@@ -126,7 +130,8 @@ template SendingMessageV1
         -- LockOrBurn, but are not emitted directly into TokenTransferV1.
         tokenArgs : BytesHex
         feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-        networkFeeUSDCents : Decimal
+        -- Legacy field name retained; value is integer USD cents.
+        networkFeeUSDCents : Numeric 0
         -- Expected token instrument for outbound TAR validation
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
@@ -176,7 +181,7 @@ template SendingMessageV1
         choice AddCCVFee : ContractId SendingMessageV1
             with
                 ccvInstanceId : Text
-                feeUSDCents : Decimal
+                feeUSDCents : Numeric 0
                 destGasLimit : Int
                 destBytesOverhead : Int
                 caller : Party
@@ -197,7 +202,7 @@ template SendingMessageV1
             with
                 poolInstanceId : Text
                 poolOwner : Party
-                feeUSDCents : Decimal
+                feeUSDCents : Numeric 0
                 destGasOverhead : Int
                 destBytesOverhead : Int
                 caller : Party
@@ -235,7 +240,7 @@ template SendingMessageV1
                 executorInstanceId : Text
                 executorArgs : BytesHex
                 blockConfirmations : Int
-                feeUSDCents : Decimal
+                feeUSDCents : Numeric 0
                 destGasLimit : Int
                 destBytesOverhead : Int
                 caller : Party
@@ -366,8 +371,8 @@ template SendingMessageV1
         -- Only exercisable by ccipOwner (via FeeQuoter).
         choice FinalizeFee : ContractId SendingMessageV1
             with
-                feeTokenPrice : Decimal
-                premiumMultiplier : Decimal
+                feeTokenPrice : Numeric 0
+                premiumMultiplier : Numeric 0
             controller ccipOwner
             do
                 assertMsg "sendingMessage: FinalizeFee only allowed after executor finalization"
@@ -377,17 +382,17 @@ template SendingMessageV1
                 assertMsg "premium multiplier must be positive"
                     (premiumMultiplier > 0.0)
 
-                -- Premium path: CCV, pool, and network fees.
-                -- Formula: usdCents * premiumMultiplier / feeTokenPrice * 1e16
-                -- Operation order avoids Numeric 10 overflow (max ~1e28).
-                let convertWithPremium usdCents = intToNumeric
-                        (truncate (usdCents * premiumMultiplier
-                            / feeTokenPrice * evmFeeTokenScalePerUsdCent))
-                -- Direct path: executor fees (no premium discount/surcharge).
-                -- Uses 1e18 (identity) instead of the fee token's premium.
-                let convertDirect usdCents = intToNumeric
-                        (truncate (usdCents * evmPremiumIdentity
-                            / feeTokenPrice * evmFeeTokenScalePerUsdCent))
+                -- Fee config values stay in integer USD cents. Canton promotes
+                -- them into the usd8 pricing domain via * 1e6 before converting
+                -- into fee-token local smallest units.
+                let promoteUsdCentsToUsd8 feeUSDCents =
+                        CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
+                let convertWithPremium feeUSDCents =
+                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
+                        in CCIP.Math.mulDivDown feeUsd8 premiumMultiplier feeTokenPrice
+                let convertDirect feeUSDCents =
+                        let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
+                        in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
 
                 let ccvAmounts = map
                         (\fee -> convertWithPremium fee.feeUSDCents) ccvFees
