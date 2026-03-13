@@ -278,6 +278,8 @@ type FeeQuoter struct {
 	TokenTransferFeeConfigs          types.GENMAP  `json:"tokenTransferFeeConfigs"`
 	UsdPerUnitGasByDestChainSelector types.GENMAP  `json:"usdPerUnitGasByDestChainSelector"`
 	UsdPerToken                      types.GENMAP  `json:"usdPerToken"`
+	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
+	MaxFeeJuelsPerMsg                types.NUMERIC `json:"maxFeeJuelsPerMsg"`
 	PriceUpdaters                    []types.PARTY `json:"priceUpdaters"`
 }
 
@@ -340,6 +342,16 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 		}
 		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
+
+	args["linkTokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.LinkTokenInstrumentId
+	}()
+
+	args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -405,6 +417,16 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 		}
 		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
+
+	args["linkTokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.LinkTokenInstrumentId
+	}()
+
+	args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
