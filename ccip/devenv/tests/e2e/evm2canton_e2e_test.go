@@ -45,6 +45,7 @@ func mustGetBlockchainInputByType(t *testing.T, cfg *ccv.Cfg, chainType string) 
 		}
 	}
 	require.FailNowf(t, "missing chain", "need at least one %s chain for this test", chainType)
+
 	return nil
 }
 
@@ -67,6 +68,7 @@ func newAggregatorClients(
 			client.Close()
 		})
 	}
+
 	return clients
 }
 
@@ -189,6 +191,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.NotNil(t, res.AggregatedResult)
 		require.Len(t, res.IndexedVerifications.Results, 1)
 		vr := res.IndexedVerifications.Results[0].VerifierResult
+
 		return vr.Message, vr.VerifierDestAddress, vr.CCVData
 	}
 
@@ -294,6 +297,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		// Assert the receiver's token amount (amount credited to receiver on Canton) matches the EVM->Canton transfer amount.
 		require.Equal(t, 0, message.TokenTransfer.Amount.Cmp(big.NewInt(evmToCantonTransferAmount)), "receiver token amount should match transfer amount")
 
+		// Note: verifierDestAddress is the canton verifier not EVM.
 		executionStateChangedEvent, err := dstChain.ManuallyExecuteMessage(subtestCtx, message, 0, []protocol.UnknownAddress{verifierDestAddress}, [][]byte{ccvData})
 		require.NoError(t, err, "failed to manually execute token transfer message on Canton chain")
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State, "expected token transfer message execution to succeed")

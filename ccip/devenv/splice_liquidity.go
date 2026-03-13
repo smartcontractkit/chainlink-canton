@@ -29,6 +29,7 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 			return fmt.Errorf("retrieve participant token: %w", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 		return nil
 	}
 
@@ -131,6 +132,7 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 		slices.SortFunc(openMiningRoundResponse.JSON200.OpenMiningRounds, func(a, b scanProxy.ContractWithState) int {
 			aOpen, _ := time.Parse(time.RFC3339, a.Contract.Payload["opensAt"].(string))
 			bOpen, _ := time.Parse(time.RFC3339, b.Contract.Payload["opensAt"].(string))
+
 			return int(aOpen.UnixMilli() - bOpen.UnixMilli())
 		})
 		var openMiningRoundCID string
@@ -151,6 +153,7 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 		if openMiningRoundCID == "" {
 			return "", fmt.Errorf("no active open mining round found")
 		}
+
 		return openMiningRoundCID, nil
 	}
 	openMiningRoundCID, err := getActiveOpenMiningRoundCID()
@@ -182,6 +185,7 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 				DisclosedContracts: disclosures,
 			},
 		})
+
 		return submitErr
 	}
 
@@ -198,6 +202,7 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 	if err != nil {
 		return fmt.Errorf("mint AMT for %s: %w", ownerParty, err)
 	}
+
 	return nil
 }
 
@@ -218,6 +223,7 @@ func getTransferFactoryFromScanProxy(
 			return fmt.Errorf("retrieve participant token: %w", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 		return nil
 	}
 	transferClient, err := transferInstructionV1.NewClientWithResponses(
@@ -357,5 +363,6 @@ func selectUnlockedHoldingCIDs(holdings []*apiv2.ActiveContract, owner, admin, i
 			SynchronizerId:   holding.GetSynchronizerId(),
 		})
 	}
+
 	return cids, disclosures
 }

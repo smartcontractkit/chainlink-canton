@@ -1777,6 +1777,7 @@ func (c *Chain) findLatestActiveContractByInstanceAddress(
 			if errors.Is(recvErr, io.EOF) {
 				break
 			}
+
 			return nil, fmt.Errorf("receive active contracts for fallback lookup: %w", recvErr)
 		}
 		entry, ok := resp.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
@@ -1809,6 +1810,7 @@ func (c *Chain) findLatestActiveContractByInstanceAddress(
 	if latestMatch == nil {
 		return nil, err
 	}
+
 	return latestMatch, nil
 }
 
@@ -1822,6 +1824,7 @@ func (c *Chain) resolveDisclosedContractByAddress(
 	if err != nil {
 		return "", nil, err
 	}
+
 	return types.CONTRACT_ID(active.GetCreatedEvent().GetContractId()), convertToDisclosedContract(active), nil
 }
 
@@ -2210,6 +2213,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					out = append(out, k)
 				}
 				sort.Strings(out)
+
 				return out
 			}
 			if os.Getenv("CCIP_DEBUG_POOL_CONFIG") == "1" {
@@ -2516,6 +2520,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					outboundKeys = append(outboundKeys, k)
 				}
 				sort.Strings(outboundKeys)
+
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing outbound rate limiter config for destination selector %d (outboundKeys=%v)", dest, outboundKeys)
 			}
 			var inboundFallback any
@@ -2540,6 +2545,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					inboundKeys = append(inboundKeys, k)
 				}
 				sort.Strings(inboundKeys)
+
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing inbound rate limiter config for destination selector %d (inboundKeys=%v)", dest, inboundKeys)
 			}
 
@@ -2729,6 +2735,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				if fallback != nil {
 					return fallback, nil
 				}
+
 				return nil, fmt.Errorf("no active rate limiter found for direction %s", direction)
 			}
 

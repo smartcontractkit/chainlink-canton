@@ -54,6 +54,7 @@ func resolveCantonSendContracts(t *testing.T, in *ccv.Cfg, chainSelector uint64)
 				return ref
 			}
 		}
+
 		return candidates[0]
 	}
 

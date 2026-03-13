@@ -70,6 +70,7 @@ func uniqueParties(parties ...string) []string {
 		seen[party] = struct{}{}
 		out = append(out, party)
 	}
+
 	return out
 }
 
@@ -82,6 +83,7 @@ func isRouterCreateConflictError(err error) bool {
 		return false
 	}
 	msg := err.Error()
+
 	return strings.Contains(msg, "instanceId already in use") || strings.Contains(msg, "router already exists for this party")
 }
 
@@ -97,6 +99,7 @@ func newTransferInstructionClient(participant canton.Participant) (*transferInst
 			return fmt.Errorf("retrieve participant token: %w", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 		return nil
 	}
 
@@ -107,6 +110,7 @@ func newTransferInstructionClient(participant canton.Participant) (*transferInst
 	if err != nil {
 		return nil, fmt.Errorf("create transfer instruction client: %w", err)
 	}
+
 	return client, nil
 }
 
@@ -179,6 +183,7 @@ func ensureParticipantDarVetted(ctx context.Context, participant canton.Particip
 	}); err != nil && !isAlreadyExistsError(err) {
 		return fmt.Errorf("upload %s dar: %w", pkg, err)
 	}
+
 	return nil
 }
 
@@ -188,6 +193,7 @@ func ensureExecuteParticipantDarsVetted(ctx context.Context, participant canton.
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -266,6 +272,7 @@ func (c *Chain) createRouterWithDisclosedFactory(
 			}
 		}
 	}
+
 	return "", nil
 }
 
@@ -390,6 +397,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					if errors.Is(recvErr, io.EOF) {
 						break
 					}
+
 					return nil, fmt.Errorf("receive active contracts for duplicate contract fallback: %w", recvErr)
 				}
 				entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
@@ -400,6 +408,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					latest = entry.ActiveContract
 				}
 			}
+
 			return latest, nil
 		}
 
@@ -641,6 +650,7 @@ func (c *Chain) acceptPendingTransferInstruction(
 	if err != nil {
 		return fmt.Errorf("submit transfer instruction accept: %w", err)
 	}
+
 	return nil
 }
 
@@ -741,6 +751,7 @@ func (c *Chain) findPerPartyRouterContractID(
 				if errors.Is(recvErr, io.EOF) {
 					break
 				}
+
 				return "", fmt.Errorf("receive active routers: %w", recvErr)
 			}
 			entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
@@ -779,6 +790,7 @@ func (c *Chain) findPerPartyRouterContractID(
 				latestCID = created.GetContractId()
 			}
 		}
+
 		return latestCID, nil
 	}
 
@@ -791,6 +803,7 @@ func (c *Chain) findPerPartyRouterContractID(
 			return cid, nil
 		}
 	}
+
 	return "", fmt.Errorf("no active PerPartyRouter found for owner %s and instanceId %s", partyOwner, instanceID)
 }
 
@@ -836,6 +849,7 @@ func (c *Chain) findAnyPerPartyRouterForOwner(
 			if errors.Is(recvErr, io.EOF) {
 				break
 			}
+
 			return "", "", fmt.Errorf("receive any router for owner: %w", recvErr)
 		}
 		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
@@ -871,9 +885,18 @@ func (c *Chain) findAnyPerPartyRouterForOwner(
 			latestInstanceID = gotInstanceID
 		}
 	}
+
 	return latestCID, latestInstanceID, nil
 }
 
+// BuildManualExecuteTokenTransferInput builds the input for the manual execute token transfer command.
+// - selecting the correct lock/release pool,
+// - matching by instrument hash vs destTokenAddress,
+// - ensuring exact source pool membership in remotePools,
+// - ensuring inbound rate limiter exists/resolves,
+// - collecting sender pool holdings CIDs + disclosures,
+// - fetching transfer factory + choice context/disclosures via scan-proxy,
+// - injecting rate limiter CID in poolExtraContext.
 func (c *Chain) buildManualExecuteTokenTransferInput(
 	ctx context.Context,
 	participant canton.Participant,
@@ -1117,6 +1140,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 				debugPoolCandidates,
 			)
 		}
+
 		return nil, nil, fmt.Errorf("no lock/release pool found for source selector %s and source pool %s", sourceSelectorKey, sourcePoolHex)
 	}
 	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.ChainPoolConfigs, sourceSelectorKey); ok {
@@ -1259,6 +1283,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 			poolHoldings = append(poolHoldings, holding.GetCreatedEvent().GetContractId())
 			poolHoldingDisclosures = append(poolHoldingDisclosures, disclosure)
 		}
+
 		return poolHoldings, poolHoldingDisclosures, nil
 	}
 
@@ -1414,6 +1439,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 			sourceSelectorKey,
 			resolveActiveContractIDByAddress,
 		)
+
 		return err == nil
 	}
 	if raw, ok := pool.InboundRateLimiters[sourceSelectorKey]; ok && tryResolveConfigured(pool, raw) {
@@ -1757,6 +1783,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 	if err != nil {
 		return nil, "", fmt.Errorf("parse updated lock/release pool after inbound rate limiter patch: %w", err)
 	}
+
 	return updatedPool, updatedCID, nil
 }
 
@@ -1767,6 +1794,7 @@ func extractRemotePools(chainPoolCfgAny any) []string {
 		for _, rp := range cfg.RemotePools {
 			out = append(out, string(rp))
 		}
+
 		return out
 	case map[string]any:
 		m := cfg
@@ -1783,11 +1811,13 @@ func extractRemotePools(chainPoolCfgAny any) []string {
 			for _, v := range pools {
 				out = append(out, fmt.Sprint(v))
 			}
+
 			return out
 		case []string:
 			return pools
 		}
 	}
+
 	return nil
 }
 
@@ -1822,6 +1852,7 @@ func extractInstrumentCombinedFromCreateArgs(created *apiv2.CreatedEvent) string
 	if id == "" || admin == "" {
 		return ""
 	}
+
 	return id + "@" + admin
 }
 
@@ -1833,6 +1864,7 @@ func parseRawInstanceAddress(v any) (string, error) {
 		if rv == "" {
 			return "", fmt.Errorf("empty raw instance address string")
 		}
+
 		return rv, nil
 	case map[string]any:
 		m := rv
@@ -1843,6 +1875,7 @@ func parseRawInstanceAddress(v any) (string, error) {
 			return unpack, nil
 		}
 	}
+
 	return "", fmt.Errorf("unexpected raw instance address type %T", v)
 }
 
@@ -1865,6 +1898,7 @@ func normalizeNumericText(v string) string {
 			}
 		}
 	}
+
 	return strings.TrimSuffix(v, ".")
 }
 
@@ -1875,6 +1909,7 @@ func findChainPoolConfigBySelector(chainPoolConfigs map[string]any, sourceSelect
 			return cfg, true
 		}
 	}
+
 	return nil, false
 }
 
@@ -1905,6 +1940,7 @@ func chainPoolConfigFromAny(v any) (lockreleasetokenpool.ChainPoolConfig, bool) 
 				}
 				outCCV = append(outCCV, common.RawInstanceAddress{Unpack: types.TEXT(unpack)})
 			}
+
 			return outCCV
 		}
 		out.InboundCCVs = parseCCVs(m["inboundCCVs"])
@@ -1914,6 +1950,7 @@ func chainPoolConfigFromAny(v any) (lockreleasetokenpool.ChainPoolConfig, bool) 
 				out.RemotePools = append(out.RemotePools, types.TEXT(fmt.Sprint(rp)))
 			}
 		}
+
 		return out, true
 	default:
 		return lockreleasetokenpool.ChainPoolConfig{}, false
@@ -2009,8 +2046,10 @@ func ensureManualExecuteSourcePoolAllowed(
 	if err == nil {
 		updatedPool := *pool
 		updatedPool.ChainPoolConfigs = updatedChainPoolConfigs
+
 		return &updatedPool, updatedCID, nil
 	}
+
 	return nil, "", fmt.Errorf("resolve updated lock/release pool contract id: %w", err)
 }
 
@@ -2059,6 +2098,7 @@ func resolveRateLimiterForManualExecute(
 			sourceSelectorNumericKey,
 		)
 	}
+
 	return "", nil, fmt.Errorf(
 		"resolve configured inbound rate limiter for source selector %s (pool=%s@%s): %s",
 		sourceSelectorKey,
@@ -2167,8 +2207,10 @@ func resolveRateLimiterFromRawAddress(
 			CreatedEventBlob: entry.ActiveContract.GetCreatedEvent().GetCreatedEventBlob(),
 			SynchronizerId:   entry.ActiveContract.GetSynchronizerId(),
 		}
+
 		return cid, disclosure, nil
 	}
+
 	return "", nil, fmt.Errorf(
 		"no active inbound rate limiter matched raw=%s instance address %s for pool %s@%s selector %s (poolSelectorCandidates=%v instanceCandidates=%v)",
 		rawRateLimiter,
