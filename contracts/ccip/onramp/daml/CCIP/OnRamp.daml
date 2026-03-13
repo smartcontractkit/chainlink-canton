@@ -1,7 +1,7 @@
 -- | OnRamp for CCIP message sending, called by PerPartyRouter.
 module CCIP.OnRamp where
 
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Map qualified as Map
@@ -173,7 +173,7 @@ template OnRamp
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 let resolvedTokenReceiver = if hasTokenTransfer
-                        then fromOptional receiver tokenReceiver
+                        then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
                         else ""
                 let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
 
@@ -196,7 +196,8 @@ template OnRamp
                     requiredCCVs = resolvedCCVs
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
-                    receiver, payload
+                    receiver = validateDestChainAddress receiver destConfig.addressBytesLength
+                    payload = payload
                     executionGasLimit = 0
                     ccipReceiveGasLimit
                     blockConfirmations = resolvedBlockConfirmations
@@ -346,6 +347,8 @@ template OnRamp
                             (tt.sourceTokenAddress == expectedTokenAddr)
                         assertMsg "token amount mismatch"
                             (tt.amount == tsd.amount)
+                        let _ = validateDestChainAddress tsd.destTokenAddress destConfig.addressBytesLength
+                        pure()
                     (None, None) -> pure ()
                     _ -> abort "token transfer / token send data mismatch"
 
@@ -468,6 +471,15 @@ findFeeWithAmount _ [] _ = error "missing CCV fee token amount"
 findFeeWithAmount (f :: fs) (a :: as) pred =
     if pred f then (f, a)
     else findFeeWithAmount fs as pred
+
+-- | Validates a destination-chain address against the chain's expected address length.
+-- The message receiver, tokenReceiver, and destTokenAddress are all validated using this function since they're all remote chain addresses.
+validateDestChainAddress : BytesHex -> Int -> BytesHex
+validateDestChainAddress address addressBytesLength =
+    let actualLength = byteCount address
+    in if actualLength == addressBytesLength
+        then address
+        else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
 
 -- ===========================================================================
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint

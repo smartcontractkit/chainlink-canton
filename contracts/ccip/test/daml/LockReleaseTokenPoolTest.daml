@@ -4,12 +4,15 @@ module LockReleaseTokenPoolTest where
 import Daml.Script
 
 import DA.Assert
+import DA.Date (date, Month(..))
 import DA.List (head)
 import DA.Map qualified as Map
 import DA.Optional
 import DA.TextMap qualified as TextMap
+import DA.Time (time)
 import qualified CCIP.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
+import CCIP.FeeQuoter qualified as FeeQuoter
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
@@ -25,6 +28,18 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 import TestToken qualified
+
+usd : Decimal -> Numeric 0
+usd d = intToNumeric (truncate (d * 100000000.0))
+
+cents : Decimal -> Numeric 0
+cents c = intToNumeric (truncate c)
+
+usdToCents : Decimal -> Numeric 0
+usdToCents d = intToNumeric (truncate (d * 100.0))
+
+mult : Decimal -> Numeric 0
+mult m = intToNumeric (truncate (m * 100000000.0))
 
 mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
@@ -195,7 +210,7 @@ testLockOrBurn = script do
             encodedMessage = ""
             messageId = ""
             feeToken = testInstrumentId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -606,7 +621,7 @@ testExecutionGasLimitAggregation = script do
             encodedMessage = ""
             messageId = ""
             feeToken = testInstrumentId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = None
             outboundPoolCCVs = None
             executorArgs = ""
@@ -627,7 +642,7 @@ testExecutionGasLimitAggregation = script do
     sendingMessageCid <- submit (actAs ccvOwner1 <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-1"
-            feeUSDCents = 1.0
+            feeUSDCents = cents 1.0
             destGasLimit = 12345
             destBytesOverhead = 0
             caller = ccvOwner1
@@ -636,7 +651,7 @@ testExecutionGasLimitAggregation = script do
     sendingMessageCid <- submit (actAs ccvOwner2 <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-2"
-            feeUSDCents = 2.0
+            feeUSDCents = cents 2.0
             destGasLimit = 23456
             destBytesOverhead = 0
             caller = ccvOwner2
@@ -647,7 +662,7 @@ testExecutionGasLimitAggregation = script do
             executorInstanceId = "executor-gas"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 3.0
+            feeUSDCents = cents 3.0
             destGasLimit = 34567
             destBytesOverhead = 0
             caller = executorOwner
@@ -740,7 +755,7 @@ testExecutionGasLimitWithTokenSendFee = script do
             encodedMessage = ""
             messageId = ""
             feeToken = testInstrumentId
-            networkFeeUSDCents = 0.0
+            networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some testTokenInstrumentId
             outboundPoolCCVs = None
             executorArgs = ""
@@ -762,7 +777,7 @@ testExecutionGasLimitWithTokenSendFee = script do
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
             ccvInstanceId = "ccv-pool"
-            feeUSDCents = 1.0
+            feeUSDCents = cents 1.0
             destGasLimit = 10000
             destBytesOverhead = 0
             caller = ccvOwner
@@ -773,7 +788,7 @@ testExecutionGasLimitWithTokenSendFee = script do
         exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
             poolInstanceId = "pool-gas"
             poolOwner = poolOwner
-            feeUSDCents = 2.0
+            feeUSDCents = cents 2.0
             destGasOverhead = 50000
             destBytesOverhead = 0
             caller = poolOwner
@@ -802,7 +817,7 @@ testExecutionGasLimitWithTokenSendFee = script do
             executorInstanceId = "executor-gas-pool"
             executorArgs = ""
             blockConfirmations = 0
-            feeUSDCents = 3.0
+            feeUSDCents = cents 3.0
             destGasLimit = 30000
             destBytesOverhead = 0
             caller = executorOwner
@@ -1184,3 +1199,492 @@ testVerifyInboundMessageMissingChainConfig = script do
             caller = receiver
 
     debug "testVerifyInboundMessageMissingChainConfig: PASSED"
+
+-- M-6: when pool custom fees are absent, CalculateFee falls back to FeeQuoter's
+-- per-destination token transfer fee config.
+testCalculateFeeFallsBackToFeeQuoter : Script ()
+testCalculateFeeFallsBackToFeeQuoter = script do
+    ccipOwner <- allocateParty "ccip-owner-fee-fallback"
+    poolOwner <- allocateParty "pool-owner-fee-fallback"
+    sender <- allocateParty "sender-fee-fallback"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let sourceChainSelector : Numeric 0 = 123.0
+    let feeTokenId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "LINK"
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    feeQuoter <- submit ccipOwner do
+        createCmd FeeQuoter.FeeQuoter with
+            owner = ccipOwner
+            instanceId = "test-feequoter-fallback"
+            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 5000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "2812d52c"
+                defaultTxGasLimit = 200000
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.5
+                defaultTokenDestGasOverhead = 11111)]
+            tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
+                isEnabled = True
+                feeUSD = usdToCents 3.0
+                destGasOverhead = 70000
+                destBytesOverhead = 64)])]
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = feeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = [ccipOwner]
+
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool-fallback"
+            instrumentId = testInstrumentId
+            decimals = 6
+            chainPoolConfigs = Map.empty
+            chainFeeConfigs = Map.empty
+            remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+
+    let senderAddr = MessageCodecV1.encodePartyAddress sender
+    sendingMessageCid <- submit ccipOwner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            ccipOwner = ccipOwner
+            sender = sender
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "test-router-fallback" sender
+                onRamp = RawInstanceAddress.make "test-onramp-fallback" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalconfig-fallback" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-fallback" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tar-fallback" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-fallback" ccipOwner
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "default-executor-fallback" ccipOwner
+            sourceChainSelector = sourceChainSelector
+            senderAddress = senderAddr
+            receiver = "0000000000000000000000000000000000000001"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000002"
+            tokenReceiver = "0000000000000000000000000000000000000001"
+            tokenArgs = ""
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            feeToken = feeTokenId
+            networkFeeUSDCents = cents 0.0
+            expectedTokenInstrumentId = Some testInstrumentId
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            verifierData = []
+            ccvOwners = []
+            tokenSendData = None
+            observingParties = [sender]
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq <> disclose disclosedSm) do
+        exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
+            ITokenPool.TokenPool_CalculateFee with
+                sendingMessageCid = sendingMessageCid
+                feeQuoterCid = feeQuoter
+                tokenInstrumentId = testInstrumentId
+                caller = sender
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    let tokenSendFee = fromSome sm.tokenSendFee
+    tokenSendFee.feeUSDCents === usdToCents 3.0
+    tokenSendFee.destGasOverhead === 70000
+    tokenSendFee.destBytesOverhead === 64
+
+    debug "testCalculateFeeFallsBackToFeeQuoter: PASSED"
+
+-- M-6: enabled pool fee config overrides FeeQuoter fallback config.
+testCalculateFeePrefersPoolOverride : Script ()
+testCalculateFeePrefersPoolOverride = script do
+    ccipOwner <- allocateParty "ccip-owner-pool-override"
+    poolOwner <- allocateParty "pool-owner-pool-override"
+    sender <- allocateParty "sender-pool-override"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let feeTokenId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "LINK"
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    feeQuoter <- submit ccipOwner do
+        createCmd FeeQuoter.FeeQuoter with
+            owner = ccipOwner
+            instanceId = "test-feequoter-pool-override"
+            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 5000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "2812d52c"
+                defaultTxGasLimit = 200000
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.5
+                defaultTokenDestGasOverhead = 11111)]
+            tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
+                isEnabled = True
+                feeUSD = usdToCents 9.0
+                destGasOverhead = 90000
+                destBytesOverhead = 96)])]
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = feeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = [ccipOwner]
+
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool-override"
+            instrumentId = testInstrumentId
+            decimals = 6
+            chainPoolConfigs = Map.empty
+            chainFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.PoolFeeConfig with
+                isEnabled = True
+                feeUSDCents = cents 2.0
+                destGasOverhead = 50000
+                destBytesOverhead = 32)]
+            remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+
+    let senderAddr = MessageCodecV1.encodePartyAddress sender
+    sendingMessageCid <- submit ccipOwner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            ccipOwner = ccipOwner
+            sender = sender
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "test-router-override" sender
+                onRamp = RawInstanceAddress.make "test-onramp-override" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalconfig-override" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-override" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tar-override" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-pool-override" ccipOwner
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "default-executor-override" ccipOwner
+            sourceChainSelector = 123.0
+            senderAddress = senderAddr
+            receiver = "0000000000000000000000000000000000000001"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000002"
+            tokenReceiver = "0000000000000000000000000000000000000001"
+            tokenArgs = ""
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            feeToken = feeTokenId
+            networkFeeUSDCents = cents 0.0
+            expectedTokenInstrumentId = Some testInstrumentId
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            verifierData = []
+            ccvOwners = []
+            tokenSendData = None
+            observingParties = [sender]
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq <> disclose disclosedSm) do
+        exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
+            ITokenPool.TokenPool_CalculateFee with
+                sendingMessageCid = sendingMessageCid
+                feeQuoterCid = feeQuoter
+                tokenInstrumentId = testInstrumentId
+                caller = sender
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    let tokenSendFee = fromSome sm.tokenSendFee
+    tokenSendFee.feeUSDCents === cents 2.0
+    tokenSendFee.destGasOverhead === 50000
+    tokenSendFee.destBytesOverhead === 32
+
+    debug "testCalculateFeePrefersPoolOverride: PASSED"
+
+-- M-6: disabled pool fee config should fall back to FeeQuoter.
+testCalculateFeeFallsBackWhenPoolFeeDisabled : Script ()
+testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
+    ccipOwner <- allocateParty "ccip-owner-pool-disabled"
+    poolOwner <- allocateParty "pool-owner-pool-disabled"
+    sender <- allocateParty "sender-pool-disabled"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let feeTokenId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "LINK"
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    feeQuoter <- submit ccipOwner do
+        createCmd FeeQuoter.FeeQuoter with
+            owner = ccipOwner
+            instanceId = "test-feequoter-pool-disabled"
+            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 5000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "2812d52c"
+                defaultTxGasLimit = 200000
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.5
+                defaultTokenDestGasOverhead = 11111)]
+            tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
+                isEnabled = True
+                feeUSD = usdToCents 4.0
+                destGasOverhead = 71000
+                destBytesOverhead = 65)])]
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(feeTokenId, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = feeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = [ccipOwner]
+
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool-disabled"
+            instrumentId = testInstrumentId
+            decimals = 6
+            chainPoolConfigs = Map.empty
+            chainFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.PoolFeeConfig with
+                isEnabled = False
+                feeUSDCents = cents 2.0
+                destGasOverhead = 50000
+                destBytesOverhead = 32)]
+            remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+
+    let senderAddr = MessageCodecV1.encodePartyAddress sender
+    sendingMessageCid <- submit ccipOwner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            ccipOwner = ccipOwner
+            sender = sender
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "test-router-disabled" sender
+                onRamp = RawInstanceAddress.make "test-onramp-disabled" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalconfig-disabled" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-disabled" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tar-disabled" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter-pool-disabled" ccipOwner
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            requiredCCVs = []
+            executorAddress = RawInstanceAddress.make "default-executor-disabled" ccipOwner
+            sourceChainSelector = 123.0
+            senderAddress = senderAddr
+            receiver = "0000000000000000000000000000000000000001"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            blockConfirmations = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000002"
+            tokenReceiver = "0000000000000000000000000000000000000001"
+            tokenArgs = ""
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            feeToken = feeTokenId
+            networkFeeUSDCents = cents 0.0
+            expectedTokenInstrumentId = Some testInstrumentId
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            verifierData = []
+            ccvOwners = []
+            tokenSendData = None
+            observingParties = [sender]
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedFq <> disclose disclosedSm) do
+        exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
+            ITokenPool.TokenPool_CalculateFee with
+                sendingMessageCid = sendingMessageCid
+                feeQuoterCid = feeQuoter
+                tokenInstrumentId = testInstrumentId
+                caller = sender
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    let tokenSendFee = fromSome sm.tokenSendFee
+    tokenSendFee.feeUSDCents === usdToCents 4.0
+    tokenSendFee.destGasOverhead === 71000
+    tokenSendFee.destBytesOverhead === 65
+
+    debug "testCalculateFeeFallsBackWhenPoolFeeDisabled: PASSED"
+
+-- M-6: FeeQuoter should fall back to destination-chain defaults when no token-specific config exists.
+testFeeQuoterGetTokenTransferFee_Defaults : Script ()
+testFeeQuoterGetTokenTransferFee_Defaults = script do
+    owner <- allocateParty "owner-feequoter-defaults"
+    let destChainSelector : Numeric 0 = 456.0
+    let linkToken = HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = owner
+            id = "TestToken"
+
+    feeQuoter <- submit owner do
+        createCmd FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-defaults"
+            feeTokens = Map.fromList [(linkToken, 100000000.0)]
+            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 5000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "2812d52c"
+                defaultTxGasLimit = 200000
+                networkFeeUSD = usdToCents 0.0
+                defaultTokenFeeUSD = usdToCents 0.75
+                defaultTokenDestGasOverhead = 12345)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = linkToken
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = [owner]
+
+    (feeUSD, destGasOverhead, destBytesOverhead) <- submit owner do
+        exerciseCmd feeQuoter FeeQuoter.FeeQuoter_GetTokenTransferFee with
+            destChainSelector = destChainSelector
+            token = testInstrumentId
+            caller = owner
+
+    feeUSD === usdToCents 0.75
+    destGasOverhead === 12345
+    destBytesOverhead === 32
+
+    debug "testFeeQuoterGetTokenTransferFee_Defaults: PASSED"
+
+-- M-6: FeeQuoter token transfer fee config is destination-chain specific.
+testFeeQuoterGetTokenTransferFee_PerDestination : Script ()
+testFeeQuoterGetTokenTransferFee_PerDestination = script do
+    owner <- allocateParty "owner-feequoter-per-dest"
+    let destChainSelector1 : Numeric 0 = 456.0
+    let destChainSelector2 : Numeric 0 = 789.0
+    let linkToken = HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = owner
+            id = "TestToken"
+
+    feeQuoter <- submit owner do
+        createCmd FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter-per-dest"
+            feeTokens = Map.fromList [(linkToken, 100000000.0)]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.fromList
+                [ (destChainSelector1, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
+                    isEnabled = True
+                    feeUSD = usdToCents 1.0
+                    destGasOverhead = 10000
+                    destBytesOverhead = 32)])
+                , (destChainSelector2, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
+                    isEnabled = True
+                    feeUSD = usdToCents 2.0
+                    destGasOverhead = 20000
+                    destBytesOverhead = 64)])
+                ]
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
+            linkTokenInstrumentId = linkToken
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = [owner]
+
+    (fee1, gas1, bytes1) <- submit owner do
+        exerciseCmd feeQuoter FeeQuoter.FeeQuoter_GetTokenTransferFee with
+            destChainSelector = destChainSelector1
+            token = testInstrumentId
+            caller = owner
+    (fee2, gas2, bytes2) <- submit owner do
+        exerciseCmd feeQuoter FeeQuoter.FeeQuoter_GetTokenTransferFee with
+            destChainSelector = destChainSelector2
+            token = testInstrumentId
+            caller = owner
+
+    fee1 === usdToCents 1.0
+    gas1 === 10000
+    bytes1 === 32
+    fee2 === usdToCents 2.0
+    gas2 === 20000
+    bytes2 === 64
+
+    debug "testFeeQuoterGetTokenTransferFee_PerDestination: PASSED"
