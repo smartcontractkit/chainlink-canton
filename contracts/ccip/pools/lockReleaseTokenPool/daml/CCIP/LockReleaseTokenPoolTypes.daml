@@ -10,5 +10,6 @@ data ChainPoolConfig = ChainPoolConfig
     with
         inboundCCVs : [RawInstanceAddress]   -- Required CCVs for incoming transfers
         outboundCCVs : [RawInstanceAddress]  -- Required CCVs for outgoing transfers
+        minBlockDepth : Int                  -- Minimum accepted source-chain depth; 0 means finalized-only
         remotePools : [BytesHex]             -- Allowed remote pool addresses for this chain
     deriving (Eq, Show)

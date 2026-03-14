@@ -400,6 +400,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+								{Label: "minBlockDepth", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte(partyTokenPoolOwner))}},
 								}}}}},
@@ -411,6 +412,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							Key:   &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
 							Value: rawInstanceAddress("test-pool-receive-inbound-rl@" + partyTokenPoolOwner),
 						}}}}}},
+						{Label: "inboundCustomRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "remoteTokens", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},

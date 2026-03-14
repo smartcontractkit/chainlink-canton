@@ -59,6 +59,7 @@ func argsToMap(args any) map[string]any {
 type ChainPoolConfig struct {
 	InboundCCVs  []common.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs []common.RawInstanceAddress `json:"outboundCCVs"`
+	MinBlockDepth types.INT64                `json:"minBlockDepth"`
 	RemotePools  []types.TEXT                `json:"remotePools"`
 }
 
@@ -91,6 +92,8 @@ func (t ChainPoolConfig) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	m["remotePools"] = func() []any {
 		res := make([]any, 0, len(t.RemotePools))
@@ -137,6 +140,7 @@ type LockReleaseTokenPool struct {
 	RemoteTokens         types.GENMAP                             `json:"remoteTokens"`
 	OutboundRateLimiters types.GENMAP                             `json:"outboundRateLimiters"`
 	InboundRateLimiters  types.GENMAP                             `json:"inboundRateLimiters"`
+	InboundCustomRateLimiters types.GENMAP                        `json:"inboundCustomRateLimiters"`
 	PoolReceiveContext   common.CCIPContext                       `json:"poolReceiveContext"`
 	TransferTimeout      TransferTimeout                          `json:"transferTimeout"`
 }
@@ -214,6 +218,14 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
 		return map[string]any{"_type": "genmap", "value": t.InboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["inboundCustomRateLimiters"] = func() any {
+		if t.InboundCustomRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.InboundCustomRateLimiters}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -303,6 +315,14 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
 		return map[string]any{"_type": "genmap", "value": t.InboundRateLimiters}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["inboundCustomRateLimiters"] = func() any {
+		if t.InboundCustomRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.InboundCustomRateLimiters}
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -1111,8 +1131,9 @@ func (t *LockReleaseTokenPoolUpdateChainPoolConfigs) UnmarshalHex(data string) e
 
 // LockReleaseTokenPoolUpdateRateLimiters is a Record type
 type LockReleaseTokenPoolUpdateRateLimiters struct {
-	NewOutboundRateLimiters types.GENMAP `json:"newOutboundRateLimiters"`
-	NewInboundRateLimiters  types.GENMAP `json:"newInboundRateLimiters"`
+	NewOutboundRateLimiters      types.GENMAP `json:"newOutboundRateLimiters"`
+	NewInboundRateLimiters       types.GENMAP `json:"newInboundRateLimiters"`
+	NewInboundCustomRateLimiters types.GENMAP `json:"newInboundCustomRateLimiters"`
 }
 
 // ToMap converts LockReleaseTokenPoolUpdateRateLimiters to a map for DAML arguments
@@ -1131,6 +1152,13 @@ func (t LockReleaseTokenPoolUpdateRateLimiters) ToMap() map[string]any {
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
 		return map[string]any{"_type": "genmap", "value": t.NewInboundRateLimiters}
+	}()
+
+	m["newInboundCustomRateLimiters"] = func() any {
+		if t.NewInboundCustomRateLimiters == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.NewInboundCustomRateLimiters}
 	}()
 
 	return m

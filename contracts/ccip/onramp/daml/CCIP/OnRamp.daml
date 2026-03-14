@@ -145,7 +145,7 @@ template OnRamp
                 let resolvedTokenReceiver = if hasTokenTransfer
                         then fromOptional receiver tokenReceiver
                         else ""
-                let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
+                let resolvedBlockConfirmations = 0
 
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents

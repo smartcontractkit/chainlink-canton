@@ -18,11 +18,13 @@ testUpdateChainPoolConfigsParamsRoundtrip = do
   let config1 = ChainPoolConfig with
         inboundCCVs = [RawInstanceAddress "ccv-inbound@party1"]
         outboundCCVs = [RawInstanceAddress "ccv-outbound@party1", RawInstanceAddress "ccv-out2@party2"]
+        minBlockDepth = 0
         remotePools = ["1234567890abcdef", "fedcba0987654321"]
 
       config2 = ChainPoolConfig with
         inboundCCVs = []
         outboundCCVs = [RawInstanceAddress "single-ccv@owner"]
+        minBlockDepth = 0
         remotePools = ["deadbeef"]
 
       configs = Map.fromList [
@@ -70,6 +72,7 @@ testUpdateChainPoolConfigsSingleEntry = do
   let config = ChainPoolConfig with
         inboundCCVs = [RawInstanceAddress "in@p1", RawInstanceAddress "in@p2"]
         outboundCCVs = [RawInstanceAddress "out@p1"]
+        minBlockDepth = 0
         remotePools = ["aabb", "ccdd", "eeff"]
 
       configs = Map.fromList [(42161.0, config)]  -- Arbitrum
@@ -100,6 +103,7 @@ testUpdateChainPoolConfigsLargeSelector = do
       config = ChainPoolConfig with
         inboundCCVs = []
         outboundCCVs = []
+        minBlockDepth = 0
         remotePools = ["00112233"]
 
       configs = Map.fromList [(largeSelector, config)]
@@ -158,6 +162,7 @@ testChainPoolConfigWithManyAddresses = do
       config = ChainPoolConfig with
         inboundCCVs = addresses
         outboundCCVs = addresses
+        minBlockDepth = 0
         remotePools = ["aabb01", "ccdd02", "eeff03", "112233", "445566"]
 
       configs = Map.fromList [(1.0, config)]
@@ -184,6 +189,7 @@ testRemotePoolsVariousLengths = do
   let config = ChainPoolConfig with
         inboundCCVs = []
         outboundCCVs = []
+        minBlockDepth = 0
         remotePools = [
           "00",                                  -- 1 byte
           "0011",                                -- 2 bytes

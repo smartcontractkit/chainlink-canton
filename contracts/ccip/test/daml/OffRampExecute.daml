@@ -174,6 +174,7 @@ testExecuteWithCCVVerification = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
+            receiverMinBlockDepth = 0
 
     -- Verify SUCCESS
     executeResult.state === Internal.SUCCESS
@@ -308,6 +309,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
         exerciseCmd offRamp OffRamp.ExecuteFromRouter with
             routerPartyOwner = receiver
             receiverRequiredCCVs = [receiverCCV]
+            receiverMinBlockDepth = 0
             executingMessageCid = executingMessageCid
             globalConfigCid = globalConfig
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -438,6 +440,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = [receiverCCV]
+            receiverMinBlockDepth = 0
 
     debug "testExecuteMessageOnlyRequiresReceiverCCVs: PASSED"
 
@@ -571,6 +574,7 @@ testExecuteFailsMissingCCV = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
+            receiverMinBlockDepth = 0
 
     debug ("Execute fails with missing CCV: PASSED")
     pure ()
@@ -810,6 +814,7 @@ testExecuteAllowsMultipleOnRamps = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
+            receiverMinBlockDepth = 0
 
     executeResult.state === Internal.SUCCESS
     debug ("Execute succeeds with alternate configured onramp: PASSED")
@@ -932,6 +937,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
+            receiverMinBlockDepth = 0
 
     debug ("Execute fails with unconfigured onramp: PASSED")
     pure ()

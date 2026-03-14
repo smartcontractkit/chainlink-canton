@@ -242,6 +242,7 @@ template SendingMessageV1
             controller caller
             do
                 let isTokenSend = expectedTokenInstrumentId /= None
+                let resolvedBlockConfirmations = 0
                 assertMsg "sendingMessage: invalid state for AddExecutorWithFee"
                     (if isTokenSend
                         then state == SendingMessageState_TokenLocked
@@ -283,7 +284,7 @@ template SendingMessageV1
                         sequenceNumber
                         executionGasLimit = finalExecutionGasLimit
                         ccipReceiveGasLimit
-                        finality = blockConfirmations
+                        finality = resolvedBlockConfirmations
                         ccvAndExecutorHash = finalHash
                         onRampAddress
                         offRampAddress
@@ -301,7 +302,7 @@ template SendingMessageV1
                     executorAddress = derivedExecutor
                     executorArgs = executorArgs
                     executionGasLimit = finalExecutionGasLimit
-                    blockConfirmations = blockConfirmations
+                    blockConfirmations = resolvedBlockConfirmations
                     ccvAndExecutorHash = finalHash
                     executorFee = Some ef
                     message = Some messageV1

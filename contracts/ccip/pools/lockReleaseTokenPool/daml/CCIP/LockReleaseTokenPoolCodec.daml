@@ -49,21 +49,23 @@ encodeUpdateChainPoolConfigsParams configs =
 -- ===========================================================================
 -- CHAIN POOL CONFIG ENCODING/DECODING
 -- Format: [rawInstanceAddressList inboundCCVs][rawInstanceAddressList outboundCCVs]
---         [bytesHexList remotePools]
+--         [int256 minBlockDepth][bytesHexList remotePools]
 -- ===========================================================================
 
 encodeChainPoolConfig : ChainPoolConfig -> BytesHex
 encodeChainPoolConfig cpc =
   encodeRawInstanceAddressList cpc.inboundCCVs <>
   encodeRawInstanceAddressList cpc.outboundCCVs <>
+  encodeInt256 cpc.minBlockDepth <>
   encodeBytesHexList cpc.remotePools
 
 decodeChainPoolConfigAt : BytesHex -> Int -> Optional (ChainPoolConfig, Int)
 decodeChainPoolConfigAt encoded offset = do
   (inboundCCVs, offset1) <- decodeRawInstanceAddressList encoded offset
   (outboundCCVs, offset2) <- decodeRawInstanceAddressList encoded offset1
-  (remotePools, offset3) <- decodeBytesHexList encoded offset2
-  Some (ChainPoolConfig inboundCCVs outboundCCVs remotePools, offset3)
+  (minBlockDepth, offset3) <- decodeInt256At encoded offset2
+  (remotePools, offset4) <- decodeBytesHexList encoded offset3
+  Some (ChainPoolConfig inboundCCVs outboundCCVs minBlockDepth remotePools, offset4)
 
 decodeChainPoolConfigMapEntries : BytesHex -> Int -> Optional ([(Numeric 0, ChainPoolConfig)], Int)
 decodeChainPoolConfigMapEntries encoded offset = do
@@ -77,4 +79,3 @@ decodeChainPoolConfigMapEntriesHelper encoded offset remaining acc = do
   (chainSelector, offset1) <- decodeNumeric0At encoded offset
   (config, offset2) <- decodeChainPoolConfigAt encoded offset1
   decodeChainPoolConfigMapEntriesHelper encoded offset2 (remaining - 1) ((chainSelector, config) :: acc)
-

@@ -411,6 +411,7 @@ testCCIPExecute = script do
                  (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
+            receiverMinBlockDepth = 0
 
     executeResult.state === CCIP.Internal.SUCCESS
 
@@ -420,7 +421,7 @@ testCCIPExecute = script do
 
     pure ()
 
--- | Test PrepareSend applies blockConfirmations and token-only default CCV behavior.
+    -- | Test PrepareSend normalizes blockConfirmations to zero and preserves token-only default CCV behavior.
 -- Executor finalization is tested separately; after PrepareSend message is always None.
 testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
@@ -530,7 +531,7 @@ testPrepareSendExtraArgs = script do
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Message-only send with explicit blockConfirmations.
-    -- Message is deferred to executor; only blockConfirmations is verifiable here.
+    -- Canton send normalizes this to zero.
     let receiver = CCIP.MessageCodecV1.encodePartyAddress user
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -552,7 +553,7 @@ testPrepareSendExtraArgs = script do
             feeToken = feeTokenId
 
     Some sm <- user `queryContractId` smCid
-    sm.blockConfirmations === 42
+    sm.blockConfirmations === 0
     sm.message === None
     sm.ccipReceiveGasLimit === 123
 

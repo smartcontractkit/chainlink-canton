@@ -41,6 +41,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs = script do
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -51,6 +52,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs = script do
   let config = ChainPoolConfig with
         inboundCCVs = [RawInstanceAddress "ccv-inbound@owner"]
         outboundCCVs = [RawInstanceAddress "ccv-outbound@owner"]
+        minBlockDepth = 0
         remotePools = ["1234567890abcdef"]
 
       configs = Map.fromList [(1.0, config)]
@@ -101,6 +103,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = RelativeHours 24
 
@@ -182,6 +185,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Replace = script d
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -243,6 +247,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Empty = script do
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -294,6 +299,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -331,6 +337,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
@@ -368,6 +375,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
       remoteTokens = Map.empty
       outboundRateLimiters = Map.empty
       inboundRateLimiters = Map.empty
+      inboundCustomRateLimiters = Map.empty
       poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
       transferTimeout = Indefinite
 
