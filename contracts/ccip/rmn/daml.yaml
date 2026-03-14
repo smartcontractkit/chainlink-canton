@@ -4,6 +4,7 @@ source: daml
 version: 0.0.1
 build-options:
   - "-Wno-crypto-text-is-alpha"
+  - "-Werror=unused-dependency"
 dependencies:
   - daml-prim
   - daml-stdlib

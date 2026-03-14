@@ -7,7 +7,10 @@ import (
 	"testing"
 
 	participantv30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/admin/participant/v30"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/stretchr/testify/require"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -18,7 +21,6 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -127,7 +129,6 @@ func TestConfigureChainForLanes(t *testing.T) {
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainSelector, 10)),
-						OnRampAddress: "", // TODO ?
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
@@ -192,16 +193,16 @@ func TestConfigureChainForLanes(t *testing.T) {
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {
 						AllowTrafficFrom:         true,
-						OnRamps:                  [][]byte{[]byte("")},
-						OffRamp:                  nil,
-						DefaultInboundCCVs:       nil,
-						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-						DefaultOutboundCCVs:      nil,
+						OnRamps:                  [][]byte{hexutil.MustDecode("0x0b5c6e23bb6f8e3abe5fcbdd406f3df8b96b8e1c")},
+						OffRamp:                  hexutil.MustDecode("0xbd8f6f5f14d9efbde3c72cc1affc968a5f49a2b3"),
+						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+						LaneMandatedInboundCCVs:  nil,
+						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
-						AddressBytesLength:       0,
+						AddressBytesLength:       20,
 						BaseExecutionGasCost:     0,
 					},
 				},

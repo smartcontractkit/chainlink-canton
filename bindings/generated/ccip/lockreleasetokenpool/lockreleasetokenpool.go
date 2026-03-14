@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "0fec43d13064a248a01a6bbc2844b4d8bc42f82f753eb4c488dc037b029ed945"
+	PackageID   = "f6a6c530899f248de6a580f221c956a5ddcab4f8960d9f8e746cb0f751b1ddb4"
 	SDKVersion  = "3.4.10"
 )
 
@@ -562,27 +562,6 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolUpdateRateLimitersWithPackageI
 	}
 }
 
-// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this LockReleaseTokenPool contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t LockReleaseTokenPool) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_GetInstanceId",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this LockReleaseTokenPool contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
@@ -738,8 +717,10 @@ var _ interfaces.IITokenPool = (*LockReleaseTokenPool)(nil)
 
 // LockReleaseTokenPoolCalculateFee is a Record type
 type LockReleaseTokenPoolCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	Caller            types.PARTY       `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller            types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolCalculateFee to a map for DAML arguments
@@ -752,6 +733,22 @@ func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
+	}()
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["tokenInstrumentId"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenInstrumentId).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenInstrumentId
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -784,7 +781,9 @@ func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
 // LockReleaseTokenPoolCalculateFeeMCMSParams is LockReleaseTokenPoolCalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolCalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1358,6 +1357,7 @@ func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data str
 
 // PoolFeeConfig is a Record type
 type PoolFeeConfig struct {
+	IsEnabled         types.BOOL    `json:"isEnabled"`
 	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
@@ -1366,6 +1366,8 @@ type PoolFeeConfig struct {
 // ToMap converts PoolFeeConfig to a map for DAML arguments
 func (t PoolFeeConfig) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["isEnabled"] = bool(t.IsEnabled)
 
 	m["feeUSDCents"] = t.FeeUSDCents
 

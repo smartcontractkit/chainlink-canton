@@ -12,6 +12,7 @@ import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.Math
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import CCIP.RawInstanceAddress (RawInstanceAddress)
@@ -22,6 +23,13 @@ import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Internal
 import qualified CCIP.Context
+import CCIP.Codec
+  ( encodeRawInstanceAddress
+  , decodeRawInstanceAddressAt
+  , encodeOptionalRawInstanceAddress
+  , decodeOptionalRawInstanceAddressAt
+  )
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -37,6 +45,16 @@ data PerPartyRouterDeps = PerPartyRouterDeps
         rmnRemote : RawInstanceAddress
     deriving (Eq, Show)
 
+data SetDepsParams = SetDepsParams
+    with
+        onRamp : Optional RawInstanceAddress
+        offRamp : Optional RawInstanceAddress
+        globalConfig : Optional RawInstanceAddress
+        tokenAdminRegistry : Optional RawInstanceAddress
+        feeQuoter : Optional RawInstanceAddress
+        rmnRemote : Optional RawInstanceAddress
+    deriving (Eq, Show)
+
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
 template PerPartyRouterFactory
@@ -47,6 +65,20 @@ template PerPartyRouterFactory
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
+
+        choice FactorySetDeps : ContractId PerPartyRouterFactory
+            with
+                newDeps : SetDepsParams
+            controller ccipOwner
+            do
+                let mergedDeps = PerPartyRouterDeps with
+                        onRamp = fromOptional deps.onRamp newDeps.onRamp
+                        offRamp = fromOptional deps.offRamp newDeps.offRamp
+                        globalConfig = fromOptional deps.globalConfig newDeps.globalConfig
+                        tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
+                        feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
+                        rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                create this with deps = mergedDeps
 
         choice CreateRouter : CreateRouterResult
             with
@@ -84,6 +116,27 @@ template PerPartyRouterFactory
             controller caller
             do pure (Map.member partyOwner registeredRouters)
 
+        interface instance MCMSReceiver for PerPartyRouterFactory where
+          view = MCMSReceiverView with
+            mcmsController = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId PerPartyRouterFactory)
+
+            case functionName of
+              "FactorySetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: FactorySetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid FactorySetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
 
 data CreateRouterResult = CreateRouterResult
     with
@@ -105,6 +158,20 @@ template PerPartyRouter
     where
         signatory ccipOwner
         observer partyOwner
+
+        choice SetDeps : ContractId PerPartyRouter
+            with
+                newDeps : SetDepsParams
+            controller ccipOwner
+            do
+                let mergedDeps = PerPartyRouterDeps with
+                        onRamp = fromOptional deps.onRamp newDeps.onRamp
+                        offRamp = fromOptional deps.offRamp newDeps.offRamp
+                        globalConfig = fromOptional deps.globalConfig newDeps.globalConfig
+                        tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
+                        feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
+                        rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                create this with deps = mergedDeps
 
         -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -225,7 +292,7 @@ template PerPartyRouter
                                 Splice.Api.Token.TransferInstructionV1.Transfer with
                                     sender = partyOwner
                                     receiver = ccipOwner
-                                    amount = intToDecimal (truncate totalFee)
+                                    amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.totalFee" totalFee
                                     instrumentId = sendingMsg.feeToken
                                     requestedAt = now
                                     executeBefore = addRelTime now (hours 1)
@@ -432,6 +499,27 @@ template PerPartyRouter
                     receiverRequiredCCVs = receiverRequiredCCVs
                     sourceChainSelector = sourceChainSelector
 
+        interface instance MCMSReceiver for PerPartyRouter where
+          view = MCMSReceiverView with
+            mcmsController = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId PerPartyRouter)
+
+            case functionName of
+              "SetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid SetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
 
 data CCIPSendResult = CCIPSendResult
     with
@@ -450,3 +538,51 @@ data ExecuteResult = ExecuteResult
         message : CCIP.MessageCodecV1.MessageV1
         state : CCIP.Internal.MessageExecutionState
     deriving (Eq, Show)
+
+-- ===========================================================================
+-- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
+-- ===========================================================================
+
+-- | Decode SetDeps params (Optional fields)
+-- Format: [OptRIA onRamp][OptRIA offRamp][OptRIA globalConfig][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA rmnRemote]
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (onRamp, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
+  (offRamp, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
+  (globalConfig, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
+  (tokenAdminRegistry, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
+  (feeQuoter, offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
+  (rmnRemote, _offset6) <- decodeOptionalRawInstanceAddressAt encoded offset5
+  Some (SetDepsParams onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote)
+
+-- | Encode SetDeps params (Optional fields)
+encodeSetDepsParams : SetDepsParams -> BytesHex
+encodeSetDepsParams params =
+  encodeOptionalRawInstanceAddress params.onRamp <>
+  encodeOptionalRawInstanceAddress params.offRamp <>
+  encodeOptionalRawInstanceAddress params.globalConfig <>
+  encodeOptionalRawInstanceAddress params.tokenAdminRegistry <>
+  encodeOptionalRawInstanceAddress params.feeQuoter <>
+  encodeOptionalRawInstanceAddress params.rmnRemote
+
+-- | Decode PerPartyRouterDeps at offset (full, non-optional)
+-- Format: [RIA onRamp][RIA offRamp][RIA globalConfig][RIA tokenAdminRegistry][RIA feeQuoter][RIA rmnRemote]
+decodePerPartyRouterDepsAt : BytesHex -> Int -> Optional (PerPartyRouterDeps, Int)
+decodePerPartyRouterDepsAt encoded offset = do
+  (onRamp, offset1) <- decodeRawInstanceAddressAt encoded offset
+  (offRamp, offset2) <- decodeRawInstanceAddressAt encoded offset1
+  (globalConfig, offset3) <- decodeRawInstanceAddressAt encoded offset2
+  (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
+  (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
+  (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
+  Some (PerPartyRouterDeps onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, offset6)
+
+-- | Encode PerPartyRouterDeps (full, non-optional)
+encodePerPartyRouterDeps : PerPartyRouterDeps -> BytesHex
+encodePerPartyRouterDeps deps =
+  encodeRawInstanceAddress deps.onRamp <>
+  encodeRawInstanceAddress deps.offRamp <>
+  encodeRawInstanceAddress deps.globalConfig <>
+  encodeRawInstanceAddress deps.tokenAdminRegistry <>
+  encodeRawInstanceAddress deps.feeQuoter <>
+  encodeRawInstanceAddress deps.rmnRemote

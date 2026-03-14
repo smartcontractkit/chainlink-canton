@@ -29,8 +29,10 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
+import qualified CCIP.Math
 import qualified CCIP.RateLimiter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RawInstanceAddress
@@ -58,7 +60,8 @@ data TransferTimeout
 -- | Per-chain fee config for outbound pool fee calculation.
 data PoolFeeConfig = PoolFeeConfig
     with
-        feeUSDCents : Decimal
+        isEnabled : Bool
+        feeUSDCents : Numeric 0
         destGasOverhead : Int
         destBytesOverhead : Int
     deriving (Eq, Show)
@@ -165,28 +168,6 @@ template LockReleaseTokenPool
     where
         signatory poolOwner
 
-        interface instance MCMSReceiver for LockReleaseTokenPool where
-          view = MCMSReceiverView with
-            owner = poolOwner
-            instanceId
-
-          mcmsEntrypoint functionName operationData contractIds = do
-            let instAddr = instanceId <> "@" <> partyToText poolOwner
-            selfCid <- case Map.lookup instAddr contractIds of
-              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
-              Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
-
-            case functionName of
-              "UpdateChainPoolConfigs" -> do
-                case decodeUpdateChainPoolConfigsParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateChainPoolConfigs"
-                  Some newChainPoolConfigs -> do
-                    newCid <- exercise selfCid LockReleaseTokenPool_UpdateChainPoolConfigs with
-                      newChainPoolConfigs
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with
                 owner = poolOwner
@@ -245,6 +226,8 @@ template LockReleaseTokenPool
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
+                        feeQuoterCid = arg.feeQuoterCid
+                        tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
         -- Get required CCV raw instance addresses based on chain and direction.
@@ -414,8 +397,11 @@ template LockReleaseTokenPool
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
                 let sourceDecimals = parseSourcePoolDecimals decimals ticket.sourcePoolData
+                let remoteAmountDecimal = CCIP.Math.numeric0ToDecimalChecked
+                        "ReleaseFromTicket.ticket.amount"
+                        ticket.amount
                 let amountDecimal = calculateLocalAmountDecimal
-                        (intToDecimal (truncate ticket.amount))
+                        remoteAmountDecimal
                         sourceDecimals
                         decimals
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -474,21 +460,33 @@ template LockReleaseTokenPool
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
             do
                 -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
-                let feeConfig = fromSomeNote "no pool fee config for dest chain"
-                        (Map.lookup sendingMsg.destChainSelector chainFeeConfigs)
+                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector chainFeeConfigs of
+                    Some feeConfig | feeConfig.isEnabled ->
+                        pure
+                            ( feeConfig.feeUSDCents
+                            , feeConfig.destGasOverhead
+                            , feeConfig.destBytesOverhead
+                            )
+                    _ ->
+                        exercise feeQuoterCid CCIP.FeeQuoter.FeeQuoter_GetTokenTransferFee with
+                            destChainSelector = sendingMsg.destChainSelector
+                            token = tokenInstrumentId
+                            caller = poolOwner
 
                 exercise sendingMessageCid
                     CCIP.SendingMessageV1.AddTokenSendFee with
                         poolInstanceId = instanceId
                         poolOwner = poolOwner
-                        feeUSDCents = feeConfig.feeUSDCents
-                        destGasOverhead = feeConfig.destGasOverhead
-                        destBytesOverhead = feeConfig.destBytesOverhead
+                        feeUSDCents
+                        destGasOverhead
+                        destBytesOverhead
                         caller = poolOwner
 
         -- Lock tokens for outbound transfer and append token send data.
@@ -544,7 +542,9 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let amountDecimal : Decimal = intToDecimal (truncate amount)
+                let amountDecimal : Decimal = CCIP.Math.numeric0ToDecimalChecked
+                        "LockOrBurn.amount"
+                        amount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
@@ -580,3 +580,25 @@ template LockReleaseTokenPool
                             senderChangeCids = transferResult.senderChangeCids
                             sendingMessageCid = newSendingMessageCid
                     _ -> abort "LockOrBurn: transfer did not complete directly"
+
+        interface instance MCMSReceiver for LockReleaseTokenPool where
+          view = MCMSReceiverView with
+            mcmsController = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText poolOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
+
+            case functionName of
+              "UpdateChainPoolConfigs" -> do
+                case decodeUpdateChainPoolConfigsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: UpdateChainPoolConfigs"
+                  Some newChainPoolConfigs -> do
+                    newCid <- exercise selfCid LockReleaseTokenPool_UpdateChainPoolConfigs with
+                      newChainPoolConfigs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

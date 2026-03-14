@@ -73,8 +73,8 @@ var ConfigureChainForLanes = operations.NewSequence(
 	func(b operations.Bundle, deps dependencies.CantonDeps, input ConfigureChainForLanesInput) (sequences.OnChainOutput, error) {
 
 		// Create inputs for each operation
-		globalConfigSourceChainConfigArgs := make([]common.UpdateSourceChainConfig, 0, len(input.RemoteChains))
-		globalConfigDestChainConfigArgs := make([]common.UpdateDestChainConfig, 0, len(input.RemoteChains))
+		globalConfigSourceChainConfigArgs := make([]common.SourceChainConfigArgs, 0, len(input.RemoteChains))
+		globalConfigDestChainConfigArgs := make([]common.DestChainConfigArgs, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
@@ -98,14 +98,12 @@ var ConfigureChainForLanes = operations.NewSequence(
 				}
 				onRamps = append(onRamps, types.TEXT(normalizedOnRamp))
 			}
-			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.UpdateSourceChainConfig{
+			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.SourceChainConfigArgs{
 				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
-				Config: common.SourceChainConfig{
-					IsEnabled:        types.BOOL(remoteConfig.AllowTrafficFrom),
-					OnRampAddresses:  onRamps,
-					LaneMandatedCCVs: laneMandatedInboundCCVs,
-					DefaultCCVs:      defaultInboundCCVs,
-				},
+				IsEnabled:           types.BOOL(remoteConfig.AllowTrafficFrom),
+				OnRampAddresses:     onRamps,
+				LaneMandatedCCVs:    laneMandatedInboundCCVs,
+				DefaultCCVs:         defaultInboundCCVs,
 			})
 
 			defaultOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
@@ -118,31 +116,30 @@ var ConfigureChainForLanes = operations.NewSequence(
 			}
 
 			// Outbound / OnRamp
-			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.UpdateDestChainConfig{
-				DestChainSelector: types.NUMERIC(remoteSelectorStr),
-				Config: common.DestChainConfig{
-					IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
-					OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
-					LaneMandatedCCVs:          laneMandatedOutboundCCVs,
-					DefaultCCVs:               defaultOutboundCCVs,
-					MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
-					TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
-				},
+			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.DestChainConfigArgs{
+				DestChainSelector:         types.NUMERIC(remoteSelectorStr),
+				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
+				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
+				OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
+				LaneMandatedCCVs:          laneMandatedOutboundCCVs,
+				DefaultCCVs:               defaultOutboundCCVs,
+				MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
+				TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
 			})
 			// TODO: Other configs once the contracts are ready
 		}
 
 		// Apply SourceChainConfigs to GlobalConfig
-		for i, arg := range globalConfigSourceChainConfigArgs {
-			_, err := operations.ExecuteOperation(b, global_config.UpdateSourceChainConfig, deps, contract.ChoiceInput[common.UpdateSourceChainConfig]{
-				ChainSelector:   deps.Chain.Selector,
-				InstanceAddress: input.GlobalConfig,
-				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-				Args:            arg,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.SourceChainSelector), err)
-			}
+		_, err := operations.ExecuteOperation(b, global_config.ApplySourceChainConfigUpdates, deps, contract.ChoiceInput[common.ApplySourceChainConfigUpdates]{
+			ChainSelector:   deps.Chain.Selector,
+			InstanceAddress: input.GlobalConfig,
+			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+			Args: common.ApplySourceChainConfigUpdates{
+				SourceChainConfigUpdates: globalConfigSourceChainConfigArgs,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates: %w", err)
 		}
 
 		// Apply signature configs to CommitteeVerifiers
@@ -182,16 +179,16 @@ var ConfigureChainForLanes = operations.NewSequence(
 		}
 
 		// Apply DestChainConfigs to GlobalConfig
-		for i, arg := range globalConfigDestChainConfigArgs {
-			_, err := operations.ExecuteOperation(b, global_config.UpdateDestChainConfig, deps, contract.ChoiceInput[common.UpdateDestChainConfig]{
-				ChainSelector:   deps.Chain.Selector,
-				InstanceAddress: input.GlobalConfig,
-				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-				Args:            arg,
-			})
-			if err != nil {
-				return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config %d for remote chain %s: %w", i, string(arg.DestChainSelector), err)
-			}
+		_, err = operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[common.ApplyDestChainConfigUpdates]{
+			ChainSelector:   deps.Chain.Selector,
+			InstanceAddress: input.GlobalConfig,
+			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+			Args: common.ApplyDestChainConfigUpdates{
+				DestChainConfigUpdates: globalConfigDestChainConfigArgs,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates: %w", err)
 		}
 
 		return sequences.OnChainOutput{}, nil

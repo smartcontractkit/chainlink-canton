@@ -16,10 +16,12 @@ module MCMS.Codec
   , extractBytes
   , encodeText
   , decodeText
+  , decodeTextAt
   , encodeList
   , decodeList
   , encodeBool
   , decodeBool
+  , decodeBoolAt
   , ScheduleBatchParams(..)
   , encodeScheduleBatchParams
   , decodeScheduleBatchParams
@@ -38,11 +40,29 @@ module MCMS.Codec
   , encodeInt64
   , decodeInt64
   , decodeInt64At
+  -- BytesHex encoding (length-prefixed)
+  , encodeBytesHex
+  , decodeBytesHexAt
+  , encodeBytesHexList
+  , decodeBytesHexList
+  -- Decimal encoding (as text)
+  , encodeDecimal
+  , decodeDecimalAt
+  , parseDecimal
+  , parseDecimalUnsafe
+  , parseIntUnsafe
+  , parseDigitsUnsafe
+  , charToDigitInt
+  , pow10
+  -- Party encoding
+  , encodeParty
+  , decodePartyAt
+  , encodePartyList
+  , decodePartyList
   ) where
 
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import qualified DA.Text as Text
-import DA.Text qualified as DA.Text
 import DA.Optional (fromSome)
 import DA.Foldable ()
 import MCMS.Types (SignerInfo(..), Role(..), BlockedFunction(..), TimelockCall(..), intToRole)
@@ -243,6 +263,10 @@ decodeText encoded offset = do
       text <- fromHex textHex
       return (text, offset + 1 + len)
 
+-- | Alias for decodeText (same signature: BytesHex -> Int -> Optional (Text, Int))
+decodeTextAt : BytesHex -> Int -> Optional (Text, Int)
+decodeTextAt = decodeText
+
 -- | Encode bool (1 byte: 0 = False, 1 = True)
 encodeBool : Bool -> BytesHex
 encodeBool b = if b then "01" else "00"
@@ -252,6 +276,14 @@ decodeBool : BytesHex -> Optional Bool
 decodeBool hex =
   if hex == "01" then Some True
   else if hex == "00" then Some False
+  else None
+
+-- | Decode bool at offset, returns (value, newOffset)
+decodeBoolAt : BytesHex -> Int -> Optional (Bool, Int)
+decodeBoolAt encoded offset = do
+  boolHex <- extractBytes encoded offset 1
+  if boolHex == "01" then Some (True, offset + 1)
+  else if boolHex == "00" then Some (False, offset + 1)
   else None
 
 -- | Encode a list with length prefix
@@ -477,23 +509,23 @@ decodeNumeric0At encoded offset = do
 numeric0ToDecimalString : Numeric 0 -> Text
 numeric0ToDecimalString n =
   let str = show n
-  in if DA.Text.isSuffixOf ".0" str
-     then DA.Text.take (DA.Text.length str - 2) str
+  in if Text.isSuffixOf ".0" str
+     then Text.take (Text.length str - 2) str
      else str
 
 -- | Parse decimal string to Numeric 0
 -- Multiplies accumulated value by 10 and adds each digit
 parseNumeric0 : Text -> Optional (Numeric 0)
 parseNumeric0 text =
-  if DA.Text.length text == 0 then None
+  if Text.length text == 0 then None
   else parseNumeric0Helper text 0.0
 
 parseNumeric0Helper : Text -> Numeric 0 -> Optional (Numeric 0)
 parseNumeric0Helper text acc =
-  if DA.Text.length text == 0 then Some acc
+  if Text.length text == 0 then Some acc
   else
-    let firstChar = DA.Text.take 1 text
-        rest = DA.Text.drop 1 text
+    let firstChar = Text.take 1 text
+        rest = Text.drop 1 text
         digitOpt = charToDigit firstChar
     in case digitOpt of
       None -> None
@@ -504,4 +536,151 @@ charToDigit c = case c of
   "0" -> Some 0.0; "1" -> Some 1.0; "2" -> Some 2.0; "3" -> Some 3.0; "4" -> Some 4.0
   "5" -> Some 5.0; "6" -> Some 6.0; "7" -> Some 7.0; "8" -> Some 8.0; "9" -> Some 9.0
   _ -> None
+
+-- ===========================================================================
+-- BYTES HEX ENCODING/DECODING
+-- Format: [uint8 len][raw bytes]
+-- ===========================================================================
+
+-- | Encode BytesHex with uint8 length prefix
+encodeBytesHex : BytesHex -> BytesHex
+encodeBytesHex bh =
+  let len = byteCount bh
+  in fromSome (encodeUint8 len) <> bh
+
+-- | Decode BytesHex with uint8 length prefix
+decodeBytesHexAt : BytesHex -> Int -> Optional (BytesHex, Int)
+decodeBytesHexAt encoded offset = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  bytes <- extractBytes encoded (offset + 1) len
+  Some (bytes, offset + 1 + len)
+
+-- | Encode list of BytesHex
+encodeBytesHexList : [BytesHex] -> BytesHex
+encodeBytesHexList items =
+  let count = length items
+  in fromSome (encodeUint8 count) <> foldl (\acc bh -> acc <> encodeBytesHex bh) "" items
+
+-- | Decode list of BytesHex
+decodeBytesHexList : BytesHex -> Int -> Optional ([BytesHex], Int)
+decodeBytesHexList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeBytesHexListHelper encoded (offset + 1) count []
+
+decodeBytesHexListHelper : BytesHex -> Int -> Int -> [BytesHex] -> Optional ([BytesHex], Int)
+decodeBytesHexListHelper _ offset 0 acc = Some (reverse acc, offset)
+decodeBytesHexListHelper encoded offset remaining acc = do
+  (bh, newOffset) <- decodeBytesHexAt encoded offset
+  decodeBytesHexListHelper encoded newOffset (remaining - 1) (bh :: acc)
+
+-- ===========================================================================
+-- DECIMAL ENCODING/DECODING
+-- Format: [text representation of decimal]
+-- ===========================================================================
+
+-- | Encode Decimal as length-prefixed text
+encodeDecimal : Decimal -> BytesHex
+encodeDecimal d = encodeText (show d)
+
+-- | Decode Decimal from length-prefixed text
+decodeDecimalAt : BytesHex -> Int -> Optional (Decimal, Int)
+decodeDecimalAt encoded offset = do
+  (text, newOffset) <- decodeText encoded offset
+  dec <- parseDecimal text
+  Some (dec, newOffset)
+
+-- | Parse decimal from text (handles "123.456" format)
+parseDecimal : Text -> Optional Decimal
+parseDecimal text = Some (parseDecimalUnsafe text)
+
+parseDecimalUnsafe : Text -> Decimal
+parseDecimalUnsafe text =
+  let parts = Text.splitOn "." text
+  in case parts of
+    [intPart] -> intToDecimal (parseIntUnsafe intPart)
+    [intPart, fracPart] ->
+      let intVal = parseIntUnsafe intPart
+          fracLen = Text.length fracPart
+          fracVal = parseIntUnsafe fracPart
+          divisor = pow10 fracLen
+      in intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor)
+    _ -> error ("Invalid decimal format: " <> text)
+
+parseIntUnsafe : Text -> Int
+parseIntUnsafe text =
+  if Text.length text == 0 then 0
+  else
+    let (negative, digits) =
+          if Text.take 1 text == "-"
+          then (True, Text.drop 1 text)
+          else (False, text)
+        value = parseDigitsUnsafe digits 0
+    in if negative then negate value else value
+
+parseDigitsUnsafe : Text -> Int -> Int
+parseDigitsUnsafe text acc =
+  if Text.length text == 0 then acc
+  else
+    let c = Text.take 1 text
+        rest = Text.drop 1 text
+        digit = charToDigitInt c
+    in parseDigitsUnsafe rest (acc * 10 + digit)
+
+charToDigitInt : Text -> Int
+charToDigitInt c = case c of
+  "0" -> 0; "1" -> 1; "2" -> 2; "3" -> 3; "4" -> 4
+  "5" -> 5; "6" -> 6; "7" -> 7; "8" -> 8; "9" -> 9
+  _ -> error ("Invalid digit: " <> c)
+
+pow10 : Int -> Int
+pow10 0 = 1
+pow10 n = 10 * pow10 (n - 1)
+
+-- ===========================================================================
+-- PARTY ENCODING/DECODING
+-- Format: [uint8 len][party text as hex]
+-- ===========================================================================
+
+encodeParty : Party -> BytesHex
+encodeParty party =
+  let
+    partyHex = toHex (partyToText party)
+    len = byteCount partyHex
+  in
+    fromSome (encodeUint8 len) <> partyHex
+
+decodePartyAt : BytesHex -> Int -> Optional (Party, Int)
+decodePartyAt encoded offset = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  partyHex <- extractBytes encoded (offset + 1) len
+  partyText <- fromHex partyHex
+  party <- partyFromText partyText
+  Some (party, offset + 1 + len)
+
+-- ===========================================================================
+-- PARTY LIST ENCODING/DECODING
+-- Format: [uint8 count][party...]
+-- ===========================================================================
+
+-- | Encode list of parties
+encodePartyList : [Party] -> BytesHex
+encodePartyList parties =
+  let count = length parties
+  in fromSome (encodeUint8 count) <> foldl (\acc p -> acc <> encodeParty p) "" parties
+
+-- | Decode list of parties
+decodePartyList : BytesHex -> Int -> Optional ([Party], Int)
+decodePartyList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodePartyListHelper encoded (offset + 1) count []
+
+decodePartyListHelper : BytesHex -> Int -> Int -> [Party] -> Optional ([Party], Int)
+decodePartyListHelper _ offset 0 acc = Some (reverse acc, offset)
+decodePartyListHelper encoded offset remaining acc = do
+  (party, newOffset) <- decodePartyAt encoded offset
+  decodePartyListHelper encoded newOffset (remaining - 1) (party :: acc)
 

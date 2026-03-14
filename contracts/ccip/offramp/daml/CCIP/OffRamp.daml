@@ -4,7 +4,8 @@ module CCIP.OffRamp where
 import DA.Foldable qualified as Foldable
 import DA.Crypto.Text (BytesHex, keccak256)
 import DA.List (dedup)
-import DA.Optional (fromSomeNote, isSome)
+import DA.Map qualified as Map
+import DA.Optional (fromOptional, fromSomeNote, isSome)
 
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
@@ -16,6 +17,13 @@ import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
+import CCIP.Codec
+  ( encodeRawInstanceAddress
+  , decodeRawInstanceAddressAt
+  , encodeOptionalRawInstanceAddress
+  , decodeOptionalRawInstanceAddressAt
+  )
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 offRampKey : Text
 offRampKey = "off-ramp"
@@ -28,9 +36,16 @@ rawInstanceAddress offRamp = CCIP.RawInstanceAddress.make offRamp.instanceId off
 
 data OffRampDeps = OffRampDeps
     with
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress
+    deriving (Eq, Show)
+
+data SetDepsParams = SetDepsParams
+    with
+        globalConfig : Optional RawInstanceAddress
+        rmnRemote : Optional RawInstanceAddress
+        tokenAdminRegistry : Optional RawInstanceAddress
     deriving (Eq, Show)
 
 
@@ -42,6 +57,17 @@ template OffRamp
         deps : OffRampDeps
     where
         signatory ccipOwner
+
+        choice SetDeps : ContractId OffRamp
+            with
+                newDeps : SetDepsParams
+            controller ccipOwner
+            do
+                let mergedDeps = OffRampDeps with
+                        globalConfig = fromOptional deps.globalConfig newDeps.globalConfig
+                        rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                        tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
+                create this with deps = mergedDeps
 
         -- | Get required CCV raw instance addresses for inbound message execution.
         -- Returns lane-mandated + receiver + default CCVs. Pool CCVs are handled
@@ -299,6 +325,27 @@ template OffRamp
                     tokenReceiveTicket = finalizeResult.tokenReceiveTicket
                     executionStateChanged = finalizeResult.executionStateChanged
 
+        interface instance MCMSReceiver for OffRamp where
+          view = MCMSReceiverView with
+            mcmsController = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId OffRamp)
+
+            case functionName of
+              "SetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid SetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
 
 data ExecuteFromRouterResult = ExecuteFromRouterResult
     with
@@ -309,3 +356,39 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
         tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
         executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
     deriving (Eq, Show)
+
+-- ===========================================================================
+-- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
+-- ===========================================================================
+
+-- | Decode SetDeps params (Optional fields)
+-- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry]
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
+  (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
+  (tokenAdminRegistry, _offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
+  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry)
+
+-- | Encode SetDeps params (Optional fields)
+encodeSetDepsParams : SetDepsParams -> BytesHex
+encodeSetDepsParams params =
+  encodeOptionalRawInstanceAddress params.globalConfig <>
+  encodeOptionalRawInstanceAddress params.rmnRemote <>
+  encodeOptionalRawInstanceAddress params.tokenAdminRegistry
+
+-- | Decode OffRampDeps at offset (full, non-optional)
+-- Format: [RIA globalConfig][RIA rmnRemote][RIA tokenAdminRegistry]
+decodeOffRampDepsAt : BytesHex -> Int -> Optional (OffRampDeps, Int)
+decodeOffRampDepsAt encoded offset = do
+  (globalConfig, offset1) <- decodeRawInstanceAddressAt encoded offset
+  (rmnRemote, offset2) <- decodeRawInstanceAddressAt encoded offset1
+  (tokenAdminRegistry, offset3) <- decodeRawInstanceAddressAt encoded offset2
+  Some (OffRampDeps globalConfig rmnRemote tokenAdminRegistry, offset3)
+
+-- | Encode OffRampDeps (full, non-optional)
+encodeOffRampDeps : OffRampDeps -> BytesHex
+encodeOffRampDeps deps =
+  encodeRawInstanceAddress deps.globalConfig <>
+  encodeRawInstanceAddress deps.rmnRemote <>
+  encodeRawInstanceAddress deps.tokenAdminRegistry

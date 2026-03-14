@@ -14,7 +14,6 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
@@ -122,6 +121,8 @@ template CCIPSender
                     Some tt -> exercise tt.tokenPoolCid
                         CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
                             sendingMessageCid = smCid
+                            feeQuoterCid = feeQuoterCid
+                            tokenInstrumentId = tt.tokenInstrumentId
                             caller = owner
 
                 -- Outbound pool CCV verification via TAR

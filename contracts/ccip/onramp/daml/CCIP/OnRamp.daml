@@ -1,9 +1,10 @@
 -- | OnRamp for CCIP message sending, called by PerPartyRouter.
 module CCIP.OnRamp where
 
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
+import DA.Map qualified as Map
 import DA.Optional (fromOptional, isSome)
 
 import qualified CCIP.Events
@@ -16,6 +17,13 @@ import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
+import CCIP.Codec
+  ( encodeRawInstanceAddress
+  , decodeRawInstanceAddressAt
+  , encodeOptionalRawInstanceAddress
+  , decodeOptionalRawInstanceAddressAt
+  )
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -37,6 +45,15 @@ data OnRampDeps = OnRampDeps
         ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
+data SetDepsParams = SetDepsParams
+    with
+        globalConfig : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+        feeQuoter : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+        ccvRegistry : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
 template OnRamp
     with
         instanceId : Text
@@ -44,6 +61,19 @@ template OnRamp
         deps : OnRampDeps
     where
         signatory ccipOwner
+
+        choice SetDeps : ContractId OnRamp
+            with
+                newDeps : SetDepsParams
+            controller ccipOwner
+            do
+                let mergedDeps = OnRampDeps with
+                        globalConfig = fromOptional deps.globalConfig newDeps.globalConfig
+                        rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                        tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
+                        feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
+                        ccvRegistry = fromOptional deps.ccvRegistry newDeps.ccvRegistry
+                create this with deps = mergedDeps
 
         -- | Get required CCV raw instance addresses for outbound message.
         -- TODO: this should not concat default and lane mandated CCVs and return
@@ -142,7 +172,7 @@ template OnRamp
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 let resolvedTokenReceiver = if hasTokenTransfer
-                        then fromOptional receiver tokenReceiver
+                        then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
                         else ""
                 let resolvedBlockConfirmations = 0
 
@@ -165,7 +195,8 @@ template OnRamp
                     requiredCCVs = resolvedCCVs
                     sourceChainSelector = globalConfig.chainSelector
                     senderAddress = senderAddr
-                    receiver, payload
+                    receiver = validateDestChainAddress receiver destConfig.addressBytesLength
+                    payload = payload
                     executionGasLimit = 0
                     ccipReceiveGasLimit
                     blockConfirmations = resolvedBlockConfirmations
@@ -315,6 +346,8 @@ template OnRamp
                             (tt.sourceTokenAddress == expectedTokenAddr)
                         assertMsg "token amount mismatch"
                             (tt.amount == tsd.amount)
+                        let _ = validateDestChainAddress tsd.destTokenAddress destConfig.addressBytesLength
+                        pure()
                     (None, None) -> pure ()
                     _ -> abort "token transfer / token send data mismatch"
 
@@ -332,6 +365,27 @@ template OnRamp
                     messageSentObservers =
                         concatMap (.messageSentObservers) sendingMsg.verifierData
                     receipts
+
+        interface instance MCMSReceiver for OnRamp where
+          view = MCMSReceiverView with
+            mcmsController = ccipOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText ccipOwner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId OnRamp)
+
+            case functionName of
+              "SetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDeps"
+                  Some newDeps -> do
+                    newCid <- exercise selfCid SetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
     with
@@ -416,3 +470,56 @@ findFeeWithAmount _ [] _ = error "missing CCV fee token amount"
 findFeeWithAmount (f :: fs) (a :: as) pred =
     if pred f then (f, a)
     else findFeeWithAmount fs as pred
+
+-- | Validates a destination-chain address against the chain's expected address length.
+-- The message receiver, tokenReceiver, and destTokenAddress are all validated using this function since they're all remote chain addresses.
+validateDestChainAddress : BytesHex -> Int -> BytesHex
+validateDestChainAddress address addressBytesLength =
+    let actualLength = byteCount address
+    in if actualLength == addressBytesLength
+        then address
+        else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
+
+-- ===========================================================================
+-- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
+-- ===========================================================================
+
+-- | Decode SetDeps params (Optional fields)
+-- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA ccvRegistry]
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
+  (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
+  (tokenAdminRegistry, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
+  (feeQuoter, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
+  (ccvRegistry, _offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
+  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry)
+
+-- | Encode SetDeps params (Optional fields)
+encodeSetDepsParams : SetDepsParams -> BytesHex
+encodeSetDepsParams params =
+  encodeOptionalRawInstanceAddress params.globalConfig <>
+  encodeOptionalRawInstanceAddress params.rmnRemote <>
+  encodeOptionalRawInstanceAddress params.tokenAdminRegistry <>
+  encodeOptionalRawInstanceAddress params.feeQuoter <>
+  encodeOptionalRawInstanceAddress params.ccvRegistry
+
+-- | Decode OnRampDeps at offset (full, non-optional)
+-- Format: [RIA globalConfig][RIA rmnRemote][RIA tokenAdminRegistry][RIA feeQuoter][RIA ccvRegistry]
+decodeOnRampDepsAt : BytesHex -> Int -> Optional (OnRampDeps, Int)
+decodeOnRampDepsAt encoded offset = do
+  (globalConfig, offset1) <- decodeRawInstanceAddressAt encoded offset
+  (rmnRemote, offset2) <- decodeRawInstanceAddressAt encoded offset1
+  (tokenAdminRegistry, offset3) <- decodeRawInstanceAddressAt encoded offset2
+  (feeQuoter, offset4) <- decodeRawInstanceAddressAt encoded offset3
+  (ccvRegistry, offset5) <- decodeRawInstanceAddressAt encoded offset4
+  Some (OnRampDeps globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry, offset5)
+
+-- | Encode OnRampDeps (full, non-optional)
+encodeOnRampDeps : OnRampDeps -> BytesHex
+encodeOnRampDeps deps =
+  encodeRawInstanceAddress deps.globalConfig <>
+  encodeRawInstanceAddress deps.rmnRemote <>
+  encodeRawInstanceAddress deps.tokenAdminRegistry <>
+  encodeRawInstanceAddress deps.feeQuoter <>
+  encodeRawInstanceAddress deps.ccvRegistry

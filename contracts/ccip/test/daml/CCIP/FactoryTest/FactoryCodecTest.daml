@@ -1,0 +1,567 @@
+-- | Round-trip tests for CCIPFactory codec functions
+module CCIP.FactoryTest.FactoryCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Optional (fromSome)
+import DA.Crypto.Text (BytesHex)
+
+import MCMS.Codec
+  ( encodeText
+  , encodeNumeric0
+  , encodeParty
+  , encodePartyList
+  , encodeBytesHex
+  , encodeBytesHexList
+  , encodeBool
+  , encodeInt64
+  , encodeUint8
+  , encodeList
+  )
+import CCIP.Codec
+  ( encodeInstrumentId
+  , encodeRawInstanceAddress
+  , encodeRawInstanceAddressList
+  )
+import qualified Splice.Api.Token.HoldingV1
+
+import CCIP.Factory
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
+
+-- ===========================================================================
+-- ENCODER FUNCTIONS FOR DEPLOY PARAMS
+-- ===========================================================================
+
+encodeDeployGlobalConfigParams : DeployGlobalConfigParams -> BytesHex
+encodeDeployGlobalConfigParams params =
+  encodeText params.instanceId
+  <> encodeNumeric0 params.chainSelector
+
+encodeDeployFeeQuoterParams : DeployFeeQuoterParams -> BytesHex
+encodeDeployFeeQuoterParams params =
+  encodeText params.instanceId
+  <> encodeInstrumentId params.linkTokenInstrumentId
+  <> encodeNumeric0 params.maxFeeJuelsPerMsg
+
+encodeDeployTokenAdminRegistryParams : DeployTokenAdminRegistryParams -> BytesHex
+encodeDeployTokenAdminRegistryParams params =
+  encodeText params.instanceId
+
+encodeDeployOnRampParams : DeployOnRampParams -> BytesHex
+encodeDeployOnRampParams params =
+  encodeText params.instanceId
+  <> encodeRawInstanceAddress params.globalConfig
+  <> encodeRawInstanceAddress params.rmnRemote
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.ccvRegistry
+
+encodeDeployOffRampParams : DeployOffRampParams -> BytesHex
+encodeDeployOffRampParams params =
+  encodeText params.instanceId
+  <> encodeRawInstanceAddress params.globalConfig
+  <> encodeRawInstanceAddress params.rmnRemote
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+
+encodeDeployPerPartyRouterFactoryParams : DeployPerPartyRouterFactoryParams -> BytesHex
+encodeDeployPerPartyRouterFactoryParams params =
+  encodeText params.instanceId
+  <> encodeRawInstanceAddress params.onRamp
+  <> encodeRawInstanceAddress params.offRamp
+  <> encodeRawInstanceAddress params.globalConfig
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.rmnRemote
+
+encodeDeployRMNRemoteParams : DeployRMNRemoteParams -> BytesHex
+encodeDeployRMNRemoteParams params =
+  encodeText params.instanceId
+  <> encodeParty params.rmnOwner
+  <> encodeParty params.ccipOwner
+  <> encodePartyList params.customObservers
+  <> encodeBytesHexList params.cursedSubjects
+
+encodeDeployCommitteeVerifierParams : DeployCommitteeVerifierParams -> BytesHex
+encodeDeployCommitteeVerifierParams params =
+  encodeText params.instanceId
+  <> encodeParty params.owner
+  <> encodeParty params.ccipOwner
+  <> encodeBytesHex params.versionTag
+  <> encodeParty params.messageSentObserver
+  <> encodeRawInstanceAddress params.rmnRemote
+  <> encodeList params.storageLocations encodeText
+  <> encodeParty params.storageLocationsAdmin
+  <> encodeParty params.pendingStorageLocationsAdmin
+
+encodeDeployLockReleaseTokenPoolParams : DeployLockReleaseTokenPoolParams -> BytesHex
+encodeDeployLockReleaseTokenPoolParams params =
+  encodeText params.instanceId
+  <> encodeParty params.ccipOwner
+  <> encodeParty params.poolOwner
+  <> encodeInstrumentId params.instrumentId
+  <> fromSome (encodeInt64 params.decimals)
+
+encodeRateLimitDirection : RateLimitDirection -> BytesHex
+encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
+encodeRateLimitDirection RateLimitDirection_Inbound = fromSome (encodeUint8 1)
+
+encodeRateLimitMode : RateLimitMode -> BytesHex
+encodeRateLimitMode RateLimitMode_DefaultFinality = fromSome (encodeUint8 0)
+encodeRateLimitMode RateLimitMode_CustomFinality = fromSome (encodeUint8 1)
+
+encodeDeployRateLimiterParams : DeployRateLimiterParams -> BytesHex
+encodeDeployRateLimiterParams params =
+  encodeText params.instanceId
+  <> encodeText params.poolInstanceId
+  <> encodeParty params.poolOwner
+  <> encodeNumeric0 params.remoteChainSelector
+  <> encodeRateLimitDirection params.direction
+  <> encodeRateLimitMode params.mode
+  <> encodeBool params.isEnabled
+  <> encodeNumeric0 params.capacity
+  <> encodeNumeric0 params.rate
+
+encodeDeployCCIPSenderParams : DeployCCIPSenderParams -> BytesHex
+encodeDeployCCIPSenderParams params =
+  encodeText params.instanceId
+  <> encodeParty params.owner
+
+encodeDeployCCIPReceiverParams : DeployCCIPReceiverParams -> BytesHex
+encodeDeployCCIPReceiverParams params =
+  encodeText params.instanceId
+  <> encodeParty params.owner
+  <> encodeRawInstanceAddressList params.requiredCCVs
+
+-- ===========================================================================
+-- ROUND-TRIP TESTS
+-- ===========================================================================
+
+testDecodeDeployGlobalConfigParams : Script ()
+testDecodeDeployGlobalConfigParams = script do
+  let params = DeployGlobalConfigParams with
+        instanceId = "gc-1"
+        chainSelector = 123.0
+      encoded = encodeDeployGlobalConfigParams params
+
+  case decodeDeployGlobalConfigParams encoded of
+    None -> abort "Failed to decode DeployGlobalConfigParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.chainSelector === params.chainSelector
+
+  pure ()
+
+testDecodeDeployGlobalConfigParams_LargeChainSelector : Script ()
+testDecodeDeployGlobalConfigParams_LargeChainSelector = script do
+  -- Test with large CCIP-style chain selector
+  let largeSelector : Numeric 0 = 16015286601757825753.0  -- Avalanche Fuji
+      params = DeployGlobalConfigParams with
+        instanceId = "gc-large"
+        chainSelector = largeSelector
+      encoded = encodeDeployGlobalConfigParams params
+
+  case decodeDeployGlobalConfigParams encoded of
+    None -> abort "Failed to decode with large chain selector"
+    Some decoded -> decoded.chainSelector === largeSelector
+
+  pure ()
+
+testDecodeDeployFeeQuoterParams : Script ()
+testDecodeDeployFeeQuoterParams = script do
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let params = DeployFeeQuoterParams with
+        instanceId = "fq-1"
+        linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+        maxFeeJuelsPerMsg = 1000000000000000000.0
+      encoded = encodeDeployFeeQuoterParams params
+
+  case decodeDeployFeeQuoterParams encoded of
+    None -> abort "Failed to decode DeployFeeQuoterParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.linkTokenInstrumentId === params.linkTokenInstrumentId
+      decoded.maxFeeJuelsPerMsg === params.maxFeeJuelsPerMsg
+
+  pure ()
+
+testDecodeDeployTokenAdminRegistryParams : Script ()
+testDecodeDeployTokenAdminRegistryParams = script do
+  let params = DeployTokenAdminRegistryParams with
+        instanceId = "tar-1"
+      encoded = encodeDeployTokenAdminRegistryParams params
+
+  case decodeDeployTokenAdminRegistryParams encoded of
+    None -> abort "Failed to decode DeployTokenAdminRegistryParams"
+    Some decoded -> decoded.instanceId === params.instanceId
+
+  pure ()
+
+testDecodeDeployOnRampParams : Script ()
+testDecodeDeployOnRampParams = script do
+  let params = DeployOnRampParams with
+        instanceId = "onramp-1"
+        globalConfig = RawInstanceAddress "gc@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        ccvRegistry = RawInstanceAddress "ccv@owner"
+      encoded = encodeDeployOnRampParams params
+
+  case decodeDeployOnRampParams encoded of
+    None -> abort "Failed to decode DeployOnRampParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.globalConfig === params.globalConfig
+      decoded.rmnRemote === params.rmnRemote
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.ccvRegistry === params.ccvRegistry
+
+  pure ()
+
+testDecodeDeployOffRampParams : Script ()
+testDecodeDeployOffRampParams = script do
+  let params = DeployOffRampParams with
+        instanceId = "offramp-1"
+        globalConfig = RawInstanceAddress "gc@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+      encoded = encodeDeployOffRampParams params
+
+  case decodeDeployOffRampParams encoded of
+    None -> abort "Failed to decode DeployOffRampParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.globalConfig === params.globalConfig
+      decoded.rmnRemote === params.rmnRemote
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+
+  pure ()
+
+testDecodeDeployPerPartyRouterFactoryParams : Script ()
+testDecodeDeployPerPartyRouterFactoryParams = script do
+  let params = DeployPerPartyRouterFactoryParams with
+        instanceId = "ppr-factory-1"
+        onRamp = RawInstanceAddress "onramp@owner"
+        offRamp = RawInstanceAddress "offramp@owner"
+        globalConfig = RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        feeQuoter = RawInstanceAddress "fq@owner"
+        rmnRemote = RawInstanceAddress "rmn@owner"
+      encoded = encodeDeployPerPartyRouterFactoryParams params
+
+  case decodeDeployPerPartyRouterFactoryParams encoded of
+    None -> abort "Failed to decode DeployPerPartyRouterFactoryParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.onRamp === params.onRamp
+      decoded.offRamp === params.offRamp
+      decoded.globalConfig === params.globalConfig
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.rmnRemote === params.rmnRemote
+
+  pure ()
+
+testDecodeDeployRMNRemoteParams : Script ()
+testDecodeDeployRMNRemoteParams = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  observer1 <- allocateParty "observer1"
+  observer2 <- allocateParty "observer2"
+
+  let params = DeployRMNRemoteParams with
+        instanceId = "rmn-1"
+        rmnOwner
+        ccipOwner
+        customObservers = [observer1, observer2]
+        cursedSubjects = ["deadbeef", "cafebabe"]
+      encoded = encodeDeployRMNRemoteParams params
+
+  case decodeDeployRMNRemoteParams encoded of
+    None -> abort "Failed to decode DeployRMNRemoteParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.rmnOwner === params.rmnOwner
+      decoded.ccipOwner === params.ccipOwner
+      decoded.customObservers === params.customObservers
+      decoded.cursedSubjects === params.cursedSubjects
+
+  pure ()
+
+testDecodeDeployRMNRemoteParams_EmptyLists : Script ()
+testDecodeDeployRMNRemoteParams_EmptyLists = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let params = DeployRMNRemoteParams with
+        instanceId = "rmn-empty"
+        rmnOwner
+        ccipOwner
+        customObservers = []
+        cursedSubjects = []
+      encoded = encodeDeployRMNRemoteParams params
+
+  case decodeDeployRMNRemoteParams encoded of
+    None -> abort "Failed to decode with empty lists"
+    Some decoded -> do
+      decoded.customObservers === []
+      decoded.cursedSubjects === []
+
+  pure ()
+
+testDecodeDeployCommitteeVerifierParams : Script ()
+testDecodeDeployCommitteeVerifierParams = script do
+  owner <- allocateParty "owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  messageSentObserver <- allocateParty "msg_observer"
+  storageAdmin <- allocateParty "storage_admin"
+  pendingAdmin <- allocateParty "pending_admin"
+
+  let params = DeployCommitteeVerifierParams with
+        instanceId = "ccv-1"
+        owner
+        ccipOwner
+        versionTag = "01020304"
+        messageSentObserver
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        storageLocations = ["loc1", "loc2", "loc3"]
+        storageLocationsAdmin = storageAdmin
+        pendingStorageLocationsAdmin = pendingAdmin
+      encoded = encodeDeployCommitteeVerifierParams params
+
+  case decodeDeployCommitteeVerifierParams encoded of
+    None -> abort "Failed to decode DeployCommitteeVerifierParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.owner === params.owner
+      decoded.ccipOwner === params.ccipOwner
+      decoded.versionTag === params.versionTag
+      decoded.messageSentObserver === params.messageSentObserver
+      decoded.rmnRemote === params.rmnRemote
+      decoded.storageLocations === params.storageLocations
+      decoded.storageLocationsAdmin === params.storageLocationsAdmin
+      decoded.pendingStorageLocationsAdmin === params.pendingStorageLocationsAdmin
+
+  pure ()
+
+testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations : Script ()
+testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
+  owner <- allocateParty "owner"
+  ccipOwner <- allocateParty "ccip_owner"
+  messageSentObserver <- allocateParty "msg_observer"
+  storageAdmin <- allocateParty "storage_admin"
+
+  let params = DeployCommitteeVerifierParams with
+        instanceId = "ccv-empty"
+        owner
+        ccipOwner
+        versionTag = ""
+        messageSentObserver
+        rmnRemote = RawInstanceAddress "rmn@owner"
+        storageLocations = []
+        storageLocationsAdmin = storageAdmin
+        pendingStorageLocationsAdmin = storageAdmin
+      encoded = encodeDeployCommitteeVerifierParams params
+
+  case decodeDeployCommitteeVerifierParams encoded of
+    None -> abort "Failed to decode with empty storage locations"
+    Some decoded -> decoded.storageLocations === []
+
+  pure ()
+
+testDecodeDeployLockReleaseTokenPoolParams : Script ()
+testDecodeDeployLockReleaseTokenPoolParams = script do
+  ccipOwner <- allocateParty "ccip_owner"
+  poolOwner <- allocateParty "pool_owner"
+  tokenAdmin <- allocateParty "token_admin"
+
+  let params = DeployLockReleaseTokenPoolParams with
+        instanceId = "lrtp-1"
+        ccipOwner
+        poolOwner
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+        decimals = 6
+      encoded = encodeDeployLockReleaseTokenPoolParams params
+
+  case decodeDeployLockReleaseTokenPoolParams encoded of
+    None -> abort "Failed to decode DeployLockReleaseTokenPoolParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.ccipOwner === params.ccipOwner
+      decoded.poolOwner === params.poolOwner
+      decoded.instrumentId === params.instrumentId
+      decoded.decimals === params.decimals
+
+  pure ()
+
+testDecodeDeployRateLimiterParams : Script ()
+testDecodeDeployRateLimiterParams = script do
+  poolOwner <- allocateParty "pool_owner"
+
+  let params = DeployRateLimiterParams with
+        instanceId = "rl-1"
+        poolInstanceId = "pool-1"
+        poolOwner
+        remoteChainSelector = 137.0
+        direction = RateLimitDirection_Outbound
+        mode = RateLimitMode_DefaultFinality
+        isEnabled = True
+        capacity = 1000000.0
+        rate = 100.0
+      encoded = encodeDeployRateLimiterParams params
+
+  case decodeDeployRateLimiterParams encoded of
+    None -> abort "Failed to decode DeployRateLimiterParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.poolInstanceId === params.poolInstanceId
+      decoded.poolOwner === params.poolOwner
+      decoded.remoteChainSelector === params.remoteChainSelector
+      decoded.direction === params.direction
+      decoded.mode === params.mode
+      decoded.isEnabled === params.isEnabled
+      decoded.capacity === params.capacity
+      decoded.rate === params.rate
+
+  pure ()
+
+testDecodeDeployRateLimiterParams_Inbound : Script ()
+testDecodeDeployRateLimiterParams_Inbound = script do
+  poolOwner <- allocateParty "pool_owner"
+
+  let params = DeployRateLimiterParams with
+        instanceId = "rl-inbound"
+        poolInstanceId = "pool-1"
+        poolOwner
+        remoteChainSelector = 1.0
+        direction = RateLimitDirection_Inbound
+        mode = RateLimitMode_CustomFinality
+        isEnabled = False
+        capacity = 500000.0
+        rate = 50.0
+      encoded = encodeDeployRateLimiterParams params
+
+  case decodeDeployRateLimiterParams encoded of
+    None -> abort "Failed to decode inbound rate limiter params"
+    Some decoded -> do
+      decoded.direction === RateLimitDirection_Inbound
+      decoded.mode === RateLimitMode_CustomFinality
+      decoded.isEnabled === False
+
+  pure ()
+
+testDecodeDeployCCIPSenderParams : Script ()
+testDecodeDeployCCIPSenderParams = script do
+  owner <- allocateParty "owner"
+
+  let params = DeployCCIPSenderParams with
+        instanceId = "sender-1"
+        owner
+      encoded = encodeDeployCCIPSenderParams params
+
+  case decodeDeployCCIPSenderParams encoded of
+    None -> abort "Failed to decode DeployCCIPSenderParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.owner === params.owner
+
+  pure ()
+
+testDecodeDeployCCIPReceiverParams : Script ()
+testDecodeDeployCCIPReceiverParams = script do
+  owner <- allocateParty "owner"
+
+  let params = DeployCCIPReceiverParams with
+        instanceId = "receiver-1"
+        owner
+        requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+      encoded = encodeDeployCCIPReceiverParams params
+
+  case decodeDeployCCIPReceiverParams encoded of
+    None -> abort "Failed to decode DeployCCIPReceiverParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.owner === params.owner
+      decoded.requiredCCVs === params.requiredCCVs
+
+  pure ()
+
+testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs : Script ()
+testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
+  owner <- allocateParty "owner"
+
+  let params = DeployCCIPReceiverParams with
+        instanceId = "receiver-empty"
+        owner
+        requiredCCVs = []
+      encoded = encodeDeployCCIPReceiverParams params
+
+  case decodeDeployCCIPReceiverParams encoded of
+    None -> abort "Failed to decode with empty requiredCCVs"
+    Some decoded -> decoded.requiredCCVs === []
+
+  pure ()
+
+-- ===========================================================================
+-- EDGE CASE TESTS
+-- ===========================================================================
+
+testRateLimitDirection_Enum : Script ()
+testRateLimitDirection_Enum = script do
+  -- Test Outbound = 0
+  let outboundEncoded = encodeRateLimitDirection RateLimitDirection_Outbound
+  outboundEncoded === "00"
+
+  -- Test Inbound = 1
+  let inboundEncoded = encodeRateLimitDirection RateLimitDirection_Inbound
+  inboundEncoded === "01"
+
+  pure ()
+
+testRateLimitMode_Enum : Script ()
+testRateLimitMode_Enum = script do
+  -- Test DefaultFinality = 0
+  let defaultEncoded = encodeRateLimitMode RateLimitMode_DefaultFinality
+  defaultEncoded === "00"
+
+  -- Test CustomFinality = 1
+  let customEncoded = encodeRateLimitMode RateLimitMode_CustomFinality
+  customEncoded === "01"
+
+  pure ()
+
+testChainSelectorEdgeCases : Script ()
+testChainSelectorEdgeCases = script do
+  -- Test zero selector
+  let zeroParams = DeployGlobalConfigParams with
+        instanceId = "gc-zero"
+        chainSelector = 0.0
+      zeroEncoded = encodeDeployGlobalConfigParams zeroParams
+  case decodeDeployGlobalConfigParams zeroEncoded of
+    None -> abort "Failed to decode zero selector"
+    Some decoded -> decoded.chainSelector === 0.0
+
+  -- Test max Int64 boundary
+  let maxInt64 : Numeric 0 = 9223372036854775807.0
+      maxInt64Params = DeployGlobalConfigParams with
+        instanceId = "gc-max-int64"
+        chainSelector = maxInt64
+      maxInt64Encoded = encodeDeployGlobalConfigParams maxInt64Params
+  case decodeDeployGlobalConfigParams maxInt64Encoded of
+    None -> abort "Failed to decode max Int64 selector"
+    Some decoded -> decoded.chainSelector === maxInt64
+
+  -- Test max uint64
+  let maxUint64 : Numeric 0 = 18446744073709551615.0
+      maxUint64Params = DeployGlobalConfigParams with
+        instanceId = "gc-max-uint64"
+        chainSelector = maxUint64
+      maxUint64Encoded = encodeDeployGlobalConfigParams maxUint64Params
+  case decodeDeployGlobalConfigParams maxUint64Encoded of
+    None -> abort "Failed to decode max uint64 selector"
+    Some decoded -> decoded.chainSelector === maxUint64
+
+  pure ()

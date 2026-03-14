@@ -21,7 +21,7 @@ template ForgedReceiver
 
     interface instance MCMSReceiver for ForgedReceiver where
       view = MCMSReceiverView with
-        owner
+        mcmsController = owner
         instanceId
 
       mcmsEntrypoint _functionName _operationData _contractIds =

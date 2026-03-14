@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
@@ -304,7 +305,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: types.NUMERIC(strconv.FormatUint(chainsel.CANTON_LOCALNET.Selector, 10)),
-						OnRampAddress: "", // TODO ?
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{
@@ -444,16 +444,16 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					remoteSelector: {
 						AllowTrafficFrom:         true,
-						OnRamps:                  [][]byte{[]byte("0000000000000000000000000000000000000001")},
-						OffRamp:                  nil,
-						DefaultInboundCCVs:       nil,
-						LaneMandatedInboundCCVs:  []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-						DefaultOutboundCCVs:      nil,
+						OnRamps:                  [][]byte{hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd")},
+						OffRamp:                  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+						LaneMandatedInboundCCVs:  nil,
+						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          "",
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{},
 						ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
-						AddressBytesLength:       0,
+						AddressBytesLength:       20,
 						BaseExecutionGasCost:     0,
 					},
 				},
@@ -510,7 +510,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		CCIPReceiveGasLimit: 100000,
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
-		OnRampAddress:       hexToBytes("0000000000000000000000000000000000000000000000000000000000000001"),
+		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
 		OffRampAddress:      hexToBytes("0000000000000000000000000000000000000002"),
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),

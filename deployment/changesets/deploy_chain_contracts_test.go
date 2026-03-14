@@ -120,7 +120,6 @@ func TestDeployChainContracts(t *testing.T) {
 					Template: common.GlobalConfig{
 						CcipOwner:     "", // Populated by the sequence
 						ChainSelector: chainSelector,
-						OnRampAddress: "", // TODO ?
 					},
 				},
 				RMNRemote: sequences.RMNRemoteParams{

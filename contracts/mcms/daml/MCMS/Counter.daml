@@ -27,7 +27,7 @@ template Counter
     -- Implement MCMSReceiver interface
     interface instance MCMSReceiver for Counter where
       view = MCMSReceiverView with
-        owner
+        mcmsController = owner
         instanceId = instanceId
 
       mcmsEntrypoint functionName operationData contractIds = do
