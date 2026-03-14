@@ -5,17 +5,19 @@ module CCIP.LockReleaseTokenPoolCodec
   , encodeUpdateChainPoolConfigsParams
   ) where
 
-import MCMS.Codec
+import CCIP.MCMSCodecUtils
   ( extractBytes
   , encodeUint8
   , decodeUint8
   , encodeNumeric0
   , decodeNumeric0At
+  , encodeBytesHex
+  , decodeBytesHexAt
+  , encodeInt64
+  , decodeInt64At
   , encodeBytesHexList
   , decodeBytesHexList
-  )
-import CCIP.Codec
-  ( encodeRawInstanceAddressList
+  , encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
 
@@ -49,21 +51,21 @@ encodeUpdateChainPoolConfigsParams configs =
 -- ===========================================================================
 -- CHAIN POOL CONFIG ENCODING/DECODING
 -- Format: [rawInstanceAddressList inboundCCVs][rawInstanceAddressList outboundCCVs]
---         [int256 minBlockDepth][bytesHexList remotePools]
+--         [int64 minBlockDepth][bytesHexList remotePools]
 -- ===========================================================================
 
 encodeChainPoolConfig : ChainPoolConfig -> BytesHex
 encodeChainPoolConfig cpc =
   encodeRawInstanceAddressList cpc.inboundCCVs <>
   encodeRawInstanceAddressList cpc.outboundCCVs <>
-  encodeInt256 cpc.minBlockDepth <>
+  fromSome (encodeInt64 cpc.minBlockDepth) <>
   encodeBytesHexList cpc.remotePools
 
 decodeChainPoolConfigAt : BytesHex -> Int -> Optional (ChainPoolConfig, Int)
 decodeChainPoolConfigAt encoded offset = do
   (inboundCCVs, offset1) <- decodeRawInstanceAddressList encoded offset
   (outboundCCVs, offset2) <- decodeRawInstanceAddressList encoded offset1
-  (minBlockDepth, offset3) <- decodeInt256At encoded offset2
+  (minBlockDepth, offset3) <- decodeInt64At encoded offset2
   (remotePools, offset4) <- decodeBytesHexList encoded offset3
   Some (ChainPoolConfig inboundCCVs outboundCCVs minBlockDepth remotePools, offset4)
 

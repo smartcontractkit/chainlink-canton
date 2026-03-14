@@ -114,14 +114,16 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
   let config1 = ChainPoolConfig
         [RawInstanceAddress "in1@p1"]
         [RawInstanceAddress "out1@p1"]
+        0
         ["abc001"]
 
       config2 = ChainPoolConfig
         [RawInstanceAddress "in2@p2", RawInstanceAddress "in2b@p2"]
         []
+        0
         ["aabb2a", "ccdd2b"]
 
-      config3 = ChainPoolConfig [] [] ["def003"]
+      config3 = ChainPoolConfig [] [] 0 ["def003"]
 
       configs = Map.fromList [
         (1.0, config1),
@@ -170,7 +172,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Replace = script d
 
   let instanceId = "pool-replace-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WETH"
-      existingConfig = ChainPoolConfig [] [] ["abcd1234"]
+      existingConfig = ChainPoolConfig [] [] 0 ["abcd1234"]
 
   -- Create LockReleaseTokenPool with existing config
   poolCid <- submit poolOwner do
@@ -196,6 +198,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Replace = script d
   let newConfig = ChainPoolConfig
         [RawInstanceAddress "new-in@owner"]
         [RawInstanceAddress "new-out@owner"]
+        0
         ["ef123456", "ab789012"]
 
       -- Note: This replaces the entire chainPoolConfigs map
@@ -232,7 +235,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Empty = script do
 
   let instanceId = "pool-empty-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "DAI"
-      existingConfig = ChainPoolConfig [] [] ["aabbcc"]
+      existingConfig = ChainPoolConfig [] [] 0 ["aabbcc"]
 
   -- Create LockReleaseTokenPool with existing config
   poolCid <- submit poolOwner do

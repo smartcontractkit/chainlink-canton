@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "e1301d4e296a28eb837ddb483682242456f404aad95126fb1ddce22b5d5b16c2"
+	PackageID   = "a8abf0723a2997d145d5b7ec677a5dbe6b1e5742bc6b3c8c6b1f967464276f97"
 	SDKVersion  = "3.4.10"
 )
 
@@ -100,7 +100,7 @@ type CommitteeVerifier struct {
 	Owner                        types.PARTY           `json:"owner"`
 	CcipOwner                    types.PARTY           `json:"ccipOwner"`
 	VersionTag                   types.TEXT            `json:"versionTag"`
-	MessageSentObservers         []types.PARTY         `json:"messageSentObservers"`
+	MessageSentObserver          types.PARTY           `json:"messageSentObserver"`
 	StorageLocations             []types.TEXT          `json:"storageLocations"`
 	StorageLocationsAdmin        types.PARTY           `json:"storageLocationsAdmin"`
 	PendingStorageLocationsAdmin types.PARTY           `json:"pendingStorageLocationsAdmin"`
@@ -136,13 +136,7 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	args["versionTag"] = string(t.VersionTag)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["messageSentObservers"] = func() []any {
-		res := make([]any, 0, len(t.MessageSentObservers))
-		for _, e := range t.MessageSentObservers {
-			res = append(res, e.ToMap())
-		}
-		return res
-	}()
+	args["messageSentObserver"] = t.MessageSentObserver.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["storageLocations"] = func() []any {
@@ -207,13 +201,7 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	args["versionTag"] = string(t.VersionTag)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["messageSentObservers"] = func() []any {
-		res := make([]any, 0, len(t.MessageSentObservers))
-		for _, e := range t.MessageSentObservers {
-			res = append(res, e.ToMap())
-		}
-		return res
-	}()
+	args["messageSentObserver"] = t.MessageSentObserver.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["storageLocations"] = func() []any {
@@ -411,11 +399,11 @@ func (t CommitteeVerifier) CommitteeVerifierCalculateFeeWithPackageID(contractID
 	}
 }
 
-// Archive exercises the Archive choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
+// Archive exercises the Archive choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -425,7 +413,7 @@ func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

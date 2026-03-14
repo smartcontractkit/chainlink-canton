@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "664861dd465149e625ef4596d0555756b4c53fb2bf412cd0febe4a279fe9ee64"
+	PackageID   = "7934cbd3730274268380ae3db2c41f54418d1c5e9ed9dd25f646c1cd46c87e44"
 	SDKVersion  = "3.4.10"
 )
 
@@ -52,59 +52,6 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
-}
-
-// Get2 is a Record type
-type Get2 struct {
-	Caller types.PARTY `json:"caller"`
-}
-
-// ToMap converts Get2 to a map for DAML arguments
-func (t Get2) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t Get2) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *Get2) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes Get2 to hex string (Canton MCMS format)
-func (t Get2) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes Get2 from hex string (Canton MCMS format)
-func (t *Get2) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Get2MCMSParams is Get2 without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type Get2MCMSParams struct {
-}
-
-// MarshalHex encodes Get2MCMSParams to hex string for MCMS operationData.
-func (t Get2MCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes Get2MCMSParams from hex string.
-func (t *Get2MCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
 }
 
 // PoolRegistration is a Record type
@@ -445,11 +392,11 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(
 	}
 }
 
-// Archive exercises the Archive choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -459,30 +406,30 @@ func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
 	}
 }
 
-// Get exercises the Get choice on this TokenAdminRegistry contract
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t TokenAdminRegistry) Get(contractID string, args Get2) *model.ExerciseCommand {
+func (t TokenAdminRegistry) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
 		ContractID: contractID,
-		Choice:     "Get",
+		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetWithPackageID exercises the Get choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) GetWithPackageID(contractID string, packageID string, args Get2) *model.ExerciseCommand {
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
 		ContractID: contractID,
-		Choice:     "Get",
+		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1304,8 +1251,6 @@ func (t *TokenConfig) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	Get2(args Get2) (*bind.EncodedChoice, error)
-	Get2MCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAcceptAdminRole(args TokenAdminRegistryAcceptAdminRole) (*bind.EncodedChoice, error)
 	TokenAdminRegistryAcceptAdminRoleMCMSParams(args TokenAdminRegistryAcceptAdminRoleMCMSParams) (*bind.EncodedChoice, error)
 	TokenAdminRegistryConsumeReceiveTicket(args TokenAdminRegistryConsumeReceiveTicket) (*bind.EncodedChoice, error)
@@ -1353,16 +1298,6 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
-}
-
-// Get2 encodes parameters for the Get2 choice.
-func (e *encoder) Get2(args Get2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Get2", args)
-}
-
-// Get2MCMSParams encodes MCMS parameters (without Caller) for the Get2 choice.
-func (e *encoder) Get2MCMSParams(args Get2MCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Get2", args)
 }
 
 // TokenAdminRegistryAcceptAdminRole encodes parameters for the TokenAdminRegistryAcceptAdminRole choice.

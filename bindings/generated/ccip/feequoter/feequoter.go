@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "0ba20d91f0960aeba1b45510ba9e1248866bb73e6ca06ddd3724553c11fb8b71"
+	PackageID   = "68e0c5e37ab51be1c42ef682109881a762c80bd321d4fbae964e4ecf0a48dfca"
 	SDKVersion  = "3.4.10"
 )
 
@@ -53,13 +53,13 @@ func argsToMap(args any) map[string]any {
 	return map[string]any{"args": args}
 }
 
-// ApplyDestChainConfigUpdates2 is a Record type
-type ApplyDestChainConfigUpdates2 struct {
-	DestChainConfigArgs []DestChainConfigArgs2 `json:"destChainConfigArgs"`
+// ApplyDestChainConfigUpdates is a Record type
+type ApplyDestChainConfigUpdates struct {
+	DestChainConfigArgs []DestChainConfigArgs `json:"destChainConfigArgs"`
 }
 
-// ToMap converts ApplyDestChainConfigUpdates2 to a map for DAML arguments
-func (t ApplyDestChainConfigUpdates2) ToMap() map[string]any {
+// ToMap converts ApplyDestChainConfigUpdates to a map for DAML arguments
+func (t ApplyDestChainConfigUpdates) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainConfigArgs"] = func() []any {
@@ -78,24 +78,24 @@ func (t ApplyDestChainConfigUpdates2) ToMap() map[string]any {
 	return m
 }
 
-func (t ApplyDestChainConfigUpdates2) MarshalJSON() ([]byte, error) {
+func (t ApplyDestChainConfigUpdates) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ApplyDestChainConfigUpdates2) UnmarshalJSON(data []byte) error {
+func (t *ApplyDestChainConfigUpdates) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ApplyDestChainConfigUpdates2 to hex string (Canton MCMS format)
-func (t ApplyDestChainConfigUpdates2) MarshalHex() (string, error) {
+// MarshalHex encodes ApplyDestChainConfigUpdates to hex string (Canton MCMS format)
+func (t ApplyDestChainConfigUpdates) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ApplyDestChainConfigUpdates2 from hex string (Canton MCMS format)
-func (t *ApplyDestChainConfigUpdates2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes ApplyDestChainConfigUpdates from hex string (Canton MCMS format)
+func (t *ApplyDestChainConfigUpdates) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -224,14 +224,14 @@ func (t *DestChainConfig2) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// DestChainConfigArgs2 is a Record type
-type DestChainConfigArgs2 struct {
+// DestChainConfigArgs is a Record type
+type DestChainConfigArgs struct {
 	DestChainSelector types.NUMERIC    `json:"destChainSelector"`
 	DestChainConfig   DestChainConfig2 `json:"destChainConfig"`
 }
 
-// ToMap converts DestChainConfigArgs2 to a map for DAML arguments
-func (t DestChainConfigArgs2) ToMap() map[string]any {
+// ToMap converts DestChainConfigArgs to a map for DAML arguments
+func (t DestChainConfigArgs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
@@ -247,40 +247,38 @@ func (t DestChainConfigArgs2) ToMap() map[string]any {
 	return m
 }
 
-func (t DestChainConfigArgs2) MarshalJSON() ([]byte, error) {
+func (t DestChainConfigArgs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *DestChainConfigArgs2) UnmarshalJSON(data []byte) error {
+func (t *DestChainConfigArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes DestChainConfigArgs2 to hex string (Canton MCMS format)
-func (t DestChainConfigArgs2) MarshalHex() (string, error) {
+// MarshalHex encodes DestChainConfigArgs to hex string (Canton MCMS format)
+func (t DestChainConfigArgs) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes DestChainConfigArgs2 from hex string (Canton MCMS format)
-func (t *DestChainConfigArgs2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes DestChainConfigArgs from hex string (Canton MCMS format)
+func (t *DestChainConfigArgs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
 // FeeQuoter is a Template type
 type FeeQuoter struct {
-	InstanceId                       types.TEXT                               `json:"instanceId"`
-	Owner                            types.PARTY                              `json:"owner"`
-	FeeTokens                        types.GENMAP                             `json:"feeTokens"`
-	DestChainConfigs                 types.GENMAP                             `json:"destChainConfigs"`
-	TokenTransferFeeConfigs          types.GENMAP                             `json:"tokenTransferFeeConfigs"`
-	UsdPerUnitGasByDestChainSelector types.GENMAP                             `json:"usdPerUnitGasByDestChainSelector"`
-	UsdPerToken                      types.GENMAP                             `json:"usdPerToken"`
-	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
-	MaxFeeJuelsPerMsg                types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
-	PriceUpdaters                    []types.PARTY                            `json:"priceUpdaters"`
+	InstanceId                       types.TEXT    `json:"instanceId"`
+	Owner                            types.PARTY   `json:"owner"`
+	FeeTokens                        types.GENMAP  `json:"feeTokens"`
+	DestChainConfigs                 types.GENMAP  `json:"destChainConfigs"`
+	TokenTransferFeeConfigs          types.GENMAP  `json:"tokenTransferFeeConfigs"`
+	UsdPerUnitGasByDestChainSelector types.GENMAP  `json:"usdPerUnitGasByDestChainSelector"`
+	UsdPerToken                      types.GENMAP  `json:"usdPerToken"`
+	PriceUpdaters                    []types.PARTY `json:"priceUpdaters"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -342,19 +340,6 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 		}
 		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.LinkTokenInstrumentId
-	}()
-
-	if t.MaxFeeJuelsPerMsg != "" {
-		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
-	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -420,19 +405,6 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 		}
 		return map[string]any{"_type": "genmap", "value": t.UsdPerToken}
 	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["linkTokenInstrumentId"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.LinkTokenInstrumentId).(mapper); ok {
-			return m.toMap()
-		}
-		return t.LinkTokenInstrumentId
-	}()
-
-	if t.MaxFeeJuelsPerMsg != "" {
-		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
-	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -536,27 +508,6 @@ func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string
 	}
 }
 
-// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // FeeQuoterFinalizeFee exercises the FeeQuoter_FinalizeFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterFinalizeFee(contractID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
@@ -622,7 +573,7 @@ func (t FeeQuoter) GetDestChainConfigWithPackageID(contractID string, packageID 
 
 // ApplyDestChainConfigUpdates exercises the ApplyDestChainConfigUpdates choice on this FeeQuoter contract
 // This method uses the package name in the template ID
-func (t FeeQuoter) ApplyDestChainConfigUpdates(contractID string, args ApplyDestChainConfigUpdates2) *model.ExerciseCommand {
+func (t FeeQuoter) ApplyDestChainConfigUpdates(contractID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
@@ -632,7 +583,7 @@ func (t FeeQuoter) ApplyDestChainConfigUpdates(contractID string, args ApplyDest
 }
 
 // ApplyDestChainConfigUpdatesWithPackageID exercises the ApplyDestChainConfigUpdates choice using the provided package ID instead of package name
-func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainConfigUpdates2) *model.ExerciseCommand {
+func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
@@ -641,11 +592,11 @@ func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, p
 	}
 }
 
-// Archive exercises the Archive choice on this FeeQuoter contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this FeeQuoter contract
 // This method uses the package name in the template ID
 func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -655,30 +606,30 @@ func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
 	}
 }
 
-// Get exercises the Get choice on this FeeQuoter contract
+// FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract
 // This method uses the package name in the template ID
-func (t FeeQuoter) Get(contractID string, args Get) *model.ExerciseCommand {
+func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "Get",
+		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetWithPackageID exercises the Get choice using the provided package ID instead of package name
-func (t FeeQuoter) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
+// FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
-		Choice:     "Get",
+		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -721,6 +672,27 @@ func (t FeeQuoter) ApplyFeeTokenUpdatesWithPackageID(contractID string, packageI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "ApplyFeeTokenUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceId exercises the MCMSReceiver_GetInstanceId choice on this FeeQuoter contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) MCMSReceiverGetInstanceId(contractID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverGetInstanceIdWithPackageID exercises the MCMSReceiver_GetInstanceId choice using the provided package ID instead of package name
+func (t FeeQuoter) MCMSReceiverGetInstanceIdWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverGetInstanceId) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_GetInstanceId",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -960,59 +932,6 @@ func (t GasPriceUpdate) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GasPriceUpdate from hex string (Canton MCMS format)
 func (t *GasPriceUpdate) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Get is a Record type
-type Get struct {
-	Caller types.PARTY `json:"caller"`
-}
-
-// ToMap converts Get to a map for DAML arguments
-func (t Get) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t Get) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *Get) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes Get to hex string (Canton MCMS format)
-func (t Get) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes Get from hex string (Canton MCMS format)
-func (t *Get) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetMCMSParams is Get without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type GetMCMSParams struct {
-}
-
-// MarshalHex encodes GetMCMSParams to hex string for MCMS operationData.
-func (t GetMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetMCMSParams from hex string.
-func (t *GetMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1457,7 +1376,6 @@ func (t *TokenPriceUpdate) UnmarshalHex(data string) error {
 
 // TokenTransferFeeConfig is a Record type
 type TokenTransferFeeConfig struct {
-	IsEnabled         types.BOOL    `json:"isEnabled"`
 	FeeUSD            types.NUMERIC `json:"feeUSD"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
@@ -1466,8 +1384,6 @@ type TokenTransferFeeConfig struct {
 // ToMap converts TokenTransferFeeConfig to a map for DAML arguments
 func (t TokenTransferFeeConfig) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["isEnabled"] = bool(t.IsEnabled)
 
 	m["feeUSD"] = t.FeeUSD
 
@@ -1566,14 +1482,12 @@ func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
+	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
 	ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error)
 	FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error)
 	FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
-	Get(args Get) (*bind.EncodedChoice, error)
-	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error)
 	GetDestChainConfig2MCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error)
 	GetDestinationChainGasPrice(args GetDestinationChainGasPrice) (*bind.EncodedChoice, error)
@@ -1615,9 +1529,9 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
-// ApplyDestChainConfigUpdates2 encodes parameters for the ApplyDestChainConfigUpdates2 choice.
-func (e *encoder) ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates2", args)
+// ApplyDestChainConfigUpdates encodes parameters for the ApplyDestChainConfigUpdates choice.
+func (e *encoder) ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyDestChainConfigUpdates", args)
 }
 
 // ApplyFeeTokenUpdates encodes parameters for the ApplyFeeTokenUpdates choice.
@@ -1643,16 +1557,6 @@ func (e *encoder) FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee
 // FeeQuoterGetTokenTransferFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterGetTokenTransferFee choice.
 func (e *encoder) FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("FeeQuoterGetTokenTransferFee", args)
-}
-
-// Get encodes parameters for the Get choice.
-func (e *encoder) Get(args Get) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Get", args)
-}
-
-// GetMCMSParams encodes MCMS parameters (without Caller) for the Get choice.
-func (e *encoder) GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("Get", args)
 }
 
 // GetDestChainConfig2 encodes parameters for the GetDestChainConfig2 choice.

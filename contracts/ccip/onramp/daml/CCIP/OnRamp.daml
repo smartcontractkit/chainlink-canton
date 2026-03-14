@@ -111,7 +111,6 @@ template OnRamp
                 receiver : BytesHex
                 payload : BytesHex
                 ccipReceiveGasLimit : Int
-                blockConfirmations : Optional Int
                 currentSequenceNumber : Numeric 0
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
