@@ -377,6 +377,7 @@ template PerPartyRouter
                 context : CCIP.Context.CCIPContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
                 receiverRequiredCCVs : [RawInstanceAddress]
+                receiverMinBlockDepth : Int
             controller partyOwner
             do
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
@@ -415,6 +416,7 @@ template PerPartyRouter
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
                     receiverRequiredCCVs = receiverRequiredCCVs
+                    receiverMinBlockDepth = receiverMinBlockDepth
                     executingMessageCid = executingMessageCid
                     rmnRemoteCid = rmnRemoteCid
                     globalConfigCid = globalConfigCid

@@ -48,6 +48,7 @@ template TokenReceiveTicket
 
         messageHash : BytesHex
         sourceChainSelector : Numeric 0
+        finality : Int
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer poolOwner, receiver, tokenReceiver

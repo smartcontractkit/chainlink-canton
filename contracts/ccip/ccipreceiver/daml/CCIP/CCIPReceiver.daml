@@ -149,6 +149,7 @@ template CCIPReceiver
                     context = context
                     executingMessageCid = emCid
                     receiverRequiredCCVs = allRequiredCCVs
+                    receiverMinBlockDepth = minBlockDepth
 
                 -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of

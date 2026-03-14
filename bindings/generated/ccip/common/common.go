@@ -4968,6 +4968,7 @@ type TokenReceiveTicket struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageHash                  types.TEXT                               `json:"messageHash"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
+	Finality                     types.INT64                              `json:"finality"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -5031,6 +5032,8 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
+	args["finality"] = int64(t.Finality)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -5087,6 +5090,8 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	if t.SourceChainSelector != "" {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
+
+	args["finality"] = int64(t.Finality)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

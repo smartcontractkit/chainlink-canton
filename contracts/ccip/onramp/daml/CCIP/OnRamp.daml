@@ -173,7 +173,7 @@ template OnRamp
                 let resolvedTokenReceiver = if hasTokenTransfer
                         then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
                         else ""
-                let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
+                let resolvedBlockConfirmations = 0
 
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
