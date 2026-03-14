@@ -954,6 +954,129 @@ testVerifyInboundMessage = script do
     debug "testVerifyInboundMessage: PASSED"
 
 
+testVerifyInboundMessageAllowsConfiguredFTF = script do
+    ccipOwner <- allocateParty "ccip-owner-pool-ftf-ok"
+    poolOwner <- allocateParty "pool-owner-pool-ftf-ok"
+    receiver <- allocateParty "receiver-pool-ftf-ok"
+
+    let sourceChainSelector : Numeric 0 = 111.0
+    let destChainSelector : Numeric 0 = 222.0
+    let tokenAdminRegistryInstanceId = "test-tar-pool-ftf-ok"
+    let allowedSourcePool = "000000000000000000000000aaaaaaaaaaaaaaaa"
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            instanceId = tokenAdminRegistryInstanceId
+            tokenConfigs = Map.empty
+
+    tokenAdminRegistry <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+            instrumentId = testInstrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+
+    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+            instrumentId = testInstrumentId
+            caller = poolOwner
+
+    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+            instrumentId = testInstrumentId
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = "test-lock-release-pool-ftf-ok"
+            caller = poolOwner
+
+    let ccvAddr = RawInstanceAddress.make "test-ccv-pool-ftf-ok" ccipOwner
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool-ftf-ok"
+            instrumentId = testInstrumentId
+            decimals = 6
+            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
+                inboundCCVs = [ccvAddr]
+                outboundCCVs = []
+                minBlockDepth = 5
+                remotePools = [allowedSourcePool])]
+            chainFeeConfigs = Map.empty
+            remoteTokens = Map.empty
+            outboundRateLimiters = Map.empty
+            inboundRateLimiters = Map.empty
+            inboundCustomRateLimiters = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+
+    let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 5
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
+                amount = 5000000.0
+                sourcePoolAddress = allowedSourcePool
+                sourceTokenAddress = "000000000000000000000000bbbbbbbbbbbbbbbb"
+                destTokenAddress = destTokenAddr
+                tokenReceiver = MessageCodecV1.encodePartyAddress receiver
+                extraData = ""
+            messageData = ""
+
+    let offRampInstanceAddress = RawInstanceAddress.make "test-offramp-pool-ftf-ok" ccipOwner
+    let tarInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1.ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = ccipOwner
+            observingParties = [receiver, ccipOwner, poolOwner]
+            ccvVerifications = []
+            ccvOwners = []
+            inboundPoolCCVs = None
+            deps = ExecutingMessageV1.ExecutingMessageDeps with
+                offRamp = offRampInstanceAddress
+                globalConfig = RawInstanceAddress.make "test-globalconfig-pool-ftf-ok" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn-pool-ftf-ok" ccipOwner
+                tokenAdminRegistry = tarInstanceAddress
+            state = ExecutingMessageV1.ExecutingMessageState_Prepared
+
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    newEmCid <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
+                    <> disclose disclosedTar) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            extraContext = CCIP.Context.emptyCCIPContext
+            executingMessageCid = executingMessageCid
+            caller = receiver
+
+    newExecMsg <- queryContractId ccipOwner newEmCid
+    assertMsg "ExecutingMessageV1 should exist for configured FTF path" (isSome newExecMsg)
+    let em = fromSome newExecMsg
+    em.inboundPoolCCVs === Some [ccvAddr]
+
+    debug "testVerifyInboundMessageAllowsConfiguredFTF: PASSED"
+
+
 -- | Test VerifyInboundMessage fails when sourcePoolAddress is not in remotePools.
 testVerifyInboundMessageInvalidSourcePool = script do
     ccipOwner <- allocateParty "ccip-owner"

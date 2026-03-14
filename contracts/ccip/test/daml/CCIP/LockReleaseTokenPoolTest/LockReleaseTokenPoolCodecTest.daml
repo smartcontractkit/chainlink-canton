@@ -121,7 +121,7 @@ testUpdateChainPoolConfigsLargeSelector = do
 
 testUpdateChainPoolConfigsEdgeCases : Script ()
 testUpdateChainPoolConfigsEdgeCases = do
-  let emptyConfig = ChainPoolConfig [] [] []
+  let emptyConfig = ChainPoolConfig [] [] 0 []
 
   -- Test zero selector
   let zeroSelector : Numeric 0 = 0.0

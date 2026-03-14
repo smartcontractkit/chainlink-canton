@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "3838a5c0aa34c9ca06bdd3740b63b3bea7800854414801096ec4b6a4c51d850a"
+	PackageID   = "c65558b587022d2d6481197f964bd421547e1792543be6a826f41d718cbc70e1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -515,7 +515,6 @@ type PrepareSendFromRouter struct {
 	Receiver              types.TEXT                                `json:"receiver"`
 	Payload               types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations    *types.INT64                              `json:"blockConfirmations" hex:"optional"`
 	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
 	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
 	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
@@ -571,17 +570,6 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 	m["payload"] = string(t.Payload)
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	if t.BlockConfirmations != nil {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-			"value": int64(*t.BlockConfirmations),
-		}
-	} else {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-		}
-	}
 
 	m["currentSequenceNumber"] = t.CurrentSequenceNumber
 

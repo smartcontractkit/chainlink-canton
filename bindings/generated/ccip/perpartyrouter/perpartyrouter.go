@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "4543be2ad549b90c72cd228eec2db6cc317276c6765e341f9a50bbb238c65fae"
+	PackageID   = "36081413b28118a589c745c61e2ad493397c40c88710edbbea2280623534e1f0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -278,9 +278,10 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context              common.CCIPContext          `json:"context"`
-	ExecutingMessageCid  types.CONTRACT_ID           `json:"executingMessageCid"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	Context               common.CCIPContext          `json:"context"`
+	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
+	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverMinBlockDepth types.INT64                 `json:"receiverMinBlockDepth"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -315,6 +316,8 @@ func (t Execute) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["receiverMinBlockDepth"] = int64(t.ReceiverMinBlockDepth)
 
 	return m
 }
@@ -1328,7 +1331,6 @@ type PrepareSend struct {
 	Receiver            types.TEXT                                `json:"receiver"`
 	Payload             types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                              `json:"blockConfirmations" hex:"optional"`
 	SenderRequiredCCVs  []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
 	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
@@ -1355,17 +1357,6 @@ func (t PrepareSend) ToMap() map[string]any {
 	m["payload"] = string(t.Payload)
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	if t.BlockConfirmations != nil {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-			"value": int64(*t.BlockConfirmations),
-		}
-	} else {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-		}
-	}
 
 	m["senderRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.SenderRequiredCCVs))

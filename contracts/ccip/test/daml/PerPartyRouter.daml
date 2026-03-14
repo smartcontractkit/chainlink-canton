@@ -173,7 +173,6 @@ testCCIPSend = script do
             receiver = receiver
             payload = "48656c6c6f20576f726c64"
             ccipReceiveGasLimit = 100000
-            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
@@ -244,7 +243,6 @@ testCCIPSend = script do
             receiver = receiver
             payload = "48656c6c6f20576f726c6432"
             ccipReceiveGasLimit = 100000
-            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
@@ -421,7 +419,7 @@ testCCIPExecute = script do
 
     pure ()
 
-    -- | Test PrepareSend normalizes blockConfirmations to zero and preserves token-only default CCV behavior.
+    -- | Test PrepareSend uses finalized-only send defaults and preserves token-only default CCV behavior.
 -- Executor finalization is tested separately; after PrepareSend message is always None.
 testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
@@ -530,8 +528,7 @@ testPrepareSendExtraArgs = script do
     disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Message-only send with explicit blockConfirmations.
-    -- Canton send normalizes this to zero.
+    -- Message-only send keeps finalized-only defaults on Canton.
     let receiver = CCIP.MessageCodecV1.encodePartyAddress user
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -545,7 +542,6 @@ testPrepareSendExtraArgs = script do
             receiver = receiver
             payload = "01"
             ccipReceiveGasLimit = 123
-            blockConfirmations = Some 42
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
@@ -570,7 +566,6 @@ testPrepareSendExtraArgs = script do
             receiver = receiver
             payload = ""
             ccipReceiveGasLimit = 0
-            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = Some tokenInstrumentId
             tokenReceiver = None

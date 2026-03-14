@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "137a76927e731ca67d0b7e3d9d09363f26f168bc44dfc27d592e196332b5855a"
+	PackageID   = "0fec43d13064a248a01a6bbc2844b4d8bc42f82f753eb4c488dc037b029ed945"
 	SDKVersion  = "3.4.10"
 )
 
@@ -57,10 +57,10 @@ func argsToMap(args any) map[string]any {
 
 // ChainPoolConfig is a Record type
 type ChainPoolConfig struct {
-	InboundCCVs  []common.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockDepth types.INT64                `json:"minBlockDepth"`
-	RemotePools  []types.TEXT                `json:"remotePools"`
+	InboundCCVs   []common.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs  []common.RawInstanceAddress `json:"outboundCCVs"`
+	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
+	RemotePools   []types.TEXT                `json:"remotePools"`
 }
 
 // ToMap converts ChainPoolConfig to a map for DAML arguments
@@ -130,19 +130,19 @@ func (t *ChainPoolConfig) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
-	InstanceId           types.TEXT                               `json:"instanceId"`
-	CcipOwner            types.PARTY                              `json:"ccipOwner"`
-	PoolOwner            types.PARTY                              `json:"poolOwner"`
-	InstrumentId         splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals             types.INT64                              `json:"decimals"`
-	ChainPoolConfigs     types.GENMAP                             `json:"chainPoolConfigs"`
-	ChainFeeConfigs      types.GENMAP                             `json:"chainFeeConfigs"`
-	RemoteTokens         types.GENMAP                             `json:"remoteTokens"`
-	OutboundRateLimiters types.GENMAP                             `json:"outboundRateLimiters"`
-	InboundRateLimiters  types.GENMAP                             `json:"inboundRateLimiters"`
-	InboundCustomRateLimiters types.GENMAP                        `json:"inboundCustomRateLimiters"`
-	PoolReceiveContext   common.CCIPContext                       `json:"poolReceiveContext"`
-	TransferTimeout      TransferTimeout                          `json:"transferTimeout"`
+	InstanceId                types.TEXT                               `json:"instanceId"`
+	CcipOwner                 types.PARTY                              `json:"ccipOwner"`
+	PoolOwner                 types.PARTY                              `json:"poolOwner"`
+	InstrumentId              splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Decimals                  types.INT64                              `json:"decimals"`
+	ChainPoolConfigs          types.GENMAP                             `json:"chainPoolConfigs"`
+	ChainFeeConfigs           types.GENMAP                             `json:"chainFeeConfigs"`
+	RemoteTokens              types.GENMAP                             `json:"remoteTokens"`
+	OutboundRateLimiters      types.GENMAP                             `json:"outboundRateLimiters"`
+	InboundRateLimiters       types.GENMAP                             `json:"inboundRateLimiters"`
+	InboundCustomRateLimiters types.GENMAP                             `json:"inboundCustomRateLimiters"`
+	PoolReceiveContext        common.CCIPContext                       `json:"poolReceiveContext"`
+	TransferTimeout           TransferTimeout                          `json:"transferTimeout"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name

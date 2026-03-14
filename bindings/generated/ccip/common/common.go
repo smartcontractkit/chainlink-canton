@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "99a2615fac6a7389ce3c69ccb8e2eb2fb4c4fe0187d87e44d15d16c534c417c3"
+	PackageID   = "4d77890380d7d78cfcf7603c90f4e57d08a466ccaa73e4380037b401ceeeef0a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -4808,6 +4808,7 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["finality"] = int64(t.Finality)
 
 	return &model.CreateCommand{
@@ -4867,6 +4868,7 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["finality"] = int64(t.Finality)
 
 	return &model.CreateCommand{

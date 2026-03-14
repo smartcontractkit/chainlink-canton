@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "835bdb9a21b6d27a034cb113dc6094f6958fa3af9d0cb66a80474bf54e9f0e61"
+	PackageID   = "6e4f610b83b730c5df6dab681cfda971b6084fc2060f52e3651362a91c205748"
 	SDKVersion  = "3.4.10"
 )
 
@@ -249,6 +249,7 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return &model.CreateCommand{
@@ -281,6 +282,7 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return &model.CreateCommand{

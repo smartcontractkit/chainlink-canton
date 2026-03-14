@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "1d04cd756d3c498f4b35f12e075a0b7db5499d709dae7ece94b179d874c3efd8"
+	PackageID   = "ba5d58d287ad87e20c41a0b8ddcc4befcfa3f2ae03105f0f1898ff53ba679c79"
 	SDKVersion  = "3.4.10"
 )
 
@@ -56,6 +56,7 @@ func argsToMap(args any) map[string]any {
 type ExecuteFromRouter struct {
 	RouterPartyOwner      types.PARTY                 `json:"routerPartyOwner"`
 	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverMinBlockDepth types.INT64                 `json:"receiverMinBlockDepth"`
 	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
 	GlobalConfigCid       types.CONTRACT_ID           `json:"globalConfigCid"`
 	TokenAdminRegistryCid types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
@@ -80,6 +81,8 @@ func (t ExecuteFromRouter) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["receiverMinBlockDepth"] = int64(t.ReceiverMinBlockDepth)
 
 	m["executingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
