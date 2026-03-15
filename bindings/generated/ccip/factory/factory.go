@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "3f8efaf49336aa5eb3f91725c18ea65ca50daffdb8807e4beb90864dfb2dd2fc"
+	PackageID   = "daf5a4e569854bffbac9df9bebe389fc4d6f5e5e8d3748d68e5edf06d739dda7"
 	SDKVersion  = "3.4.10"
 )
 
@@ -561,9 +561,10 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId   types.TEXT                  `json:"instanceId"`
-	Owner        types.PARTY                 `json:"owner"`
-	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId    types.TEXT                  `json:"instanceId"`
+	Owner         types.PARTY                 `json:"owner"`
+	RequiredCCVs  []common.RawInstanceAddress `json:"requiredCCVs"`
+	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -586,6 +587,8 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return m
 }

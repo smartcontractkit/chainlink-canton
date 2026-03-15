@@ -1761,9 +1761,6 @@ func damlNumericToBigInt(v string) (*big.Int, error) {
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid decimal numeric %q", v)
 	}
-	if strings.TrimRight(parts[1], "0") != "" {
-		return nil, fmt.Errorf("non-integer DAML numeric %q cannot be represented as big.Int", v)
-	}
 	intPart := parts[0]
 	if intPart == "" {
 		intPart = "0"

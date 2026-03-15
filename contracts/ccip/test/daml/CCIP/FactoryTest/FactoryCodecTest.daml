@@ -132,6 +132,7 @@ encodeDeployCCIPReceiverParams params =
   encodeText params.instanceId
   <> encodeParty params.owner
   <> encodeRawInstanceAddressList params.requiredCCVs
+  <> fromSome (encodeInt64 params.minBlockDepth)
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS
@@ -478,6 +479,7 @@ testDecodeDeployCCIPReceiverParams = script do
         instanceId = "receiver-1"
         owner
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        minBlockDepth = 5
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
@@ -486,6 +488,7 @@ testDecodeDeployCCIPReceiverParams = script do
       decoded.instanceId === params.instanceId
       decoded.owner === params.owner
       decoded.requiredCCVs === params.requiredCCVs
+      decoded.minBlockDepth === params.minBlockDepth
 
   pure ()
 
@@ -497,11 +500,14 @@ testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
         instanceId = "receiver-empty"
         owner
         requiredCCVs = []
+        minBlockDepth = 0
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
     None -> abort "Failed to decode with empty requiredCCVs"
-    Some decoded -> decoded.requiredCCVs === []
+    Some decoded -> do
+      decoded.requiredCCVs === []
+      decoded.minBlockDepth === 0
 
   pure ()
 

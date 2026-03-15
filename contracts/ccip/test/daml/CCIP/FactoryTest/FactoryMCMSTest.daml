@@ -661,6 +661,7 @@ testDeployCCIPReceiver_MCMS = script do
         instanceId = "receiver-1"
         owner = mcmsParty
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        minBlockDepth = 5
       encoded = encodeDeployCCIPReceiverParams params
 
   submit mcmsParty do

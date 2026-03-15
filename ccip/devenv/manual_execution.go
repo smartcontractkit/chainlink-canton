@@ -53,9 +53,13 @@ var executeRequiredPackages = []contracts.Package{
 }
 
 const (
-	perPartyRouterEntityName = "PerPartyRouter"
-	createArgFieldPartyOwner = "partyOwner"
-	createArgFieldInstanceID = "instanceId"
+	perPartyRouterEntityName  = "PerPartyRouter"
+	createArgFieldPartyOwner  = "partyOwner"
+	createArgFieldInstanceID  = "instanceId"
+	rateLimiterModuleName     = "CCIP.RateLimiter"
+	rateLimiterEntityName     = "RateLimiter"
+	lockReleasePoolModuleName = "CCIP.LockReleaseTokenPool"
+	lockReleasePoolEntityName = "LockReleaseTokenPool"
 )
 
 func uniqueParties(parties ...string) []string {
@@ -1598,7 +1602,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 			continue
 		}
 		tmpl := entry.ActiveContract.GetCreatedEvent().GetTemplateId()
-		if tmpl == nil || tmpl.GetModuleName() != "CCIP.RateLimiter" || tmpl.GetEntityName() != "RateLimiter" {
+		if tmpl == nil || tmpl.GetModuleName() != rateLimiterModuleName || tmpl.GetEntityName() != rateLimiterEntityName {
 			continue
 		}
 		parsed, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](entry.ActiveContract.GetCreatedEvent())
@@ -1636,8 +1640,8 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 					Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 						TemplateId: &apiv2.Identifier{
 							PackageId:  "#ccip-common",
-							ModuleName: "CCIP.RateLimiter",
-							EntityName: "RateLimiter",
+							ModuleName: rateLimiterModuleName,
+							EntityName: rateLimiterEntityName,
 						},
 						CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: createArgFieldInstanceID, Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}}},
@@ -1666,7 +1670,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 				continue
 			}
 			tmpl := created.GetTemplateId()
-			if tmpl.GetModuleName() != "CCIP.RateLimiter" || tmpl.GetEntityName() != "RateLimiter" {
+			if tmpl.GetModuleName() != rateLimiterModuleName || tmpl.GetEntityName() != rateLimiterEntityName {
 				continue
 			}
 			parsedLimiter, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](created)
@@ -1683,6 +1687,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 				continue
 			}
 			replacementRaw = contracts.InstanceID(string(parsedLimiter.InstanceId)).RawInstanceAddress(parsedLimiter.PoolOwner).Binding()
+
 			break
 		}
 		if replacementRaw == (common.RawInstanceAddress{}) {
@@ -1733,7 +1738,7 @@ func ensureManualExecuteInboundRateLimiterConfigured(
 			continue
 		}
 		tmpl := created.GetTemplateId()
-		if tmpl.GetModuleName() != "CCIP.LockReleaseTokenPool" || tmpl.GetEntityName() != "LockReleaseTokenPool" {
+		if tmpl.GetModuleName() != lockReleasePoolModuleName || tmpl.GetEntityName() != lockReleasePoolEntityName {
 			continue
 		}
 		updatedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
