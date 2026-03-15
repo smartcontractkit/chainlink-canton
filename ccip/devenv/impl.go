@@ -2104,7 +2104,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("list fee token holdings: %w", err)
 	}
-	feeTokenHoldingCIDs, _ := selectUnlockedHoldingCIDs(holdings, party, registryAdmin, string(feeTokenInstrument.Id))
+	feeTokenHoldingCIDs := selectUnlockedHoldingCIDs(holdings, party, registryAdmin, string(feeTokenInstrument.Id))
 	if len(feeTokenHoldingCIDs) == 0 {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no unlocked fee token holdings found for %s/%s", feeTokenInstrument.Admin, feeTokenInstrument.Id)
 	}
@@ -2901,7 +2901,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 		adminParty := string(parsedTokenPool.InstrumentId.Admin)
 		poolOwnerParty := string(parsedTokenPool.PoolOwner)
-		senderHoldingCIDs, _ := selectUnlockedHoldingCIDs(holdings, party, adminParty, string(parsedTokenPool.InstrumentId.Id))
+		senderHoldingCIDs := selectUnlockedHoldingCIDs(holdings, party, adminParty, string(parsedTokenPool.InstrumentId.Id))
 		if len(senderHoldingCIDs) == 0 {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("no unlocked sender holdings found for %s/%s", parsedTokenPool.InstrumentId.Admin, parsedTokenPool.InstrumentId.Id)
 		}
