@@ -184,6 +184,7 @@ testCCIPSend = script do
             receiver = receiver
             payload = "48656c6c6f20576f726c64"
             ccipReceiveGasLimit = 100000
+            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
@@ -254,6 +255,7 @@ testCCIPSend = script do
             receiver = receiver
             payload = "48656c6c6f20576f726c6432"
             ccipReceiveGasLimit = 100000
+            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
@@ -306,7 +308,7 @@ testCCIPSendAcceptsPendingFeeTransfer = script do
     let ccvRegistryInstanceId = "test-ccvregistry-pending-fee"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
-    let expectedFeeTokenAmount : Decimal = 1000000000000000000.0
+    let expectedFeeTokenAmount : Decimal = 100000000.0
 
     let testFeeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -350,13 +352,13 @@ testCCIPSendAcceptsPendingFeeTransfer = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter-pending-fee"
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, 1.0)]
+            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
-                    price = 1.0
+                    price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
@@ -576,7 +578,7 @@ testCCIPExecute = script do
             finality = 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
-            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner)
+            offRampAddress = CCIP.MessageCodecV1.encodeInstanceAddress offRampInstanceId ccipOwner
             sender = "0000000000000000000000000000000000000003"
             receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
@@ -612,7 +614,6 @@ testCCIPExecute = script do
                  (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 2000
 
     executeResult.state === CCIP.Internal.SUCCESS
 
@@ -622,7 +623,7 @@ testCCIPExecute = script do
 
     pure ()
 
--- | Test PrepareSend keeps token-only default CCV behavior without per-message block confirmations.
+-- | Test PrepareSend applies blockConfirmations and token-only default CCV behavior.
 -- Executor finalization is tested separately; after PrepareSend message is always None.
 testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
@@ -733,7 +734,8 @@ testPrepareSendExtraArgs = script do
     disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Message-only send still defers message construction to the executor.
+    -- Message-only send with explicit blockConfirmations.
+    -- Message is deferred to executor; only blockConfirmations is verifiable here.
     let receiver = "b8a3d7a9c797b5bd47f8c5efd96dadecf15ddd3c" -- 20 bytes
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -747,6 +749,7 @@ testPrepareSendExtraArgs = script do
             receiver = receiver
             payload = "01"
             ccipReceiveGasLimit = 123
+            blockConfirmations = Some 42
             senderRequiredCCVs = []
             tokenInstrumentId = None
             tokenReceiver = None
@@ -754,6 +757,7 @@ testPrepareSendExtraArgs = script do
             feeToken = feeTokenId
 
     Some sm <- user `queryContractId` smCid
+    sm.blockConfirmations === 42
     sm.message === None
     sm.ccipReceiveGasLimit === 123
 
@@ -770,6 +774,7 @@ testPrepareSendExtraArgs = script do
             receiver = receiver
             payload = ""
             ccipReceiveGasLimit = 0
+            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = Some tokenInstrumentId
             tokenReceiver = None
@@ -795,6 +800,7 @@ testPrepareSendExtraArgs = script do
             receiver = receiver
             payload = ""
             ccipReceiveGasLimit = 0
+            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = Some tokenInstrumentId
             tokenReceiver = Some tokenReceiver
@@ -820,6 +826,7 @@ testPrepareSendExtraArgs = script do
             receiver = "12345678" -- invalid receiver (not 20 bytes)
             payload = ""
             ccipReceiveGasLimit = 0
+            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = Some tokenInstrumentId
             tokenReceiver = Some tokenReceiver
@@ -838,6 +845,7 @@ testPrepareSendExtraArgs = script do
             receiver = receiver
             payload = ""
             ccipReceiveGasLimit = 0
+            blockConfirmations = None
             senderRequiredCCVs = []
             tokenInstrumentId = Some tokenInstrumentId
             tokenReceiver = Some("12345678") -- invalid token receiver (not 20 bytes)

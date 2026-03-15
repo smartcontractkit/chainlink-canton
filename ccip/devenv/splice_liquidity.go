@@ -336,9 +336,8 @@ func getTransferFactoryFromScanProxy(
 	return types.CONTRACT_ID(resp.JSON200.FactoryId), disclosures, choiceCtx, nil
 }
 
-func selectUnlockedHoldingCIDs(holdings []*apiv2.ActiveContract, owner, admin, instrumentID string) ([]types.CONTRACT_ID, []*apiv2.DisclosedContract) {
+func selectUnlockedHoldingCIDs(holdings []*apiv2.ActiveContract, owner, admin, instrumentID string) []types.CONTRACT_ID {
 	cids := make([]types.CONTRACT_ID, 0, len(holdings))
-	disclosures := make([]*apiv2.DisclosedContract, 0, len(holdings))
 	for _, holding := range holdings {
 		views := holding.GetCreatedEvent().GetInterfaceViews()
 		if len(views) == 0 || views[0].GetViewValue() == nil {
@@ -374,13 +373,7 @@ func selectUnlockedHoldingCIDs(holdings []*apiv2.ActiveContract, owner, admin, i
 		}
 		cid := types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
 		cids = append(cids, cid)
-		disclosures = append(disclosures, &apiv2.DisclosedContract{
-			TemplateId:       holding.GetCreatedEvent().GetTemplateId(),
-			ContractId:       holding.GetCreatedEvent().GetContractId(),
-			CreatedEventBlob: holding.GetCreatedEvent().GetCreatedEventBlob(),
-			SynchronizerId:   holding.GetSynchronizerId(),
-		})
 	}
 
-	return cids, disclosures
+	return cids
 }
