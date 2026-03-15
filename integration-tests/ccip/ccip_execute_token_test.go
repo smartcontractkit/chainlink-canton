@@ -619,7 +619,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	receiverBalanceBefore := getHoldingsBalance(receiverHoldingsBefore)
 
-	// Get disclosures for CCIPReceiver.Execute
+	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
+	// receiver-only; pool/ccip-owned contracts are only supplied via disclosure.
 	disclosedCCIPReceiver, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), receiverParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
 	})
@@ -696,7 +697,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release in one transaction
+	// CCIPReceiver.Execute: PrepareExecute + CCV + Pool Verify + Execute + Release
+	// in one receiver-authored transaction with disclosed shared dependencies.
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
