@@ -293,7 +293,6 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
 
                 let poolCCVs = case Map.lookup sm.destChainSelector chainPoolConfigs of
@@ -446,7 +445,6 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
                 (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector chainFeeConfigs of
                     Some feeConfig | feeConfig.isEnabled ->
@@ -484,7 +482,6 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller, poolOwner
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
 
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with

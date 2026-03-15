@@ -23,11 +23,11 @@ import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
+import qualified CCIP.Executor
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
-import qualified TestExecutor
 import qualified TestToken
 
 mult : Decimal -> Numeric 0
@@ -123,16 +123,20 @@ testCCIPSend = script do
                 feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
-    -- Deploy TestExecutor
+    -- Deploy production Executor
     executor <- submit ccipOwner do
-        createCmd TestExecutor.TestExecutor with
+        createCmd CCIP.Executor.Executor with
             instanceId = "test-executor"
             owner = ccipOwner
-            minBlockConfirmations = 0
             maxCCVsPerMsg = 10
-            ccvAllowlistEnabled = False
+            dynamicConfig = CCIP.Executor.DynamicConfig with
+                feeAggregator = None
+                minBlockConfirmations = 0
+                ccvAllowlistEnabled = False
             allowedCCVs = []
-            remoteChainFeeUSDCents = Map.fromList [(destChainSelector, 0.0)]
+            remoteChainConfigs = Map.fromList [(destChainSelector, CCIP.Executor.RemoteChainConfig with
+                feeUSDCents = cents 0.0
+                enabled = True)]
 
     -- Deploy PerPartyRouter factory
     factory <- submit ccipOwner do

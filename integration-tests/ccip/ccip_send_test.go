@@ -78,10 +78,12 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSender, contracts.CurrentVersion)
 	require.NoError(t, err)
+	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	require.NoError(t, err)
 	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipSenderDar, ccipTestDar}
+	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipSenderDar, ccipExecutorDar, ccipTestDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -409,24 +411,30 @@ func TestCCIPSend(t *testing.T) {
 	ccipSenderCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPSender: %s", ccipSenderCid)
 
-	// Deploy TestExecutor (implements IExecutor) with dest chain fee config
+	// Deploy Executor with dest chain fee config
 	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-test", ModuleName: "TestExecutor", EntityName: "TestExecutor"},
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor"},
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-executor"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 						{Label: "maxCCVsPerMsg", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 10}}},
-						{Label: "ccvAllowlistEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+						{Label: "dynamicConfig", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "feeAggregator", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
+							{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
+							{Label: "ccvAllowlistEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+						}}}}},
 						{Label: "allowedCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-						{Label: "remoteChainFeeUSDCents", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
+						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
 							{
-								Key:   &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(remoteSelector, 10)}},
-								Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}},
+								Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(remoteSelector, 10)}},
+								Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+									{Label: "feeUSDCents", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+									{Label: "enabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
+								}}}},
 							},
 						}}}}},
 					}},
@@ -437,7 +445,7 @@ func TestCCIPSend(t *testing.T) {
 	})
 	require.NoError(t, err)
 	executorCid := extractCreatedContractId(res)
-	t.Logf("Deployed TestExecutor: %s", executorCid)
+	t.Logf("Deployed Executor: %s", executorCid)
 
 	// Get disclosures for CCIPSender.Send
 	disclosedCCIPSender, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
@@ -509,9 +517,9 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to get disclosed CommitteeVerifier")
 
 	disclosedExecutor, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-test", ModuleName: "TestExecutor", EntityName: "TestExecutor",
+		PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor",
 	})
-	require.NoError(t, err, "failed to get disclosed TestExecutor")
+	require.NoError(t, err, "failed to get disclosed Executor")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContext, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)

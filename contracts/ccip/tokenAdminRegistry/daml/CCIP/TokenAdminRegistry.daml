@@ -197,7 +197,6 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
                 -- Trust model: TAR is currently a concrete trusted internal
                 -- dependency chosen by `owner`/`ccipOwner`, not an adversarial
