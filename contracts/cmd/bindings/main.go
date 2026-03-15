@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime/debug"
 	"strings"
 
@@ -108,6 +109,8 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("outputFile", outputFile).Msg("Failed to create output subdirectory for package")
 		}
+		output = applyPostGenPatches(p, output)
+
 		err = os.WriteFile(outputFile, output, 0o644)
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("outputFile", outputFile).Msg("Failed to write generated bindings to file")
@@ -167,4 +170,21 @@ func generatePackage(dar []byte, pkgFile string, externalPackages model.External
 	}
 
 	return []byte(res), nil
+}
+
+// TODO: fix upstream in go-daml — when a template choice name normalizes to
+// the same Go identifier as its args struct (e.g. Executor_CalculateFee →
+// ExecutorCalculateFee for both), the codegen appends "2" to the struct but
+// forgets to update the method signature.
+func applyPostGenPatches(pkg contracts.Package, src []byte) []byte {
+	if pkg != contracts.CCIPExecutor {
+		return src
+	}
+
+	// The codegen generates the args struct as ExecutorCalculateFee2 to avoid
+	// colliding with the method name, but the method signature still references
+	// the non-existent ExecutorCalculateFee type. Rewrite to use the canonical
+	// type from the common (interface) package.
+	re := regexp.MustCompile(`\bargs ExecutorCalculateFee\b`)
+	return re.ReplaceAll(src, []byte("args common.ExecutorCalculateFee"))
 }
