@@ -92,7 +92,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
         Some config -> do
           assertSourceChainConfigsEqual config (sourceChainConfigUpdates2 !! 1)
 
-    -- | ======== Test 3 =======
+    -- | ======== Test 3 =======    
     -- | Add invalid source chain config updates and verify that the entire transaction is reverted
     -- | =======================
     let invalidSourceChainConfigUpdates = [
@@ -109,7 +109,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
 
     let invalidSourceChainConfigUpdates = [
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
-                sourceChainSelector = -123.0 -- Invalid negative chain selector
+                sourceChainSelector = 123.0 -- Invalid chain selector that is the same as the local chain selector
                 isEnabled = True
                 onRampAddresses = ["0x1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
@@ -121,7 +121,19 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
 
     let invalidSourceChainConfigUpdates = [
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
-                sourceChainSelector = 123.0
+                sourceChainSelector = -111.0 -- Invalid negative chain selector
+                isEnabled = True
+                onRampAddresses = ["0x1111111111111111"]
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
+            sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    let invalidSourceChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.SourceChainConfigArgs with
+                sourceChainSelector = 111.0
                 isEnabled = True
                 onRampAddresses = ["0x1111111111111111"]
                 -- Empty default and mandated CCV lists, which is invalid since at least one CCV must be provided
@@ -134,7 +146,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
 
     let invalidSourceChainConfigUpdates = [
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
-                sourceChainSelector = 123.0
+                sourceChainSelector = 111.0
                 isEnabled = True
                 onRampAddresses = ["0x1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xabc"] -- Duplicate CCVs within the default list, which is invalid
@@ -158,7 +170,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
 
     let invalidSourceChainConfigUpdates = [
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
-                sourceChainSelector = 123.0
+                sourceChainSelector = 111.0
                 isEnabled = True
                 onRampAddresses = ["0x1111111111111111"]
                 -- Duplicate CCVs across the default and mandated lists, which is invalid
@@ -168,6 +180,71 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
     submitMustFail owner do
         exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplySourceChainConfigUpdates with
             sourceChainConfigUpdates = invalidSourceChainConfigUpdates
+
+    -- | ======== Test 4 ========
+    -- | Test creating a GlobalConfig with invalid chain selector and verify that the transaction is reverted
+    -- | =======================
+    submitMustFail owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 0.0 -- Invalid zero chain selector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.empty
+    submitMustFail owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 123.0
+            destChainConfigs = Map.fromList [(123.0, CCIP.GlobalConfigTypes.DestChainConfig with -- Invalid chain selector that is the same as the local chain selector
+                    isEnabled = True
+                    addressBytesLength = 20
+                    offRampAddress = "8ffecae212a6c3d2cbd5bfdeedccfa4f0bfde53f"
+                    laneMandatedCCVs = [RawInstanceAddress "0x123"]
+                    defaultCCVs = [RawInstanceAddress "0xabc"]
+                    messageNetworkFeeUSDCents = 10.0
+                    tokenNetworkFeeUSDCents = 20.0
+                )]
+            sourceChainConfigs = Map.empty
+    submitMustFail owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 123.0
+            destChainConfigs = Map.fromList [(0.0, CCIP.GlobalConfigTypes.DestChainConfig with -- Invalid zero chain selector
+                    isEnabled = True
+                    addressBytesLength = 20
+                    offRampAddress = "8ffecae212a6c3d2cbd5bfdeedccfa4f0bfde53f"
+                    laneMandatedCCVs = [RawInstanceAddress "0x123"]
+                    defaultCCVs = [RawInstanceAddress "0xabc"]
+                    messageNetworkFeeUSDCents = 10.0
+                    tokenNetworkFeeUSDCents = 20.0
+                )]
+            sourceChainConfigs = Map.empty
+    submitMustFail owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 123.0
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(123.0, CCIP.GlobalConfigTypes.SourceChainConfig with -- Invalid chain selector that is the same as the local chain selector
+                    isEnabled = True
+                    onRampAddresses = ["0x1111111111111111"]
+                    defaultCCVs = [RawInstanceAddress "0xabc"]
+                    laneMandatedCCVs = [RawInstanceAddress "0x123"]
+                )]
+    submitMustFail owner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = instanceId
+            ccipOwner = owner
+            chainSelector = 123.0
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(0.0, CCIP.GlobalConfigTypes.SourceChainConfig with -- Invalid zero chain selector
+                    isEnabled = True
+                    onRampAddresses = ["0x1111111111111111"]
+                    defaultCCVs = [RawInstanceAddress "0xabc"]
+                    laneMandatedCCVs = [RawInstanceAddress "0x123"]
+                )]
 
     pure()
 
@@ -285,7 +362,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
 
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = -123.0 -- Invalid negative chain selector
+                destChainSelector = 123.0 -- Invalid chain selector that is the same as the local chain selector
                 isEnabled = True
                 addressBytesLength = 20
                 offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
@@ -300,7 +377,22 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
 
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = 123.0
+                destChainSelector = -111.0 -- Invalid negative chain selector
+                isEnabled = True
+                addressBytesLength = 20
+                offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
+                defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
+                laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
+                messageNetworkFeeUSDCents = 10.0
+                tokenNetworkFeeUSDCents = 20.0
+            ]
+    submitMustFail owner do
+        exerciseCmd globalConfigCid CCIP.GlobalConfig.ApplyDestChainConfigUpdates with
+            destChainConfigUpdates = invalidDestChainConfigUpdates
+
+    let invalidDestChainConfigUpdates = [
+            CCIP.GlobalConfigTypes.DestChainConfigArgs with
+                destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
                 offRampAddress = "bc30fdec959bce0af7a36ac681dfadddfddac2ab"
@@ -316,7 +408,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = 123.0
+                destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
                 offRampAddress = "beafb8e4f9fab41badca6edfb9f0aaea8b6cc9c3"
@@ -331,7 +423,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = 123.0
+                destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
                 offRampAddress = "8a16cb05dcffcbe196a5c8c2d6ebc4ba664fd41b"
@@ -347,7 +439,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = 123.0
+                destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
                 offRampAddress = "8fd2fe964b7ebbdf1ba2eaf949fdcf05baead07f"
@@ -363,7 +455,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = 123.0
+                destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 3
                 offRampAddress = "12345678" -- 4 bytes, which is invalid given the addressBytesLength of 3
@@ -378,7 +470,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     let invalidDestChainConfigUpdates = [
             CCIP.GlobalConfigTypes.DestChainConfigArgs with
-                destChainSelector = 123.0
+                destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 0 -- Invalid zero address byte length
                 offRampAddress = ""
