@@ -31,6 +31,14 @@ type DeployTokenPoolConfig struct {
 	Qualifier string
 	// Optional; defaults to empty. ChainPoolConfigs can be set for chain-specific pool config (CCV requirements, remote pools).
 	ChainPoolConfigs types.GENMAP
+	// Optional; defaults to empty. ChainFeeConfigs can be set for chain-specific fee config.
+	ChainFeeConfigs types.GENMAP
+	// Optional; defaults to empty. RemoteTokens can be set for chain-specific remote token addresses.
+	RemoteTokens types.GENMAP
+	// Optional; if true, deploy default rate limiters for configured chain pool selectors and wire them into the pool.
+	ConfigureRateLimiters bool
+	// Optional; defaults apply if zero-valued. Used when ConfigureRateLimiters is true.
+	RateLimiterConfig sequences.ConfigureTokenPoolRateLimiterConfig
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
 	PoolReceiveContext common.CCIPContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
@@ -69,6 +77,14 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	if chainPoolConfigs == nil {
 		chainPoolConfigs = types.GENMAP{}
 	}
+	chainFeeConfigs := cfg.ChainFeeConfigs
+	if chainFeeConfigs == nil {
+		chainFeeConfigs = types.GENMAP{}
+	}
+	remoteTokens := cfg.RemoteTokens
+	if remoteTokens == nil {
+		remoteTokens = types.GENMAP{}
+	}
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
 		poolReceiveContext = common.CCIPContext{Values: types.TEXTMAP{}}
@@ -86,6 +102,8 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		InstrumentId:       cfg.InstrumentId,
 		Decimals:           types.INT64(cfg.Decimals),
 		ChainPoolConfigs:   chainPoolConfigs,
+		ChainFeeConfigs:    chainFeeConfigs,
+		RemoteTokens:       remoteTokens,
 		PoolReceiveContext: poolReceiveContext,
 		TransferTimeout:    transferTimeout,
 	}
@@ -110,19 +128,32 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
 	}
 
-	regInput := sequences.RegisterTokenPoolInput{
-		TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
-		InstrumentId: splice_api_token_holding_v1.InstrumentId{
-			Admin: cfg.InstrumentId.Admin,
-			Id:    cfg.InstrumentId.Id,
-		},
-		CcipParty:      cfg.CcipOwner,
-		PoolOwnerParty: cfg.PoolOwner,
-		PoolInstanceID: out.Output.Address,
+	if cfg.TokenAdminRegistryInstanceAddress.Cmp(contracts.InstanceAddress{}) != 0 {
+		regInput := sequences.RegisterTokenPoolInput{
+			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
+			InstrumentId: splice_api_token_holding_v1.InstrumentId{
+				Admin: cfg.InstrumentId.Admin,
+				Id:    cfg.InstrumentId.Id,
+			},
+			CcipParty:      cfg.CcipOwner,
+			PoolOwnerParty: cfg.PoolOwner,
+			PoolInstanceID: out.Output.Address,
+		}
+		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
+		}
 	}
-	_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
+
+	if cfg.ConfigureRateLimiters {
+		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.ConfigureTokenPoolRateLimiters, deps, sequences.ConfigureTokenPoolRateLimitersInput{
+			PoolInstanceAddress: contracts.HexToInstanceAddress(out.Output.Address),
+			PoolOwnerParty:      cfg.PoolOwner,
+			Config:              cfg.RateLimiterConfig,
+		})
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to configure token pool rate limiters: %w", err)
+		}
 	}
 
 	return cldf.ChangesetOutput{

@@ -894,10 +894,10 @@ func (c *Chain) findAnyPerPartyRouterForOwner(
 }
 
 // BuildManualExecuteTokenTransferInput builds the input for the manual execute token transfer command.
-// - selecting the correct lock/release pool,
+// - selecting the correct preconfigured lock/release pool,
 // - matching by instrument hash vs destTokenAddress,
-// - ensuring exact source pool membership in remotePools,
-// - ensuring inbound rate limiter exists/resolves,
+// - requiring exact source pool membership in remotePools,
+// - resolving inbound rate limiters,
 // - collecting sender pool holdings CIDs + disclosures,
 // - fetching transfer factory + choice context/disclosures via scan-proxy,
 // - injecting inbound rate limiter CIDs in poolExtraContext.
@@ -911,304 +911,60 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	if message == nil || message.TokenTransfer == nil {
 		return nil, nil, fmt.Errorf("token transfer message is required")
 	}
-	sourceSelectorKey := fmt.Sprintf("%d", message.SourceChainSelector)
-	sourceSelectorNumericKey := sourceSelectorKey + "."
-	sourcePoolHex := strings.ToLower(hex.EncodeToString(message.TokenTransfer.SourcePoolAddress))
-	sourcePoolHex = strings.TrimPrefix(sourcePoolHex, "0x")
-	sourcePoolHexTail40 := sourcePoolHex
-	if len(sourcePoolHexTail40) > 40 {
-		sourcePoolHexTail40 = sourcePoolHexTail40[len(sourcePoolHexTail40)-40:]
-	}
-	destTokenHex := strings.ToLower(hex.EncodeToString(message.TokenTransfer.DestTokenAddress))
-	destTokenHex = strings.TrimPrefix(destTokenHex, "0x")
-	requireInstrumentMatch := len(destTokenHex) > 0
+	selectorInfo := newManualExecuteSelectorInfo(message)
+	executionParticipant := participant
+	resolveByAddress := resolveActiveContractIDByAddress
 
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+	selectedPool, err := c.selectManualExecuteTokenPool(ctx, executionParticipant, message, selectorInfo)
 	if err != nil {
-		return nil, nil, fmt.Errorf("get ledger end for token pool lookup: %w", err)
+		return nil, nil, err
 	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  "#ccip-lockreleasetokenpool",
-										ModuleName: "CCIP.LockReleaseTokenPool",
-										EntityName: "LockReleaseTokenPool",
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("query active lock/release pools: %w", err)
-	}
-	defer stream.CloseSend()
-
-	var selectedPool *lockreleasetokenpool.LockReleaseTokenPool
-	var selectedPoolContractID string
-	var selectedPoolPackageID string
-	var selectedInstrumentFromCreateArgs string
-	var tokenMatchedPool *lockreleasetokenpool.LockReleaseTokenPool
-	var tokenMatchedPoolContractID string
-	var fallbackPool *lockreleasetokenpool.LockReleaseTokenPool
-	var fallbackPoolContractID string
-	debugPoolCandidates := make([]string, 0, 8)
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return nil, nil, fmt.Errorf("receive lock/release pools: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			return nil, nil, fmt.Errorf("parse lock/release pool: %w", parseErr)
-		}
-		chainPoolCfgAny, ok := findChainPoolConfigBySelector(parsed.ChainPoolConfigs, sourceSelectorKey)
-		if !ok {
-			continue
-		}
-		remoteTokenMatch := false
-		instrumentCombined := fmt.Sprintf("%s@%s", string(parsed.InstrumentId.Id), string(parsed.InstrumentId.Admin))
-		instrumentRawHex := strings.ToLower(hex.EncodeToString([]byte(instrumentCombined)))
-		instrumentKeccakCombinedHex := strings.ToLower(hex.EncodeToString(crypto.Keccak256([]byte(instrumentCombined))))
-		instrumentTokenMatch := instrumentRawHex == destTokenHex ||
-			instrumentKeccakCombinedHex == destTokenHex ||
-			strings.HasSuffix(instrumentRawHex, destTokenHex) ||
-			strings.HasSuffix(destTokenHex, instrumentRawHex) ||
-			strings.HasSuffix(instrumentKeccakCombinedHex, destTokenHex) ||
-			strings.HasSuffix(destTokenHex, instrumentKeccakCombinedHex)
-		if instrumentTokenMatch && tokenMatchedPool == nil {
-			tokenMatchedPool = parsed
-			tokenMatchedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-		}
-		remoteTokenAny, ok := parsed.RemoteTokens[sourceSelectorKey]
-		if !ok {
-			remoteTokenAny, ok = parsed.RemoteTokens[sourceSelectorNumericKey]
-		}
-		if ok {
-			remoteTokenHex := strings.ToLower(strings.TrimPrefix(fmt.Sprint(remoteTokenAny), "0x"))
-			if remoteTokenHex == destTokenHex || strings.HasSuffix(remoteTokenHex, destTokenHex) || strings.HasSuffix(destTokenHex, remoteTokenHex) {
-				remoteTokenMatch = true
-			}
-		}
-		if !remoteTokenMatch && strings.Contains(strings.ToLower(fmt.Sprint(parsed.RemoteTokens)), destTokenHex) {
-			remoteTokenMatch = true
-		}
-		remotePools := extractRemotePools(chainPoolCfgAny)
-		if len(debugPoolCandidates) < 8 {
-			debugPoolCandidates = append(debugPoolCandidates, fmt.Sprintf(
-				"poolCID=%s instrumentRaw=%s instrumentKeccak=%s remotePools=%v",
-				entry.ActiveContract.GetCreatedEvent().GetContractId(),
-				instrumentRawHex,
-				instrumentKeccakCombinedHex,
-				remotePools,
-			))
-		}
-		remotePoolMatch := false
-		if len(remotePools) == 0 {
-			if requireInstrumentMatch {
-				continue
-			}
-			cfgText := strings.ToLower(fmt.Sprint(chainPoolCfgAny))
-			remotePoolMatch = strings.Contains(cfgText, sourcePoolHex) || strings.Contains(cfgText, sourcePoolHexTail40)
-		}
-		if len(remotePools) == 0 {
-			if remoteTokenMatch && tokenMatchedPool == nil {
-				tokenMatchedPool = parsed
-				tokenMatchedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-			if fallbackPool == nil {
-				fallbackPool = parsed
-				fallbackPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-
-			continue
-		}
-		for _, remotePool := range remotePools {
-			remotePoolHex := strings.ToLower(strings.TrimPrefix(remotePool, "0x"))
-			if remotePoolHex == sourcePoolHex ||
-				remotePoolHex == sourcePoolHexTail40 ||
-				strings.HasSuffix(remotePoolHex, sourcePoolHex) ||
-				strings.HasSuffix(sourcePoolHex, remotePoolHex) ||
-				strings.HasSuffix(remotePoolHex, sourcePoolHexTail40) ||
-				strings.HasSuffix(sourcePoolHexTail40, remotePoolHex) {
-				remotePoolMatch = true
-				break
-			}
-		}
-		if !remotePoolMatch {
-			if remoteTokenMatch && tokenMatchedPool == nil {
-				tokenMatchedPool = parsed
-				tokenMatchedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-			if fallbackPool == nil {
-				fallbackPool = parsed
-				fallbackPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-
-			continue
-		}
-		if instrumentTokenMatch {
-			selectedPool = parsed
-			selectedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			if tid := entry.ActiveContract.GetCreatedEvent().GetTemplateId(); tid != nil {
-				selectedPoolPackageID = tid.GetPackageId()
-			}
-			selectedInstrumentFromCreateArgs = extractInstrumentCombinedFromCreateArgs(entry.ActiveContract.GetCreatedEvent())
-
-			break
-		}
-		if requireInstrumentMatch {
-			continue
-		}
-		selectedPool = parsed
-		selectedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-		if tid := entry.ActiveContract.GetCreatedEvent().GetTemplateId(); tid != nil {
-			selectedPoolPackageID = tid.GetPackageId()
-		}
-		selectedInstrumentFromCreateArgs = extractInstrumentCombinedFromCreateArgs(entry.ActiveContract.GetCreatedEvent())
-
-		break
-	}
-	if selectedPool == nil && tokenMatchedPool != nil && !requireInstrumentMatch {
-		selectedPool = tokenMatchedPool
-		selectedPoolContractID = tokenMatchedPoolContractID
-	}
-	if selectedPool == nil && tokenMatchedPool != nil && requireInstrumentMatch {
-		selectedPool = tokenMatchedPool
-		selectedPoolContractID = tokenMatchedPoolContractID
-	}
-	if selectedPool == nil && fallbackPool != nil && !requireInstrumentMatch {
-		selectedPool = fallbackPool
-		selectedPoolContractID = fallbackPoolContractID
-	}
-	if selectedPool == nil {
-		if len(debugPoolCandidates) == 0 && len(c.chain.Participants) > 0 && participant.PartyID != c.chain.Participants[0].PartyID {
-			return c.buildManualExecuteTokenTransferInput(
+	if poolOwnerParty := string(selectedPool.pool.PoolOwner); poolOwnerParty != "" && executionParticipant.PartyID != poolOwnerParty {
+		executionParticipant = c.chain.Participants[c.participantIndexForParty(poolOwnerParty)]
+		resolveByAddress = func(templateID string, address contracts.InstanceAddress) (string, error) {
+			return contract.FindActiveContractIDByInstanceAddress(
 				ctx,
-				c.chain.Participants[0],
-				tokenReceiverParty,
-				message,
-				resolveActiveContractIDByAddress,
+				executionParticipant.LedgerServices.State,
+				executionParticipant.PartyID,
+				templateID,
+				address,
 			)
 		}
-		if requireInstrumentMatch {
-			return nil, nil, fmt.Errorf(
-				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; candidates=%v",
-				destTokenHex,
-				sourceSelectorKey,
-				sourcePoolHex,
-				debugPoolCandidates,
-			)
+		selectedPool, err = c.selectManualExecuteTokenPool(ctx, executionParticipant, message, selectorInfo)
+		if err != nil {
+			return nil, nil, err
 		}
-
-		return nil, nil, fmt.Errorf("no lock/release pool found for source selector %s and source pool %s", sourceSelectorKey, sourcePoolHex)
 	}
 	defaultRateLimiterCID, defaultRateLimiterDisclosure, err := resolveRateLimiterForManualExecute(
 		ctx,
-		participant,
-		selectedPool,
-		sourceSelectorKey,
-		sourceSelectorNumericKey,
-		selectedPool.InboundRateLimiters,
-		resolveActiveContractIDByAddress,
+		executionParticipant,
+		selectedPool.pool,
+		selectorInfo.sourceSelectorKey,
+		selectorInfo.sourceSelectorNumericKey,
+		selectedPool.pool.InboundRateLimiters,
+		resolveByAddress,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve default-finality rate limiter disclosure: %w", err)
 	}
 	customRateLimiterCID, customRateLimiterDisclosure, err := resolveRateLimiterForManualExecute(
 		ctx,
-		participant,
-		selectedPool,
-		sourceSelectorKey,
-		sourceSelectorNumericKey,
-		selectedPool.InboundCustomRateLimiters,
-		resolveActiveContractIDByAddress,
+		executionParticipant,
+		selectedPool.pool,
+		selectorInfo.sourceSelectorKey,
+		selectorInfo.sourceSelectorNumericKey,
+		selectedPool.pool.InboundCustomRateLimiters,
+		resolveByAddress,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolve custom-finality rate limiter disclosure: %w", err)
 	}
 
-	instrumentAdmin := string(selectedPool.InstrumentId.Admin)
-	instrumentID := string(selectedPool.InstrumentId.Id)
+	instrumentAdmin := string(selectedPool.pool.InstrumentId.Admin)
+	instrumentID := string(selectedPool.pool.InstrumentId.Id)
 	expectedTransferAdmin := instrumentAdmin
-	transferSenderParty := string(selectedPool.PoolOwner)
-
-	collectPoolHoldings := func() ([]string, []*apiv2.DisclosedContract, error) {
-		holdings, holdingsErr := listHoldingContracts(ctx, participant)
-		if holdingsErr != nil {
-			return nil, nil, fmt.Errorf("list pool holdings: %w", holdingsErr)
-		}
-		poolHoldings := make([]string, 0, len(holdings))
-		poolHoldingDisclosures := make([]*apiv2.DisclosedContract, 0, len(holdings))
-		for _, holding := range holdings {
-			views := holding.GetCreatedEvent().GetInterfaceViews()
-			if len(views) == 0 || views[0].GetViewValue() == nil {
-				continue
-			}
-			fields := views[0].GetViewValue().GetFields()
-			if len(fields) < 4 {
-				continue
-			}
-			instrumentRecord := fields[1].GetValue().GetRecord()
-			if instrumentRecord == nil || len(instrumentRecord.GetFields()) < 2 {
-				continue
-			}
-			var holdingInstrumentAdmin, holdingInstrumentID string
-			holdingOwner := fields[0].GetValue().GetParty()
-			if holdingOwner != transferSenderParty {
-				continue
-			}
-			for _, instrumentField := range instrumentRecord.GetFields() {
-				if instrumentField == nil || instrumentField.GetValue() == nil {
-					continue
-				}
-				switch instrumentField.GetLabel() {
-				case "admin":
-					holdingInstrumentAdmin = instrumentField.GetValue().GetParty()
-				case "id":
-					holdingInstrumentID = instrumentField.GetValue().GetText()
-				}
-			}
-			isLocked := fields[3].GetValue().GetOptional().GetValue() != nil
-			if isLocked {
-				continue
-			}
-			disclosure := &apiv2.DisclosedContract{
-				TemplateId:       holding.GetCreatedEvent().GetTemplateId(),
-				ContractId:       holding.GetCreatedEvent().GetContractId(),
-				CreatedEventBlob: holding.GetCreatedEvent().GetCreatedEventBlob(),
-				SynchronizerId:   holding.GetSynchronizerId(),
-			}
-			if holdingInstrumentAdmin != instrumentAdmin || holdingInstrumentID != instrumentID {
-				continue
-			}
-			poolHoldings = append(poolHoldings, holding.GetCreatedEvent().GetContractId())
-			poolHoldingDisclosures = append(poolHoldingDisclosures, disclosure)
-		}
-
-		return poolHoldings, poolHoldingDisclosures, nil
-	}
-
-	poolHoldings, poolHoldingDisclosures, err := collectPoolHoldings()
+	transferSenderParty := string(selectedPool.pool.PoolOwner)
+	poolHoldings, poolHoldingDisclosures, err := collectUnlockedPoolHoldings(ctx, executionParticipant, transferSenderParty, instrumentAdmin, instrumentID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1221,7 +977,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		)
 	}
 
-	transferClient, err := newTransferInstructionClient(participant)
+	transferClient, err := newTransferInstructionClient(executionParticipant)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1292,13 +1048,333 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	if err != nil {
 		return nil, nil, fmt.Errorf("build pool extra context: %w", err)
 	}
-	emptyMetadata := emptyMetadataValue()
+	tokenTransferValue := buildManualExecuteTokenTransferValue(
+		selectedPool.contractID,
+		tokenReceiverParty,
+		transferFactoryCID,
+		transferFactoryCtx,
+		poolHoldings,
+		poolExtraContext,
+	)
+
+	poolDisclosure, err := getDisclosedContractByID(ctx, executionParticipant, selectedPool.contractID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("get token pool disclosure: %w", err)
+	}
+	disclosures := make([]*apiv2.DisclosedContract, 0, 3+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
+	disclosures = append(disclosures, defaultRateLimiterDisclosure, customRateLimiterDisclosure, poolDisclosure)
+	disclosures = append(disclosures, transferFactoryDisclosures...)
+	disclosures = append(disclosures, poolHoldingDisclosures...)
+	finalRemotePools := []string{}
+	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.pool.ChainPoolConfigs, selectorInfo.sourceSelectorKey); ok {
+		finalRemotePools = extractRemotePools(selectedCfgAny)
+	}
+	instrumentCombined := fmt.Sprintf("%s@%s", instrumentID, instrumentAdmin)
+	c.logger.Debug().
+		Str("SelectedTokenPoolCID", selectedPool.contractID).
+		Str("MessageSourcePoolHex", selectorInfo.sourcePoolHex).
+		Any("FinalRemotePools", finalRemotePools).
+		Str("SelectedInstrumentCombined", instrumentCombined).
+		Str("SelectedInstrumentCombinedHex", hex.EncodeToString([]byte(instrumentCombined))).
+		Int("SelectedInstrumentCombinedLen", len([]byte(instrumentCombined))).
+		Str("SelectedInstrumentHashHex", strings.ToLower(hex.EncodeToString(crypto.Keccak256([]byte(instrumentCombined))))).
+		Str("SelectedPoolInstrumentAdmin", string(selectedPool.pool.InstrumentId.Admin)).
+		Str("ExpectedTransferAdmin", expectedTransferAdmin).
+		Str("MessageDestTokenHex", selectorInfo.destTokenHex).
+		Str("SelectedTokenPoolPackageID", selectedPool.packageID).
+		Str("SelectedInstrumentFromCreateArgs", selectedPool.instrumentCreate).
+		Msg("Prepared manual execute token transfer input")
+
+	return tokenTransferValue, disclosures, nil
+}
+
+type manualExecuteSelectorInfo struct {
+	sourceSelectorKey        string
+	sourceSelectorNumericKey string
+	sourcePoolHex            string
+	sourcePoolHexTail40      string
+	destTokenHex             string
+	requireInstrumentMatch   bool
+}
+
+type manualExecutePoolCandidate struct {
+	pool             *lockreleasetokenpool.LockReleaseTokenPool
+	contractID       string
+	offset           int64
+	packageID        string
+	instrumentCreate string
+}
+
+func newManualExecuteSelectorInfo(message *protocol.Message) manualExecuteSelectorInfo {
+	sourceSelectorKey := fmt.Sprintf("%d", message.SourceChainSelector)
+	sourcePoolHex := strings.TrimPrefix(strings.ToLower(hex.EncodeToString(message.TokenTransfer.SourcePoolAddress)), "0x")
+	sourcePoolHexTail40 := sourcePoolHex
+	if len(sourcePoolHexTail40) > 40 {
+		sourcePoolHexTail40 = sourcePoolHexTail40[len(sourcePoolHexTail40)-40:]
+	}
+	destTokenHex := strings.TrimPrefix(strings.ToLower(hex.EncodeToString(message.TokenTransfer.DestTokenAddress)), "0x")
+
+	return manualExecuteSelectorInfo{
+		sourceSelectorKey:        sourceSelectorKey,
+		sourceSelectorNumericKey: sourceSelectorKey + ".",
+		sourcePoolHex:            sourcePoolHex,
+		sourcePoolHexTail40:      sourcePoolHexTail40,
+		destTokenHex:             destTokenHex,
+		requireInstrumentMatch:   destTokenHex != "",
+	}
+}
+
+func (c *Chain) selectManualExecuteTokenPool(
+	ctx context.Context,
+	participant canton.Participant,
+	message *protocol.Message,
+	info manualExecuteSelectorInfo,
+) (*manualExecutePoolCandidate, error) {
+	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("get ledger end for token pool lookup: %w", err)
+	}
+	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: ledgerEnd.GetOffset(),
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				participant.PartyID: {
+					Cumulative: []*apiv2.CumulativeFilter{{
+						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+							TemplateFilter: &apiv2.TemplateFilter{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  "#ccip-lockreleasetokenpool",
+									ModuleName: "CCIP.LockReleaseTokenPool",
+									EntityName: "LockReleaseTokenPool",
+								},
+								IncludeCreatedEventBlob: true,
+							},
+						},
+					}},
+				},
+			},
+			Verbose: true,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("query active lock/release pools: %w", err)
+	}
+	defer stream.CloseSend()
+
+	var selected *manualExecutePoolCandidate
+	debugPoolCandidates := make([]string, 0, 8)
+	for {
+		resp, recvErr := stream.Recv()
+		if errors.Is(recvErr, io.EOF) {
+			break
+		}
+		if recvErr != nil {
+			return nil, fmt.Errorf("receive lock/release pools: %w", recvErr)
+		}
+		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
+		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
+			continue
+		}
+		candidate, err := buildManualExecutePoolCandidate(entry.ActiveContract.GetCreatedEvent())
+		if err != nil {
+			return nil, err
+		}
+		chainPoolCfgAny, ok := findChainPoolConfigBySelector(candidate.pool.ChainPoolConfigs, info.sourceSelectorKey)
+		if !ok {
+			continue
+		}
+		instrumentMatch, remotePoolMatch, finalityCompatible, debugText := manualExecutePoolMatches(message, info, candidate.pool, chainPoolCfgAny)
+		if len(debugPoolCandidates) < cap(debugPoolCandidates) {
+			debugPoolCandidates = append(debugPoolCandidates, fmt.Sprintf("poolCID=%s %s", candidate.contractID, debugText))
+		}
+		if !remotePoolMatch {
+			continue
+		}
+		if !finalityCompatible {
+			continue
+		}
+		if info.requireInstrumentMatch && !instrumentMatch {
+			continue
+		}
+		selected = newerManualExecutePoolCandidate(selected, candidate)
+	}
+	if selected == nil {
+		if info.requireInstrumentMatch {
+			return nil, fmt.Errorf(
+				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; candidates=%v",
+				info.destTokenHex,
+				info.sourceSelectorKey,
+				info.sourcePoolHex,
+				debugPoolCandidates,
+			)
+		}
+		return nil, fmt.Errorf("no lock/release pool found for source selector %s and source pool %s", info.sourceSelectorKey, info.sourcePoolHex)
+	}
+
+	return selected, nil
+}
+
+func buildManualExecutePoolCandidate(created *apiv2.CreatedEvent) (*manualExecutePoolCandidate, error) {
+	pool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
+	if err != nil {
+		return nil, fmt.Errorf("parse lock/release pool: %w", err)
+	}
+	candidate := &manualExecutePoolCandidate{
+		pool:             pool,
+		contractID:       created.GetContractId(),
+		offset:           created.GetOffset(),
+		instrumentCreate: extractInstrumentCombinedFromCreateArgs(created),
+	}
+	if tid := created.GetTemplateId(); tid != nil {
+		candidate.packageID = tid.GetPackageId()
+	}
+
+	return candidate, nil
+}
+
+func newerManualExecutePoolCandidate(current, next *manualExecutePoolCandidate) *manualExecutePoolCandidate {
+	if next == nil {
+		return current
+	}
+	if current == nil || next.offset > current.offset {
+		return next
+	}
+
+	return current
+}
+
+func manualExecutePoolMatches(
+	message *protocol.Message,
+	info manualExecuteSelectorInfo,
+	pool *lockreleasetokenpool.LockReleaseTokenPool,
+	chainPoolCfgAny any,
+) (bool, bool, bool, string) {
+	instrumentCombined := fmt.Sprintf("%s@%s", string(pool.InstrumentId.Id), string(pool.InstrumentId.Admin))
+	instrumentRawHex := strings.ToLower(hex.EncodeToString([]byte(instrumentCombined)))
+	instrumentKeccakHex := strings.ToLower(hex.EncodeToString(crypto.Keccak256([]byte(instrumentCombined))))
+	instrumentMatch := instrumentRawHex == info.destTokenHex ||
+		instrumentKeccakHex == info.destTokenHex ||
+		strings.HasSuffix(instrumentRawHex, info.destTokenHex) ||
+		strings.HasSuffix(info.destTokenHex, instrumentRawHex) ||
+		strings.HasSuffix(instrumentKeccakHex, info.destTokenHex) ||
+		strings.HasSuffix(info.destTokenHex, instrumentKeccakHex)
+
+	remotePools := extractRemotePools(chainPoolCfgAny)
+	minBlockDepth := extractMinBlockDepth(chainPoolCfgAny)
+
+	remotePoolMatch := manualExecuteRemotePoolMatches(info, chainPoolCfgAny, remotePools)
+	finalityCompatible := (message.Finality == 0 && minBlockDepth == 0) ||
+		(message.Finality > 0 && minBlockDepth > 0 && minBlockDepth <= int64(message.Finality))
+
+	return instrumentMatch, remotePoolMatch, finalityCompatible, fmt.Sprintf(
+		"instrumentRaw=%s instrumentKeccak=%s minBlockDepth=%d remotePools=%v",
+		instrumentRawHex,
+		instrumentKeccakHex,
+		minBlockDepth,
+		remotePools,
+	)
+}
+
+func manualExecuteRemotePoolMatches(info manualExecuteSelectorInfo, chainPoolCfgAny any, remotePools []string) bool {
+	if len(remotePools) == 0 {
+		if info.requireInstrumentMatch {
+			return false
+		}
+		cfgText := strings.ToLower(fmt.Sprint(chainPoolCfgAny))
+		return strings.Contains(cfgText, info.sourcePoolHex) || strings.Contains(cfgText, info.sourcePoolHexTail40)
+	}
+	for _, remotePool := range remotePools {
+		remotePoolHex := strings.ToLower(strings.TrimPrefix(remotePool, "0x"))
+		if remotePoolHex == info.sourcePoolHex ||
+			remotePoolHex == info.sourcePoolHexTail40 ||
+			strings.HasSuffix(remotePoolHex, info.sourcePoolHex) ||
+			strings.HasSuffix(info.sourcePoolHex, remotePoolHex) ||
+			strings.HasSuffix(remotePoolHex, info.sourcePoolHexTail40) ||
+			strings.HasSuffix(info.sourcePoolHexTail40, remotePoolHex) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func collectUnlockedPoolHoldings(
+	ctx context.Context,
+	participant canton.Participant,
+	transferSenderParty string,
+	instrumentAdmin string,
+	instrumentID string,
+) ([]string, []*apiv2.DisclosedContract, error) {
+	holdings, err := listHoldingContracts(ctx, participant)
+	if err != nil {
+		return nil, nil, fmt.Errorf("list pool holdings: %w", err)
+	}
+	poolHoldings := make([]string, 0, len(holdings))
+	poolHoldingDisclosures := make([]*apiv2.DisclosedContract, 0, len(holdings))
+	for _, holding := range holdings {
+		created := holding.GetCreatedEvent()
+		if created == nil || !holdingMatchesPoolInstrument(created, transferSenderParty, instrumentAdmin, instrumentID) {
+			continue
+		}
+		poolHoldings = append(poolHoldings, created.GetContractId())
+		poolHoldingDisclosures = append(poolHoldingDisclosures, &apiv2.DisclosedContract{
+			TemplateId:       created.GetTemplateId(),
+			ContractId:       created.GetContractId(),
+			CreatedEventBlob: created.GetCreatedEventBlob(),
+			SynchronizerId:   holding.GetSynchronizerId(),
+		})
+	}
+
+	return poolHoldings, poolHoldingDisclosures, nil
+}
+
+func holdingMatchesPoolInstrument(created *apiv2.CreatedEvent, transferSenderParty, instrumentAdmin, instrumentID string) bool {
+	views := created.GetInterfaceViews()
+	if len(views) == 0 || views[0].GetViewValue() == nil {
+		return false
+	}
+	fields := views[0].GetViewValue().GetFields()
+	if len(fields) < 4 || fields[0].GetValue().GetParty() != transferSenderParty {
+		return false
+	}
+	if fields[3].GetValue().GetOptional().GetValue() != nil {
+		return false
+	}
+	instrumentRecord := fields[1].GetValue().GetRecord()
+	if instrumentRecord == nil || len(instrumentRecord.GetFields()) < 2 {
+		return false
+	}
+	var holdingInstrumentAdmin, holdingInstrumentID string
+	for _, instrumentField := range instrumentRecord.GetFields() {
+		if instrumentField == nil || instrumentField.GetValue() == nil {
+			continue
+		}
+		switch instrumentField.GetLabel() {
+		case "admin":
+			holdingInstrumentAdmin = instrumentField.GetValue().GetParty()
+		case "id":
+			holdingInstrumentID = instrumentField.GetValue().GetText()
+		}
+	}
+
+	return holdingInstrumentAdmin == instrumentAdmin && holdingInstrumentID == instrumentID
+}
+
+func buildManualExecuteTokenTransferValue(
+	selectedPoolContractID string,
+	tokenReceiverParty string,
+	transferFactoryCID string,
+	transferFactoryCtx *apiv2.Value,
+	poolHoldings []string,
+	poolExtraContext *apiv2.Value,
+) *apiv2.Value {
 	tokenPoolHoldingValues := make([]*apiv2.Value, 0, len(poolHoldings))
 	for _, cid := range poolHoldings {
 		tokenPoolHoldingValues = append(tokenPoolHoldingValues, &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: cid}})
 	}
+	emptyMetadata := emptyMetadataValue()
 
-	tokenTransferValue := &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+	return &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 		{Label: "tokenPoolCid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: selectedPoolContractID}}},
 		{Label: "tokenReceiverParty", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: tokenReceiverParty}}},
 		{Label: "tokenInput", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -1311,36 +1387,6 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		}}}}},
 		{Label: "poolExtraContext", Value: poolExtraContext},
 	}}}}}}}
-
-	poolDisclosure, err := getDisclosedContractByID(ctx, participant, selectedPoolContractID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get token pool disclosure: %w", err)
-	}
-	disclosures := make([]*apiv2.DisclosedContract, 0, 3+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
-	disclosures = append(disclosures, defaultRateLimiterDisclosure, customRateLimiterDisclosure, poolDisclosure)
-	disclosures = append(disclosures, transferFactoryDisclosures...)
-	disclosures = append(disclosures, poolHoldingDisclosures...)
-	finalRemotePools := []string{}
-	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.ChainPoolConfigs, sourceSelectorKey); ok {
-		finalRemotePools = extractRemotePools(selectedCfgAny)
-	}
-	instrumentCombined := fmt.Sprintf("%s@%s", instrumentID, instrumentAdmin)
-	c.logger.Debug().
-		Str("SelectedTokenPoolCID", selectedPoolContractID).
-		Str("MessageSourcePoolHex", sourcePoolHex).
-		Any("FinalRemotePools", finalRemotePools).
-		Str("SelectedInstrumentCombined", instrumentCombined).
-		Str("SelectedInstrumentCombinedHex", hex.EncodeToString([]byte(instrumentCombined))).
-		Int("SelectedInstrumentCombinedLen", len([]byte(instrumentCombined))).
-		Str("SelectedInstrumentHashHex", strings.ToLower(hex.EncodeToString(crypto.Keccak256([]byte(instrumentCombined))))).
-		Str("SelectedPoolInstrumentAdmin", string(selectedPool.InstrumentId.Admin)).
-		Str("ExpectedTransferAdmin", expectedTransferAdmin).
-		Str("MessageDestTokenHex", destTokenHex).
-		Str("SelectedTokenPoolPackageID", selectedPoolPackageID).
-		Str("SelectedInstrumentFromCreateArgs", selectedInstrumentFromCreateArgs).
-		Msg("Prepared manual execute token transfer input")
-
-	return tokenTransferValue, disclosures, nil
 }
 
 func extractRemotePools(chainPoolCfgAny any) []string {
@@ -1375,6 +1421,30 @@ func extractRemotePools(chainPoolCfgAny any) []string {
 	}
 
 	return nil
+}
+
+func extractMinBlockDepth(chainPoolCfgAny any) int64 {
+	switch cfg := chainPoolCfgAny.(type) {
+	case lockreleasetokenpool.ChainPoolConfig:
+		return int64(cfg.MinBlockDepth)
+	case map[string]any:
+		m := cfg
+		if data, ok := cfg["data"].(map[string]any); ok {
+			m = data
+		}
+		switch raw := m["minBlockDepth"].(type) {
+		case types.INT64:
+			return int64(raw)
+		case int64:
+			return raw
+		case int:
+			return int64(raw)
+		case float64:
+			return int64(raw)
+		}
+	}
+
+	return 0
 }
 
 func extractInstrumentCombinedFromCreateArgs(created *apiv2.CreatedEvent) string {
@@ -1479,33 +1549,26 @@ func resolveRateLimiterForManualExecute(
 	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
 ) (string, *apiv2.DisclosedContract, error) {
 	configuredInboundErrs := make([]string, 0, 2)
-	if inboundRateLimiterRaw, ok := selectedRateLimiters[sourceSelectorKey]; ok {
-		cid, disclosure, err := resolveRateLimiterFromRawAddress(
-			ctx,
-			participant,
-			inboundRateLimiterRaw,
-			selectedPool,
-			sourceSelectorKey,
-			resolveActiveContractIDByAddress,
-		)
-		if err == nil {
-			return cid, disclosure, nil
-		}
-		configuredInboundErrs = append(configuredInboundErrs, fmt.Sprintf("%s: %v", sourceSelectorKey, err))
+	selectorCandidates := []string{sourceSelectorKey}
+	if sourceSelectorNumericKey != "" && sourceSelectorNumericKey != sourceSelectorKey {
+		selectorCandidates = append(selectorCandidates, sourceSelectorNumericKey)
 	}
-	if inboundRateLimiterRaw, ok := selectedRateLimiters[sourceSelectorNumericKey]; ok {
+	for _, selectorCandidate := range selectorCandidates {
+		inboundRateLimiterRaw, ok := selectedRateLimiters[selectorCandidate]
+		if !ok {
+			continue
+		}
 		cid, disclosure, err := resolveRateLimiterFromRawAddress(
 			ctx,
 			participant,
 			inboundRateLimiterRaw,
 			selectedPool,
-			sourceSelectorKey,
 			resolveActiveContractIDByAddress,
 		)
 		if err == nil {
 			return cid, disclosure, nil
 		}
-		configuredInboundErrs = append(configuredInboundErrs, fmt.Sprintf("%s: %v", sourceSelectorNumericKey, err))
+		configuredInboundErrs = append(configuredInboundErrs, fmt.Sprintf("%s: %v", selectorCandidate, err))
 	}
 	if len(configuredInboundErrs) == 0 {
 		return "", nil, fmt.Errorf(
@@ -1530,8 +1593,7 @@ func resolveRateLimiterFromRawAddress(
 	participant canton.Participant,
 	inboundRateLimiterRaw any,
 	selectedPool *lockreleasetokenpool.LockReleaseTokenPool,
-	sourceSelectorKey string,
-	_ func(templateID string, address contracts.InstanceAddress) (string, error),
+	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
 ) (string, *apiv2.DisclosedContract, error) {
 	rawRateLimiter, err := parseRawInstanceAddress(inboundRateLimiterRaw)
 	if err != nil {
@@ -1541,103 +1603,22 @@ func resolveRateLimiterFromRawAddress(
 	if err != nil {
 		return "", nil, fmt.Errorf("parse rate limiter raw instance address: %w", err)
 	}
-
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+	rateLimiterCID, err := resolveActiveContractIDByAddress(common.RateLimiter{}.GetTemplateID(), rateLimiterRawAddr.InstanceAddress())
 	if err != nil {
-		return "", nil, fmt.Errorf("get ledger end for rate limiter lookup: %w", err)
+		return "", nil, fmt.Errorf(
+			"resolve inbound rate limiter by address %s for pool %s@%s: %w",
+			rateLimiterRawAddr.InstanceAddress().String(),
+			selectedPool.InstanceId,
+			selectedPool.PoolOwner,
+			err,
+		)
 	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
-								WildcardFilter: &apiv2.WildcardFilter{
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
+	disclosure, err := getDisclosedContractByID(ctx, participant, rateLimiterCID)
 	if err != nil {
-		return "", nil, fmt.Errorf("query active rate limiters by raw address: %w", err)
-	}
-	defer stream.CloseSend()
-	selectorNorm := normalizeNumericText(sourceSelectorKey)
-	poolSelectorCandidates := make([]string, 0, 6)
-	instanceCandidates := make([]string, 0, 3)
-
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return "", nil, fmt.Errorf("receive active rate limiters by raw address: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		tmpl := entry.ActiveContract.GetCreatedEvent().GetTemplateId()
-		if tmpl == nil || tmpl.GetModuleName() != "CCIP.RateLimiter" || tmpl.GetEntityName() != "RateLimiter" {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			continue
-		}
-		candidateRaw := contracts.InstanceID(string(parsed.InstanceId)).RawInstanceAddress(parsed.PoolOwner)
-		if parsed.Direction == common.RateLimitDirectionRateLimitDirection_Inbound &&
-			(selectedPool == nil || (string(parsed.PoolOwner) == string(selectedPool.PoolOwner) && string(parsed.PoolInstanceId) == string(selectedPool.InstanceId))) &&
-			(selectorNorm == "" || normalizeNumericText(string(parsed.RemoteChainSelector)) == selectorNorm) &&
-			len(poolSelectorCandidates) < cap(poolSelectorCandidates) {
-			poolSelectorCandidates = append(poolSelectorCandidates, fmt.Sprintf("%s=>%s", parsed.InstanceId, candidateRaw.InstanceAddress().String()))
-		}
-		if candidateRaw.InstanceAddress().String() != rateLimiterRawAddr.InstanceAddress().String() {
-			continue
-		}
-		if len(instanceCandidates) < cap(instanceCandidates) {
-			instanceCandidates = append(instanceCandidates, fmt.Sprintf("instanceId=%s pool=%s@%s selector=%s dir=%s", parsed.InstanceId, parsed.PoolInstanceId, parsed.PoolOwner, parsed.RemoteChainSelector, parsed.Direction))
-		}
-		if parsed.Direction != common.RateLimitDirectionRateLimitDirection_Inbound {
-			continue
-		}
-		if selectedPool != nil {
-			if string(parsed.PoolOwner) != string(selectedPool.PoolOwner) || string(parsed.PoolInstanceId) != string(selectedPool.InstanceId) {
-				continue
-			}
-		}
-		if selectorNorm != "" && normalizeNumericText(string(parsed.RemoteChainSelector)) != selectorNorm {
-			continue
-		}
-		cid := entry.ActiveContract.GetCreatedEvent().GetContractId()
-		disclosure := &apiv2.DisclosedContract{
-			TemplateId:       entry.ActiveContract.GetCreatedEvent().GetTemplateId(),
-			ContractId:       cid,
-			CreatedEventBlob: entry.ActiveContract.GetCreatedEvent().GetCreatedEventBlob(),
-			SynchronizerId:   entry.ActiveContract.GetSynchronizerId(),
-		}
-
-		return cid, disclosure, nil
+		return "", nil, fmt.Errorf("get disclosed inbound rate limiter %s: %w", rateLimiterCID, err)
 	}
 
-	return "", nil, fmt.Errorf(
-		"no active inbound rate limiter matched raw=%s instance address %s for pool %s@%s selector %s (poolSelectorCandidates=%v instanceCandidates=%v)",
-		rawRateLimiter,
-		rateLimiterRawAddr.InstanceAddress().String(),
-		selectedPool.InstanceId,
-		selectedPool.PoolOwner,
-		sourceSelectorKey,
-		poolSelectorCandidates,
-		instanceCandidates,
-	)
+	return rateLimiterCID, disclosure, nil
 }
 
 func listHoldingContracts(ctx context.Context, participant canton.Participant) ([]*apiv2.ActiveContract, error) {

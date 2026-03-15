@@ -34,3 +34,13 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 	PackageName: string(contracts.CCIPLockReleaseTokenPool),
 	Prefix:      "lockreleasetokenpool",
 })
+
+var UpdateRateLimiters = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.LockReleaseTokenPoolUpdateRateLimiters]{
+	Name:         "canton/ccip/lock_release_token_pool/update_rate_limiters",
+	Version:      Version,
+	Description:  "Updates the rate limiter references for a LockReleaseTokenPool instance",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.LockReleaseTokenPoolUpdateRateLimiters,
+})
