@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -548,11 +547,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	// Build Message
 	// Encode instrumentId for destTokenAddress
 	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
-	hashedInstrumentIdHex := hex.EncodeToString(crypto.Keccak256(encodedInstrumentId))
+	hashedInstrumentId := crypto.Keccak256(encodedInstrumentId)
 
 	// Build token transfer (5 AMT in Splice Decimal format)
 	tokenAmount := big.NewInt(5)
-	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remoteTokenAddress.Hex(), remotePoolAddress.Hex(), hashedInstrumentIdHex, partyReceiver)
+	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remoteTokenAddress.Bytes(), remotePoolAddress.Bytes(), hashedInstrumentId, partyReceiver)
 
 	// Build message
 	msg := &MessageV1{
@@ -874,14 +873,11 @@ func extractCreatedContractId(res *apiv2.SubmitAndWaitForTransactionResponse) st
 // tokenReceiver is keccak256-hashed to match Daml encodePartyAddress.
 func buildTokenTransferV1(
 	amount *big.Int,
-	sourcePoolAddressHex,
-	sourceTokenAddressHex,
-	destTokenAddressHex,
+	sourcePoolAddress,
+	sourceTokenAddress,
+	destTokenAddress []byte,
 	tokenReceiverParty string,
 ) *TokenTransferV1 {
-	sourcePoolAddress := hexutil.MustDecode(sourcePoolAddressHex)
-	sourceTokenAddress := hexutil.MustDecode(sourceTokenAddressHex)
-	destTokenAddress := hexutil.MustDecode(destTokenAddressHex)
 
 	return &TokenTransferV1{
 		Amount:             amount,
