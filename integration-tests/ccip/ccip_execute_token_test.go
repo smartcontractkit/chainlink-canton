@@ -556,7 +556,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Build token transfer (5 AMT in Splice Decimal format)
 	tokenAmount := big.NewInt(5)
-	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remoteTokenAddress.Bytes(), remotePoolAddress.Bytes(), hashedInstrumentId, partyReceiver)
+	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remotePoolAddress.Bytes(), remoteTokenAddress.Bytes(), hashedInstrumentId, partyReceiver)
 
 	// Build message
 	msg := &MessageV1{
