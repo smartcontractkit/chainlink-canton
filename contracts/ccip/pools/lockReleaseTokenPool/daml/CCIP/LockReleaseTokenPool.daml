@@ -367,7 +367,7 @@ template LockReleaseTokenPool
                         then "ReleaseFromTicket: no custom-finality inbound rate limiter configured for source chain"
                         else "ReleaseFromTicket: no inbound rate limiter configured for source chain")
                     Some limiter -> pure limiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.RateLimiter.lookupInboundRateLimiterCid expectedRateLimitMode extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"

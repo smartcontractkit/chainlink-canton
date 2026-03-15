@@ -687,11 +687,13 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool",
 	})
 	require.NoError(t, err)
-	disclosedRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, inboundCustomRateLimiterCid)
+	disclosedInboundRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, inboundRateLimiterCid)
+	require.NoError(t, err)
+	disclosedInboundCustomRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, inboundCustomRateLimiterCid)
 	require.NoError(t, err)
 
 	executeDisclosures := slices.Concat(
-		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool, disclosedRateLimiter},
+		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool, disclosedInboundRateLimiter, disclosedInboundCustomRateLimiter},
 		transferFactoryDisclosures,
 		poolHoldingDisclosures,
 	)
@@ -721,9 +723,13 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	poolExtraContext, err := testhelpers.ChoiceContextFromData(map[string]any{
 		"values": map[string]any{
-			"rate-limiter": map[string]any{
+			"inbound-rate-limiter": map[string]any{
 				"tag":   "AV_ContractId",
-				"value": disclosedRateLimiter.ContractId,
+				"value": disclosedInboundRateLimiter.ContractId,
+			},
+			"inbound-custom-rate-limiter": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": disclosedInboundCustomRateLimiter.ContractId,
 			},
 		},
 	})

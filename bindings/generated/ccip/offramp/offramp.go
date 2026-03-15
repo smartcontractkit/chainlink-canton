@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "22700c84fb9482a3571c9c49a5e718565ccf157bc13a9573f9be63e0eefa5d0a"
+	PackageID   = "2ffa6617702270661df309ec32e9b092fa8bc4c791998aa0c51da0b8589e8cd8"
 	SDKVersion  = "3.4.10"
 )
 

@@ -7,10 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -902,7 +900,7 @@ func (c *Chain) findAnyPerPartyRouterForOwner(
 // - ensuring inbound rate limiter exists/resolves,
 // - collecting sender pool holdings CIDs + disclosures,
 // - fetching transfer factory + choice context/disclosures via scan-proxy,
-// - injecting rate limiter CID in poolExtraContext.
+// - injecting inbound rate limiter CIDs in poolExtraContext.
 func (c *Chain) buildManualExecuteTokenTransferInput(
 	ctx context.Context,
 	participant canton.Participant,
@@ -966,7 +964,6 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	var tokenMatchedPoolContractID string
 	var fallbackPool *lockreleasetokenpool.LockReleaseTokenPool
 	var fallbackPoolContractID string
-	var ensureSourcePoolErr error
 	debugPoolCandidates := make([]string, 0, 8)
 	for {
 		resp, recvErr := stream.Recv()
@@ -1096,26 +1093,8 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		selectedPoolContractID = tokenMatchedPoolContractID
 	}
 	if selectedPool == nil && tokenMatchedPool != nil && requireInstrumentMatch {
-		updatedPool, updatedCID, ensureErr := ensureManualExecuteSourcePoolAllowed(
-			ctx,
-			participant,
-			tokenMatchedPool,
-			tokenMatchedPoolContractID,
-			sourceSelectorKey,
-			sourceSelectorNumericKey,
-			sourcePoolHex,
-			resolveActiveContractIDByAddress,
-		)
-		if ensureErr == nil {
-			selectedPool = updatedPool
-			selectedPoolContractID = updatedCID
-			if d, dErr := getDisclosedContractByID(ctx, participant, updatedCID); dErr == nil && d.GetTemplateId() != nil {
-				selectedPoolPackageID = d.GetTemplateId().GetPackageId()
-			}
-			selectedInstrumentFromCreateArgs = ""
-		} else {
-			ensureSourcePoolErr = ensureErr
-		}
+		selectedPool = tokenMatchedPool
+		selectedPoolContractID = tokenMatchedPoolContractID
 	}
 	if selectedPool == nil && fallbackPool != nil && !requireInstrumentMatch {
 		selectedPool = fallbackPool
@@ -1132,119 +1111,40 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 			)
 		}
 		if requireInstrumentMatch {
-			ensureSourcePoolErrMsg := "<nil>"
-			if ensureSourcePoolErr != nil {
-				ensureSourcePoolErrMsg = ensureSourcePoolErr.Error()
-			}
-
 			return nil, nil, fmt.Errorf(
-				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; ensureSourcePoolErr=%s; candidates=%v",
+				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; candidates=%v",
 				destTokenHex,
 				sourceSelectorKey,
 				sourcePoolHex,
-				ensureSourcePoolErrMsg,
 				debugPoolCandidates,
 			)
 		}
 
 		return nil, nil, fmt.Errorf("no lock/release pool found for source selector %s and source pool %s", sourceSelectorKey, sourcePoolHex)
 	}
-	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.ChainPoolConfigs, sourceSelectorKey); ok {
-		remotePools := extractRemotePools(selectedCfgAny)
-		hasSourcePool := false
-		for _, rp := range remotePools {
-			rpHex := strings.ToLower(strings.TrimPrefix(rp, "0x"))
-			// Must be exact: on-ledger VerifyInboundMessage checks exact byte equality.
-			if rpHex == sourcePoolHex {
-				hasSourcePool = true
-				break
-			}
-		}
-		if !hasSourcePool {
-			updatedPool, updatedCID, ensureErr := ensureManualExecuteSourcePoolAllowed(
-				ctx,
-				participant,
-				selectedPool,
-				selectedPoolContractID,
-				sourceSelectorKey,
-				sourceSelectorNumericKey,
-				sourcePoolHex,
-				resolveActiveContractIDByAddress,
-			)
-			if ensureErr != nil {
-				return nil, nil, fmt.Errorf("ensure source pool is allowed for selected lock/release pool: %w", ensureErr)
-			}
-			selectedPool = updatedPool
-			selectedPoolContractID = updatedCID
-		}
-	}
-	selectedPool, selectedPoolContractID, err = ensureManualExecuteInboundRateLimiterConfigured(
-		ctx,
-		participant,
-		selectedPool,
-		selectedPoolContractID,
-		sourceSelectorKey,
-		sourceSelectorNumericKey,
-		int64(message.Finality),
-		resolveActiveContractIDByAddress,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("ensure inbound rate limiter is configured for selected lock/release pool: %w", err)
-	}
-	selectedPool, selectedPoolContractID, err = ensureManualExecutePoolSupportsFinality(
-		ctx,
-		participant,
-		selectedPool,
-		selectedPoolContractID,
-		sourceSelectorKey,
-		sourceSelectorNumericKey,
-		int64(message.Finality),
-		resolveActiveContractIDByAddress,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("ensure pool finality policy is configured for selected lock/release pool: %w", err)
-	}
-	// Inbound limiter reconciliation may select a different active pool version.
-	// Re-enforce exact 32-byte sourcePoolAddress membership in remotePools on that final version.
-	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.ChainPoolConfigs, sourceSelectorKey); ok {
-		remotePools := extractRemotePools(selectedCfgAny)
-		hasExactSourcePool := false
-		for _, rp := range remotePools {
-			if strings.EqualFold(strings.TrimPrefix(rp, "0x"), sourcePoolHex) {
-				hasExactSourcePool = true
-				break
-			}
-		}
-		if !hasExactSourcePool {
-			updatedPool, updatedCID, ensureErr := ensureManualExecuteSourcePoolAllowed(
-				ctx,
-				participant,
-				selectedPool,
-				selectedPoolContractID,
-				sourceSelectorKey,
-				sourceSelectorNumericKey,
-				sourcePoolHex,
-				resolveActiveContractIDByAddress,
-			)
-			if ensureErr != nil {
-				return nil, nil, fmt.Errorf("re-ensure source pool is allowed on inbound-limiter-selected lock/release pool: %w", ensureErr)
-			}
-			selectedPool = updatedPool
-			selectedPoolContractID = updatedCID
-		}
-	}
-
-	rateLimiterCID, rateLimiterDisclosure, err := resolveRateLimiterForManualExecute(
+	defaultRateLimiterCID, defaultRateLimiterDisclosure, err := resolveRateLimiterForManualExecute(
 		ctx,
 		participant,
 		selectedPool,
 		sourceSelectorKey,
 		sourceSelectorNumericKey,
-		int64(message.Finality),
+		selectedPool.InboundRateLimiters,
 		resolveActiveContractIDByAddress,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("resolve rate limiter disclosure: %w", err)
+		return nil, nil, fmt.Errorf("resolve default-finality rate limiter disclosure: %w", err)
+	}
+	customRateLimiterCID, customRateLimiterDisclosure, err := resolveRateLimiterForManualExecute(
+		ctx,
+		participant,
+		selectedPool,
+		sourceSelectorKey,
+		sourceSelectorNumericKey,
+		selectedPool.InboundCustomRateLimiters,
+		resolveActiveContractIDByAddress,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve custom-finality rate limiter disclosure: %w", err)
 	}
 
 	instrumentAdmin := string(selectedPool.InstrumentId.Admin)
@@ -1379,9 +1279,13 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 
 	poolExtraContext, err := ChoiceContextFromData(map[string]any{
 		"values": map[string]any{
-			"rate-limiter": map[string]any{
+			"inbound-rate-limiter": map[string]any{
 				"tag":   "AV_ContractId",
-				"value": rateLimiterCID,
+				"value": defaultRateLimiterCID,
+			},
+			"inbound-custom-rate-limiter": map[string]any{
+				"tag":   "AV_ContractId",
+				"value": customRateLimiterCID,
 			},
 		},
 	})
@@ -1412,8 +1316,8 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	if err != nil {
 		return nil, nil, fmt.Errorf("get token pool disclosure: %w", err)
 	}
-	disclosures := make([]*apiv2.DisclosedContract, 0, 2+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
-	disclosures = append(disclosures, rateLimiterDisclosure, poolDisclosure)
+	disclosures := make([]*apiv2.DisclosedContract, 0, 3+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
+	disclosures = append(disclosures, defaultRateLimiterDisclosure, customRateLimiterDisclosure, poolDisclosure)
 	disclosures = append(disclosures, transferFactoryDisclosures...)
 	disclosures = append(disclosures, poolHoldingDisclosures...)
 	finalRemotePools := []string{}
@@ -1437,430 +1341,6 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		Msg("Prepared manual execute token transfer input")
 
 	return tokenTransferValue, disclosures, nil
-}
-
-func ensureManualExecuteInboundRateLimiterConfigured(
-	ctx context.Context,
-	participant canton.Participant,
-	pool *lockreleasetokenpool.LockReleaseTokenPool,
-	poolCID string,
-	sourceSelectorKey string,
-	sourceSelectorNumericKey string,
-	finality int64,
-	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
-) (*lockreleasetokenpool.LockReleaseTokenPool, string, error) {
-	if pool == nil || poolCID == "" {
-		return nil, "", fmt.Errorf("pool and poolCID are required")
-	}
-	isFTF := finality > 0
-	selectedRateLimiters := pool.InboundRateLimiters
-	expectedMode := "RateLimitMode_DefaultFinality"
-	if isFTF {
-		selectedRateLimiters = pool.InboundCustomRateLimiters
-		expectedMode = "RateLimitMode_CustomFinality"
-	}
-	tryResolveConfigured := func(candidatePool *lockreleasetokenpool.LockReleaseTokenPool, rawAny any) bool {
-		_, _, err := resolveRateLimiterFromRawAddress(
-			ctx,
-			participant,
-			rawAny,
-			candidatePool,
-			sourceSelectorKey,
-			resolveActiveContractIDByAddress,
-		)
-
-		return err == nil
-	}
-	if raw, ok := selectedRateLimiters[sourceSelectorKey]; ok && tryResolveConfigured(pool, raw) {
-		return pool, poolCID, nil
-	}
-	if raw, ok := selectedRateLimiters[sourceSelectorNumericKey]; ok && tryResolveConfigured(pool, raw) {
-		return pool, poolCID, nil
-	}
-
-	// Multiple active versions of the same pool instance may exist; prefer the newest one that already has a resolvable inbound limiter.
-	ledgerEndForPoolLookup, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return nil, "", fmt.Errorf("get ledger end for lock/release pool inbound limiter lookup: %w", err)
-	}
-	poolStream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEndForPoolLookup.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  "#ccip-lockreleasetokenpool",
-										ModuleName: "CCIP.LockReleaseTokenPool",
-										EntityName: "LockReleaseTokenPool",
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("query active lock/release pools for inbound limiter lookup: %w", err)
-	}
-	defer poolStream.CloseSend()
-	var bestPool *lockreleasetokenpool.LockReleaseTokenPool
-	var bestCID string
-	var bestOffset int64
-	for {
-		resp, recvErr := poolStream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return nil, "", fmt.Errorf("receive active lock/release pools for inbound limiter lookup: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		created := entry.ActiveContract.GetCreatedEvent()
-		parsedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
-		if parseErr != nil {
-			continue
-		}
-		if string(parsedPool.InstanceId) != string(pool.InstanceId) || string(parsedPool.PoolOwner) != string(pool.PoolOwner) {
-			continue
-		}
-		candidateRateLimiters := parsedPool.InboundRateLimiters
-		if isFTF {
-			candidateRateLimiters = parsedPool.InboundCustomRateLimiters
-		}
-		if raw, ok := candidateRateLimiters[sourceSelectorKey]; ok && tryResolveConfigured(parsedPool, raw) {
-			if created.GetOffset() >= bestOffset {
-				bestOffset = created.GetOffset()
-				bestPool = parsedPool
-				bestCID = created.GetContractId()
-			}
-
-			continue
-		}
-		if raw, ok := candidateRateLimiters[sourceSelectorNumericKey]; ok && tryResolveConfigured(parsedPool, raw) {
-			if created.GetOffset() >= bestOffset {
-				bestOffset = created.GetOffset()
-				bestPool = parsedPool
-				bestCID = created.GetContractId()
-			}
-		}
-	}
-	if bestPool != nil && bestCID != "" {
-		return bestPool, bestCID, nil
-	}
-
-	selectorNorm := normalizeNumericText(sourceSelectorKey)
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return nil, "", fmt.Errorf("get ledger end for inbound rate limiter lookup: %w", err)
-	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
-								WildcardFilter: &apiv2.WildcardFilter{
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("query active inbound rate limiters: %w", err)
-	}
-	defer stream.CloseSend()
-
-	var replacementRaw common.RawInstanceAddress
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return nil, "", fmt.Errorf("receive active inbound rate limiters: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		tmpl := entry.ActiveContract.GetCreatedEvent().GetTemplateId()
-		if tmpl == nil || tmpl.GetModuleName() != rateLimiterModuleName || tmpl.GetEntityName() != rateLimiterEntityName {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			continue
-		}
-		if parsed.Direction != common.RateLimitDirectionRateLimitDirection_Inbound {
-			continue
-		}
-		if string(parsed.Mode) != expectedMode {
-			continue
-		}
-		if string(parsed.PoolOwner) != string(pool.PoolOwner) || string(parsed.PoolInstanceId) != string(pool.InstanceId) {
-			continue
-		}
-		if normalizeNumericText(string(parsed.RemoteChainSelector)) != selectorNorm {
-			continue
-		}
-		replacementRaw = contracts.InstanceID(string(parsed.InstanceId)).RawInstanceAddress(parsed.PoolOwner).Binding()
-
-		break
-	}
-	if replacementRaw == (common.RawInstanceAddress{}) {
-		selectorForInstanceID := strings.ReplaceAll(sourceSelectorKey, ".", "-")
-		instanceID := fmt.Sprintf("manualexec-inbound-rl-%s-%s", selectorForInstanceID, uuid.NewString()[:8])
-		selectorNumeric := sourceSelectorKey
-		if !strings.Contains(selectorNumeric, ".") {
-			selectorNumeric += "."
-		}
-		nowMicro := time.Now().UnixMicro()
-		createRes, createErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-			Commands: &apiv2.Commands{
-				CommandId: uuid.New().String(),
-				Commands: []*apiv2.Command{{
-					Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-						TemplateId: &apiv2.Identifier{
-							PackageId:  "#ccip-common",
-							ModuleName: rateLimiterModuleName,
-							EntityName: rateLimiterEntityName,
-						},
-						CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: createArgFieldInstanceID, Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: instanceID}}},
-							{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: string(pool.InstanceId)}}},
-							{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: string(pool.PoolOwner)}}},
-							{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: selectorNumeric}}},
-							{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
-							{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: expectedMode}}}},
-							{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
-							{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "999999999999999999"}}},
-							{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "999999999999999999"}}},
-							{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-							{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: nowMicro}}},
-						}},
-					}},
-				}},
-				ActAs: []string{string(pool.PoolOwner)},
-			},
-		})
-		if createErr != nil {
-			return nil, "", fmt.Errorf("create inbound rate limiter for selector %s and pool %s@%s: %w", sourceSelectorKey, pool.InstanceId, pool.PoolOwner, createErr)
-		}
-		for _, ev := range createRes.GetTransaction().GetEvents() {
-			created := ev.GetCreated()
-			if created == nil || created.GetTemplateId() == nil {
-				continue
-			}
-			tmpl := created.GetTemplateId()
-			if tmpl.GetModuleName() != rateLimiterModuleName || tmpl.GetEntityName() != rateLimiterEntityName {
-				continue
-			}
-			parsedLimiter, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](created)
-			if parseErr != nil {
-				continue
-			}
-			if string(parsedLimiter.PoolOwner) != string(pool.PoolOwner) || string(parsedLimiter.PoolInstanceId) != string(pool.InstanceId) {
-				continue
-			}
-			if normalizeNumericText(string(parsedLimiter.RemoteChainSelector)) != selectorNorm {
-				continue
-			}
-			if string(parsedLimiter.Mode) != expectedMode {
-				continue
-			}
-			replacementRaw = contracts.InstanceID(string(parsedLimiter.InstanceId)).RawInstanceAddress(parsedLimiter.PoolOwner).Binding()
-
-			break
-		}
-		if replacementRaw == (common.RawInstanceAddress{}) {
-			return nil, "", fmt.Errorf("create inbound rate limiter for selector %s succeeded but created contract could not be resolved", sourceSelectorKey)
-		}
-	}
-
-	updatedInbound := types.GENMAP{}
-	maps.Copy(updatedInbound, pool.InboundRateLimiters)
-	updatedInboundCustom := types.GENMAP{}
-	maps.Copy(updatedInboundCustom, pool.InboundCustomRateLimiters)
-	if isFTF {
-		updatedInboundCustom[sourceSelectorKey] = replacementRaw
-		updatedInboundCustom[sourceSelectorNumericKey] = replacementRaw
-	} else {
-		updatedInbound[sourceSelectorKey] = replacementRaw
-		updatedInbound[sourceSelectorNumericKey] = replacementRaw
-	}
-	updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateRateLimiters{
-		NewOutboundRateLimiters:      pool.OutboundRateLimiters,
-		NewInboundRateLimiters:       updatedInbound,
-		NewInboundCustomRateLimiters: updatedInboundCustom,
-	}
-	updateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{
-						PackageId:  "#ccip-lockreleasetokenpool",
-						ModuleName: "CCIP.LockReleaseTokenPool",
-						EntityName: "LockReleaseTokenPool",
-					},
-					ContractId:     poolCID,
-					Choice:         "LockReleaseTokenPool_UpdateRateLimiters",
-					ChoiceArgument: ledger.MapToValue(updateArgs),
-				}},
-			}},
-			ActAs: []string{string(pool.PoolOwner)},
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("patch inbound rate limiter for manual execute: %w", err)
-	}
-	for _, ev := range updateRes.GetTransaction().GetEvents() {
-		created := ev.GetCreated()
-		if created == nil || created.GetTemplateId() == nil {
-			continue
-		}
-		tmpl := created.GetTemplateId()
-		if tmpl.GetModuleName() != lockReleasePoolModuleName || tmpl.GetEntityName() != lockReleasePoolEntityName {
-			continue
-		}
-		updatedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
-		if parseErr != nil {
-			continue
-		}
-		if string(updatedPool.InstanceId) == string(pool.InstanceId) && string(updatedPool.PoolOwner) == string(pool.PoolOwner) {
-			return updatedPool, created.GetContractId(), nil
-		}
-	}
-
-	ledgerEndAfterUpdate, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return nil, "", fmt.Errorf("get ledger end for updated lock/release pool lookup after inbound rate limiter patch: %w", err)
-	}
-	streamAfterUpdate, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEndAfterUpdate.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  "#ccip-lockreleasetokenpool",
-										ModuleName: "CCIP.LockReleaseTokenPool",
-										EntityName: "LockReleaseTokenPool",
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("query active lock/release pools after inbound rate limiter patch: %w", err)
-	}
-	defer streamAfterUpdate.CloseSend()
-
-	expectedLimiterRaw, err := contracts.RawInstanceAddressFromString(string(replacementRaw.Unpack))
-	if err != nil {
-		return nil, "", fmt.Errorf("parse replacement inbound rate limiter raw address %q: %w", replacementRaw.Unpack, err)
-	}
-	expectedLimiterAddr := expectedLimiterRaw.InstanceAddress().String()
-	var latestMatchingPool *lockreleasetokenpool.LockReleaseTokenPool
-	var latestMatchingPoolCID string
-	var latestMatchingOffset int64
-	for {
-		resp, recvErr := streamAfterUpdate.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return nil, "", fmt.Errorf("receive active lock/release pools after inbound rate limiter patch: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		created := entry.ActiveContract.GetCreatedEvent()
-		parsedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
-		if parseErr != nil {
-			continue
-		}
-		if string(parsedPool.InstanceId) != string(pool.InstanceId) || string(parsedPool.PoolOwner) != string(pool.PoolOwner) {
-			continue
-		}
-		updatedRateLimiters := parsedPool.InboundRateLimiters
-		if isFTF {
-			updatedRateLimiters = parsedPool.InboundCustomRateLimiters
-		}
-		rawAny, ok := updatedRateLimiters[sourceSelectorKey]
-		if !ok {
-			rawAny, ok = updatedRateLimiters[sourceSelectorNumericKey]
-		}
-		if !ok {
-			continue
-		}
-		rawText, parseRawErr := parseRawInstanceAddress(rawAny)
-		if parseRawErr != nil {
-			continue
-		}
-		rawAddr, rawAddrErr := contracts.RawInstanceAddressFromString(rawText)
-		if rawAddrErr != nil || rawAddr.InstanceAddress().String() != expectedLimiterAddr {
-			continue
-		}
-		if created.GetOffset() >= latestMatchingOffset {
-			latestMatchingOffset = created.GetOffset()
-			latestMatchingPool = parsedPool
-			latestMatchingPoolCID = created.GetContractId()
-		}
-	}
-	if latestMatchingPool != nil && latestMatchingPoolCID != "" {
-		return latestMatchingPool, latestMatchingPoolCID, nil
-	}
-
-	raw := contracts.InstanceID(string(pool.InstanceId)).RawInstanceAddress(pool.PoolOwner)
-	updatedCID, err := resolveActiveContractIDByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), raw.InstanceAddress())
-	if err != nil {
-		return nil, "", fmt.Errorf("resolve updated lock/release pool contract id after inbound rate limiter patch: %w", err)
-	}
-	updatedActive, err := contract.FindActiveContractByInstanceAddress(
-		ctx,
-		participant.LedgerServices.State,
-		participant.PartyID,
-		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-		raw.InstanceAddress(),
-	)
-	if err != nil {
-		return nil, "", fmt.Errorf("find active updated lock/release pool contract after inbound rate limiter patch: %w", err)
-	}
-	updatedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](updatedActive.GetCreatedEvent())
-	if err != nil {
-		return nil, "", fmt.Errorf("parse updated lock/release pool after inbound rate limiter patch: %w", err)
-	}
-
-	return updatedPool, updatedCID, nil
 }
 
 func extractRemotePools(chainPoolCfgAny any) []string {
@@ -1989,278 +1469,15 @@ func findChainPoolConfigBySelector(chainPoolConfigs map[string]any, sourceSelect
 	return nil, false
 }
 
-func chainPoolConfigFromAny(v any) (lockreleasetokenpool.ChainPoolConfig, bool) {
-	switch cfg := v.(type) {
-	case lockreleasetokenpool.ChainPoolConfig:
-		return cfg, true
-	case map[string]any:
-		m := cfg
-		if data, ok := cfg["data"].(map[string]any); ok {
-			m = data
-		}
-		out := lockreleasetokenpool.ChainPoolConfig{
-			InboundCCVs:   []common.RawInstanceAddress{},
-			OutboundCCVs:  []common.RawInstanceAddress{},
-			MinBlockDepth: types.INT64(0),
-			RemotePools:   []types.TEXT{},
-		}
-		parseCCVs := func(raw any) []common.RawInstanceAddress {
-			outCCV := make([]common.RawInstanceAddress, 0)
-			rawList, ok := raw.([]any)
-			if !ok {
-				return outCCV
-			}
-			for _, item := range rawList {
-				unpack, err := parseRawInstanceAddress(item)
-				if err != nil || unpack == "" {
-					continue
-				}
-				outCCV = append(outCCV, common.RawInstanceAddress{Unpack: types.TEXT(unpack)})
-			}
-
-			return outCCV
-		}
-		out.InboundCCVs = parseCCVs(m["inboundCCVs"])
-		out.OutboundCCVs = parseCCVs(m["outboundCCVs"])
-		switch depth := m["minBlockDepth"].(type) {
-		case int64:
-			out.MinBlockDepth = types.INT64(depth)
-		case int:
-			out.MinBlockDepth = types.INT64(depth)
-		case types.INT64:
-			out.MinBlockDepth = depth
-		case string:
-			if depth != "" {
-				if parsedDepth, err := strconv.ParseInt(depth, 10, 64); err == nil {
-					out.MinBlockDepth = types.INT64(parsedDepth)
-				}
-			}
-		}
-		if remoteRaw, ok := m["remotePools"].([]any); ok {
-			for _, rp := range remoteRaw {
-				out.RemotePools = append(out.RemotePools, types.TEXT(fmt.Sprint(rp)))
-			}
-		}
-
-		return out, true
-	default:
-		return lockreleasetokenpool.ChainPoolConfig{}, false
-	}
-}
-
-func typedChainPoolConfigsFromAny(cfgs types.GENMAP) types.GENMAP {
-	out := types.GENMAP{}
-	for key, value := range cfgs {
-		typedCfg, ok := chainPoolConfigFromAny(value)
-		if !ok {
-			continue
-		}
-		out[key] = typedCfg
-	}
-
-	return out
-}
-
-func ensureManualExecuteSourcePoolAllowed(
-	ctx context.Context,
-	participant canton.Participant,
-	pool *lockreleasetokenpool.LockReleaseTokenPool,
-	poolCID string,
-	sourceSelectorKey string,
-	sourceSelectorNumericKey string,
-	sourcePoolHex string,
-	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
-) (*lockreleasetokenpool.LockReleaseTokenPool, string, error) {
-	updatedChainPoolConfigs := typedChainPoolConfigsFromAny(pool.ChainPoolConfigs)
-	existingCfgAny, _ := findChainPoolConfigBySelector(pool.ChainPoolConfigs, sourceSelectorKey)
-	existingCfg, ok := chainPoolConfigFromAny(existingCfgAny)
-	if !ok {
-		existingCfg = lockreleasetokenpool.ChainPoolConfig{
-			InboundCCVs:   []common.RawInstanceAddress{},
-			OutboundCCVs:  []common.RawInstanceAddress{},
-			MinBlockDepth: types.INT64(0),
-			RemotePools:   []types.TEXT{},
-		}
-	}
-	existingCfg.RemotePools = []types.TEXT{types.TEXT(strings.TrimPrefix(strings.ToLower(sourcePoolHex), "0x"))}
-	updatedChainPoolConfigs[sourceSelectorKey] = existingCfg
-	updatedChainPoolConfigs[sourceSelectorNumericKey] = existingCfg
-
-	updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateChainPoolConfigs{
-		NewChainPoolConfigs: updatedChainPoolConfigs,
-	}
-	updateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{
-						PackageId:  "#ccip-lockreleasetokenpool",
-						ModuleName: "CCIP.LockReleaseTokenPool",
-						EntityName: "LockReleaseTokenPool",
-					},
-					ContractId:     poolCID,
-					Choice:         "LockReleaseTokenPool_UpdateChainPoolConfigs",
-					ChoiceArgument: ledger.MapToValue(updateArgs.ToMap()),
-				}},
-			}},
-			ActAs: []string{string(pool.PoolOwner)},
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("patch lock/release pool source remote pool for manual execute: %w", err)
-	}
-
-	var latestCreated *apiv2.CreatedEvent
-	var identityMatchedPool *lockreleasetokenpool.LockReleaseTokenPool
-	var identityMatchedCID string
-	for _, ev := range updateRes.GetTransaction().GetEvents() {
-		created := ev.GetCreated()
-		if created == nil || created.GetTemplateId() == nil {
-			continue
-		}
-		tmpl := created.GetTemplateId()
-		if tmpl.GetModuleName() != "CCIP.LockReleaseTokenPool" || tmpl.GetEntityName() != "LockReleaseTokenPool" {
-			continue
-		}
-		if latestCreated == nil || created.GetOffset() > latestCreated.GetOffset() {
-			latestCreated = created
-		}
-		parsedCreated, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
-		if parseErr != nil {
-			continue
-		}
-		if string(parsedCreated.InstanceId) == string(pool.InstanceId) && string(parsedCreated.PoolOwner) == string(pool.PoolOwner) {
-			identityMatchedPool = parsedCreated
-			identityMatchedCID = created.GetContractId()
-		}
-	}
-	if identityMatchedPool != nil && identityMatchedCID != "" {
-		return identityMatchedPool, identityMatchedCID, nil
-	}
-	if latestCreated != nil {
-		updatedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](latestCreated)
-		if parseErr == nil {
-			return updatedPool, latestCreated.GetContractId(), nil
-		}
-	}
-
-	raw := contracts.InstanceID(string(pool.InstanceId)).RawInstanceAddress(pool.PoolOwner)
-	updatedCID, err := resolveActiveContractIDByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), raw.InstanceAddress())
-	if err == nil {
-		updatedPool := *pool
-		updatedPool.ChainPoolConfigs = updatedChainPoolConfigs
-
-		return &updatedPool, updatedCID, nil
-	}
-
-	return nil, "", fmt.Errorf("resolve updated lock/release pool contract id: %w", err)
-}
-
-func ensureManualExecutePoolSupportsFinality(
-	ctx context.Context,
-	participant canton.Participant,
-	pool *lockreleasetokenpool.LockReleaseTokenPool,
-	poolCID string,
-	sourceSelectorKey string,
-	sourceSelectorNumericKey string,
-	minBlockDepth int64,
-	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
-) (*lockreleasetokenpool.LockReleaseTokenPool, string, error) {
-	if pool == nil || poolCID == "" {
-		return nil, "", fmt.Errorf("pool and poolCID are required")
-	}
-	if minBlockDepth <= 0 {
-		return pool, poolCID, nil
-	}
-
-	existingCfgAny, _ := findChainPoolConfigBySelector(pool.ChainPoolConfigs, sourceSelectorKey)
-	existingCfg, ok := chainPoolConfigFromAny(existingCfgAny)
-	if ok && int64(existingCfg.MinBlockDepth) >= minBlockDepth {
-		return pool, poolCID, nil
-	}
-	if !ok {
-		existingCfg = lockreleasetokenpool.ChainPoolConfig{
-			InboundCCVs:   []common.RawInstanceAddress{},
-			OutboundCCVs:  []common.RawInstanceAddress{},
-			MinBlockDepth: types.INT64(0),
-			RemotePools:   []types.TEXT{},
-		}
-	}
-	existingCfg.MinBlockDepth = types.INT64(minBlockDepth)
-
-	updatedChainPoolConfigs := typedChainPoolConfigsFromAny(pool.ChainPoolConfigs)
-	updatedChainPoolConfigs[sourceSelectorKey] = existingCfg
-	updatedChainPoolConfigs[sourceSelectorNumericKey] = existingCfg
-
-	updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateChainPoolConfigs{
-		NewChainPoolConfigs: updatedChainPoolConfigs,
-	}
-	updateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{
-						PackageId:  "#ccip-lockreleasetokenpool",
-						ModuleName: "CCIP.LockReleaseTokenPool",
-						EntityName: "LockReleaseTokenPool",
-					},
-					ContractId:     poolCID,
-					Choice:         "LockReleaseTokenPool_UpdateChainPoolConfigs",
-					ChoiceArgument: ledger.MapToValue(updateArgs.ToMap()),
-				}},
-			}},
-			ActAs: []string{string(pool.PoolOwner)},
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("patch lock/release pool minBlockDepth for manual execute: %w", err)
-	}
-
-	for _, ev := range updateRes.GetTransaction().GetEvents() {
-		created := ev.GetCreated()
-		if created == nil || created.GetTemplateId() == nil {
-			continue
-		}
-		tmpl := created.GetTemplateId()
-		if tmpl.GetModuleName() != "CCIP.LockReleaseTokenPool" || tmpl.GetEntityName() != "LockReleaseTokenPool" {
-			continue
-		}
-		updatedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
-		if parseErr != nil {
-			continue
-		}
-		if string(updatedPool.InstanceId) == string(pool.InstanceId) && string(updatedPool.PoolOwner) == string(pool.PoolOwner) {
-			return updatedPool, created.GetContractId(), nil
-		}
-	}
-
-	raw := contracts.InstanceID(string(pool.InstanceId)).RawInstanceAddress(pool.PoolOwner)
-	updatedCID, err := resolveActiveContractIDByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), raw.InstanceAddress())
-	if err == nil {
-		updatedPool := *pool
-		updatedPool.ChainPoolConfigs = updatedChainPoolConfigs
-
-		return &updatedPool, updatedCID, nil
-	}
-
-	return nil, "", fmt.Errorf("resolve updated lock/release pool contract id after minBlockDepth patch: %w", err)
-}
-
 func resolveRateLimiterForManualExecute(
 	ctx context.Context,
 	participant canton.Participant,
 	selectedPool *lockreleasetokenpool.LockReleaseTokenPool,
 	sourceSelectorKey string,
 	sourceSelectorNumericKey string,
-	finality int64,
+	selectedRateLimiters types.GENMAP,
 	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
 ) (string, *apiv2.DisclosedContract, error) {
-	selectedRateLimiters := selectedPool.InboundRateLimiters
-	if finality > 0 {
-		selectedRateLimiters = selectedPool.InboundCustomRateLimiters
-	}
 	configuredInboundErrs := make([]string, 0, 2)
 	if inboundRateLimiterRaw, ok := selectedRateLimiters[sourceSelectorKey]; ok {
 		cid, disclosure, err := resolveRateLimiterFromRawAddress(

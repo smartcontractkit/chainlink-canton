@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "83dd08b76bc082eddf1bfb177f398cab3055a8a0a3d8d2f455d557c7fd3e9b1b"
+	PackageID   = "7da748cd30c07397dcc7f3f1fb39e40bfc674fc245025827f5045e2605c5823b"
 	SDKVersion  = "3.4.10"
 )
 
@@ -213,7 +213,6 @@ func (t *AddCCVVerificationMCMSParams) UnmarshalHex(data string) error {
 type AddExecutorWithFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
@@ -227,8 +226,6 @@ func (t AddExecutorWithFee) ToMap() map[string]any {
 	m["executorInstanceId"] = string(t.ExecutorInstanceId)
 
 	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	m["feeUSDCents"] = t.FeeUSDCents
 
@@ -268,7 +265,6 @@ func (t *AddExecutorWithFee) UnmarshalHex(data string) error {
 type AddExecutorWithFeeMCMSParams struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
@@ -3882,7 +3878,6 @@ type SendingMessageV1 struct {
 	Payload                   types.TEXT                                `json:"payload"`
 	ExecutionGasLimit         types.INT64                               `json:"executionGasLimit"`
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations        types.INT64                               `json:"blockConfirmations"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
 	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
@@ -3988,9 +3983,6 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4246,9 +4238,6 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
