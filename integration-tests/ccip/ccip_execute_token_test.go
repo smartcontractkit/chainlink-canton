@@ -9,9 +9,12 @@ import (
 	"math/big"
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -410,6 +413,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	outboundRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed outbound RateLimiter: %s", outboundRateLimiterCid)
 
+	remotePoolAddress := common.HexToAddress("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
+	remoteTokenAddress := common.HexToAddress("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
+
 	// Deploy LockReleaseTokenPool
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -427,9 +433,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
 							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte(partyTokenPoolOwner))}},
+									{Sum: &apiv2.Value_Text{Text: strings.TrimPrefix(remotePoolAddress.Hex(), "0x")}},
 								}}}}},
-								{Label: "remoteTokenAddress", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+								{Label: "remoteTokenAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: strings.TrimPrefix(remoteTokenAddress.Hex(), "0x")}}},
 								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								{Label: "inboundRateLimiter", Value: rawInstanceAddress(inboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
@@ -546,7 +552,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Build token transfer (5 AMT in Splice Decimal format)
 	tokenAmount := big.NewInt(5)
-	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, partyTokenPoolOwner, hashedInstrumentIdHex, partyReceiver)
+	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remoteTokenAddress.Hex(), remotePoolAddress.Hex(), hashedInstrumentIdHex, partyReceiver)
 
 	// Build message
 	msg := &MessageV1{
@@ -866,11 +872,16 @@ func extractCreatedContractId(res *apiv2.SubmitAndWaitForTransactionResponse) st
 
 // buildTokenTransferV1 builds the encoded token transfer bytes for the message.
 // tokenReceiver is keccak256-hashed to match Daml encodePartyAddress.
-func buildTokenTransferV1(amount *big.Int, sourcePoolOwner, destTokenAddressHex, tokenReceiverParty string) *TokenTransferV1 {
-	sourcePoolAddress := []byte(sourcePoolOwner)
-	sourceTokenAddress := []byte{} // Empty for Canton
-
-	destTokenAddress, _ := hex.DecodeString(destTokenAddressHex)
+func buildTokenTransferV1(
+	amount *big.Int,
+	sourcePoolAddressHex,
+	sourceTokenAddressHex,
+	destTokenAddressHex,
+	tokenReceiverParty string,
+) *TokenTransferV1 {
+	sourcePoolAddress := hexutil.MustDecode(sourcePoolAddressHex)
+	sourceTokenAddress := hexutil.MustDecode(sourceTokenAddressHex)
+	destTokenAddress := hexutil.MustDecode(destTokenAddressHex)
 
 	return &TokenTransferV1{
 		Amount:             amount,
