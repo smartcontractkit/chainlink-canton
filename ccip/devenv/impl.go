@@ -526,7 +526,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedOutboundCCVs: nil,
 			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
-			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{NetworkFeeUSDCents: 0, DefaultTokenFeeUSDCents: 0},
+			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{NetworkFeeUSDCents: 25, DefaultTokenFeeUSDCents: 10},
 			ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
 			AddressBytesLength:       addressBytesLength,
 			BaseExecutionGasCost:     0,
