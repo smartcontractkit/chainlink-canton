@@ -173,7 +173,7 @@ testExecuteWithCCVVerification = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 0
+            receiverMinBlockDepth = 2000
 
     -- Verify SUCCESS
     executeResult.state === Internal.SUCCESS
@@ -937,7 +937,7 @@ testExecuteAllowsMultipleOnRamps = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 0
+            receiverMinBlockDepth = 2000
 
     executeResult.state === Internal.SUCCESS
     debug ("Execute succeeds with alternate configured onramp: PASSED")

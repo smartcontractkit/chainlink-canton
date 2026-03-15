@@ -419,7 +419,7 @@ testCCIPExecute = script do
                  (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 0
+            receiverMinBlockDepth = 2000
 
     executeResult.state === CCIP.Internal.SUCCESS
 
@@ -541,7 +541,7 @@ testPrepareSendExtraArgs = script do
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
     -- Message-only send keeps finalized-only defaults on Canton.
-    let receiver = CCIP.MessageCodecV1.encodePartyAddress user
+    let receiver = "9df48df28ecc2863af9e90cde2e82fa62a9ee2c5"
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
