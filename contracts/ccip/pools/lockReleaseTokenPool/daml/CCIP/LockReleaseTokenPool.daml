@@ -263,7 +263,7 @@ template LockReleaseTokenPool
             controller caller
             do
                 execMsg <- fetch executingMessageCid
-                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: executing message tokenAdminRegistry mismatch"
@@ -304,7 +304,7 @@ template LockReleaseTokenPool
             controller caller
             do
                 sm <- fetch sendingMessageCid
-                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
@@ -336,14 +336,14 @@ template LockReleaseTokenPool
             controller caller
             do
                 ticket <- fetch tokenReceiveTicketCid
-                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
                     (ticket.ccipOwner == tokenAdminRegistry.owner)
-                rmnRemote <- fetch rmnRemoteCid
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
@@ -464,7 +464,7 @@ template LockReleaseTokenPool
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
-                feeQuoter <- fetch feeQuoterCid
+                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
                 assertMsg "pool: sending message feeQuoter mismatch"
@@ -506,7 +506,7 @@ template LockReleaseTokenPool
             controller caller, poolOwner
             do
                 sendingMsg <- fetch sendingMessageCid
-                rmnRemote <- fetch rmnRemoteCid
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "LockOrBurn: sending message rmn mismatch"

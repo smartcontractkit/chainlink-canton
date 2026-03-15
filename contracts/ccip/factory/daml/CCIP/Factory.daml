@@ -485,6 +485,9 @@ data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
+        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data DeployRateLimiterParams = DeployRateLimiterParams
@@ -616,6 +619,10 @@ mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTok
     inboundRateLimiters = Map.empty
     poolReceiveContext = CCIP.Context.emptyCCIPContext
     transferTimeout = CCIP.LockReleaseTokenPool.Indefinite
+    deps = CCIP.LockReleaseTokenPool.LockReleaseTokenPoolDeps with
+        tokenAdminRegistry = params.tokenAdminRegistry
+        rmnRemote = params.rmnRemote
+        feeQuoter = params.feeQuoter
 
 mkRateLimiterContract : DeployRateLimiterParams -> Update CCIP.RateLimiter.RateLimiter
 mkRateLimiterContract params = do
@@ -756,13 +763,19 @@ decodeDeployLockReleaseTokenPoolParams encoded = do
     (ccipOwner, offset2) <- decodePartyAt encoded offset1
     (poolOwner, offset3) <- decodePartyAt encoded offset2
     (instrumentId, offset4) <- decodeInstrumentId encoded offset3
-    (decimals, _) <- decodeInt64At encoded offset4
+    (decimals, offset5) <- decodeInt64At encoded offset4
+    (tokenAdminRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
+    (feeQuoter, offset7) <- decodeRawInstanceAddressAt encoded offset6
+    (rmnRemote, _) <- decodeRawInstanceAddressAt encoded offset7
     Some DeployLockReleaseTokenPoolParams with
         instanceId
         ccipOwner
         poolOwner
         instrumentId
         decimals
+        tokenAdminRegistry
+        feeQuoter
+        rmnRemote
 
 decodeRateLimitDirectionAt : BytesHex -> Int -> Optional (CCIP.RateLimiter.RateLimitDirection, Int)
 decodeRateLimitDirectionAt encoded offset = do

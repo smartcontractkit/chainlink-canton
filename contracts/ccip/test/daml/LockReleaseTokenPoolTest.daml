@@ -47,11 +47,11 @@ mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
         [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
 
 
-mkPoolDeps : Text -> Text -> Text -> Party -> LockReleaseTokenPool.LockReleaseTokenPoolDeps
-mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner =
+mkPoolDeps : Text -> Text -> Text -> Party -> Party -> LockReleaseTokenPool.LockReleaseTokenPoolDeps
+mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner =
     LockReleaseTokenPool.LockReleaseTokenPoolDeps with
         tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-        rmnRemote = RawInstanceAddress.make rmnInstanceId ccipOwner
+        rmnRemote = RawInstanceAddress.make rmnInstanceId rmnOwner
         feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
 
 createRateLimiter
@@ -183,7 +183,7 @@ testLockOrBurn = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter" ccipOwner
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter" ccipOwner rmnOwner
 
     -- Create SendingMessageV1 with token transfer fields.
     -- LockOrBurn reads dest chain, token amount, and receiver from here.
@@ -196,7 +196,7 @@ testLockOrBurn = script do
                 router = RawInstanceAddress.make "test-router" sender
                 onRamp = RawInstanceAddress.make "test-onramp" ccipOwner
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" rmnOwner
                 tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
                 feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
             destChainSelector = destChainSelector
@@ -251,12 +251,14 @@ testLockOrBurn = script do
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
 
     -- LockOrBurn stores token data via AddTokenSend
-    result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
+    result <- submit (actAs sender <> actAs poolOwner
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
-                      <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter
+                      <> disclose disclosedSm) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
@@ -382,7 +384,7 @@ testReleaseFromTicket = script do
             inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release" "test-feequoter-release" ccipOwner
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release" "test-feequoter-release" ccipOwner rmnOwner
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates via finalize)
     tokenReceiveTicket <- submit ccipOwner do
@@ -407,17 +409,20 @@ testReleaseFromTicket = script do
             tokenPoolHoldings = [toInterfaceContractId poolHolding]
 
     -- Disclose contracts
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
 
     -- Call ReleaseFromTicket
-    result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                      <> disclose disclosedTar <> disclose disclosedFactory
+    result <- submit (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
-                      <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -538,7 +543,7 @@ testReleaseFromTicketDecimalConversion = script do
             inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals" ccipOwner
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals" ccipOwner rmnOwner
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
     tokenReceiveTicket <- submit ccipOwner do
@@ -562,16 +567,19 @@ testReleaseFromTicketDecimalConversion = script do
                 meta = MetadataV1.emptyMetadata
             tokenPoolHoldings = [toInterfaceContractId poolHolding]
 
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
 
-    result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                      <> disclose disclosedTar <> disclose disclosedFactory
+    result <- submit (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
-                      <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
@@ -905,7 +913,7 @@ testVerifyInboundMessage = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify" "test-feequoter-verify" ccipOwner
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify" "test-feequoter-verify" ccipOwner ccipOwner
 
     -- Build message with token transfer from allowed source pool
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -954,9 +962,11 @@ testVerifyInboundMessage = script do
             state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should succeed
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    newEmCid <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                        <> disclose disclosedTar) do
+    disclosedEm <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
+    newEmCid <- submit (actAs receiver
+                        <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedEm) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             extraContext = CCIP.Context.emptyCCIPContext
@@ -1034,7 +1044,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-invalid" "test-feequoter-verify-invalid" ccipOwner
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-invalid" "test-feequoter-verify-invalid" ccipOwner ccipOwner
 
     -- Build message with disallowed source pool
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1155,7 +1165,7 @@ testVerifyInboundMessageMissingChainConfig = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-nochain" "test-feequoter-verify-nochain" ccipOwner
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-nochain" "test-feequoter-verify-nochain" ccipOwner ccipOwner
 
     -- Build message from an unconfigured source chain
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1272,7 +1282,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps "test-tar-fallback" "test-rmn-fallback" "test-feequoter-fallback" ccipOwner
+            deps = mkPoolDeps "test-tar-fallback" "test-rmn-fallback" "test-feequoter-fallback" ccipOwner ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1402,7 +1412,7 @@ testCalculateFeePrefersPoolOverride = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps "test-tar-override" "test-rmn-override" "test-feequoter-pool-override" ccipOwner
+            deps = mkPoolDeps "test-tar-override" "test-rmn-override" "test-feequoter-pool-override" ccipOwner ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1532,7 +1542,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             inboundRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
-            deps = mkPoolDeps "test-tar-disabled" "test-rmn-disabled" "test-feequoter-pool-disabled" ccipOwner
+            deps = mkPoolDeps "test-tar-disabled" "test-rmn-disabled" "test-feequoter-pool-disabled" ccipOwner ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do

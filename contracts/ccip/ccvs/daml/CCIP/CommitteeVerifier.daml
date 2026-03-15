@@ -159,7 +159,7 @@ template CommitteeVerifier
                         (Map.lookup message.sourceChainSelector signerConfigs)
 
                 -- Validate RMN instance and check source chain curse
-                rmnRemote <- fetch rmnRemoteCid
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
@@ -236,7 +236,7 @@ template CommitteeVerifier
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse
-                rmnRemote <- fetch rmnRemoteCid
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "verifier: sending message rmn mismatch"
