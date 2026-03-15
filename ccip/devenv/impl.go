@@ -129,6 +129,70 @@ func (c *Chain) ChainSelector() uint64 {
 	return c.chainDetails.ChainSelector
 }
 
+func typedChainPoolConfigs(cfgs types.GENMAP) types.GENMAP {
+	out := types.GENMAP{}
+	for key, value := range cfgs {
+		switch v := value.(type) {
+		case lockreleasetokenpool.ChainPoolConfig:
+			out[key] = v
+		case map[string]any:
+			typed := lockreleasetokenpool.ChainPoolConfig{
+				InboundCCVs:   []common.RawInstanceAddress{},
+				OutboundCCVs:  []common.RawInstanceAddress{},
+				MinBlockDepth: types.INT64(0),
+				RemotePools:   []types.TEXT{},
+			}
+			if inbound, ok := v["inboundCCVs"].([]any); ok {
+				for _, raw := range inbound {
+					switch c := raw.(type) {
+					case common.RawInstanceAddress:
+						typed.InboundCCVs = append(typed.InboundCCVs, c)
+					case map[string]any:
+						if unpack, ok := c["unpack"].(string); ok {
+							typed.InboundCCVs = append(typed.InboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(unpack)})
+						}
+					}
+				}
+			}
+			if outbound, ok := v["outboundCCVs"].([]any); ok {
+				for _, raw := range outbound {
+					switch c := raw.(type) {
+					case common.RawInstanceAddress:
+						typed.OutboundCCVs = append(typed.OutboundCCVs, c)
+					case map[string]any:
+						if unpack, ok := c["unpack"].(string); ok {
+							typed.OutboundCCVs = append(typed.OutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(unpack)})
+						}
+					}
+				}
+			}
+			switch m := v["minBlockDepth"].(type) {
+			case types.INT64:
+				typed.MinBlockDepth = m
+			case int64:
+				typed.MinBlockDepth = types.INT64(m)
+			case int:
+				typed.MinBlockDepth = types.INT64(m)
+			}
+			if remotePools, ok := v["remotePools"].([]any); ok {
+				for _, raw := range remotePools {
+					switch rp := raw.(type) {
+					case types.TEXT:
+						typed.RemotePools = append(typed.RemotePools, rp)
+					case string:
+						typed.RemotePools = append(typed.RemotePools, types.TEXT(rp))
+					}
+				}
+			}
+			out[key] = typed
+		default:
+			out[key] = value
+		}
+	}
+
+	return out
+}
+
 func New(ctx context.Context, cfg *ccv.Cfg, logger zerolog.Logger, e *deployment.Environment, chainID string) (*Chain, error) {
 	chainDetails, err := chainsel.GetChainDetailsByChainIDAndFamily(chainID, chainsel.FamilyCanton)
 	if err != nil {
@@ -421,6 +485,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		}
 		selectorKey := strconv.FormatUint(remoteSelector, 10)
 		chainFeeConfigs[selectorKey] = lockreleasetokenpool.PoolFeeConfig{
+			IsEnabled:         types.BOOL(true),
 			FeeUSDCents:       types.NUMERIC("0"),
 			DestGasOverhead:   types.INT64(0),
 			DestBytesOverhead: types.INT64(0),
@@ -483,9 +548,10 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 			remotePools = []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(poolRef.Address))}
 		}
 		chainPoolConfigs[selectorKey] = lockreleasetokenpool.ChainPoolConfig{
-			InboundCCVs:  outboundCCVs,
-			OutboundCCVs: outboundCCVs,
-			RemotePools:  remotePools,
+			InboundCCVs:   outboundCCVs,
+			OutboundCCVs:  outboundCCVs,
+			MinBlockDepth: types.INT64(0),
+			RemotePools:   remotePools,
 		}
 		if tokenRef == nil {
 			continue
@@ -1048,8 +1114,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		if parseErr != nil {
 			return fmt.Errorf("parse active lock/release pool for lane remotePools update: %w", parseErr)
 		}
-		updatedChainPoolConfigs := types.GENMAP{}
-		maps.Copy(updatedChainPoolConfigs, parsedPool.ChainPoolConfigs)
+		updatedChainPoolConfigs := typedChainPoolConfigs(parsedPool.ChainPoolConfigs)
 		needsPoolUpdate := false
 		for _, remoteSelector := range remoteSelectors {
 			remotePoolHex := ""
@@ -1075,9 +1140,10 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			}
 			selectorKey := strconv.FormatUint(remoteSelector, 10)
 			updatedChainPoolConfigs[selectorKey] = lockreleasetokenpool.ChainPoolConfig{
-				InboundCCVs:  outboundCCVs,
-				OutboundCCVs: outboundCCVs,
-				RemotePools:  []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
+				InboundCCVs:   outboundCCVs,
+				OutboundCCVs:  outboundCCVs,
+				MinBlockDepth: types.INT64(0),
+				RemotePools:   []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
 			}
 			needsPoolUpdate = true
 		}
@@ -2387,12 +2453,12 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			if err != nil {
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve remote pool address for destination selector %d: %w", dest, err)
 			}
-			updatedChainPoolConfigs := types.GENMAP{}
-			maps.Copy(updatedChainPoolConfigs, parsedTokenPool.ChainPoolConfigs)
+			updatedChainPoolConfigs := typedChainPoolConfigs(parsedTokenPool.ChainPoolConfigs)
 			updatedChainPoolConfigs[destSelectorKey] = lockreleasetokenpool.ChainPoolConfig{
-				InboundCCVs:  senderRequiredCCVs,
-				OutboundCCVs: senderRequiredCCVs,
-				RemotePools:  []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
+				InboundCCVs:   senderRequiredCCVs,
+				OutboundCCVs:  senderRequiredCCVs,
+				MinBlockDepth: types.INT64(0),
+				RemotePools:   []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
 			}
 			updatedChainFeeConfigs := types.GENMAP{}
 			maps.Copy(updatedChainFeeConfigs, parsedTokenPool.ChainFeeConfigs)
@@ -2927,7 +2993,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(opts.ExecutionGasLimit),
-			BlockConfirmations: nil,
 			SenderRequiredCCVs: senderRequiredCCVs,
 			ExecutorCid:        executorCID,
 			ExecutorArgs:       nil,
