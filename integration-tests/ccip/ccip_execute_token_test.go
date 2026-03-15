@@ -436,7 +436,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 								{Label: "outboundRateLimiter", Value: rawInstanceAddress(outboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
 							}}}},
 						}}}}}},
-						{Label: "tokenTransferFeeConfig", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "tokenTransferFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
 						}}}}},
