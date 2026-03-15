@@ -229,13 +229,13 @@ func TestCCIPSend(t *testing.T) {
 						LaneMandatedInboundCCVs:  nil,
 						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
-						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // random executor
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
-							NetworkFeeUSDCents:      0,
-							DefaultTokenFeeUSDCents: 0,
-						},
-						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
-						AddressBytesLength:      20,
+							DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // random executor
+							FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+								NetworkFeeUSDCents:      25,
+								DefaultTokenFeeUSDCents: 10,
+							},
+							ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+							AddressBytesLength:      20,
 						BaseExecutionGasCost:    0,
 					},
 				},
