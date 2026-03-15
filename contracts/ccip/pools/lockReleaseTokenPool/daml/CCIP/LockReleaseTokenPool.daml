@@ -18,10 +18,11 @@ import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
 import DA.Time (time, addRelTime, hours)
+import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.LockReleaseTokenPoolCodec (decodeUpdateChainPoolConfigsParams)
-import CCIP.LockReleaseTokenPoolTypes (ChainPoolConfig(..))
+import CCIP.LockReleaseTokenPoolCodec (decodeApplyChainUpdatesParams, decodeUpdateRateLimitersParams)
+import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), RateLimiterConfigArgs(..))
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -53,17 +54,6 @@ maxTime = time (date 9999 Dec 31) 23 59 59
 data TransferTimeout
     = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
-    deriving (Eq, Show)
-
--- ChainPoolConfig is imported from CCIP.LockReleaseTokenPoolTypes
-
--- | Per-chain fee config for outbound pool fee calculation.
-data PoolFeeConfig = PoolFeeConfig
-    with
-        isEnabled : Bool
-        feeUSDCents : Numeric 0
-        destGasOverhead : Int
-        destBytesOverhead : Int
     deriving (Eq, Show)
 
 parseSourcePoolDecimals : Int -> BytesHex -> Int
@@ -144,16 +134,13 @@ template LockReleaseTokenPool
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
-        -- Per-chain pool config: CCV requirements and allowed remote pools
-        chainPoolConfigs : Map.Map (Numeric 0) ChainPoolConfig
-        -- Fee config per remote chain selector
-        chainFeeConfigs : Map.Map (Numeric 0) PoolFeeConfig
-        -- Destination token address per remote chain, matching EVM's getRemoteToken()
-        remoteTokens : Map.Map (Numeric 0) BytesHex
-        -- Expected outbound rate limiter identity per destination chain.
-        outboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
-        -- Expected inbound rate limiter identity per source chain.
-        inboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
+
+        -- Remote chain config: remote token address, CCV requirements, and rate limiter requirements for each remote chain.
+        -- Keyed by remote chain selector.
+        remoteChainConfigs : Map.Map (Numeric 0) RemoteChainConfig
+        -- Optional token-transfer fee overrides keyed by destination chain selector.
+        tokenTransferFeeConfigs : Map.Map (Numeric 0) TokenTransferFeeConfig
+
         -- Context merged into extraArgs for transfers TO the pool (LockOrBurn).
         -- For tokens following Splice patterns (e.g., Amulet), this should contain
         -- the pool's preapproval CID under the key the TransferFactory expects
@@ -238,8 +225,8 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
-                case Map.lookup remoteChainSelector chainPoolConfigs of
-                    None -> pure []
+                case Map.lookup remoteChainSelector remoteChainConfigs of
+                    None -> abort "pool: unsupported remote chain selector"
                     Some config -> case direction of
                         CCIP.Interfaces.TokenPool.Inbound -> pure config.inboundCCVs
                         CCIP.Interfaces.TokenPool.Outbound -> pure config.outboundCCVs
@@ -268,18 +255,18 @@ template LockReleaseTokenPool
                 assertMsg "pool: destTokenAddress does not match pool instrumentId"
                     (tt.destTokenAddress == expectedAddr)
 
-                chainCfg <- case Map.lookup message.sourceChainSelector chainPoolConfigs of
+                remoteChainCfg <- case Map.lookup message.sourceChainSelector remoteChainConfigs of
                     None -> abort "pool: unsupported source chain"
                     Some cfg -> pure cfg
 
                 assertMsg "pool: invalid sourcePoolAddress"
-                    (tt.sourcePoolAddress `elem` chainCfg.remotePools)
+                    (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_SetInboundPoolCCVs with
                         executingMessageCid
                         poolInstanceId = instanceId
-                        poolCCVs = chainCfg.inboundCCVs
+                        poolCCVs = remoteChainCfg.inboundCCVs
                         caller = poolOwner
 
         -- Declare outbound CCV requirements on SendingMessageV1 via TAR.
@@ -295,9 +282,9 @@ template LockReleaseTokenPool
             do
                 sm <- fetch sendingMessageCid
 
-                let poolCCVs = case Map.lookup sm.destChainSelector chainPoolConfigs of
-                        None -> []
-                        Some cfg -> cfg.outboundCCVs
+                poolCCVs <- case Map.lookup sm.destChainSelector remoteChainConfigs of
+                        None -> abort "pool: unsupported dest chain"
+                        Some cfg -> pure cfg.outboundCCVs
 
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_SetOutboundPoolCCVs with
@@ -339,17 +326,15 @@ template LockReleaseTokenPool
                 -- This is the pool's local security check: it rejects forged tickets
                 -- that lack the CCV-owner authorization the pool requires.
                 let ticketSignatories = signatory ticket
-                sourceCfg <- case Map.lookup ticket.sourceChainSelector chainPoolConfigs of
+                remoteChainCfg <- case Map.lookup ticket.sourceChainSelector remoteChainConfigs of
                     None -> abort "ReleaseFromTicket: unsupported source chain"
                     Some cfg -> pure cfg
-                let requiredPoolOwners = dedup (map CCIP.RawInstanceAddress.ownerParty sourceCfg.inboundCCVs)
+                let requiredPoolOwners = dedup (map CCIP.RawInstanceAddress.ownerParty remoteChainCfg.inboundCCVs)
                 Foldable.forA_ requiredPoolOwners $ \requiredOwner ->
                     assertMsg ("ReleaseFromTicket: missing required pool CCV owner " <> show requiredOwner)
                         (requiredOwner `elem` ticketSignatories)
 
-                expectedRateLimiter <- case Map.lookup ticket.sourceChainSelector inboundRateLimiters of
-                    None -> abort "ReleaseFromTicket: no inbound rate limiter configured for source chain"
-                    Some limiter -> pure limiter
+                let expectedRateLimiter = remoteChainCfg.inboundRateLimiter
                 rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
@@ -415,23 +400,68 @@ template LockReleaseTokenPool
                             poolChangeCids = transferResult.senderChangeCids
                     _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
-        -- Update per-chain pool configuration (CCV requirements and remote pools).
-        choice LockReleaseTokenPool_UpdateChainPoolConfigs : ContractId LockReleaseTokenPool
+        choice ApplyChainUpdates : ContractId LockReleaseTokenPool
             with
-                newChainPoolConfigs : Map.Map (Numeric 0) ChainPoolConfig
+                remoteChainSelectorsToRemove : [Numeric 0]
+                chainsToAdd : [ChainUpdate]
             controller poolOwner
             do
-                create this with chainPoolConfigs = newChainPoolConfigs
+                -- Validate
+                forA_ remoteChainSelectorsToRemove $ \remoteChainSelectorToRemove -> do
+                    assertMsg "ApplyChainUpdates: cannot remove non-existent chain config" (Map.member remoteChainSelectorToRemove remoteChainConfigs)
+                -- Remove specified chain configs
+                let remoteChainConfigsRemoved = foldl
+                        (\configs remoteChainSelectorToRemove -> Map.delete remoteChainSelectorToRemove configs)
+                        remoteChainConfigs
+                        remoteChainSelectorsToRemove
 
-        choice LockReleaseTokenPool_UpdateRateLimiters : ContractId LockReleaseTokenPool
+                -- Validate
+                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, inboundRateLimiter, outboundRateLimiter} -> do
+                    assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
+                    assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
+                    -- If the chain already exists, the update should first remove it.
+                    assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
+                    -- Validate rate limiters
+                    assertMsg "ApplyChainUpdates: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
+                    assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
+                    -- Validate remote pools
+                    assertMsg "ApplyChainUpdates: remotePools cannot contain empty address" ("" `notElem` remotePools)
+                    assertMsg "ApplyChainUpdates: remotePools cannot contain duplicates" (length remotePools == length (dedup remotePools))
+                    assertMsg "ApplyChainUpdates: inbound and outbound CCV lists cannot contain duplicates" (length inboundCCVs == length (dedup inboundCCVs) && length outboundCCVs == length (dedup outboundCCVs))
+                -- Add new chain configs
+                let remoteChainConfigsAdded = foldl
+                        (\configs ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, inboundRateLimiter, outboundRateLimiter} ->
+                            Map.insert remoteChainSelector RemoteChainConfig{remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, inboundRateLimiter, outboundRateLimiter} configs)
+                        remoteChainConfigsRemoved
+                        chainsToAdd
+                create this with
+                    remoteChainConfigs = remoteChainConfigsAdded
+
+        choice UpdateRateLimiters : ContractId LockReleaseTokenPool
             with
-                newOutboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
-                newInboundRateLimiters : Map.Map (Numeric 0) RawInstanceAddress
+                rateLimiterConfigArgs : [RateLimiterConfigArgs]
             controller poolOwner
             do
+                -- Validate
+                forA_ rateLimiterConfigArgs $ \RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, outboundRateLimiter} -> do
+                    assertMsg "UpdateRateLimiters: invalid chain selector" (remoteChainSelector > 0.0)
+                    assertMsg "UpdateRateLimiters: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
+                    assertMsg "UpdateRateLimiters: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
+                    assertMsg ("UpdateRateLimiters: unsupported chain selector: " <> show remoteChainSelector) (Map.member remoteChainSelector remoteChainConfigs)
+                
+                -- Update
+                let remoteChainConfigsUpdated = foldl
+                        (\configs RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, outboundRateLimiter} ->
+                            case Map.lookup remoteChainSelector configs of
+                                None -> configs
+                                Some cfg ->
+                                    let updatedCfg = cfg with inboundRateLimiter = inboundRateLimiter, outboundRateLimiter = outboundRateLimiter
+                                    in Map.insert remoteChainSelector updatedCfg configs
+                        )
+                        remoteChainConfigs
+                        rateLimiterConfigArgs
                 create this with
-                    outboundRateLimiters = newOutboundRateLimiters
-                    inboundRateLimiters = newInboundRateLimiters
+                    remoteChainConfigs = remoteChainConfigsUpdated
 
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
@@ -446,7 +476,9 @@ template LockReleaseTokenPool
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
-                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector chainFeeConfigs of
+                -- Check if fee config is enabled for the destination chain.
+                -- If no config is set/it's disabled, use the FeeQuoter defaults. If enabled, use the specified fee parameters.
+                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
                     Some feeConfig | feeConfig.isEnabled ->
                         pure
                             ( feeConfig.feeUSDCents
@@ -489,15 +521,15 @@ template LockReleaseTokenPool
                     chainSelector = sendingMsg.destChainSelector
                 assertMsg "LockOrBurn: dest chain is cursed" (not isCursed)
 
-                let destTokenAddr = fromSomeNote
-                        "LockOrBurn: no remote token for dest chain"
-                        (Map.lookup sendingMsg.destChainSelector remoteTokens)
+                remoteChainCfg <- case Map.lookup sendingMsg.destChainSelector remoteChainConfigs of
+                    None -> abort "pool: unsupported dest chain"
+                    Some cfg -> pure cfg
+
+                let destTokenAddr = remoteChainCfg.remoteTokenAddress
 
                 let destPoolData = CCIP.MessageCodecV1.encodeUint256 (intToNumeric decimals)
 
-                expectedRateLimiter <- case Map.lookup sendingMsg.destChainSelector outboundRateLimiters of
-                    None -> abort "LockOrBurn: no outbound rate limiter configured for dest chain"
-                    Some limiter -> pure limiter
+                let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
                 rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
@@ -570,12 +602,21 @@ template LockReleaseTokenPool
               Some cid -> pure (coerceContractId cid : ContractId LockReleaseTokenPool)
 
             case functionName of
-              "UpdateChainPoolConfigs" -> do
-                case decodeUpdateChainPoolConfigsParams operationData of
-                  None -> abort "E_INVALID_PARAMS: UpdateChainPoolConfigs"
-                  Some newChainPoolConfigs -> do
-                    newCid <- exercise selfCid LockReleaseTokenPool_UpdateChainPoolConfigs with
-                      newChainPoolConfigs
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "ApplyChainUpdates" -> do
+                    case decodeApplyChainUpdatesParams operationData of
+                        None -> abort "E_INVALID_PARAMS: ApplyChainUpdates"
+                        Some (remoteChainSelectorsToRemove, chainsToAdd) -> do
+                            newCid <- exercise selfCid ApplyChainUpdates with
+                                remoteChainSelectorsToRemove
+                                chainsToAdd
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+                "UpdateRateLimiters" -> do
+                  case decodeUpdateRateLimitersParams operationData of
+                    None -> abort "E_INVALID_PARAMS: UpdateRateLimiters"
+                    Some rateLimiterConfigArgs -> do
+                        newCid <- exercise selfCid UpdateRateLimiters with
+                            rateLimiterConfigArgs
+                        pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+                _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

@@ -609,11 +609,8 @@ mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTok
     poolOwner = params.poolOwner
     instrumentId = params.instrumentId
     decimals = params.decimals
-    chainPoolConfigs = Map.empty
-    chainFeeConfigs = Map.empty
-    remoteTokens = Map.empty
-    outboundRateLimiters = Map.empty
-    inboundRateLimiters = Map.empty
+    remoteChainConfigs = Map.empty
+    tokenTransferFeeConfigs = Map.empty
     poolReceiveContext = CCIP.Context.emptyCCIPContext
     transferTimeout = CCIP.LockReleaseTokenPool.Indefinite
 
