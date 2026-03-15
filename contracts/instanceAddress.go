@@ -33,6 +33,10 @@ func RawInstanceAddressFromString(s string) (RawInstanceAddress, error) {
 
 func (r RawInstanceAddress) String() string { return string(r) }
 
+func (r RawInstanceAddress) InstanceID() string { return strings.Split(string(r), "@")[0] }
+
+func (r RawInstanceAddress) Owner() string { return strings.Split(string(r), "@")[1] }
+
 func (r RawInstanceAddress) InstanceAddress() InstanceAddress {
 	h := sha3.NewLegacyKeccak256()
 	h.Write([]byte(r))
