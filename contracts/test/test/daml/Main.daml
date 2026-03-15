@@ -8,6 +8,35 @@ import qualified Interface
 import qualified Proxy
 import qualified Receiver
 
+template DisclosedTarget
+  with
+    owner : Party
+    label : Text
+  where
+    signatory owner
+
+template ArbitraryCaller
+  with
+    owner : Party
+  where
+    signatory owner
+
+    nonconsuming choice Ping : Text
+      with
+        caller : Party
+      controller caller
+      do
+        pure "pong"
+
+    nonconsuming choice FetchTarget : Text
+      with
+        caller : Party
+        targetCid : ContractId DisclosedTarget
+      controller caller
+      do
+        target <- fetch targetCid
+        pure target.label
+
 setup = script do
   ccipOwner <- allocateParty "ccipOwner"
   ccipUser <- allocateParty "ccipUser"
@@ -41,3 +70,32 @@ setup = script do
   
 
   pure()
+
+testDisclosedExerciseDoesNotAuthorizeDownstreamFetch = script do
+  ownerA <- allocateParty "ownerA"
+  ownerB <- allocateParty "ownerB"
+  caller <- allocateParty "caller"
+
+  targetCid <- submit ownerA do
+    createCmd DisclosedTarget with
+      owner = ownerA
+      label = "secret"
+
+  arbitraryCallerCid <- submit ownerB do
+    createCmd ArbitraryCaller with
+      owner = ownerB
+
+  targetDisclosure <- fromSome <$> queryDisclosure ownerA targetCid
+  arbitraryCallerDisclosure <- fromSome <$> queryDisclosure ownerB arbitraryCallerCid
+
+  pong <- submit (actAs caller <> disclose arbitraryCallerDisclosure) do
+    exerciseCmd arbitraryCallerCid Ping with
+      caller = caller
+  if pong /= "pong"
+    then abort "expected disclosed arbitrary-caller exercise to succeed"
+    else pure ()
+
+  submit (actAs caller <> disclose arbitraryCallerDisclosure <> disclose targetDisclosure) do
+    exerciseCmd arbitraryCallerCid FetchTarget with
+      caller = caller
+      targetCid = targetCid
