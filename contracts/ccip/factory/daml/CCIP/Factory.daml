@@ -471,7 +471,7 @@ data DeployCommitteeVerifierParams = DeployCommitteeVerifierParams
         owner : Party
         ccipOwner : Party
         versionTag : BytesHex
-        messageSentObservers : [Party]
+        messageSentObserver : Party
         rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
         storageLocations : [Text]
         storageLocationsAdmin : Party
@@ -485,9 +485,6 @@ data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
         poolOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data DeployRateLimiterParams = DeployRateLimiterParams
@@ -514,6 +511,7 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
         instanceId : Text
         owner : Party
         requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        minBlockDepth : Int
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -596,7 +594,7 @@ mkCommitteeVerifierContract params = CCIP.CommitteeVerifier.CommitteeVerifier wi
     owner = params.owner
     ccipOwner = params.ccipOwner
     versionTag = params.versionTag
-    messageSentObservers = params.messageSentObservers
+    messageSentObserver = params.messageSentObserver
     storageLocations = params.storageLocations
     storageLocationsAdmin = params.storageLocationsAdmin
     pendingStorageLocationsAdmin = params.pendingStorageLocationsAdmin
@@ -612,14 +610,14 @@ mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTok
     poolOwner = params.poolOwner
     instrumentId = params.instrumentId
     decimals = params.decimals
-    remoteChainConfigs = Map.empty
-    tokenTransferFeeConfigs = Map.empty
+    chainPoolConfigs = Map.empty
+    chainFeeConfigs = Map.empty
+    remoteTokens = Map.empty
+    outboundRateLimiters = Map.empty
+    inboundRateLimiters = Map.empty
+    inboundCustomRateLimiters = Map.empty
     poolReceiveContext = CCIP.Context.emptyCCIPContext
     transferTimeout = CCIP.LockReleaseTokenPool.Indefinite
-    deps = CCIP.LockReleaseTokenPool.LockReleaseTokenPoolDeps with
-        tokenAdminRegistry = params.tokenAdminRegistry
-        rmnRemote = params.rmnRemote
-        feeQuoter = params.feeQuoter
 
 mkRateLimiterContract : DeployRateLimiterParams -> Update CCIP.RateLimiter.RateLimiter
 mkRateLimiterContract params = do
@@ -648,6 +646,7 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     instanceId = params.instanceId
     owner = params.owner
     requiredCCVs = params.requiredCCVs
+    minBlockDepth = params.minBlockDepth
 
 decodeDeployGlobalConfigParams : BytesHex -> Optional DeployGlobalConfigParams
 decodeDeployGlobalConfigParams encoded = do
@@ -738,7 +737,7 @@ decodeDeployCommitteeVerifierParams encoded = do
     (owner, offset2) <- decodePartyAt encoded offset1
     (ccipOwner, offset3) <- decodePartyAt encoded offset2
     (versionTag, offset4) <- decodeBytesHexAt encoded offset3
-    (messageSentObservers, offset5) <- decodePartyList encoded offset4
+    (messageSentObserver, offset5) <- decodePartyAt encoded offset4
     (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
     (storageLocations, offset7) <- decodeList encoded offset6 decodeTextAt
     (storageLocationsAdmin, offset8) <- decodePartyAt encoded offset7
@@ -748,7 +747,7 @@ decodeDeployCommitteeVerifierParams encoded = do
         owner
         ccipOwner
         versionTag
-        messageSentObservers
+        messageSentObserver
         rmnRemote
         storageLocations
         storageLocationsAdmin
@@ -760,19 +759,13 @@ decodeDeployLockReleaseTokenPoolParams encoded = do
     (ccipOwner, offset2) <- decodePartyAt encoded offset1
     (poolOwner, offset3) <- decodePartyAt encoded offset2
     (instrumentId, offset4) <- decodeInstrumentId encoded offset3
-    (decimals, offset5) <- decodeInt64At encoded offset4
-    (tokenAdminRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
-    (feeQuoter, offset7) <- decodeRawInstanceAddressAt encoded offset6
-    (rmnRemote, _) <- decodeRawInstanceAddressAt encoded offset7
+    (decimals, _) <- decodeInt64At encoded offset4
     Some DeployLockReleaseTokenPoolParams with
         instanceId
         ccipOwner
         poolOwner
         instrumentId
         decimals
-        tokenAdminRegistry
-        feeQuoter
-        rmnRemote
 
 decodeRateLimitDirectionAt : BytesHex -> Int -> Optional (CCIP.RateLimiter.RateLimitDirection, Int)
 decodeRateLimitDirectionAt encoded offset = do
@@ -826,11 +819,13 @@ decodeDeployCCIPReceiverParams : BytesHex -> Optional DeployCCIPReceiverParams
 decodeDeployCCIPReceiverParams encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (owner, offset2) <- decodePartyAt encoded offset1
-    (requiredCCVs, _) <- decodeList encoded offset2 decodeRawInstanceAddressAt
+    (requiredCCVs, offset3) <- decodeList encoded offset2 decodeRawInstanceAddressAt
+    (minBlockDepth, _) <- decodeInt64At encoded offset3
     Some DeployCCIPReceiverParams with
         instanceId
         owner
         requiredCCVs
+        minBlockDepth
 
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =

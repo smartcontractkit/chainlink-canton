@@ -39,7 +39,6 @@ const (
 
 type evmToCantonHarness struct {
 	cfg                    *ccv.Cfg
-	ctx                    context.Context
 	logger                 zerolog.Logger
 	srcSelector            uint64
 	dstSelector            uint64
@@ -214,17 +213,16 @@ func setupEVMToCantonHarness(t *testing.T) *evmToCantonHarness {
 	}
 
 	return &evmToCantonHarness{
-		cfg:               in,
-		ctx:               ctx,
-		logger:            *l,
-		srcSelector:       uint64(srcSelector),
-		dstSelector:       uint64(dstSelector),
-		srcChain:          srcChain,
-		dstChain:          dstChain,
-		receiver:          receiver,
-		receiverParty:     receiverParty,
-		defaultCCVAddress: defaultCCVAddress,
-		executorAddress:   executorAddress,
+		cfg:                    in,
+		logger:                 *l,
+		srcSelector:            srcSelector,
+		dstSelector:            dstSelector,
+		srcChain:               srcChain,
+		dstChain:               dstChain,
+		receiver:               receiver,
+		receiverParty:          receiverParty,
+		defaultCCVAddress:      defaultCCVAddress,
+		executorAddress:        executorAddress,
 		assertSingleVerifierFn: assertSingleVerifier,
 	}
 }
