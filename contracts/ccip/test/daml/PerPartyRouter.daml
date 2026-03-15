@@ -561,7 +561,6 @@ testPrepareSendExtraArgs = script do
             feeToken = feeTokenId
 
     Some sm <- user `queryContractId` smCid
-    sm.blockConfirmations === 0
     sm.message === None
     sm.ccipReceiveGasLimit === 123
 

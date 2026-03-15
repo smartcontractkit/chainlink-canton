@@ -8,8 +8,21 @@ import qualified CCIP.RawInstanceAddress
 rateLimiterKey : Text
 rateLimiterKey = "rate-limiter"
 
+inboundRateLimiterKey : Text
+inboundRateLimiterKey = "inbound-rate-limiter"
+
+inboundCustomRateLimiterKey : Text
+inboundCustomRateLimiterKey = "inbound-custom-rate-limiter"
+
 lookupRateLimiterCid : CCIP.Context.CCIPContext -> Update (ContractId RateLimiter)
 lookupRateLimiterCid ctx = CCIP.Context.getFromContextU ctx rateLimiterKey
+
+lookupInboundRateLimiterCid : RateLimitMode -> CCIP.Context.CCIPContext -> Update (ContractId RateLimiter)
+lookupInboundRateLimiterCid mode ctx = CCIP.Context.getFromContextU ctx key
+  where
+    key = case mode of
+        RateLimitMode_DefaultFinality -> inboundRateLimiterKey
+        RateLimitMode_CustomFinality -> inboundCustomRateLimiterKey
 
 rawInstanceAddress : RateLimiter -> CCIP.RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress rl = CCIP.RawInstanceAddress.make rl.instanceId rl.poolOwner

@@ -41,10 +41,20 @@ usdToCents d = intToNumeric (truncate (d * 100.0))
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
-mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
-mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
+mkOutboundRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
+mkOutboundRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
         [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
+
+mkInboundRateLimiterContext
+    : ContractId RateLimiter.RateLimiter
+    -> ContractId RateLimiter.RateLimiter
+    -> CCIP.Context.CCIPContext
+mkInboundRateLimiterContext defaultRateLimiterCid customRateLimiterCid = CCIP.Context.CCIPContext with
+    values = TextMap.fromList
+        [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue defaultRateLimiterCid)
+        , (RateLimiter.inboundCustomRateLimiterKey, CCIP.Context.toAnyValue customRateLimiterCid)
+        ]
 
 createRateLimiter
     : Party
@@ -201,7 +211,6 @@ testLockOrBurn = script do
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
@@ -255,7 +264,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5000000.0
             rmnRemoteCid = rmnRemote
-            extraContext = mkRateLimiterContext outboundRateLimiter
+            extraContext = mkOutboundRateLimiterContext outboundRateLimiter
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -416,7 +425,7 @@ testReleaseFromTicket = script do
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = mkRateLimiterContext inboundRateLimiter
+            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -572,7 +581,7 @@ testReleaseFromTicketDecimalConversion = script do
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = mkRateLimiterContext inboundRateLimiter
+            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -618,7 +627,6 @@ testExecutionGasLimitAggregation = script do
             payload = "abcd"
             executionGasLimit = 0
             ccipReceiveGasLimit = 250000
-            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
@@ -668,7 +676,6 @@ testExecutionGasLimitAggregation = script do
         exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorWithFee with
             executorInstanceId = "executor-gas"
             executorArgs = ""
-            blockConfirmations = 0
             feeUSDCents = cents 3.0
             destGasLimit = 34567
             destBytesOverhead = 0
@@ -752,7 +759,6 @@ testExecutionGasLimitWithTokenSendFee = script do
             payload = "abcd"
             executionGasLimit = 0
             ccipReceiveGasLimit = 250000
-            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
@@ -823,7 +829,6 @@ testExecutionGasLimitWithTokenSendFee = script do
         exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorWithFee with
             executorInstanceId = "executor-gas-pool"
             executorArgs = ""
-            blockConfirmations = 0
             feeUSDCents = cents 3.0
             destGasLimit = 30000
             destBytesOverhead = 0
@@ -1417,7 +1422,6 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
@@ -1546,7 +1550,6 @@ testCalculateFeePrefersPoolOverride = script do
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"
@@ -1675,7 +1678,6 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             payload = ""
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            blockConfirmations = 0
             ccvAndExecutorHash = ""
             onRampAddress = "0000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000002"

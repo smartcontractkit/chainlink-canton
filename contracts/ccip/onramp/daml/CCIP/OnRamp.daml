@@ -172,8 +172,6 @@ template OnRamp
                 let resolvedTokenReceiver = if hasTokenTransfer
                         then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
                         else ""
-                let resolvedBlockConfirmations = 0
-
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
@@ -197,7 +195,6 @@ template OnRamp
                     payload = payload
                     executionGasLimit = 0
                     ccipReceiveGasLimit
-                    blockConfirmations = resolvedBlockConfirmations
                     ccvAndExecutorHash = ""
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
