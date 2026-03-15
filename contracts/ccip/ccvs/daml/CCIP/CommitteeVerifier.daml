@@ -64,7 +64,7 @@ template CommitteeVerifier
     where
         signatory owner
         observer [storageLocationsAdmin, pendingStorageLocationsAdmin]
-        
+
         -- Ensure that for each signerConfig the number of signer keys is >= threshold and that threshold > 0
         ensure versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
 
@@ -212,7 +212,6 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
                 let feeConfig = fromSomeNote "no fee config for dest chain"
                         (Map.lookup sendingMsg.destChainSelector remoteChainFeeConfigs)
@@ -236,7 +235,6 @@ template CommitteeVerifier
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sendingMsg <- fetch sendingMessageCid
 
                 -- Validate RMN instance and check destination chain curse
