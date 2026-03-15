@@ -62,9 +62,8 @@ template Executor
             controller owner
             do
                 let pruned = foldr Map.delete remoteChainConfigs destChainSelectorsToRemove
-                let merged = foldr (\cfg acc ->
-                        Map.insert cfg.destChainSelector cfg.config acc
-                    ) pruned destChainSelectorsToAdd
+                let addConfig acc cfg = Map.insert cfg.destChainSelector cfg.config acc
+                let merged = foldl addConfig pruned destChainSelectorsToAdd
                 create this with remoteChainConfigs = merged
 
         choice Executor_SetDynamicConfig : ContractId Executor
