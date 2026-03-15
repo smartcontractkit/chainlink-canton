@@ -419,6 +419,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							Constructor: "RelativeHours",
 							Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 24}},
 						}}}},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "tokenAdminRegistry", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+							{Label: "feeQuoter", Value: rawInstanceAddress("placeholder-feequoter@" + partyCCIP)},
+						}}}}},
 					}},
 				}},
 			}},
