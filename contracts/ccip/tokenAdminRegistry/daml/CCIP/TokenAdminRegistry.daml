@@ -190,6 +190,8 @@ template TokenAdminRegistry
                                         (ticket.tokenAdminRegistryInstanceId == instanceId)
                                     assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: owner mismatch"
                                         (ticket.ccipOwner == owner)
+                                    assertMsg "TokenAdminRegistry_ConsumeReceiveTicket: ticket instrument must match requested instrument"
+                                        (ticket.instrumentId == instrumentId)
                                     archive ticketCid
 
         -- | Record pool's outbound CCV requirements on a SendingMessageV1.

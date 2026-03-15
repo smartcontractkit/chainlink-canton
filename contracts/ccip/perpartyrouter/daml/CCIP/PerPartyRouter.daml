@@ -302,6 +302,17 @@ template PerPartyRouter
                         case feeResult.output of
                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
                                 pure feeResult.senderChangeCids
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
+                                acceptResult <- exercise transferInstructionCid
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                        extraArgs = feeTokenInput.extraArgs
+                                case acceptResult.output of
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                        pure feeResult.senderChangeCids
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                                        abort "fee transfer instruction failed"
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
+                                        abort "fee transfer instruction is still pending"
                             _ -> abort "fee transfer did not complete"
                     else pure []
 
