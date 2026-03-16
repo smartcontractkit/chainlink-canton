@@ -5,7 +5,7 @@ import Daml.Script
 
 import DA.Assert
 import DA.Date (date, Month(..))
-import DA.List (head)
+import DA.List (head, (!!))
 import DA.Map qualified as Map
 import DA.Optional
 import DA.TextMap qualified as TextMap
@@ -41,20 +41,18 @@ usdToCents d = intToNumeric (truncate (d * 100.0))
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
-mkOutboundRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
-mkOutboundRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
+mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
+mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
         [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
 
-mkInboundRateLimiterContext
-    : ContractId RateLimiter.RateLimiter
-    -> ContractId RateLimiter.RateLimiter
-    -> CCIP.Context.CCIPContext
-mkInboundRateLimiterContext defaultRateLimiterCid customRateLimiterCid = CCIP.Context.CCIPContext with
-    values = TextMap.fromList
-        [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue defaultRateLimiterCid)
-        , (RateLimiter.inboundCustomRateLimiterKey, CCIP.Context.toAnyValue customRateLimiterCid)
-        ]
+
+mkPoolDeps : Text -> Text -> Text -> Party -> Party -> LockReleaseTokenPool.LockReleaseTokenPoolDeps
+mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner =
+    LockReleaseTokenPool.LockReleaseTokenPoolDeps with
+        tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+        rmnRemote = RawInstanceAddress.make rmnInstanceId rmnOwner
+        feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
 
 createRateLimiter
     : Party
@@ -169,8 +167,16 @@ testLockOrBurn = script do
         10000000.0
         1000.0
 
-    -- Deploy LockReleaseTokenPool with dest chain config
-    let destTokenAddr = "0000000000000000000000000000000000000099"
+    -- Deploy LockReleaseTokenPool with remote chain config
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            outboundRateLimiter = outboundRateLimiterAddr
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -178,14 +184,11 @@ testLockOrBurn = script do
             instanceId = "test-lock-release-pool"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.empty
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.fromList [(destChainSelector, destTokenAddr)]
-            outboundRateLimiters = Map.fromList [(destChainSelector, outboundRateLimiterAddr)]
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(destChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter" ccipOwner rmnOwner
 
     -- Create SendingMessageV1 with token transfer fields.
     -- LockOrBurn reads dest chain, token amount, and receiver from here.
@@ -198,7 +201,7 @@ testLockOrBurn = script do
                 router = RawInstanceAddress.make "test-router" sender
                 onRamp = RawInstanceAddress.make "test-onramp" ccipOwner
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmn" rmnOwner
                 tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
                 feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
             destChainSelector = destChainSelector
@@ -252,19 +255,21 @@ testLockOrBurn = script do
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
 
     -- LockOrBurn stores token data via AddTokenSend
-    result <- submit (actAs sender <> actAs poolOwner <> actAs ccipOwner
+    result <- submit (actAs sender <> actAs poolOwner
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
-                      <> disclose disclosedRmn <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter
+                      <> disclose disclosedSm) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5000000.0
             rmnRemoteCid = rmnRemote
-            extraContext = mkOutboundRateLimiterContext outboundRateLimiter
+            extraContext = mkRateLimiterContext outboundRateLimiter
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -287,6 +292,7 @@ testLockOrBurn = script do
 
 
 -- | Test ReleaseFromTicket transfers tokens from pool to receiver.
+testReleaseFromTicket : Script ()
 testReleaseFromTicket = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -365,7 +371,16 @@ testReleaseFromTicket = script do
         10000000.0
         1000.0
 
-    -- Deploy LockReleaseTokenPool with source chain config for inbound
+    -- Deploy LockReleaseTokenPool with remote chain config for inbound
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = inboundRateLimiterAddr
+            inboundCustomRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -373,18 +388,11 @@ testReleaseFromTicket = script do
             instanceId = "test-lock-release-pool"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
-                inboundCCVs = []
-                outboundCCVs = []
-                minBlockDepth = 0
-                remotePools = [])]
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release" "test-feequoter-release" ccipOwner rmnOwner
 
     -- Create TokenReceiveTicket (simulating what OffRamp creates via finalize)
     tokenReceiveTicket <- submit ccipOwner do
@@ -410,22 +418,25 @@ testReleaseFromTicket = script do
             tokenPoolHoldings = [toInterfaceContractId poolHolding]
 
     -- Disclose contracts
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
 
     -- Call ReleaseFromTicket
-    result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                      <> disclose disclosedTar <> disclose disclosedFactory
+    result <- submit (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
-                      <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -451,6 +462,7 @@ testReleaseFromTicket = script do
     debug "testReleaseFromTicket: PASSED"
 
 -- | Test ReleaseFromTicket converts source decimals to local decimals.
+testReleaseFromTicketDecimalConversion : Script ()
 testReleaseFromTicketDecimalConversion = script do
     ccipOwner <- allocateParty "ccip-owner-decimals"
     rmnOwner <- allocateParty "rmn-owner-decimals"
@@ -524,6 +536,16 @@ testReleaseFromTicketDecimalConversion = script do
         9999999999999999999999999999.0
         9999999999999999999999999999.0
 
+    -- Create token pool
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = inboundRateLimiterAddr
+            inboundCustomRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -531,18 +553,11 @@ testReleaseFromTicketDecimalConversion = script do
             instanceId = "test-lock-release-pool-decimals"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
-                inboundCCVs = []
-                outboundCCVs = []
-                minBlockDepth = 0
-                remotePools = [])]
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.fromList [(sourceChainSelector, inboundRateLimiterAddr)]
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals" ccipOwner rmnOwner
 
     let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
     tokenReceiveTicket <- submit ccipOwner do
@@ -567,21 +582,24 @@ testReleaseFromTicketDecimalConversion = script do
                 meta = MetadataV1.emptyMetadata
             tokenPoolHoldings = [toInterfaceContractId poolHolding]
 
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
 
-    result <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                      <> disclose disclosedTar <> disclose disclosedFactory
+    result <- submit (actAs receiver
+                      <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
                       <> disclose disclosedPreapproval <> disclose disclosedRmn
-                      <> disclose disclosedRateLimiter) do
+                      <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            extraContext = mkRateLimiterContext inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -594,6 +612,7 @@ testReleaseFromTicketDecimalConversion = script do
 
     debug "testReleaseFromTicketDecimalConversion: PASSED"
 
+testExecutionGasLimitAggregation : Script ()
 testExecutionGasLimitAggregation = script do
     ccipOwner <- allocateParty "ccip-owner-gas"
     sender <- allocateParty "sender-gas"
@@ -690,6 +709,7 @@ testExecutionGasLimitAggregation = script do
     debug "testExecutionGasLimitAggregation: PASSED"
 
 -- C-1: Decimal conversion when remote < local (multiply path, scale up).
+testDecimalConversion_ScaleUp : Script ()
 testDecimalConversion_ScaleUp = script do
     -- remote=6, local=18: 1000000 (1 USDC in 6 decimals) -> 1000000000000000000 (1e18)
     let result = LockReleaseTokenPool.calculateLocalAmountDecimal 1000000.0 6 18
@@ -701,6 +721,7 @@ testDecimalConversion_ScaleUp = script do
     debug "testDecimalConversion_ScaleUp: PASSED"
 
 -- C-1: Equal decimals (no conversion).
+testDecimalConversion_EqualDecimals : Script ()
 testDecimalConversion_EqualDecimals = script do
     let result = LockReleaseTokenPool.calculateLocalAmountDecimal 1234567890.0 18 18
     result === 1234567890.0
@@ -710,12 +731,14 @@ testDecimalConversion_EqualDecimals = script do
     debug "testDecimalConversion_EqualDecimals: PASSED"
 
 -- C-1: Empty sourcePoolData defaults to local decimals (no conversion).
+testParseSourcePoolDecimals_Empty : Script ()
 testParseSourcePoolDecimals_Empty = script do
     let result = LockReleaseTokenPool.parseSourcePoolDecimals 18 ""
     result === 18
     debug "testParseSourcePoolDecimals_Empty: PASSED"
 
 -- C-1: Valid sourcePoolData parses correctly.
+testParseSourcePoolDecimals_Valid : Script ()
 testParseSourcePoolDecimals_Valid = script do
     let encoded = fromSome (MessageCodecV1.encodeUint256 6.0)
     let result = LockReleaseTokenPool.parseSourcePoolDecimals 18 encoded
@@ -723,6 +746,7 @@ testParseSourcePoolDecimals_Valid = script do
     debug "testParseSourcePoolDecimals_Valid: PASSED"
 
 -- C-3: tokenSendFee contributes destGasOverhead to execution gas limit.
+testExecutionGasLimitWithTokenSendFee : Script ()
 testExecutionGasLimitWithTokenSendFee = script do
     ccipOwner <- allocateParty "ccip-owner-gas-pool"
     sender <- allocateParty "sender-gas-pool"
@@ -845,6 +869,7 @@ testExecutionGasLimitWithTokenSendFee = script do
 
 
 -- | Test VerifyInboundMessage succeeds when sourcePoolAddress is in remotePools.
+testVerifyInboundMessage : Script ()
 testVerifyInboundMessage = script do
     ccipOwner <- allocateParty "ccip-owner"
     poolOwner <- allocateParty "pool-owner"
@@ -887,8 +912,17 @@ testVerifyInboundMessage = script do
                 poolInstanceId = "test-lock-release-pool-verify"
             caller = poolOwner
 
-    -- Deploy pool with chain config including allowed remote pool
+    -- Create pool with chain config including allowed remote pool
     let ccvAddr = RawInstanceAddress.make "test-ccv" ccipOwner
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = [allowedSourcePool]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = [ccvAddr]
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -896,18 +930,11 @@ testVerifyInboundMessage = script do
             instanceId = "test-lock-release-pool-verify"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
-                inboundCCVs = [ccvAddr]
-                outboundCCVs = []
-                minBlockDepth = 0
-                remotePools = [allowedSourcePool])]
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify" "test-feequoter-verify" ccipOwner ccipOwner
 
     -- Build message with token transfer from allowed source pool
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -917,7 +944,7 @@ testVerifyInboundMessage = script do
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 100000
-            finality = 0
+            finality = 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
@@ -956,9 +983,11 @@ testVerifyInboundMessage = script do
             state = ExecutingMessageV1.ExecutingMessageState_Prepared
 
     -- Exercise VerifyInboundMessage - should succeed
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    newEmCid <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                        <> disclose disclosedTar) do
+    disclosedEm <- fromSome <$> queryDisclosure ccipOwner executingMessageCid
+    newEmCid <- submit (actAs receiver
+                        <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedEm) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
             tokenAdminRegistryCid = tokenAdminRegistry
             extraContext = CCIP.Context.emptyCCIPContext
@@ -974,130 +1003,8 @@ testVerifyInboundMessage = script do
     debug "testVerifyInboundMessage: PASSED"
 
 
-testVerifyInboundMessageAllowsConfiguredFTF = script do
-    ccipOwner <- allocateParty "ccip-owner-pool-ftf-ok"
-    poolOwner <- allocateParty "pool-owner-pool-ftf-ok"
-    receiver <- allocateParty "receiver-pool-ftf-ok"
-
-    let sourceChainSelector : Numeric 0 = 111.0
-    let destChainSelector : Numeric 0 = 222.0
-    let tokenAdminRegistryInstanceId = "test-tar-pool-ftf-ok"
-    let allowedSourcePool = "000000000000000000000000aaaaaaaaaaaaaaaa"
-
-    let testInstrumentId = HoldingV1.InstrumentId with
-            admin = ccipOwner
-            id = "TestToken"
-
-    tokenAdminRegistry <- submit ccipOwner do
-        createCmd TokenAdminRegistry.TokenAdminRegistry with
-            owner = ccipOwner
-            instanceId = tokenAdminRegistryInstanceId
-            tokenConfigs = Map.empty
-
-    tokenAdminRegistry <- submit ccipOwner do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
-            instrumentId = testInstrumentId
-            newAdmin = poolOwner
-            caller = ccipOwner
-
-    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
-            instrumentId = testInstrumentId
-            caller = poolOwner
-
-    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
-        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
-            instrumentId = testInstrumentId
-            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
-                poolOwner = poolOwner
-                poolInstanceId = "test-lock-release-pool-ftf-ok"
-            caller = poolOwner
-
-    let ccvAddr = RawInstanceAddress.make "test-ccv-pool-ftf-ok" ccipOwner
-    tokenPool <- submit poolOwner do
-        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
-            ccipOwner = ccipOwner
-            poolOwner = poolOwner
-            instanceId = "test-lock-release-pool-ftf-ok"
-            instrumentId = testInstrumentId
-            decimals = 6
-            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
-                inboundCCVs = [ccvAddr]
-                outboundCCVs = []
-                minBlockDepth = 5
-                remotePools = [allowedSourcePool])]
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
-            poolReceiveContext = CCIP.Context.emptyCCIPContext
-            transferTimeout = LockReleaseTokenPool.Indefinite
-
-    let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
-    let message = MessageCodecV1.MessageV1 with
-            sourceChainSelector = sourceChainSelector
-            destChainSelector = destChainSelector
-            sequenceNumber = 1.0
-            executionGasLimit = 0
-            ccipReceiveGasLimit = 100000
-            finality = 5
-            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
-            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
-            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
-            sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = MessageCodecV1.encodePartyAddress receiver
-            destBlob = ""
-            tokenTransfer = Some MessageCodecV1.TokenTransferV1 with
-                amount = 5000000.0
-                sourcePoolAddress = allowedSourcePool
-                sourceTokenAddress = "000000000000000000000000bbbbbbbbbbbbbbbb"
-                destTokenAddress = destTokenAddr
-                tokenReceiver = MessageCodecV1.encodePartyAddress receiver
-                extraData = ""
-            messageData = ""
-
-    let offRampInstanceAddress = RawInstanceAddress.make "test-offramp-pool-ftf-ok" ccipOwner
-    let tarInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    executingMessageCid <- submit ccipOwner do
-        createCmd ExecutingMessageV1.ExecutingMessageV1 with
-            ccipOwner = ccipOwner
-            message = message
-            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-            receiver = receiver
-            tokenReceiver = Some receiver
-            executor = ccipOwner
-            observingParties = [receiver, ccipOwner, poolOwner]
-            ccvVerifications = []
-            ccvOwners = []
-            inboundPoolCCVs = None
-            deps = ExecutingMessageV1.ExecutingMessageDeps with
-                offRamp = offRampInstanceAddress
-                globalConfig = RawInstanceAddress.make "test-globalconfig-pool-ftf-ok" ccipOwner
-                rmnRemote = RawInstanceAddress.make "test-rmn-pool-ftf-ok" ccipOwner
-                tokenAdminRegistry = tarInstanceAddress
-            state = ExecutingMessageV1.ExecutingMessageState_Prepared
-
-    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
-    newEmCid <- submit (actAs poolOwner <> actAs ccipOwner <> actAs receiver
-                    <> disclose disclosedTar) do
-        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_VerifyInboundMessage with
-            tokenAdminRegistryCid = tokenAdminRegistry
-            extraContext = CCIP.Context.emptyCCIPContext
-            executingMessageCid = executingMessageCid
-            caller = receiver
-
-    newExecMsg <- queryContractId ccipOwner newEmCid
-    assertMsg "ExecutingMessageV1 should exist for configured FTF path" (isSome newExecMsg)
-    let em = fromSome newExecMsg
-    em.inboundPoolCCVs === Some [ccvAddr]
-
-    debug "testVerifyInboundMessageAllowsConfiguredFTF: PASSED"
-
-
 -- | Test VerifyInboundMessage fails when sourcePoolAddress is not in remotePools.
+testVerifyInboundMessageInvalidSourcePool : Script ()
 testVerifyInboundMessageInvalidSourcePool = script do
     ccipOwner <- allocateParty "ccip-owner"
     poolOwner <- allocateParty "pool-owner"
@@ -1142,6 +1049,15 @@ testVerifyInboundMessageInvalidSourcePool = script do
             caller = poolOwner
 
     -- Deploy pool with only allowedSourcePool in remotePools
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = [allowedSourcePool]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -1149,18 +1065,11 @@ testVerifyInboundMessageInvalidSourcePool = script do
             instanceId = "test-pool-verify-invalid"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
-                inboundCCVs = []
-                outboundCCVs = []
-                minBlockDepth = 0
-                remotePools = [allowedSourcePool])]
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-invalid" "test-feequoter-verify-invalid" ccipOwner ccipOwner
 
     -- Build message with disallowed source pool
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1221,6 +1130,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
 
 
 -- | Test VerifyInboundMessage fails when source chain has no config.
+testVerifyInboundMessageMissingChainConfig : Script ()
 testVerifyInboundMessageMissingChainConfig = script do
     ccipOwner <- allocateParty "ccip-owner"
     poolOwner <- allocateParty "pool-owner"
@@ -1264,6 +1174,15 @@ testVerifyInboundMessageMissingChainConfig = script do
             caller = poolOwner
 
     -- Deploy pool with config for sourceChainSelector only (not unconfiguredChainSelector)
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -1271,18 +1190,11 @@ testVerifyInboundMessageMissingChainConfig = script do
             instanceId = "test-pool-verify-nochain"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.fromList [(sourceChainSelector, LockReleaseTokenPool.ChainPoolConfig with
-                inboundCCVs = []
-                outboundCCVs = []
-                minBlockDepth = 0
-                remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"])]
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-verify-nochain" "test-feequoter-verify-nochain" ccipOwner ccipOwner
 
     -- Build message from an unconfigured source chain
     let destTokenAddr = MessageCodecV1.encodeInstrumentId testInstrumentId
@@ -1385,6 +1297,16 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [ccipOwner]
 
+    -- Create token pool
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -1392,14 +1314,11 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             instanceId = "test-lock-release-pool-fallback"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.empty
-            chainFeeConfigs = Map.empty
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-fallback" "test-rmn-fallback" "test-feequoter-fallback" ccipOwner ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1510,6 +1429,16 @@ testCalculateFeePrefersPoolOverride = script do
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [ccipOwner]
 
+    -- Create token pool with fee config that should override FeeQuoter's
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -1517,18 +1446,15 @@ testCalculateFeePrefersPoolOverride = script do
             instanceId = "test-lock-release-pool-override"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.empty
-            chainFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.PoolFeeConfig with
+            remoteChainConfigs = Map.fromList [(destChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.TokenTransferFeeConfig with
                 isEnabled = True
                 feeUSDCents = cents 2.0
                 destGasOverhead = 50000
                 destBytesOverhead = 32)]
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-override" "test-rmn-override" "test-feequoter-pool-override" ccipOwner ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1639,6 +1565,15 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = [ccipOwner]
 
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+                remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"]
+                remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+                inboundCCVs = []
+                outboundCCVs = []
+                minBlockDepth = 0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
             ccipOwner = ccipOwner
@@ -1646,18 +1581,15 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             instanceId = "test-lock-release-pool-disabled"
             instrumentId = testInstrumentId
             decimals = 6
-            chainPoolConfigs = Map.empty
-            chainFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.PoolFeeConfig with
+            remoteChainConfigs = Map.fromList [(destChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.fromList [(destChainSelector, LockReleaseTokenPool.TokenTransferFeeConfig with
                 isEnabled = False
                 feeUSDCents = cents 2.0
                 destGasOverhead = 50000
                 destBytesOverhead = 32)]
-            remoteTokens = Map.empty
-            outboundRateLimiters = Map.empty
-            inboundRateLimiters = Map.empty
-            inboundCustomRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-disabled" "test-rmn-disabled" "test-feequoter-pool-disabled" ccipOwner ccipOwner
 
     let senderAddr = MessageCodecV1.encodePartyAddress sender
     sendingMessageCid <- submit ccipOwner do
@@ -1829,3 +1761,454 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
     bytes2 === 64
 
     debug "testFeeQuoterGetTokenTransferFee_PerDestination: PASSED"
+
+testLockReleaseTokenPool_ApplyChainUpdates : Script ()
+testLockReleaseTokenPool_ApplyChainUpdates = script do
+    owner <- allocateParty "owner"
+    ccipOwner <- allocateParty "ccip-owner"
+    let instanceId = "lnr-tp-1"
+
+    -- | Create LockReleaseTokenPool without any remote chain configs
+    tokenPoolCid <- submit owner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = owner
+            instanceId = "test-lock-release-pool"
+            instrumentId = HoldingV1.InstrumentId with
+                admin = ccipOwner
+                id = "LINK"
+            decimals = 8
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar" "test-rmn" "test-feequoter-pool" ccipOwner ccipOwner
+
+    -- | ======== Test 1 ========
+    -- | Add multiple chain configs
+    -- | ========================
+    let remoteChainSelectorsToRemove1 = []
+        chainsToAdd1 = [
+            LockReleaseTokenPool.ChainUpdate with
+                remoteChainSelector = 123.0
+                remotePools = []
+                remoteTokenAddress = "f43dc4783082e7f5ceb0f5e3bdff4a9acc3b0ace"
+                inboundCCVs = []
+                outboundCCVs = []
+                minBlockDepth = 0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+            ,LockReleaseTokenPool.ChainUpdate with
+                remoteChainSelector = 456.0
+                remotePools = ["11111111"]
+                remoteTokenAddress = "cf383e3c65a8f8ec69b3a4fbdf0ceed7de4cd6a2cdf1ff6f82fa2eb3addf7b2e960f"
+                inboundCCVs = []
+                outboundCCVs = []
+                minBlockDepth = 0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+            ]
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = remoteChainSelectorsToRemove1
+            chainsToAdd = chainsToAdd1
+    -- Fetch the updated TokenPool and verify the chain configs were added correctly
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config -> assertChainUpdateEqual config (head chainsToAdd1)
+    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 456.0" False
+        Some config -> assertChainUpdateEqual config (chainsToAdd1 !! 1)
+
+    -- | ======== Test 2 ========
+    -- | Update an existing and add a new chain config
+    -- | ========================
+    let remoteChainSelectorsToRemove2 = [456.0] -- remove the chain config for 456.0 so we can test that it gets replaced with the updated config
+        chainsToAdd2 = [
+            LockReleaseTokenPool.ChainUpdate with
+                remoteChainSelector = 456.0
+                remotePools = ["d4c6971c2ddba89df0e572d6f3bc5369da4af478"]
+                remoteTokenAddress = "410933dc7dd6966ba1c875ab1e19a997fd82c968"
+                inboundCCVs = [RawInstanceAddress.RawInstanceAddress "inbound-ccv-1@owner"]
+                outboundCCVs = [RawInstanceAddress.RawInstanceAddress "outbound-ccv-1@owner"]
+                minBlockDepth = 12
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner"
+            ,LockReleaseTokenPool.ChainUpdate with
+                remoteChainSelector = 789.0
+                remotePools = ["0e924f6aa7efe932fab131bfc7baa7a684dbb1f8", "ac5fab2bda87e867accdede1c7ff1eeaadb2dcac"]
+                remoteTokenAddress = "f43dc4783082e7f5ceb0f5e3bdff4a9acc3b0ace"
+                inboundCCVs = []
+                outboundCCVs = []
+                minBlockDepth = 0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+            ]
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = remoteChainSelectorsToRemove2
+            chainsToAdd = chainsToAdd2
+    -- Fetch the updated TokenPool and verify the chain configs were updated/added correctly
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    assertMsg "Expected 3 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 3)
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config -> assertChainUpdateEqual config (head chainsToAdd1) -- unchanged from Test 1
+    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 456.0" False
+        Some config -> assertChainUpdateEqual config (head chainsToAdd2) -- updated in Test 2
+    case Map.lookup 789.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 789.0" False
+        Some config -> assertChainUpdateEqual config (chainsToAdd2 !! 1) -- new in Test 2
+
+    -- | ======== Test 3 ========
+    -- | Remove a chain config
+    -- | ========================
+    let remoteChainSelectorsToRemove3 = [123.0]
+        chainsToAdd3 = []
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = remoteChainSelectorsToRemove3
+            chainsToAdd = chainsToAdd3
+    -- Fetch the updated TokenPool and verify the chain config was removed
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> pure () -- expected to be removed
+        Some _ -> assertMsg "Expected chain config for selector 123.0 to be removed" False
+    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 456.0" False
+        Some config -> assertChainUpdateEqual config (head chainsToAdd2) -- unchanged from Test 2
+    case Map.lookup 789.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 789.0" False
+        Some config -> assertChainUpdateEqual config (chainsToAdd2 !! 1) -- unchanged from Test 2
+
+    -- | ======== Test 4 ========
+    -- | Test invalid updates
+    -- | ========================
+    -- Attempt to remove a non-existent chain config 
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = [999.0] -- does not exist
+            chainsToAdd = []
+    -- Attempt to add a chain that already exists without removing it first
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 456.0 -- already exists from Test 2
+                    remotePools = []
+                    remoteTokenAddress = "0dc30564e1ee874ad293fe9562714b2d0c2e2b6c"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to add a chain with an invalid chain selector (negative)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = -1.0 -- invalid
+                    remotePools = []
+                    remoteTokenAddress = "0dc30564e1ee874ad293fe9562714b2d0c2e2b6c"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to add an invalid chain config (empty remote token address)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "" -- invalid
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to add an invalid chain config (duplicate CCVs in inboundCCVs)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = [RawInstanceAddress.RawInstanceAddress "inbound-ccv-1@owner", RawInstanceAddress.RawInstanceAddress "inbound-ccv-1@owner"] -- duplicate
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to add an invalid chain config (duplicate CCVs in outboundCCVs)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = [RawInstanceAddress.RawInstanceAddress "outbound-ccv-1@owner", RawInstanceAddress.RawInstanceAddress "outbound-ccv-1@owner"] -- duplicate
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+
+    -- Attempt to add an invalid chain config (empty inbound rate limiter address)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to add an invalid chain config (empty outbound rate limiter address)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
+                ]
+    -- Attempt to add an invalid chain config (duplicate remote pool addresses)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = ["11111111", "11111111"] -- duplicate
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to add an invalid chain config (identical rate limiter for inbound and outbound)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = []
+            chainsToAdd = [
+                LockReleaseTokenPool.ChainUpdate with
+                    remoteChainSelector = 999.0
+                    remotePools = []
+                    remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
+                ]
+
+    pure ()
+
+testLockReleaseTokenPool_UpdateRateLimiters : Script ()
+testLockReleaseTokenPool_UpdateRateLimiters = script do
+    owner <- allocateParty "owner"
+    ccipOwner <- allocateParty "ccip-owner"
+    let instanceId = "lnr-tp-1"
+
+    -- | Create LockReleaseTokenPool without existing remote chain config
+    tokenPoolCid <- submit owner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = owner
+            instanceId = "test-lock-release-pool"
+            instrumentId = HoldingV1.InstrumentId with
+                admin = ccipOwner
+                id = "LINK"
+            decimals = 8
+            remoteChainConfigs = Map.fromList [
+                (123.0, LockReleaseTokenPool.RemoteChainConfig with
+                    remotePools = []
+                    remoteTokenAddress = "f43dc4783082e7f5ceb0f5e3bdff4a9acc3b0ace"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner")
+                ,(456.0, LockReleaseTokenPool.RemoteChainConfig with
+                    remotePools = ["11111111"]
+                    remoteTokenAddress = "cf383e3c65a8f8ec69b3a4fbdf0ceed7de4cd6a2cdf1ff6f82fa2eb3addf7b2e960f"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                )
+                ]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar" "test-rmn" "test-feequoter-pool" ccipOwner ccipOwner
+
+    -- | ========= Test 1 ========
+    -- | Update multiple rate limiters for existing chain config
+    -- | ========================
+    let rateLimiterConfigArgs1 = [
+            LockReleaseTokenPool.RateLimiterConfigArgs with
+                remoteChainSelector = 123.0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner"
+            ,LockReleaseTokenPool.RateLimiterConfigArgs with
+                remoteChainSelector = 456.0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner"
+            ]
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = rateLimiterConfigArgs1
+    -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config -> assertRateLimiterConfigArgsEqual config (head rateLimiterConfigArgs1)
+    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 456.0" False
+        Some config -> assertRateLimiterConfigArgsEqual config (rateLimiterConfigArgs1 !! 1)
+
+    -- | ========= Test 2 ========
+    -- | Update a single rate limiter for existing chain config
+    -- | ========================
+    let rateLimiterConfigArgs2 = [
+            LockReleaseTokenPool.RateLimiterConfigArgs with
+                remoteChainSelector = 123.0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated-again@owner"
+                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated-again@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner" -- unchanged
+            ]
+    tokenPoolCid <- submit owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = rateLimiterConfigArgs2
+    -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config -> assertRateLimiterConfigArgsEqual config (head rateLimiterConfigArgs2)
+    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 456.0" False
+        Some config -> assertRateLimiterConfigArgsEqual config (rateLimiterConfigArgs1 !! 1) -- unchanged from Test 1
+    
+    -- | ========= Test 3 ========
+    -- | Invalid updates
+    -- | ========================
+    -- Attempt to update rate limiters for a non-existent chain config
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = [
+                LockReleaseTokenPool.RateLimiterConfigArgs with
+                    remoteChainSelector = 999.0 -- does not exist
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to update with an invalid chain selector (negative)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = [
+                LockReleaseTokenPool.RateLimiterConfigArgs with
+                    remoteChainSelector = -1.0 -- invalid
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to update with an invalid inbound rate limiter address (empty)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = [
+                LockReleaseTokenPool.RateLimiterConfigArgs with
+                    remoteChainSelector = 123.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+                ]
+    -- Attempt to update with an invalid outbound rate limiter address (empty)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = [
+                LockReleaseTokenPool.RateLimiterConfigArgs with
+                    remoteChainSelector = 123.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
+                ]   
+    -- Attempt to update with an identical rate limiter for both inbound and outbound (invalid)
+    submitMustFail owner do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.UpdateRateLimiters with
+            rateLimiterConfigArgs = [
+                LockReleaseTokenPool.RateLimiterConfigArgs with
+                    remoteChainSelector = 123.0
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
+                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
+                ]
+
+    pure ()
+
+-- Assertion helpers
+
+assertChainUpdateEqual : LockReleaseTokenPool.RemoteChainConfig -> LockReleaseTokenPool.ChainUpdate -> Script ()
+assertChainUpdateEqual got expected = do
+    assertMsg ("remotePools mismatch, got: " <> show got.remotePools <> ", expected: " <> show expected.remotePools) (got.remotePools == expected.remotePools)
+    assertMsg ("remoteTokenAddress mismatch, got: " <> show got.remoteTokenAddress <> ", expected: " <> show expected.remoteTokenAddress) (got.remoteTokenAddress == expected.remoteTokenAddress) 
+    assertMsg ("inboundCCVs mismatch, got: " <> show got.inboundCCVs <> ", expected: " <> show expected.inboundCCVs) (got.inboundCCVs == expected.inboundCCVs)
+    assertMsg ("outboundCCVs mismatch, got: " <> show got.outboundCCVs <> ", expected: " <> show expected.outboundCCVs) (got.outboundCCVs == expected.outboundCCVs)
+    assertMsg ("minBlockDepth mismatch, got: " <> show got.minBlockDepth <> ", expected: " <> show expected.minBlockDepth) (got.minBlockDepth == expected.minBlockDepth)
+    assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
+    assertMsg ("inboundCustomRateLimiter mismatch, got: " <> show got.inboundCustomRateLimiter <> ", expected: " <> show expected.inboundCustomRateLimiter) (got.inboundCustomRateLimiter == expected.inboundCustomRateLimiter)
+    assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
+
+assertRateLimiterConfigArgsEqual : LockReleaseTokenPool.RemoteChainConfig -> LockReleaseTokenPool.RateLimiterConfigArgs -> Script ()
+assertRateLimiterConfigArgsEqual got expected = do
+    assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
+    assertMsg ("inboundCustomRateLimiter mismatch, got: " <> show got.inboundCustomRateLimiter <> ", expected: " <> show expected.inboundCustomRateLimiter) (got.inboundCustomRateLimiter == expected.inboundCustomRateLimiter)
+    assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)

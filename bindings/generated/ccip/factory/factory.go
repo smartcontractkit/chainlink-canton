@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "9331e4c57b63a1dece1f7aa54a03b00ee2a2b8c4b65fc1abaf1ba75aeb6a948e"
+	PackageID   = "daa0c632eff2c38f86dce2b8c0de4df8f1ee406243318ac26d89a00c914a0651"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1031,11 +1031,14 @@ func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
 
 // DeployLockReleaseTokenPoolParams is a Record type
 type DeployLockReleaseTokenPoolParams struct {
-	InstanceId   types.TEXT                               `json:"instanceId"`
-	CcipOwner    types.PARTY                              `json:"ccipOwner"`
-	PoolOwner    types.PARTY                              `json:"poolOwner"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals     types.INT64                              `json:"decimals"`
+	InstanceId         types.TEXT                               `json:"instanceId"`
+	CcipOwner          types.PARTY                              `json:"ccipOwner"`
+	PoolOwner          types.PARTY                              `json:"poolOwner"`
+	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Decimals           types.INT64                              `json:"decimals"`
+	TokenAdminRegistry common.RawInstanceAddress                `json:"tokenAdminRegistry"`
+	FeeQuoter          common.RawInstanceAddress                `json:"feeQuoter"`
+	RmnRemote          common.RawInstanceAddress                `json:"rmnRemote"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
@@ -1057,6 +1060,30 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	}()
 
 	m["decimals"] = int64(t.Decimals)
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
 	return m
 }

@@ -102,6 +102,9 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeParty params.poolOwner
   <> encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.rmnRemote
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
 encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
@@ -379,13 +382,18 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
   ccipOwner <- allocateParty "ccip_owner"
   poolOwner <- allocateParty "pool_owner"
   tokenAdmin <- allocateParty "token_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
 
-  let params : DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams with
+  let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
         ccipOwner
         poolOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
+        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" rmnOwner
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   case decodeDeployLockReleaseTokenPoolParams encoded of
@@ -395,6 +403,9 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
       decoded.ccipOwner === params.ccipOwner
       decoded.poolOwner === params.poolOwner
       decoded.instrumentId === params.instrumentId
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.rmnRemote === params.rmnRemote
       decoded.decimals === params.decimals
 
   pure ()
@@ -480,7 +491,7 @@ testDecodeDeployCCIPReceiverParams = script do
         instanceId = "receiver-1"
         owner
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
-        minBlockDepth = 5
+        minBlockDepth = 42
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
@@ -508,7 +519,7 @@ testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
     None -> abort "Failed to decode with empty requiredCCVs"
     Some decoded -> do
       decoded.requiredCCVs === []
-      decoded.minBlockDepth === 0
+      decoded.minBlockDepth === params.minBlockDepth
 
   pure ()
 

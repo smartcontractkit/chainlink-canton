@@ -1,83 +1,97 @@
 -- | Codec module for LockReleaseTokenPool MCMS parameter encoding/decoding
 -- Used by the MCMSReceiver interface implementation to decode operationData
 module CCIP.LockReleaseTokenPoolCodec
-  ( decodeUpdateChainPoolConfigsParams
-  , encodeUpdateChainPoolConfigsParams
+  ( encodeApplyChainUpdatesParams
+  , decodeApplyChainUpdatesParams
+  , encodeUpdateRateLimitersParams
+  , decodeUpdateRateLimitersParams
   ) where
 
 import MCMS.Codec
-  ( extractBytes
-  , encodeUint8
-  , decodeUint8
-  , encodeNumeric0
+  (
+    encodeNumeric0
   , decodeNumeric0At
   , encodeInt64
   , decodeInt64At
+  , encodeBytesHex
+  , decodeBytesHexAt
   , encodeBytesHexList
   , decodeBytesHexList
+  , encodeList
+  , decodeList
   )
 import CCIP.Codec
-  ( encodeRawInstanceAddressList
+  ( 
+    encodeRawInstanceAddress
+  , decodeRawInstanceAddressAt
+  , encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
 
 import DA.Crypto.Text (BytesHex)
-import DA.Map qualified as Map
 import DA.Optional (fromSome)
-import CCIP.LockReleaseTokenPoolTypes (ChainPoolConfig(..))
+import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RateLimiterConfigArgs(..))
 
--- ===========================================================================
--- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
--- ===========================================================================
+-- ApplyChainUpdates
 
--- | Decode UpdateChainPoolConfigs params
--- Format: [uint8 count][(numeric0 chainSelector, chainPoolConfig)...]
-decodeUpdateChainPoolConfigsParams : BytesHex -> Optional (Map.Map (Numeric 0) ChainPoolConfig)
-decodeUpdateChainPoolConfigsParams encoded = do
-  (entries, _) <- decodeChainPoolConfigMapEntries encoded 0
-  Some (Map.fromList entries)
+encodeApplyChainUpdatesParams : ([Numeric 0], [ChainUpdate]) -> BytesHex
+encodeApplyChainUpdatesParams (remoteChainSelectorsToRemove, chainsToAdd) =
+    encodeList remoteChainSelectorsToRemove encodeNumeric0 <>
+    encodeList chainsToAdd encodeChainUpdate
 
--- ===========================================================================
--- ENCODE FUNCTIONS (for tests and Go integration)
--- ===========================================================================
+decodeApplyChainUpdatesParams : BytesHex -> Optional ([Numeric 0], [ChainUpdate])
+decodeApplyChainUpdatesParams encoded = do
+    (remoteChainSelectorsToRemove, offset) <- decodeList encoded 0 decodeNumeric0At
+    (chainsToAdd, _) <- decodeList encoded offset decodeChainUpdateAt
+    Some (remoteChainSelectorsToRemove, chainsToAdd)
 
--- | Encode UpdateChainPoolConfigs params
-encodeUpdateChainPoolConfigsParams : Map.Map (Numeric 0) ChainPoolConfig -> BytesHex
-encodeUpdateChainPoolConfigsParams configs =
-  let entries = Map.toList configs
-      count = length entries
-  in fromSome (encodeUint8 count) <> foldl (\acc (k, v) -> acc <> encodeNumeric0 k <> encodeChainPoolConfig v) "" entries
+encodeChainUpdate : ChainUpdate -> BytesHex
+encodeChainUpdate chainUpdate =
+    encodeNumeric0 chainUpdate.remoteChainSelector <>
+    encodeBytesHexList chainUpdate.remotePools <>
+    encodeBytesHex chainUpdate.remoteTokenAddress <>
+    encodeRawInstanceAddressList chainUpdate.inboundCCVs <>
+    encodeRawInstanceAddressList chainUpdate.outboundCCVs <>
+    fromSome (encodeInt64 chainUpdate.minBlockDepth) <>
+    encodeRawInstanceAddress chainUpdate.inboundRateLimiter <>
+    encodeRawInstanceAddress chainUpdate.inboundCustomRateLimiter <>
+    encodeRawInstanceAddress chainUpdate.outboundRateLimiter
 
--- ===========================================================================
--- CHAIN POOL CONFIG ENCODING/DECODING
--- Format: [rawInstanceAddressList inboundCCVs][rawInstanceAddressList outboundCCVs]
---         [int64 minBlockDepth][bytesHexList remotePools]
--- ===========================================================================
+decodeChainUpdateAt : BytesHex -> Int -> Optional (ChainUpdate, Int)
+decodeChainUpdateAt encoded offset = do
+    (remoteChainSelector, offset) <- decodeNumeric0At encoded offset
+    (remotePools, offset) <- decodeBytesHexList encoded offset
+    (remoteTokenAddress, offset) <- decodeBytesHexAt encoded offset
+    (inboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
+    (outboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
+    (minBlockDepth, offset) <- decodeInt64At encoded offset
+    (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (inboundCustomRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter}, offset)
 
-encodeChainPoolConfig : ChainPoolConfig -> BytesHex
-encodeChainPoolConfig cpc =
-  encodeRawInstanceAddressList cpc.inboundCCVs <>
-  encodeRawInstanceAddressList cpc.outboundCCVs <>
-  fromSome (encodeInt64 cpc.minBlockDepth) <>
-  encodeBytesHexList cpc.remotePools
+-- UpdateRateLimiters
 
-decodeChainPoolConfigAt : BytesHex -> Int -> Optional (ChainPoolConfig, Int)
-decodeChainPoolConfigAt encoded offset = do
-  (inboundCCVs, offset1) <- decodeRawInstanceAddressList encoded offset
-  (outboundCCVs, offset2) <- decodeRawInstanceAddressList encoded offset1
-  (minBlockDepth, offset3) <- decodeInt64At encoded offset2
-  (remotePools, offset4) <- decodeBytesHexList encoded offset3
-  Some (ChainPoolConfig inboundCCVs outboundCCVs minBlockDepth remotePools, offset4)
+encodeUpdateRateLimitersParams : [RateLimiterConfigArgs] -> BytesHex
+encodeUpdateRateLimitersParams rateLimiterConfigArgsList =
+    encodeList rateLimiterConfigArgsList encodeRateLimiterConfigArgs
 
-decodeChainPoolConfigMapEntries : BytesHex -> Int -> Optional ([(Numeric 0, ChainPoolConfig)], Int)
-decodeChainPoolConfigMapEntries encoded offset = do
-  countHex <- extractBytes encoded offset 1
-  count <- decodeUint8 countHex
-  decodeChainPoolConfigMapEntriesHelper encoded (offset + 1) count []
+decodeUpdateRateLimitersParams : BytesHex -> Optional [RateLimiterConfigArgs]
+decodeUpdateRateLimitersParams encoded = do
+    (rateLimiterConfigArgsList, _) <- decodeList encoded 0 decodeRateLimiterConfigArgsAt
+    Some rateLimiterConfigArgsList
 
-decodeChainPoolConfigMapEntriesHelper : BytesHex -> Int -> Int -> [(Numeric 0, ChainPoolConfig)] -> Optional ([(Numeric 0, ChainPoolConfig)], Int)
-decodeChainPoolConfigMapEntriesHelper encoded offset 0 acc = Some (reverse acc, offset)
-decodeChainPoolConfigMapEntriesHelper encoded offset remaining acc = do
-  (chainSelector, offset1) <- decodeNumeric0At encoded offset
-  (config, offset2) <- decodeChainPoolConfigAt encoded offset1
-  decodeChainPoolConfigMapEntriesHelper encoded offset2 (remaining - 1) ((chainSelector, config) :: acc)
+encodeRateLimiterConfigArgs : RateLimiterConfigArgs -> BytesHex
+encodeRateLimiterConfigArgs args =
+    encodeNumeric0 args.remoteChainSelector <>
+    encodeRawInstanceAddress args.inboundRateLimiter <>
+    encodeRawInstanceAddress args.inboundCustomRateLimiter <>
+    encodeRawInstanceAddress args.outboundRateLimiter
+
+decodeRateLimiterConfigArgsAt : BytesHex -> Int -> Optional (RateLimiterConfigArgs, Int)
+decodeRateLimiterConfigArgsAt encoded offset = do
+    (remoteChainSelector, offset) <- decodeNumeric0At encoded offset
+    (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (inboundCustomRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    Some (RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter}, offset)

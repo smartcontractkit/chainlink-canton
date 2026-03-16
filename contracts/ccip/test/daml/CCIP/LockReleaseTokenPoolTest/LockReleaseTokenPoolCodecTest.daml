@@ -3,222 +3,93 @@ module CCIP.LockReleaseTokenPoolTest.LockReleaseTokenPoolCodecTest where
 
 import Daml.Script
 import DA.Assert ((===))
-import DA.Map qualified as Map
+import DA.Foldable
 
 import CCIP.LockReleaseTokenPoolCodec
-import CCIP.LockReleaseTokenPool (ChainPoolConfig(..))
+import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RateLimiterConfigArgs(..))
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
--- CHAIN POOL CONFIG ENCODING/DECODING TESTS
+-- CHAIN UPDATE ENCODING/DECODING TESTS
 -- ===========================================================================
 
-testUpdateChainPoolConfigsParamsRoundtrip : Script ()
-testUpdateChainPoolConfigsParamsRoundtrip = do
-  let config1 = ChainPoolConfig with
-        inboundCCVs = [RawInstanceAddress "ccv-inbound@party1"]
-        outboundCCVs = [RawInstanceAddress "ccv-outbound@party1", RawInstanceAddress "ccv-out2@party2"]
-        minBlockDepth = 0
-        remotePools = ["1234567890abcdef", "fedcba0987654321"]
+testApplyChainUpdatesParamsRoundtrip : Script ()
+testApplyChainUpdatesParamsRoundtrip = do
+    let args = (
+            [2.0, 3.0],  -- remoteChainSelectorsToRemove
+            [ 
+                ChainUpdate with
+                    remoteChainSelector = 1.0
+                    remotePools = ["1234567890abcdef", "fedcba0987654321"]
+                    remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                    inboundCCVs = [RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress "ccv-inbound2@party2"]
+                    outboundCCVs = [RawInstanceAddress "ccv-outbound@party1"]
+                    minBlockDepth = 0
+                    inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
+                ,ChainUpdate with
+                    remoteChainSelector = 18446744073709551615.0 -- max uint64
+                    remotePools = []
+                    remoteTokenAddress = ""
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 7
+                    inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
+                ,ChainUpdate with
+                    remoteChainSelector = 0.0
+                    remotePools = []
+                    remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
+                    inboundCCVs = []
+                    outboundCCVs = []
+                    minBlockDepth = 3
+                    inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
+            ]
+            )
+  
+    let encoded = encodeApplyChainUpdatesParams args
 
-      config2 = ChainPoolConfig with
-        inboundCCVs = []
-        outboundCCVs = [RawInstanceAddress "single-ccv@owner"]
-        minBlockDepth = 0
-        remotePools = ["deadbeef"]
-
-      configs = Map.fromList [
-        (1.0, config1),
-        (137.0, config2)
-        ]
-
-      encoded = encodeUpdateChainPoolConfigsParams configs
-
-  case decodeUpdateChainPoolConfigsParams encoded of
-    None -> abort "Failed to decode UpdateChainPoolConfigs params"
-    Some decodedConfigs -> do
-      Map.size decodedConfigs === 2
-
-      case Map.lookup 1.0 decodedConfigs of
-        None -> abort "Expected config for chain 1"
-        Some c -> do
-          length c.inboundCCVs === 1
-          length c.outboundCCVs === 2
-          length c.remotePools === 2
-
-      case Map.lookup 137.0 decodedConfigs of
-        None -> abort "Expected config for chain 137"
-        Some c -> do
-          c.inboundCCVs === []
-          length c.outboundCCVs === 1
-          length c.remotePools === 1
-
-  pure ()
-
-testUpdateChainPoolConfigsEmptyMap : Script ()
-testUpdateChainPoolConfigsEmptyMap = do
-  let configs : Map.Map (Numeric 0) ChainPoolConfig = Map.empty
-      encoded = encodeUpdateChainPoolConfigsParams configs
-
-  case decodeUpdateChainPoolConfigsParams encoded of
-    None -> abort "Failed to decode empty UpdateChainPoolConfigs params"
-    Some decodedConfigs ->
-      Map.size decodedConfigs === 0
-
-  pure ()
-
-testUpdateChainPoolConfigsSingleEntry : Script ()
-testUpdateChainPoolConfigsSingleEntry = do
-  let config = ChainPoolConfig with
-        inboundCCVs = [RawInstanceAddress "in@p1", RawInstanceAddress "in@p2"]
-        outboundCCVs = [RawInstanceAddress "out@p1"]
-        minBlockDepth = 0
-        remotePools = ["aabb", "ccdd", "eeff"]
-
-      configs = Map.fromList [(42161.0, config)]  -- Arbitrum
-
-      encoded = encodeUpdateChainPoolConfigsParams configs
-
-  case decodeUpdateChainPoolConfigsParams encoded of
-    None -> abort "Failed to decode single entry UpdateChainPoolConfigs params"
-    Some decodedConfigs -> do
-      Map.size decodedConfigs === 1
-      case Map.lookup 42161.0 decodedConfigs of
-        None -> abort "Expected config for chain 42161"
-        Some c -> do
-          length c.inboundCCVs === 2
-          length c.outboundCCVs === 1
-          length c.remotePools === 3
-
-  pure ()
+    case decodeApplyChainUpdatesParams encoded of
+        None -> abort "Failed to decode ApplyChainUpdates params"
+        Some (decodedSelectorsToRemove, decodedChainUpdates) -> do
+            decodedSelectorsToRemove === fst args
+            forA_ (zip decodedChainUpdates (snd args)) $ uncurry assertChainUpdateEqual
 
 -- ===========================================================================
--- CHAIN POOL CONFIG WITH LARGE CHAIN SELECTOR TESTS
+-- RATE LIMITER CONFIG ENCODING/DECODING TESTS
 -- ===========================================================================
 
-testUpdateChainPoolConfigsLargeSelector : Script ()
-testUpdateChainPoolConfigsLargeSelector = do
-  -- Test with CCIP-style large chain selector
-  let largeSelector : Numeric 0 = 16015286601757825753.0
-      config = ChainPoolConfig with
-        inboundCCVs = []
-        outboundCCVs = []
-        minBlockDepth = 0
-        remotePools = ["00112233"]
+testRateLimiterConfigArgsRoundtrip : Script ()
+testRateLimiterConfigArgsRoundtrip = do
+    let args = [
+            RateLimiterConfigArgs with
+                remoteChainSelector = 1.0
+                inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
+                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
+                outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
+            ,RateLimiterConfigArgs with
+                remoteChainSelector = 18446744073709551615.0 -- max uint64
+                inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party2"
+                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party2"
+                outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party2"
+            ,RateLimiterConfigArgs with
+                remoteChainSelector = 0.0
+                inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party3"
+                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party3"
+                outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party3"
+            ]
+    
+    let encoded = encodeUpdateRateLimitersParams args
 
-      configs = Map.fromList [(largeSelector, config)]
-      encoded = encodeUpdateChainPoolConfigsParams configs
+    case decodeUpdateRateLimitersParams encoded of
+        None -> abort "Failed to decode RateLimiterConfigArgs list"
+        Some decodedArgs -> do
+            forA_ (zip decodedArgs args) $ uncurry assertRateLimiterConfigArgsEqual
 
-  case decodeUpdateChainPoolConfigsParams encoded of
-    None -> abort "Failed to decode large selector UpdateChainPoolConfigs params"
-    Some decodedConfigs -> do
-      Map.size decodedConfigs === 1
-      case Map.lookup largeSelector decodedConfigs of
-        None -> abort "Expected config for large selector"
-        Some c -> c.remotePools === ["00112233"]
-
-  pure ()
-
-testUpdateChainPoolConfigsEdgeCases : Script ()
-testUpdateChainPoolConfigsEdgeCases = do
-  let emptyConfig = ChainPoolConfig [] [] 0 []
-
-  -- Test zero selector
-  let zeroSelector : Numeric 0 = 0.0
-      zeroConfigs = Map.fromList [(zeroSelector, emptyConfig)]
-      encodedZero = encodeUpdateChainPoolConfigsParams zeroConfigs
-  case decodeUpdateChainPoolConfigsParams encodedZero of
-    None -> abort "Failed to decode zero selector"
-    Some decoded -> case Map.lookup zeroSelector decoded of
-      None -> abort "Expected config for zero selector"
-      Some _ -> pure ()
-
-  -- Test max uint64 selector
-  let maxUint64 : Numeric 0 = 18446744073709551615.0
-      maxConfigs = Map.fromList [(maxUint64, emptyConfig)]
-      encodedMax = encodeUpdateChainPoolConfigsParams maxConfigs
-  case decodeUpdateChainPoolConfigsParams encodedMax of
-    None -> abort "Failed to decode max uint64 selector"
-    Some decoded -> case Map.lookup maxUint64 decoded of
-      None -> abort "Expected config for max uint64 selector"
-      Some _ -> pure ()
-
-  pure ()
-
--- ===========================================================================
--- RAW INSTANCE ADDRESS LIST TESTS
--- ===========================================================================
-
-testChainPoolConfigWithManyAddresses : Script ()
-testChainPoolConfigWithManyAddresses = do
-  let addresses = [
-        RawInstanceAddress "ccv1@party1",
-        RawInstanceAddress "ccv2@party2",
-        RawInstanceAddress "ccv3@party3",
-        RawInstanceAddress "ccv4@party4",
-        RawInstanceAddress "ccv5@party5"
-        ]
-
-      config = ChainPoolConfig with
-        inboundCCVs = addresses
-        outboundCCVs = addresses
-        minBlockDepth = 0
-        remotePools = ["aabb01", "ccdd02", "eeff03", "112233", "445566"]
-
-      configs = Map.fromList [(1.0, config)]
-      encoded = encodeUpdateChainPoolConfigsParams configs
-
-  case decodeUpdateChainPoolConfigsParams encoded of
-    None -> abort "Failed to decode config with many addresses"
-    Some decodedConfigs ->
-      case Map.lookup 1.0 decodedConfigs of
-        None -> abort "Expected config"
-        Some c -> do
-          length c.inboundCCVs === 5
-          length c.outboundCCVs === 5
-          length c.remotePools === 5
-
-  pure ()
-
--- ===========================================================================
--- BYTES HEX LIST (REMOTE POOLS) TESTS
--- ===========================================================================
-
-testRemotePoolsVariousLengths : Script ()
-testRemotePoolsVariousLengths = do
-  let config = ChainPoolConfig with
-        inboundCCVs = []
-        outboundCCVs = []
-        minBlockDepth = 0
-        remotePools = [
-          "00",                                  -- 1 byte
-          "0011",                                -- 2 bytes
-          "001122334455",                        -- 6 bytes
-          "00112233445566778899aabbccddeeff",   -- 16 bytes
-          "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"  -- 32 bytes
-          ]
-
-      configs = Map.fromList [(1.0, config)]
-      encoded = encodeUpdateChainPoolConfigsParams configs
-
-  case decodeUpdateChainPoolConfigsParams encoded of
-    None -> abort "Failed to decode config with various pool lengths"
-    Some decodedConfigs ->
-      case Map.lookup 1.0 decodedConfigs of
-        None -> abort "Expected config"
-        Some c -> do
-          length c.remotePools === 5
-          -- Verify pools are decoded correctly
-          case c.remotePools of
-            [p1, p2, p3, p4, p5] -> do
-              p1 === "00"
-              p2 === "0011"
-              p3 === "001122334455"
-              p4 === "00112233445566778899aabbccddeeff"
-              p5 === "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
-            _ -> abort "Expected 5 remote pools"
-
-  pure ()
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -227,13 +98,29 @@ testRemotePoolsVariousLengths = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case decodeUpdateChainPoolConfigsParams "" of
+  case decodeApplyChainUpdatesParams "" of
     None -> pure ()  -- Expected
-    Some _ -> abort "Expected decodeUpdateChainPoolConfigsParams to fail on empty data"
-
-  -- Truncated count should handle gracefully (0 items)
-  case decodeUpdateChainPoolConfigsParams "00" of
-    None -> abort "Should decode 0-count as empty map"
-    Some configs -> Map.size configs === 0
+    Some _ -> abort "Expected decodeApplyChainUpdatesParams to fail on empty data"
 
   pure ()
+
+
+-- Assertion helpers
+assertChainUpdateEqual : ChainUpdate -> ChainUpdate -> Script ()
+assertChainUpdateEqual got expected = do
+    assertMsg ("remoteChainSelector mismatch, got: " <> show got.remoteChainSelector <> ", expected: " <> show expected.remoteChainSelector) (got.remoteChainSelector == expected.remoteChainSelector)
+    assertMsg ("remotePools mismatch, got: " <> show got.remotePools <> ", expected: " <> show expected.remotePools) (got.remotePools == expected.remotePools)
+    assertMsg ("remoteTokenAddress mismatch, got: " <> show got.remoteTokenAddress <> ", expected: " <> show expected.remoteTokenAddress) (got.remoteTokenAddress == expected.remoteTokenAddress) 
+    assertMsg ("inboundCCVs mismatch, got: " <> show got.inboundCCVs <> ", expected: " <> show expected.inboundCCVs) (got.inboundCCVs == expected.inboundCCVs)
+    assertMsg ("outboundCCVs mismatch, got: " <> show got.outboundCCVs <> ", expected: " <> show expected.outboundCCVs) (got.outboundCCVs == expected.outboundCCVs)
+    assertMsg ("minBlockDepth mismatch, got: " <> show got.minBlockDepth <> ", expected: " <> show expected.minBlockDepth) (got.minBlockDepth == expected.minBlockDepth)
+    assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
+    assertMsg ("inboundCustomRateLimiter mismatch, got: " <> show got.inboundCustomRateLimiter <> ", expected: " <> show expected.inboundCustomRateLimiter) (got.inboundCustomRateLimiter == expected.inboundCustomRateLimiter)
+    assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
+
+assertRateLimiterConfigArgsEqual : RateLimiterConfigArgs -> RateLimiterConfigArgs -> Script ()
+assertRateLimiterConfigArgsEqual got expected = do
+    assertMsg ("remoteChainSelector mismatch, got: " <> show got.remoteChainSelector <> ", expected: " <> show expected.remoteChainSelector) (got.remoteChainSelector == expected.remoteChainSelector)
+    assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
+    assertMsg ("inboundCustomRateLimiter mismatch, got: " <> show got.inboundCustomRateLimiter <> ", expected: " <> show expected.inboundCustomRateLimiter) (got.inboundCustomRateLimiter == expected.inboundCustomRateLimiter)
+    assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)

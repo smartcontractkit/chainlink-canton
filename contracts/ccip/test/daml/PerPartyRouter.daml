@@ -383,7 +383,7 @@ testCCIPExecute = script do
             finality = 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
-            offRampAddress = "0000000000000000000000000000000000000002"
+            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner)
             sender = "0000000000000000000000000000000000000003"
             receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
@@ -429,7 +429,7 @@ testCCIPExecute = script do
 
     pure ()
 
-    -- | Test PrepareSend uses finalized-only send defaults and preserves token-only default CCV behavior.
+-- | Test PrepareSend keeps token-only default CCV behavior without per-message block confirmations.
 -- Executor finalization is tested separately; after PrepareSend message is always None.
 testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
@@ -540,8 +540,8 @@ testPrepareSendExtraArgs = script do
     disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
 
-    -- Message-only send keeps finalized-only defaults on Canton.
-    let receiver = "9df48df28ecc2863af9e90cde2e82fa62a9ee2c5"
+    -- Message-only send still defers message construction to the executor.
+    let receiver = "b8a3d7a9c797b5bd47f8c5efd96dadecf15ddd3c" -- 20 bytes
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
