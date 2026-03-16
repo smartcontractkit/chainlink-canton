@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -137,7 +135,7 @@ type CCIPSendFromRouterResult struct {
 	CcipMessageSent      types.CONTRACT_ID `json:"ccipMessageSent"`
 	VerifierBlobs        []types.TEXT      `json:"verifierBlobs"`
 	MessageSentObservers []types.PARTY     `json:"messageSentObservers"`
-	Receipts             []common.Receipt  `json:"receipts"`
+	Receipts             []Receipt         `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments
@@ -449,7 +447,7 @@ func (t OnRamp) ArchiveWithPackageID(contractID string, packageID string) *model
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this OnRamp contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t OnRamp) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t OnRamp) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "MCMSReceiver"),
 		ContractID: contractID,
@@ -459,7 +457,7 @@ func (t OnRamp) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiver
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t OnRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t OnRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "MCMSReceiver"),
 		ContractID: contractID,
@@ -470,15 +468,15 @@ func (t OnRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID
 
 // Verify interface implementations for OnRamp
 
-var _ mcms.IMCMSReceiver = (*OnRamp)(nil)
+var _ IMCMSReceiver = (*OnRamp)(nil)
 
 // OnRampDeps is a Record type
 type OnRampDeps struct {
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        RawInstanceAddress `json:"ccvRegistry"`
 }
 
 // ToMap converts OnRampDeps to a map for DAML arguments
@@ -564,7 +562,7 @@ type PrepareSendFromRouter struct {
 	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
 	BlockConfirmations    *types.INT64                              `json:"blockConfirmations" hex:"optional"`
 	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
-	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
+	SenderRequiredCCVs    []RawInstanceAddress                      `json:"senderRequiredCCVs"`
 	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver         *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
 	TokenArgs             types.TEXT                                `json:"tokenArgs"`
@@ -746,11 +744,11 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	CcvRegistry        *common.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
+	GlobalConfig       *RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	CcvRegistry        *RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments

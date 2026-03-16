@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -170,9 +169,9 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
-	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
-	VerifierArgs    types.TEXT         `json:"verifierArgs"`
-	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
+	CcvCid          types.CONTRACT_ID `json:"ccvCid"`
+	VerifierArgs    types.TEXT        `json:"verifierArgs"`
+	CcvExtraContext CCIPContext       `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVSendInput to a map for DAML arguments
@@ -224,13 +223,13 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // CantonExtraArgsV1 is a Record type
 type CantonExtraArgsV1 struct {
-	GasLimit           types.INT64                 `json:"gasLimit"`
-	BlockConfirmations *types.INT64                `json:"blockConfirmations" hex:"optional"`
-	SenderRequiredCCVs []common.RawInstanceAddress `json:"senderRequiredCCVs"`
-	ExecutorCid        types.CONTRACT_ID           `json:"executorCid"`
-	ExecutorArgs       *types.TEXT                 `json:"executorArgs" hex:"optional"`
-	TokenReceiver      *types.TEXT                 `json:"tokenReceiver" hex:"optional"`
-	TokenArgs          types.TEXT                  `json:"tokenArgs"`
+	GasLimit           types.INT64          `json:"gasLimit"`
+	BlockConfirmations *types.INT64         `json:"blockConfirmations" hex:"optional"`
+	SenderRequiredCCVs []RawInstanceAddress `json:"senderRequiredCCVs"`
+	ExecutorCid        types.CONTRACT_ID    `json:"executorCid"`
+	ExecutorArgs       *types.TEXT          `json:"executorArgs" hex:"optional"`
+	TokenReceiver      *types.TEXT          `json:"tokenReceiver" hex:"optional"`
+	TokenArgs          types.TEXT           `json:"tokenArgs"`
 }
 
 // ToMap converts CantonExtraArgsV1 to a map for DAML arguments
@@ -322,7 +321,7 @@ func (t *CantonExtraArgsV1) UnmarshalHex(data string) error {
 
 // Send is a Record type
 type Send struct {
-	Context             common.CCIPContext                       `json:"context"`
+	Context             CCIPContext                              `json:"context"`
 	RouterCid           types.CONTRACT_ID                        `json:"routerCid"`
 	DestChainSelector   types.NUMERIC                            `json:"destChainSelector"`
 	Receiver            types.TEXT                               `json:"receiver"`
@@ -449,7 +448,7 @@ type TokenTransferInput struct {
 	SenderInputCids   []types.CONTRACT_ID                      `json:"senderInputCids"`
 	Amount            types.NUMERIC                            `json:"amount"`
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	PoolExtraContext  common.CCIPContext                       `json:"poolExtraContext"`
+	PoolExtraContext  CCIPContext                              `json:"poolExtraContext"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments

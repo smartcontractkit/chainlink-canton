@@ -1,10 +1,12 @@
 package tests
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
@@ -570,6 +572,14 @@ func queryTokenConfigFromContract(
 	return nil
 }
 
+// encodeInstrumentId matches Canton's CCIP.MessageCodecV1.encodeInstrumentId
+// which computes: keccak256(toHex(id <> "@" <> partyToText admin))
+func encodeInstrumentId(instrumentId splice.InstrumentId) string {
+	combined := string(instrumentId.Id) + "@" + string(instrumentId.Admin)
+	hash := crypto.Keccak256([]byte(combined))
+	return hex.EncodeToString(hash)
+}
+
 func parseTokenConfigFromGenMap(t *testing.T, tokenConfigs *apiv2.Value, instrumentId splice.InstrumentId) *tokenadminregistry.TokenConfig {
 	t.Helper()
 
@@ -579,27 +589,16 @@ func parseTokenConfigFromGenMap(t *testing.T, tokenConfigs *apiv2.Value, instrum
 		return nil
 	}
 
+	// The map key is BytesHex (encoded InstrumentId), not a Record
+	expectedKey := encodeInstrumentId(instrumentId)
+
 	for _, entry := range genMap.GetEntries() {
 		key := entry.GetKey()
 		value := entry.GetValue()
 
-		// Check if key matches our instrumentId
-		keyRecord := key.GetRecord()
-		if keyRecord == nil {
-			continue
-		}
-
-		var keyAdmin, keyId string
-		for _, field := range keyRecord.GetFields() {
-			switch field.GetLabel() {
-			case "admin":
-				keyAdmin = field.GetValue().GetParty()
-			case "id":
-				keyId = field.GetValue().GetText()
-			}
-		}
-
-		if keyAdmin == string(instrumentId.Admin) && keyId == string(instrumentId.Id) {
+		// Key is a Text (hex string), not a Record
+		keyText := key.GetText()
+		if keyText == expectedKey {
 			return parseTokenConfig(t, value)
 		}
 	}

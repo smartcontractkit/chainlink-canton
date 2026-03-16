@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -706,7 +705,7 @@ func (t FeeQuoter) ApplyFeeTokenUpdatesWithPackageID(contractID string, packageI
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this FeeQuoter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t FeeQuoter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t FeeQuoter) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -716,7 +715,7 @@ func (t FeeQuoter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSRecei
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -727,7 +726,7 @@ func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 
 // Verify interface implementations for FeeQuoter
 
-var _ mcms.IMCMSReceiver = (*FeeQuoter)(nil)
+var _ IMCMSReceiver = (*FeeQuoter)(nil)
 
 // FeeQuoterFinalizeFee is a Record type
 type FeeQuoterFinalizeFee struct {

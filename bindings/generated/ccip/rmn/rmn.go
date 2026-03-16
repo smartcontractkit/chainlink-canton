@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -911,7 +910,7 @@ func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID str
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this RMNRemote contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
@@ -921,7 +920,7 @@ func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSRecei
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
@@ -932,7 +931,7 @@ func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 
 // Verify interface implementations for RMNRemote
 
-var _ mcms.IMCMSReceiver = (*RMNRemote)(nil)
+var _ IMCMSReceiver = (*RMNRemote)(nil)
 
 // RemoveCustomObservers is a Record type
 type RemoveCustomObservers struct {

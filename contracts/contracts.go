@@ -98,7 +98,8 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 var OutputDirs = map[Package][]string{
 	Coin: []string{"coin"},
 
-	MCMS: []string{"mcms"},
+	MCMS:     []string{"mcms"},
+	MCMSTest: []string{"mcms", "mcmstest"},
 
 	CCIPReceiver:             []string{"ccip", "ccipreceiver"},
 	CCIPSender:               []string{"ccip", "ccipsender"},
