@@ -56,6 +56,13 @@ data TransferTimeout
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
 
+data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
+    with
+        tokenAdminRegistry : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+        feeQuoter : RawInstanceAddress
+    deriving (Eq, Show)
+
 parseSourcePoolDecimals : Int -> BytesHex -> Int
 parseSourcePoolDecimals localDecimals sourcePoolData =
     if sourcePoolData == ""
@@ -124,9 +131,6 @@ assertRateLimiter prefix poolInstanceId remoteChainSelector direction expected l
         (limiter.mode == CCIP.RateLimiter.RateLimitMode_DefaultFinality)
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
--- Performs best-effort RMN curse checks via disclosed RMNRemote contract.
--- The pool cannot validate the RMN instance address (not a stakeholder);
--- OnRamp/OffRamp/PrepareExecute perform the authoritative identity + curse checks.
 template LockReleaseTokenPool
     with
         instanceId : Text  -- Unique identifier for this pool instance
@@ -149,6 +153,7 @@ template LockReleaseTokenPool
         poolReceiveContext : CCIP.Context.CCIPContext
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
+        deps : LockReleaseTokenPoolDeps
     where
         signatory poolOwner
 
@@ -245,6 +250,11 @@ template LockReleaseTokenPool
             controller caller
             do
                 execMsg <- fetch executingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: executing message tokenAdminRegistry mismatch"
+                    (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
                 let message = execMsg.message
 
                 tt <- case message.tokenTransfer of
@@ -281,6 +291,11 @@ template LockReleaseTokenPool
             controller caller
             do
                 sm <- fetch sendingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: sending message tokenAdminRegistry mismatch"
+                    (sm.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
 
                 poolCCVs <- case Map.lookup sm.destChainSelector remoteChainConfigs of
                         None -> abort "pool: unsupported dest chain"
@@ -307,13 +322,18 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
-                -- Best-effort RMN curse check for the source chain (matches EVM
-                -- TokenPool._validateReleaseOrMint). The pool cannot validate
-                -- the RMN instance address (not a stakeholder); PrepareExecute
-                -- performs the authoritative identity + curse check.
                 ticket <- fetch tokenReceiveTicketCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
+                    (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
+                assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
+                    (ticket.ccipOwner == tokenAdminRegistry.owner)
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
-                -- Best-effort RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner
                     chainSelector = ticket.sourceChainSelector
@@ -347,9 +367,7 @@ template LockReleaseTokenPool
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
                     requested = ticket.amount
 
-                -- Consume ticket via TAR. The TAR validates the ticket was issued by
-                -- the correct registry instance and archives it. The TAR is not fetchable
-                -- by the pool (visibility), but the caller discloses it.
+                -- Consume ticket via TAR after validating the disclosed TAR identity.
                 exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_ConsumeReceiveTicket with
                         ticketCid = tokenReceiveTicketCid
@@ -448,7 +466,7 @@ template LockReleaseTokenPool
                     assertMsg "UpdateRateLimiters: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
                     assertMsg "UpdateRateLimiters: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
                     assertMsg ("UpdateRateLimiters: unsupported chain selector: " <> show remoteChainSelector) (Map.member remoteChainSelector remoteChainConfigs)
-                
+
                 -- Update
                 let remoteChainConfigsUpdated = foldl
                         (\configs RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, outboundRateLimiter} ->
@@ -476,6 +494,12 @@ template LockReleaseTokenPool
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
+                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                assertMsg "pool: sending message feeQuoter mismatch"
+                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
+                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector chainFeeConfigs of
                 -- Check if fee config is enabled for the destination chain.
                 -- If no config is set/it's disabled, use the FeeQuoter defaults. If enabled, use the specified fee parameters.
                 (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
@@ -515,6 +539,11 @@ template LockReleaseTokenPool
             controller caller, poolOwner
             do
                 sendingMsg <- fetch sendingMessageCid
+                rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                assertMsg "LockOrBurn: sending message rmn mismatch"
+                    (sendingMsg.deps.rmnRemote == deps.rmnRemote)
 
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner

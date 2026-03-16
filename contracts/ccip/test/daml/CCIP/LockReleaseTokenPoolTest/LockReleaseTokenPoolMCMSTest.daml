@@ -15,6 +15,14 @@ import CCIP.LockReleaseTokenPoolCodec
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.Context
 
+dummyPoolDeps : Party -> LockReleaseTokenPoolDeps
+dummyPoolDeps ccipOwner =
+  LockReleaseTokenPoolDeps with
+    tokenAdminRegistry = RawInstanceAddress ("dummy-tar@" <> partyToText ccipOwner)
+    rmnRemote = RawInstanceAddress ("dummy-rmn@" <> partyToText ccipOwner)
+    feeQuoter = RawInstanceAddress ("dummy-fq@" <> partyToText ccipOwner)
+
+
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - ApplyChainUpdates
 -- ===========================================================================
@@ -41,6 +49,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+      deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -108,6 +117,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = RelativeHours 24
+      deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -176,18 +186,19 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
             inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
             outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
 
-    -- Create LockReleaseTokenPool with existing remote chain config
-    poolCid <- submit poolOwner do
-        createCmd LockReleaseTokenPool with
-            instanceId
-            ccipOwner
-            poolOwner
-            instrumentId
-            decimals = 18
+  -- Create LockReleaseTokenPool with existing config
+  poolCid <- submit poolOwner do
+    createCmd LockReleaseTokenPool with
+      instanceId
+      ccipOwner
+      poolOwner
+      instrumentId
+      decimals = 18
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
-            transferTimeout = RelativeHours 24
+      poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+      transferTimeout = Indefinite
+      deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -246,6 +257,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+      deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -280,6 +292,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+      deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -314,6 +327,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+      deps = dummyPoolDeps ccipOwner
 
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
@@ -349,7 +363,7 @@ toAnyContractId = coerceContractId
 assertChainUpdateEqual : RemoteChainConfig -> ChainUpdate -> Script ()
 assertChainUpdateEqual got expected = do
     assertMsg ("remotePools mismatch, got: " <> show got.remotePools <> ", expected: " <> show expected.remotePools) (got.remotePools == expected.remotePools)
-    assertMsg ("remoteTokenAddress mismatch, got: " <> show got.remoteTokenAddress <> ", expected: " <> show expected.remoteTokenAddress) (got.remoteTokenAddress == expected.remoteTokenAddress) 
+    assertMsg ("remoteTokenAddress mismatch, got: " <> show got.remoteTokenAddress <> ", expected: " <> show expected.remoteTokenAddress) (got.remoteTokenAddress == expected.remoteTokenAddress)
     assertMsg ("inboundCCVs mismatch, got: " <> show got.inboundCCVs <> ", expected: " <> show expected.inboundCCVs) (got.inboundCCVs == expected.inboundCCVs)
     assertMsg ("outboundCCVs mismatch, got: " <> show got.outboundCCVs <> ", expected: " <> show expected.outboundCCVs) (got.outboundCCVs == expected.outboundCCVs)
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)

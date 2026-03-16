@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "cb1fd95f9bff3f661ca19f4cd37bf0d6cc389c5ef3cdd6575cf6f76c4de41b05"
+	PackageID   = "5bc370651d021aed2288cc568c123c4214f329bb1e5256e73b0c3095df339b5b"
 	SDKVersion  = "3.4.10"
 )
 
@@ -240,13 +240,13 @@ func (t *CurseMultiple) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// FetchRawInstanceAddress is a Record type
-type FetchRawInstanceAddress struct {
+// Get is a Record type
+type Get struct {
 	Caller types.PARTY `json:"caller"`
 }
 
-// ToMap converts FetchRawInstanceAddress to a map for DAML arguments
-func (t FetchRawInstanceAddress) ToMap() map[string]any {
+// ToMap converts Get to a map for DAML arguments
+func (t Get) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["caller"] = t.Caller.ToMap()
@@ -254,41 +254,41 @@ func (t FetchRawInstanceAddress) ToMap() map[string]any {
 	return m
 }
 
-func (t FetchRawInstanceAddress) MarshalJSON() ([]byte, error) {
+func (t Get) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *FetchRawInstanceAddress) UnmarshalJSON(data []byte) error {
+func (t *Get) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes FetchRawInstanceAddress to hex string (Canton MCMS format)
-func (t FetchRawInstanceAddress) MarshalHex() (string, error) {
+// MarshalHex encodes Get to hex string (Canton MCMS format)
+func (t Get) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes FetchRawInstanceAddress from hex string (Canton MCMS format)
-func (t *FetchRawInstanceAddress) UnmarshalHex(data string) error {
+// UnmarshalHex decodes Get from hex string (Canton MCMS format)
+func (t *Get) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// FetchRawInstanceAddressMCMSParams is FetchRawInstanceAddress without the Caller field for MCMS operationData encoding.
+// GetMCMSParams is Get without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
-type FetchRawInstanceAddressMCMSParams struct {
+type GetMCMSParams struct {
 }
 
-// MarshalHex encodes FetchRawInstanceAddressMCMSParams to hex string for MCMS operationData.
-func (t FetchRawInstanceAddressMCMSParams) MarshalHex() (string, error) {
+// MarshalHex encodes GetMCMSParams to hex string for MCMS operationData.
+func (t GetMCMSParams) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes FetchRawInstanceAddressMCMSParams from hex string.
-func (t *FetchRawInstanceAddressMCMSParams) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetMCMSParams from hex string.
+func (t *GetMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -762,23 +762,23 @@ func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *mo
 	}
 }
 
-// FetchRawInstanceAddress exercises the FetchRawInstanceAddress choice on this RMNRemote contract
+// Get exercises the Get choice on this RMNRemote contract
 // This method uses the package name in the template ID
-func (t RMNRemote) FetchRawInstanceAddress(contractID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
+func (t RMNRemote) Get(contractID string, args Get) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "FetchRawInstanceAddress",
+		Choice:     "Get",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// FetchRawInstanceAddressWithPackageID exercises the FetchRawInstanceAddress choice using the provided package ID instead of package name
-func (t RMNRemote) FetchRawInstanceAddressWithPackageID(contractID string, packageID string, args FetchRawInstanceAddress) *model.ExerciseCommand {
+// GetWithPackageID exercises the Get choice using the provided package ID instead of package name
+func (t RMNRemote) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
-		Choice:     "FetchRawInstanceAddress",
+		Choice:     "Get",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1166,8 +1166,8 @@ type MCMSEncoder interface {
 	CurseChain(args CurseChain) (*bind.EncodedChoice, error)
 	CurseGlobal(args CurseGlobal) (*bind.EncodedChoice, error)
 	CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error)
-	FetchRawInstanceAddress(args FetchRawInstanceAddress) (*bind.EncodedChoice, error)
-	FetchRawInstanceAddressMCMSParams(args FetchRawInstanceAddressMCMSParams) (*bind.EncodedChoice, error)
+	Get(args Get) (*bind.EncodedChoice, error)
+	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	GetCursedSubjects(args GetCursedSubjects) (*bind.EncodedChoice, error)
 	GetCursedSubjectsMCMSParams(args GetCursedSubjectsMCMSParams) (*bind.EncodedChoice, error)
 	IsCursed(args IsCursed) (*bind.EncodedChoice, error)
@@ -1234,14 +1234,14 @@ func (e *encoder) CurseMultiple(args CurseMultiple) (*bind.EncodedChoice, error)
 	return e.EncodeChoiceArgs("CurseMultiple", args)
 }
 
-// FetchRawInstanceAddress encodes parameters for the FetchRawInstanceAddress choice.
-func (e *encoder) FetchRawInstanceAddress(args FetchRawInstanceAddress) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FetchRawInstanceAddress", args)
+// Get encodes parameters for the Get choice.
+func (e *encoder) Get(args Get) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Get", args)
 }
 
-// FetchRawInstanceAddressMCMSParams encodes MCMS parameters (without Caller) for the FetchRawInstanceAddress choice.
-func (e *encoder) FetchRawInstanceAddressMCMSParams(args FetchRawInstanceAddressMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FetchRawInstanceAddress", args)
+// GetMCMSParams encodes MCMS parameters (without Caller) for the Get choice.
+func (e *encoder) GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Get", args)
 }
 
 // GetCursedSubjects encodes parameters for the GetCursedSubjects choice.
