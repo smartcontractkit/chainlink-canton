@@ -1211,7 +1211,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(opts.ExecutionGasLimit),
-			BlockConfirmations: nil,
 			SenderRequiredCCVs: senderRequiredCCVs,
 			ExecutorCid:        executorCID,
 			ExecutorArgs:       nil,

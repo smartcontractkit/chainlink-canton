@@ -41,6 +41,13 @@ usdToCents d = intToNumeric (truncate (d * 100.0))
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
+mkInboundRateLimiterContext : ContractId RateLimiter.RateLimiter -> ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
+mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomRateLimiterCid = CCIP.Context.CCIPContext with
+    values = TextMap.fromList
+        [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue inboundRateLimiterCid)
+        , (RateLimiter.inboundCustomRateLimiterKey, CCIP.Context.toAnyValue inboundCustomRateLimiterCid)
+        ]
+
 mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
 mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
@@ -436,7 +443,7 @@ testReleaseFromTicket = script do
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = mkRateLimiterContext inboundRateLimiter
+            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -599,7 +606,7 @@ testReleaseFromTicketDecimalConversion = script do
             tokenReceiveTicketCid = tokenReceiveTicket
             tokenAdminRegistryCid = tokenAdminRegistry
             rmnRemoteCid = rmnRemote
-            extraContext = mkRateLimiterContext inboundRateLimiter
+            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
             tokenInput = tokenInput
             caller = receiver
 
@@ -919,7 +926,7 @@ testVerifyInboundMessage = script do
             remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
             inboundCCVs = [ccvAddr]
             outboundCCVs = []
-            minBlockDepth = 0
+            minBlockDepth = 2000
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
