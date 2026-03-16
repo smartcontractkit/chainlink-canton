@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "5a77b97b1f74662467a569a835cd30b41e55005ea0e29ca4e9cf7b95da5500a6"
+	PackageID   = "a7adc4b2dcabfcae072ee0a8926c72b6efb595d257758ecff27871d2959f62d0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -741,7 +741,7 @@ type DeployCommitteeVerifierParams struct {
 	Owner                        types.PARTY               `json:"owner"`
 	CcipOwner                    types.PARTY               `json:"ccipOwner"`
 	VersionTag                   types.TEXT                `json:"versionTag"`
-	MessageSentObserver          types.PARTY               `json:"messageSentObserver"`
+	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
 	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
 	StorageLocations             []types.TEXT              `json:"storageLocations"`
 	StorageLocationsAdmin        types.PARTY               `json:"storageLocationsAdmin"`
@@ -760,7 +760,13 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 
 	m["versionTag"] = string(t.VersionTag)
 
-	m["messageSentObserver"] = t.MessageSentObserver.ToMap()
+	m["messageSentObservers"] = func() []any {
+		res := make([]any, 0, len(t.MessageSentObservers))
+		for _, e := range t.MessageSentObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	m["rmnRemote"] = func() any {
 		type mapper interface{ toMap() map[string]any }

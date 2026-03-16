@@ -242,7 +242,7 @@ var DeployChainContracts = operations.NewSequence(
 					Owner:                        committeeVerifier.Template.Owner,
 					CcipOwner:                    types.PARTY(input.CCIPOwnerParty),
 					VersionTag:                   committeeVerifier.Template.VersionTag,
-					MessageSentObserver:          committeeVerifier.Template.MessageSentObserver,
+					MessageSentObservers:         committeeVerifier.Template.MessageSentObservers,
 					StorageLocations:             committeeVerifier.Template.StorageLocations,
 					StorageLocationsAdmin:        committeeVerifier.Template.StorageLocationsAdmin,
 					PendingStorageLocationsAdmin: committeeVerifier.Template.PendingStorageLocationsAdmin,

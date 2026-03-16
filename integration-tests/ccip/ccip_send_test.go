@@ -135,7 +135,7 @@ func TestCCIPSend(t *testing.T) {
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
-							MessageSentObserver:          types.PARTY(partyCCIP),
+							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-send"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
