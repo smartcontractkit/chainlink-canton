@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -489,7 +488,7 @@ func (t TokenAdminRegistry) GetWithPackageID(contractID string, packageID string
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t TokenAdminRegistry) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t TokenAdminRegistry) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
 		ContractID: contractID,
@@ -499,7 +498,7 @@ func (t TokenAdminRegistry) MCMSReceiverEntrypoint(contractID string, args mcms.
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t TokenAdminRegistry) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t TokenAdminRegistry) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
 		ContractID: contractID,
@@ -510,7 +509,7 @@ func (t TokenAdminRegistry) MCMSReceiverEntrypointWithPackageID(contractID strin
 
 // Verify interface implementations for TokenAdminRegistry
 
-var _ mcms.IMCMSReceiver = (*TokenAdminRegistry)(nil)
+var _ IMCMSReceiver = (*TokenAdminRegistry)(nil)
 
 // TokenAdminRegistryAcceptAdminRole is a Record type
 type TokenAdminRegistryAcceptAdminRole struct {

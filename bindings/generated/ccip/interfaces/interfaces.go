@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -564,7 +565,7 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
 	RmnRemoteCid      types.CONTRACT_ID   `json:"rmnRemoteCid"`
-	ExtraContext      CCIPContext         `json:"extraContext"`
+	ExtraContext      common.CCIPContext  `json:"extraContext"`
 	SendingMessageCid types.CONTRACT_ID   `json:"sendingMessageCid"`
 	TokenInput        TokenInput          `json:"tokenInput"`
 	SenderInputCids   []types.CONTRACT_ID `json:"senderInputCids"`
@@ -647,12 +648,12 @@ func (t *TokenPoolLockOrBurn) UnmarshalHex(data string) error {
 
 // TokenPoolReleaseFromTicket is a Record type
 type TokenPoolReleaseFromTicket struct {
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExtraContext          CCIPContext       `json:"extraContext"`
-	TokenReceiveTicketCid types.CONTRACT_ID `json:"tokenReceiveTicketCid"`
-	TokenInput            TokenInput        `json:"tokenInput"`
-	Caller                types.PARTY       `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	TokenReceiveTicketCid types.CONTRACT_ID  `json:"tokenReceiveTicketCid"`
+	TokenInput            TokenInput         `json:"tokenInput"`
+	Caller                types.PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenPoolReleaseFromTicket to a map for DAML arguments
@@ -728,10 +729,10 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
 
 // TokenPoolVerifyInboundMessage is a Record type
 type TokenPoolVerifyInboundMessage struct {
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	ExtraContext          CCIPContext       `json:"extraContext"`
-	ExecutingMessageCid   types.CONTRACT_ID `json:"executingMessageCid"`
-	Caller                types.PARTY       `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid   types.CONTRACT_ID  `json:"executingMessageCid"`
+	Caller                types.PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenPoolVerifyInboundMessage to a map for DAML arguments
@@ -791,11 +792,11 @@ func (t *TokenPoolVerifyInboundMessage) UnmarshalHex(data string) error {
 
 // TokenPoolVerifyOutboundCCVs is a Record type
 type TokenPoolVerifyOutboundCCVs struct {
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	ExtraContext          CCIPContext       `json:"extraContext"`
-	SendingMessageCid     types.CONTRACT_ID `json:"sendingMessageCid"`
-	Amount                types.NUMERIC     `json:"amount"`
-	Caller                types.PARTY       `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID  `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID  `json:"sendingMessageCid"`
+	Amount                types.NUMERIC      `json:"amount"`
+	Caller                types.PARTY        `json:"caller"`
 }
 
 // ToMap converts TokenPoolVerifyOutboundCCVs to a map for DAML arguments

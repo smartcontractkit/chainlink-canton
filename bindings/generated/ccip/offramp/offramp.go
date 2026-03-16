@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -53,12 +54,12 @@ func argsToMap(args any) map[string]any {
 
 // ExecuteFromRouter is a Record type
 type ExecuteFromRouter struct {
-	RouterPartyOwner      types.PARTY          `json:"routerPartyOwner"`
-	ReceiverRequiredCCVs  []RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ExecutingMessageCid   types.CONTRACT_ID    `json:"executingMessageCid"`
-	GlobalConfigCid       types.CONTRACT_ID    `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID    `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID    `json:"rmnRemoteCid"`
+	RouterPartyOwner      types.PARTY                 `json:"routerPartyOwner"`
+	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
+	GlobalConfigCid       types.CONTRACT_ID           `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID           `json:"rmnRemoteCid"`
 }
 
 // ToMap converts ExecuteFromRouter to a map for DAML arguments
@@ -140,7 +141,7 @@ func (t *ExecuteFromRouter) UnmarshalHex(data string) error {
 // ExecuteFromRouterResult is a Record type
 type ExecuteFromRouterResult struct {
 	MessageId             types.TEXT         `json:"messageId"`
-	Message               MessageV1          `json:"message"`
+	Message               common.MessageV1   `json:"message"`
 	SourceChainSelector   types.NUMERIC      `json:"sourceChainSelector"`
 	SequenceNumber        types.NUMERIC      `json:"sequenceNumber"`
 	TokenReceiveTicket    *types.CONTRACT_ID `json:"tokenReceiveTicket" hex:"optional"`
@@ -211,9 +212,9 @@ func (t *ExecuteFromRouterResult) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
-	GlobalConfigCid      types.CONTRACT_ID    `json:"globalConfigCid"`
-	ReceiverRequiredCCVs []RawInstanceAddress `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC        `json:"sourceChainSelector"`
+	GlobalConfigCid      types.CONTRACT_ID           `json:"globalConfigCid"`
+	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC               `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
@@ -491,9 +492,9 @@ var _ IMCMSReceiver = (*OffRamp)(nil)
 
 // OffRampDeps is a Record type
 type OffRampDeps struct {
-	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
+	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
 }
 
 // ToMap converts OffRampDeps to a map for DAML arguments
@@ -677,9 +678,9 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	GlobalConfig       *RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	RmnRemote          *RawInstanceAddress `json:"rmnRemote" hex:"optional"`
-	TokenAdminRegistry *RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments

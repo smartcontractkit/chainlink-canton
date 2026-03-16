@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -57,7 +58,7 @@ type CCIPMessageReceived struct {
 	Owner              types.PARTY                     `json:"owner"`
 	Router             types.CONTRACT_ID               `json:"router"`
 	MessageId          types.TEXT                      `json:"messageId"`
-	Message            MessageV1                       `json:"message"`
+	Message            common.MessageV1                `json:"message"`
 	TokenReleaseResult *interfaces.ReleaseOrMintResult `json:"tokenReleaseResult" hex:"optional"`
 }
 
@@ -208,9 +209,9 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId   types.TEXT           `json:"instanceId"`
-	Owner        types.PARTY          `json:"owner"`
-	RequiredCCVs []RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId   types.TEXT                  `json:"instanceId"`
+	Owner        types.PARTY                 `json:"owner"`
+	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -393,9 +394,9 @@ func (t CCIPReceiver) UpdateRequiredCCVsWithPackageID(contractID string, package
 
 // CCVInput is a Record type
 type CCVInput struct {
-	CcvCid          types.CONTRACT_ID `json:"ccvCid"`
-	VerifierResults types.TEXT        `json:"verifierResults"`
-	CcvExtraContext CCIPContext       `json:"ccvExtraContext"`
+	CcvCid          types.CONTRACT_ID  `json:"ccvCid"`
+	VerifierResults types.TEXT         `json:"verifierResults"`
+	CcvExtraContext common.CCIPContext `json:"ccvExtraContext"`
 }
 
 // ToMap converts CCVInput to a map for DAML arguments
@@ -447,12 +448,12 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context                CCIPContext          `json:"context"`
-	RouterCid              types.CONTRACT_ID    `json:"routerCid"`
-	EncodedMessage         types.TEXT           `json:"encodedMessage"`
-	TokenTransfer          *TokenTransferInput  `json:"tokenTransfer" hex:"optional"`
-	CcvInputs              []CCVInput           `json:"ccvInputs"`
-	AdditionalRequiredCCVs []RawInstanceAddress `json:"additionalRequiredCCVs"`
+	Context                common.CCIPContext          `json:"context"`
+	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
+	EncodedMessage         types.TEXT                  `json:"encodedMessage"`
+	TokenTransfer          *TokenTransferInput         `json:"tokenTransfer" hex:"optional"`
+	CcvInputs              []CCVInput                  `json:"ccvInputs"`
+	AdditionalRequiredCCVs []common.RawInstanceAddress `json:"additionalRequiredCCVs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -597,7 +598,7 @@ type TokenTransferInput struct {
 	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
 	TokenReceiverParty types.PARTY           `json:"tokenReceiverParty"`
 	TokenInput         interfaces.TokenInput `json:"tokenInput"`
-	PoolExtraContext   CCIPContext           `json:"poolExtraContext"`
+	PoolExtraContext   common.CCIPContext    `json:"poolExtraContext"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -657,7 +658,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 
 // UpdateRequiredCCVs is a Record type
 type UpdateRequiredCCVs struct {
-	NewRequiredCCVs []RawInstanceAddress `json:"newRequiredCCVs"`
+	NewRequiredCCVs []common.RawInstanceAddress `json:"newRequiredCCVs"`
 }
 
 // ToMap converts UpdateRequiredCCVs to a map for DAML arguments

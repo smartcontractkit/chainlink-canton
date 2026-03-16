@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -442,7 +443,7 @@ func (t CommitteeVerifier) CommitteeVerifierForwardToVerifierWithPackageID(contr
 
 // CrossChainVerifierVerifyMessage exercises the CrossChainVerifier_VerifyMessage choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CrossChainVerifierVerifyMessage(contractID string, args CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
+func (t CommitteeVerifier) CrossChainVerifierVerifyMessage(contractID string, args common.CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
@@ -452,7 +453,7 @@ func (t CommitteeVerifier) CrossChainVerifierVerifyMessage(contractID string, ar
 }
 
 // CrossChainVerifierVerifyMessageWithPackageID exercises the CrossChainVerifier_VerifyMessage choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CrossChainVerifierVerifyMessageWithPackageID(contractID string, packageID string, args CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
+func (t CommitteeVerifier) CrossChainVerifierVerifyMessageWithPackageID(contractID string, packageID string, args common.CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
@@ -463,7 +464,7 @@ func (t CommitteeVerifier) CrossChainVerifierVerifyMessageWithPackageID(contract
 
 // CrossChainVerifierCalculateFee exercises the CrossChainVerifier_CalculateFee choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CrossChainVerifierCalculateFee(contractID string, args CrossChainVerifierCalculateFee) *model.ExerciseCommand {
+func (t CommitteeVerifier) CrossChainVerifierCalculateFee(contractID string, args common.CrossChainVerifierCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
@@ -473,7 +474,7 @@ func (t CommitteeVerifier) CrossChainVerifierCalculateFee(contractID string, arg
 }
 
 // CrossChainVerifierCalculateFeeWithPackageID exercises the CrossChainVerifier_CalculateFee choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractID string, packageID string, args CrossChainVerifierCalculateFee) *model.ExerciseCommand {
+func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractID string, packageID string, args common.CrossChainVerifierCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
@@ -484,7 +485,7 @@ func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractI
 
 // CrossChainVerifierForwardToVerifier exercises the CrossChainVerifier_ForwardToVerifier choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string, args CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
+func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string, args common.CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
@@ -494,7 +495,7 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string
 }
 
 // CrossChainVerifierForwardToVerifierWithPackageID exercises the CrossChainVerifier_ForwardToVerifier choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(contractID string, packageID string, args CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
+func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(contractID string, packageID string, args common.CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
 		ContractID: contractID,
@@ -505,11 +506,11 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(cont
 
 // Verify interface implementations for CommitteeVerifier
 
-var _ IICrossChainVerifier = (*CommitteeVerifier)(nil)
+var _ common.IICrossChainVerifier = (*CommitteeVerifier)(nil)
 
 // CommitteeVerifierDeps is a Record type
 type CommitteeVerifierDeps struct {
-	RmnRemote RawInstanceAddress `json:"rmnRemote"`
+	RmnRemote common.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts CommitteeVerifierDeps to a map for DAML arguments
@@ -702,11 +703,11 @@ func (t *CommitteeVerifierCalculateFeeMCMSParams) UnmarshalHex(data string) erro
 
 // CommitteeVerifierForwardToVerifier is a Record type
 type CommitteeVerifierForwardToVerifier struct {
-	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExtraContext      CCIPContext       `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT        `json:"verifierArgs"`
-	Caller            types.PARTY       `json:"caller"`
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
+	Caller            types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierForwardToVerifier to a map for DAML arguments
@@ -769,10 +770,10 @@ func (t *CommitteeVerifierForwardToVerifier) UnmarshalHex(data string) error {
 // CommitteeVerifierForwardToVerifierMCMSParams is CommitteeVerifierForwardToVerifier without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CommitteeVerifierForwardToVerifierMCMSParams struct {
-	RmnRemoteCid      types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExtraContext      CCIPContext       `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT        `json:"verifierArgs"`
+	RmnRemoteCid      types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	VerifierArgs      types.TEXT         `json:"verifierArgs"`
 }
 
 // MarshalHex encodes CommitteeVerifierForwardToVerifierMCMSParams to hex string for MCMS operationData.
@@ -867,11 +868,11 @@ func (t *CommitteeVerifierUpdateStorageLocations) UnmarshalHex(data string) erro
 
 // CommitteeVerifierVerifyMessage is a Record type
 type CommitteeVerifierVerifyMessage struct {
-	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExtraContext        CCIPContext       `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	VerifierResults     types.TEXT        `json:"verifierResults"`
-	Caller              types.PARTY       `json:"caller"`
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
+	Caller              types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierVerifyMessage to a map for DAML arguments
@@ -934,10 +935,10 @@ func (t *CommitteeVerifierVerifyMessage) UnmarshalHex(data string) error {
 // CommitteeVerifierVerifyMessageMCMSParams is CommitteeVerifierVerifyMessage without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CommitteeVerifierVerifyMessageMCMSParams struct {
-	RmnRemoteCid        types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ExtraContext        CCIPContext       `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	VerifierResults     types.TEXT        `json:"verifierResults"`
+	RmnRemoteCid        types.CONTRACT_ID  `json:"rmnRemoteCid"`
+	ExtraContext        common.CCIPContext `json:"extraContext"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
+	VerifierResults     types.TEXT         `json:"verifierResults"`
 }
 
 // MarshalHex encodes CommitteeVerifierVerifyMessageMCMSParams to hex string for MCMS operationData.

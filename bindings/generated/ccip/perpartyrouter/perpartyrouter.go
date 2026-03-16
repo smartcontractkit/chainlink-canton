@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -55,7 +56,7 @@ func argsToMap(args any) map[string]any {
 
 // CCIPSend is a Record type
 type CCIPSend struct {
-	Context             CCIPContext           `json:"context"`
+	Context             common.CCIPContext    `json:"context"`
 	SendingMessageCid   types.CONTRACT_ID     `json:"sendingMessageCid"`
 	FeeTokenInput       interfaces.TokenInput `json:"feeTokenInput"`
 	FeeTokenHoldingCids []types.CONTRACT_ID   `json:"feeTokenHoldingCids"`
@@ -277,9 +278,9 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context              CCIPContext          `json:"context"`
-	ExecutingMessageCid  types.CONTRACT_ID    `json:"executingMessageCid"`
-	ReceiverRequiredCCVs []RawInstanceAddress `json:"receiverRequiredCCVs"`
+	Context              common.CCIPContext          `json:"context"`
+	ExecutingMessageCid  types.CONTRACT_ID           `json:"executingMessageCid"`
+	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -342,12 +343,12 @@ func (t *Execute) UnmarshalHex(data string) error {
 
 // ExecuteResult is a Record type
 type ExecuteResult struct {
-	Router                types.CONTRACT_ID     `json:"router"`
-	TokenReceiveTicket    *types.CONTRACT_ID    `json:"tokenReceiveTicket" hex:"optional"`
-	ExecutionStateChanged types.CONTRACT_ID     `json:"executionStateChanged"`
-	MessageId             types.TEXT            `json:"messageId"`
-	Message               MessageV1             `json:"message"`
-	State                 MessageExecutionState `json:"state"`
+	Router                types.CONTRACT_ID            `json:"router"`
+	TokenReceiveTicket    *types.CONTRACT_ID           `json:"tokenReceiveTicket" hex:"optional"`
+	ExecutionStateChanged types.CONTRACT_ID            `json:"executionStateChanged"`
+	MessageId             types.TEXT                   `json:"messageId"`
+	Message               common.MessageV1             `json:"message"`
+	State                 common.MessageExecutionState `json:"state"`
 }
 
 // ToMap converts ExecuteResult to a map for DAML arguments
@@ -504,9 +505,9 @@ func (t *GetExecutionState) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute2 is a Record type
 type GetRequiredCCVsForExecute2 struct {
-	Context              CCIPContext          `json:"context"`
-	ReceiverRequiredCCVs []RawInstanceAddress `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC        `json:"sourceChainSelector"`
+	Context              common.CCIPContext          `json:"context"`
+	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC               `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
@@ -563,8 +564,8 @@ func (t *GetRequiredCCVsForExecute2) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForSend2 is a Record type
 type GetRequiredCCVsForSend2 struct {
-	Context           CCIPContext   `json:"context"`
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	Context           common.CCIPContext `json:"context"`
+	DestChainSelector types.NUMERIC      `json:"destChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForSend2 to a map for DAML arguments
@@ -1068,12 +1069,12 @@ var _ IMCMSReceiver = (*PerPartyRouter)(nil)
 
 // PerPartyRouterDeps is a Record type
 type PerPartyRouterDeps struct {
-	OnRamp             RawInstanceAddress `json:"onRamp"`
-	OffRamp            RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
-	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          RawInstanceAddress `json:"feeQuoter"`
-	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
+	OnRamp             common.RawInstanceAddress `json:"onRamp"`
+	OffRamp            common.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
+	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
+	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts PerPartyRouterDeps to a map for DAML arguments
@@ -1372,11 +1373,11 @@ var _ IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context            CCIPContext  `json:"context"`
-	EncodedMessage     types.TEXT   `json:"encodedMessage"`
-	ReceiverParty      types.PARTY  `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY `json:"tokenReceiverParty" hex:"optional"`
-	Caller             types.PARTY  `json:"caller"`
+	Context            common.CCIPContext `json:"context"`
+	EncodedMessage     types.TEXT         `json:"encodedMessage"`
+	ReceiverParty      types.PARTY        `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
+	Caller             types.PARTY        `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1436,10 +1437,10 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context            CCIPContext  `json:"context"`
-	EncodedMessage     types.TEXT   `json:"encodedMessage"`
-	ReceiverParty      types.PARTY  `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY `json:"tokenReceiverParty" hex:"optional"`
+	Context            common.CCIPContext `json:"context"`
+	EncodedMessage     types.TEXT         `json:"encodedMessage"`
+	ReceiverParty      types.PARTY        `json:"receiverParty"`
+	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
@@ -1456,13 +1457,13 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 
 // PrepareSend is a Record type
 type PrepareSend struct {
-	Context             CCIPContext                               `json:"context"`
+	Context             common.CCIPContext                        `json:"context"`
 	DestChainSelector   types.NUMERIC                             `json:"destChainSelector"`
 	Receiver            types.TEXT                                `json:"receiver"`
 	Payload             types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
 	BlockConfirmations  *types.INT64                              `json:"blockConfirmations" hex:"optional"`
-	SenderRequiredCCVs  []RawInstanceAddress                      `json:"senderRequiredCCVs"`
+	SenderRequiredCCVs  []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
 	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
 	TokenArgs           types.TEXT                                `json:"tokenArgs"`
@@ -1614,12 +1615,12 @@ func (t *SetDeps3) UnmarshalHex(data string) error {
 
 // SetDepsParams3 is a Record type
 type SetDepsParams3 struct {
-	OnRamp             *RawInstanceAddress `json:"onRamp" hex:"optional"`
-	OffRamp            *RawInstanceAddress `json:"offRamp" hex:"optional"`
-	GlobalConfig       *RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	TokenAdminRegistry *RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	RmnRemote          *RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	OnRamp             *common.RawInstanceAddress `json:"onRamp" hex:"optional"`
+	OffRamp            *common.RawInstanceAddress `json:"offRamp" hex:"optional"`
+	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams3 to a map for DAML arguments
