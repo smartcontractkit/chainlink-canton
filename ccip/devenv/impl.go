@@ -347,7 +347,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				Owner:                        types.PARTY(participant.PartyID), // TODO: use different ccv owner?
 				CcipOwner:                    types.PARTY(participant.PartyID),
 				VersionTag:                   types.TEXT("49ff34ed"),
-				MessageSentObserver:          types.PARTY(participant.PartyID),
+				MessageSentObservers:         nil, // no need to specify additional observers, the CCV's owner will be a signatory on CCIPMessageSent
 				StorageLocations:             storageLocations,
 				StorageLocationsAdmin:        types.PARTY(participant.PartyID),
 				PendingStorageLocationsAdmin: types.PARTY(participant.PartyID),

@@ -89,7 +89,7 @@ encodeDeployCommitteeVerifierParams params =
   <> encodeParty params.owner
   <> encodeParty params.ccipOwner
   <> encodeBytesHex params.versionTag
-  <> encodeParty params.messageSentObserver
+  <> encodePartyList params.messageSentObservers
   <> encodeRawInstanceAddress params.rmnRemote
   <> encodeList params.storageLocations encodeText
   <> encodeParty params.storageLocationsAdmin
@@ -329,7 +329,7 @@ testDecodeDeployCommitteeVerifierParams = script do
         owner
         ccipOwner
         versionTag = "01020304"
-        messageSentObserver
+        messageSentObservers = [messageSentObserver]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2", "loc3"]
         storageLocationsAdmin = storageAdmin
@@ -343,7 +343,7 @@ testDecodeDeployCommitteeVerifierParams = script do
       decoded.owner === params.owner
       decoded.ccipOwner === params.ccipOwner
       decoded.versionTag === params.versionTag
-      decoded.messageSentObserver === params.messageSentObserver
+      decoded.messageSentObservers === params.messageSentObservers
       decoded.rmnRemote === params.rmnRemote
       decoded.storageLocations === params.storageLocations
       decoded.storageLocationsAdmin === params.storageLocationsAdmin
@@ -363,7 +363,7 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
         owner
         ccipOwner
         versionTag = ""
-        messageSentObserver
+        messageSentObservers = [messageSentObserver]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = []
         storageLocationsAdmin = storageAdmin

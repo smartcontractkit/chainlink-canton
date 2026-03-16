@@ -291,7 +291,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
-							MessageSentObserver:          types.PARTY(partyCCIP),
+							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),

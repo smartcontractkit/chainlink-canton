@@ -171,7 +171,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccv-receive"}}},
 						{Label: "versionTag", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: versionTag}}},
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "messageSentObserver", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "messageSentObservers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "storageLocations", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Text{Text: "ipfs://test-receive"}},
 						}}}}},

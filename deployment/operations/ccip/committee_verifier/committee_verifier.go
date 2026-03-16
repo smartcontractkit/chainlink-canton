@@ -33,9 +33,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 		if template.VersionTag == "" {
 			return errors.New("version tag cannot be empty")
 		}
-		if template.MessageSentObserver == "" {
-			return errors.New("message sent observer cannot be empty")
-		}
 		if template.StorageLocationsAdmin == "" {
 			return errors.New("storage locations admin cannot be empty")
 		}

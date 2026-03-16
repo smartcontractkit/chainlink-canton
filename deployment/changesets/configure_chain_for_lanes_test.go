@@ -117,7 +117,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							Owner:                        types.PARTY(ccipOwnerParty),
 							CcipOwner:                    types.PARTY(ccipOwnerParty),
 							VersionTag:                   types.TEXT(versionTag),
-							MessageSentObserver:          types.PARTY(ccipOwnerParty),
+							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(ccipOwnerParty),
 							PendingStorageLocationsAdmin: types.PARTY(ccipOwnerParty),

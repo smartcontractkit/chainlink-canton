@@ -48,7 +48,7 @@ template CommitteeVerifier
 
         ccipOwner : Party
         versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")
-        messageSentObserver : Party
+        messageSentObservers : [Party]
 
         -- | Storage locations for off-chain components to read from.
         storageLocations : [Text]
@@ -252,7 +252,7 @@ template CommitteeVerifier
                     ccvInstanceId = instanceId
                     versionTag = versionTag
                     verifierBlob = verifierBlob
-                    messageSentObservers = [messageSentObserver]
+                    messageSentObservers = messageSentObservers
                     caller = owner
 
 
