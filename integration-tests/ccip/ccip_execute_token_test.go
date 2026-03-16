@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -353,6 +354,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Token Pool Setup
 	// Deploy inbound RateLimiter required by ReleaseFromTicket receive flow.
+	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),
@@ -360,7 +362,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive-inbound-rl"}}},
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: inboundRateLimiterInstanceID}}},
 						{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
 						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
 						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
@@ -380,6 +382,37 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	inboundRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed inbound RateLimiter: %s", inboundRateLimiterCid)
+	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
+	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
+					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: outboundRateLimiterInstanceID}}},
+						{Label: "poolInstanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
+						{Label: "poolOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyTokenPoolOwner}}},
+						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
+						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
+						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
+						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
+						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
+					}},
+				}},
+			}},
+			ActAs: []string{partyTokenPoolOwner},
+		},
+	})
+	require.NoError(t, err)
+	outboundRateLimiterCid := extractCreatedContractId(res)
+	t.Logf("Deployed outbound RateLimiter: %s", outboundRateLimiterCid)
+
+	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
+	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
 
 	// Deploy LockReleaseTokenPool
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -394,23 +427,20 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 6}}},
-						{Label: "chainPoolConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
+						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
 							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
 							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(remotePoolAddress)}},
+								}}}}},
+								{Label: "remoteTokenAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(remoteTokenAddress)}}},
 								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
-									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte(partyTokenPoolOwner))}},
-								}}}}},
+								{Label: "inboundRateLimiter", Value: rawInstanceAddress(inboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
+								{Label: "outboundRateLimiter", Value: rawInstanceAddress(outboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
 							}}}},
 						}}}}}},
-						{Label: "chainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-						{Label: "outboundRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-						{Label: "inboundRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
-							Key:   &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
-							Value: rawInstanceAddress("test-pool-receive-inbound-rl@" + partyTokenPoolOwner),
-						}}}}}},
-						{Label: "remoteTokens", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "tokenTransferFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
 						}}}}},
@@ -521,11 +551,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	// Build Message
 	// Encode instrumentId for destTokenAddress
 	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
-	hashedInstrumentIdHex := hex.EncodeToString(crypto.Keccak256(encodedInstrumentId))
+	hashedInstrumentId := crypto.Keccak256(encodedInstrumentId)
 
 	// Build token transfer (5 AMT in Splice Decimal format)
 	tokenAmount := big.NewInt(5)
-	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, partyTokenPoolOwner, hashedInstrumentIdHex, partyReceiver)
+	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remotePoolAddress, remoteTokenAddress, hashedInstrumentId, partyReceiver)
 
 	// Build message
 	msg := &MessageV1{
@@ -658,13 +688,13 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		PackageId: "#ccip-lockreleasetokenpool", ModuleName: "CCIP.LockReleaseTokenPool", EntityName: "LockReleaseTokenPool",
 	})
 	require.NoError(t, err)
-	disclosedRateLimiter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), tokenPoolOwnerParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter",
-	})
+	disclosedInboundRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, inboundRateLimiterCid)
+	require.NoError(t, err)
+	disclosedOutboundRateLimiter, err := testhelpers.GetDisclosedContractById(t.Context(), tokenPoolOwnerParticipant, outboundRateLimiterCid)
 	require.NoError(t, err)
 
 	executeDisclosures := slices.Concat(
-		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool, disclosedRateLimiter},
+		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool, disclosedInboundRateLimiter, disclosedOutboundRateLimiter},
 		transferFactoryDisclosures,
 		poolHoldingDisclosures,
 	)
@@ -696,7 +726,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		"values": map[string]any{
 			"rate-limiter": map[string]any{
 				"tag":   "AV_ContractId",
-				"value": disclosedRateLimiter.ContractId,
+				"value": disclosedInboundRateLimiter.ContractId,
 			},
 		},
 	})
@@ -847,12 +877,13 @@ func extractCreatedContractId(res *apiv2.SubmitAndWaitForTransactionResponse) st
 
 // buildTokenTransferV1 builds the encoded token transfer bytes for the message.
 // tokenReceiver is keccak256-hashed to match Daml encodePartyAddress.
-func buildTokenTransferV1(amount *big.Int, sourcePoolOwner, destTokenAddressHex, tokenReceiverParty string) *TokenTransferV1 {
-	sourcePoolAddress := []byte(sourcePoolOwner)
-	sourceTokenAddress := []byte{} // Empty for Canton
-
-	destTokenAddress, _ := hex.DecodeString(destTokenAddressHex)
-
+func buildTokenTransferV1(
+	amount *big.Int,
+	sourcePoolAddress,
+	sourceTokenAddress,
+	destTokenAddress []byte,
+	tokenReceiverParty string,
+) *TokenTransferV1 {
 	return &TokenTransferV1{
 		Amount:             amount,
 		SourcePoolAddress:  sourcePoolAddress,
