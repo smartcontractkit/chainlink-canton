@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "2cef632fe2265aaae95da0e292bc309c7809f67f35ada3e473b47d791e0e03b5"
+	PackageID   = "47b81cc0eea9a72cdc4242b1a9b64bd79b44d83d99b08253e6c70bab098a6a3b"
 	SDKVersion  = "3.4.10"
 )
 
@@ -445,11 +445,11 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(
 	}
 }
 
-// Archive exercises the Archive choice on this TokenAdminRegistry contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this TokenAdminRegistry contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -459,7 +459,7 @@ func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

@@ -471,7 +471,7 @@ data DeployCommitteeVerifierParams = DeployCommitteeVerifierParams
         owner : Party
         ccipOwner : Party
         versionTag : BytesHex
-        messageSentObserver : Party
+        messageSentObservers : [Party]
         rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
         storageLocations : [Text]
         storageLocationsAdmin : Party
@@ -596,7 +596,7 @@ mkCommitteeVerifierContract params = CCIP.CommitteeVerifier.CommitteeVerifier wi
     owner = params.owner
     ccipOwner = params.ccipOwner
     versionTag = params.versionTag
-    messageSentObserver = params.messageSentObserver
+    messageSentObservers = params.messageSentObservers
     storageLocations = params.storageLocations
     storageLocationsAdmin = params.storageLocationsAdmin
     pendingStorageLocationsAdmin = params.pendingStorageLocationsAdmin
@@ -612,11 +612,8 @@ mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTok
     poolOwner = params.poolOwner
     instrumentId = params.instrumentId
     decimals = params.decimals
-    chainPoolConfigs = Map.empty
-    chainFeeConfigs = Map.empty
-    remoteTokens = Map.empty
-    outboundRateLimiters = Map.empty
-    inboundRateLimiters = Map.empty
+    remoteChainConfigs = Map.empty
+    tokenTransferFeeConfigs = Map.empty
     poolReceiveContext = CCIP.Context.emptyCCIPContext
     transferTimeout = CCIP.LockReleaseTokenPool.Indefinite
     deps = CCIP.LockReleaseTokenPool.LockReleaseTokenPoolDeps with
@@ -741,7 +738,7 @@ decodeDeployCommitteeVerifierParams encoded = do
     (owner, offset2) <- decodePartyAt encoded offset1
     (ccipOwner, offset3) <- decodePartyAt encoded offset2
     (versionTag, offset4) <- decodeBytesHexAt encoded offset3
-    (messageSentObserver, offset5) <- decodePartyAt encoded offset4
+    (messageSentObservers, offset5) <- decodePartyList encoded offset4
     (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
     (storageLocations, offset7) <- decodeList encoded offset6 decodeTextAt
     (storageLocationsAdmin, offset8) <- decodePartyAt encoded offset7
@@ -751,7 +748,7 @@ decodeDeployCommitteeVerifierParams encoded = do
         owner
         ccipOwner
         versionTag
-        messageSentObserver
+        messageSentObservers
         rmnRemote
         storageLocations
         storageLocationsAdmin

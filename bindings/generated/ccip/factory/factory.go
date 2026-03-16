@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "408561ecdbfe917c500e9e7191988e50867e11a83fb404495e9c285fb9af022e"
+	PackageID   = "a7adc4b2dcabfcae072ee0a8926c72b6efb595d257758ecff27871d2959f62d0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -450,11 +450,11 @@ func (t CCIPFactory) SetOwnerToMCMSWithPackageID(contractID string, packageID st
 	}
 }
 
-// Archive exercises the Archive choice on this CCIPFactory contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -464,7 +464,7 @@ func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CCIPFactory) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -741,7 +741,7 @@ type DeployCommitteeVerifierParams struct {
 	Owner                        types.PARTY               `json:"owner"`
 	CcipOwner                    types.PARTY               `json:"ccipOwner"`
 	VersionTag                   types.TEXT                `json:"versionTag"`
-	MessageSentObserver          types.PARTY               `json:"messageSentObserver"`
+	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
 	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
 	StorageLocations             []types.TEXT              `json:"storageLocations"`
 	StorageLocationsAdmin        types.PARTY               `json:"storageLocationsAdmin"`
@@ -760,7 +760,13 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 
 	m["versionTag"] = string(t.VersionTag)
 
-	m["messageSentObserver"] = t.MessageSentObserver.ToMap()
+	m["messageSentObservers"] = func() []any {
+		res := make([]any, 0, len(t.MessageSentObservers))
+		for _, e := range t.MessageSentObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	m["rmnRemote"] = func() any {
 		type mapper interface{ toMap() map[string]any }

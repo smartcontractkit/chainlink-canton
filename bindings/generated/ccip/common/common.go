@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "3eccbee0f4b51b2170096c14b149faa6eed7a0aa12043170b2dee213bda288ae"
+	PackageID   = "6341ada08e5958939521b33ffe157a594a91de36d2a012fc4ccbcf86f6b039cc"
 	SDKVersion  = "3.4.10"
 )
 
@@ -3035,11 +3035,11 @@ func (t GlobalConfig) ApplySourceChainConfigUpdatesWithPackageID(contractID stri
 	}
 }
 
-// Archive exercises the Archive choice on this GlobalConfig contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this GlobalConfig contract
 // This method uses the package name in the template ID
 func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -3049,7 +3049,7 @@ func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t GlobalConfig) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
