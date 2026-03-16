@@ -8,6 +8,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
@@ -16,12 +17,54 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
+
+// Todo: place these values in maybe defaults.go
+const (
+	feeQuoterDefaultMaxDataBytes              = int64(30_000)
+	feeQuoterDefaultMaxPerMsgGasLimit         = int64(3_000_000)
+	feeQuoterDefaultDestGasOverhead           = int64(300_000)
+	feeQuoterDefaultDestGasPerPayloadByteBase = int64(16)
+	feeQuoterDefaultTokenDestGasOverhead      = int64(90_000)
+	feeQuoterDefaultTxGasLimit                = int64(200_000)
+)
+
+const (
+	chainFamilySelectorEVM    = "2812d52c"
+	chainFamilySelectorSolana = "1e10bdc4"
+	chainFamilySelectorAptos  = "ac77ffec"
+	chainFamilySelectorSui    = "c4e05953"
+	chainFamilySelectorTvm    = "647e2ba9"
+)
+
+func feeQuoterChainFamilySelectorHex(remoteSelector uint64) (string, error) {
+	family, err := chain_selectors.GetSelectorFamily(remoteSelector)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve chain family for selector %d: %w", remoteSelector, err)
+	}
+
+	switch family {
+	case chain_selectors.FamilyEVM:
+		return chainFamilySelectorEVM, nil
+	case chain_selectors.FamilySolana:
+		return chainFamilySelectorSolana, nil
+	case chain_selectors.FamilyAptos:
+		return chainFamilySelectorAptos, nil
+	case chain_selectors.FamilySui:
+		return chainFamilySelectorSui, nil
+	case chain_selectors.FamilyTron:
+		return chainFamilySelectorTvm, nil
+	default:
+		return "", fmt.Errorf("unsupported chain family %q for selector %d", family, remoteSelector)
+	}
+}
 
 func normalizeConfiguredOnRamp(onRamp []byte) (string, error) {
 	raw := onRamp
@@ -75,6 +118,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 		// Create inputs for each operation
 		globalConfigSourceChainConfigArgs := make([]common.SourceChainConfigArgs, 0, len(input.RemoteChains))
 		globalConfigDestChainConfigArgs := make([]common.DestChainConfigArgs, 0, len(input.RemoteChains))
+		feeQuoterDestChainConfigArgs := make([]feequoter.DestChainConfigArgs2, 0, len(input.RemoteChains))
 
 		for remoteSelector, remoteConfig := range input.RemoteChains {
 			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
@@ -125,6 +169,26 @@ var ConfigureChainForLanes = operations.NewSequence(
 				DefaultCCVs:               defaultOutboundCCVs,
 				MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
 				TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
+			})
+
+			chainFamilySelectorHex, err := feeQuoterChainFamilySelectorHex(remoteSelector)
+			if err != nil {
+				return sequences.OnChainOutput{}, err
+			}
+			feeQuoterDestChainConfigArgs = append(feeQuoterDestChainConfigArgs, feequoter.DestChainConfigArgs2{
+				DestChainSelector: types.NUMERIC(remoteSelectorStr),
+				DestChainConfig: feequoter.DestChainConfig2{
+					IsEnabled:                   types.BOOL(remoteConfig.AllowTrafficFrom),
+					MaxDataBytes:                types.INT64(feeQuoterDefaultMaxDataBytes),
+					MaxPerMsgGasLimit:           types.INT64(feeQuoterDefaultMaxPerMsgGasLimit),
+					DestGasOverhead:             types.INT64(feeQuoterDefaultDestGasOverhead),
+					DestGasPerPayloadByteBase:   types.INT64(feeQuoterDefaultDestGasPerPayloadByteBase),
+					ChainFamilySelector:         types.TEXT(chainFamilySelectorHex),
+					DefaultTxGasLimit:           types.INT64(feeQuoterDefaultTxGasLimit),
+					NetworkFeeUSD:               types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
+					DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)),
+					DefaultTokenDestGasOverhead: types.INT64(feeQuoterDefaultTokenDestGasOverhead),
+				},
 			})
 			// TODO: Other configs once the contracts are ready
 		}
@@ -189,6 +253,18 @@ var ConfigureChainForLanes = operations.NewSequence(
 		})
 		if err != nil {
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply source chain config updates: %w", err)
+		}
+
+		_, err = operations.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
+			ChainSelector:   deps.Chain.Selector,
+			InstanceAddress: input.FeeQuoter,
+			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
+			Args: feequoter.ApplyDestChainConfigUpdates2{
+				DestChainConfigArgs: feeQuoterDestChainConfigArgs,
+			},
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to apply fee quoter dest chain config updates: %w", err)
 		}
 
 		return sequences.OnChainOutput{}, nil

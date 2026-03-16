@@ -375,7 +375,12 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	}
 
 	const defaultLockReleaseQualifier = "TEST (LockReleaseTokenPool 1.7.0 [default] to BurnMintTokenPool 1.7.0 [default])"
-	const reverseLockReleaseQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
+
+	// Use registry admin for Amulet instrument so sender holdings and pool instrument align.
+	lockPoolInstrumentAdmin := participant.PartyID
+	if registryAdmin, adminErr := resolveRegistryAdmin(ctx, participant); adminErr == nil && registryAdmin != "" {
+		lockPoolInstrumentAdmin = registryAdmin
+	}
 
 	// Deploy and TAR-register the default lock/release pool for Canton source token transfers.
 	relativeHours := types.INT64(24)
@@ -383,7 +388,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		CcipOwner: types.PARTY(participant.PartyID),
 		PoolOwner: types.PARTY(participant.PartyID),
 		InstrumentId: splice_api_token_holding_v1.InstrumentId{
-			Admin: types.PARTY(participant.PartyID),
+			Admin: types.PARTY(lockPoolInstrumentAdmin),
 			Id:    types.TEXT("Amulet"),
 		},
 		Decimals:                types.INT64(18),
@@ -784,8 +789,13 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				PoolInstanceID:      string(parsedPool.InstanceId),
 				RemoteChainSelector: remoteSelectorKey,
 				Direction:           common.RateLimitDirectionRateLimitDirection_Outbound,
+				Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
 				InstanceID:          outboundInstanceID,
 				Qualifier:           outboundQualifier,
+				IsEnabled:           true,
+				Capacity:            "999999999999999999",
+				Rate:                "999999999999999999",
+				Tokens:              "999999999999999999",
 			},
 		})
 		if outboundErr != nil {
@@ -794,7 +804,23 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		if mergeErr := updatedDataStore.Merge(outboundOut.DataStore.Seal()); mergeErr != nil {
 			return fmt.Errorf("merge outbound rate limiter datastore output for selector %d: %w", remoteSelector, mergeErr)
 		}
-		outboundRL := contracts.MustNewInstanceID(outboundInstanceID).RawInstanceAddress(parsedPool.PoolOwner).Binding()
+		outboundRef, outboundRefErr := outboundOut.DataStore.Seal().Addresses().Get(datastore.NewAddressRefKey(
+			selector,
+			datastore.ContractType("RateLimiter"),
+			cantonChangesets.RateLimiterVersion,
+			outboundQualifier,
+		))
+		if outboundRefErr != nil {
+			return fmt.Errorf("resolve outbound rate limiter address ref for selector %d: %w", remoteSelector, outboundRefErr)
+		}
+		if len(outboundRef.Labels.List()) == 0 {
+			return fmt.Errorf("missing outbound rate limiter raw address label for selector %d", remoteSelector)
+		}
+		outboundRawAddr, parseOutboundRawErr := contracts.RawInstanceAddressFromString(outboundRef.Labels.List()[0])
+		if parseOutboundRawErr != nil {
+			return fmt.Errorf("parse outbound rate limiter raw address for selector %d: %w", remoteSelector, parseOutboundRawErr)
+		}
+		outboundRL := outboundRawAddr.Binding()
 
 		inboundInstanceID := fmt.Sprintf("devenv-inbound-rl-%s", selectorForInstanceID)
 		inboundQualifier := fmt.Sprintf("%s-inbound-%s", defaultLockReleaseQualifier, remoteSelectorKey)
@@ -806,8 +832,13 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				PoolInstanceID:      string(parsedPool.InstanceId),
 				RemoteChainSelector: remoteSelectorKey,
 				Direction:           common.RateLimitDirectionRateLimitDirection_Inbound,
+				Mode:                common.RateLimitModeRateLimitMode_DefaultFinality,
 				InstanceID:          inboundInstanceID,
 				Qualifier:           inboundQualifier,
+				IsEnabled:           true,
+				Capacity:            "999999999999999999",
+				Rate:                "999999999999999999",
+				Tokens:              "999999999999999999",
 			},
 		})
 		if inboundErr != nil {
@@ -816,7 +847,23 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		if mergeErr := updatedDataStore.Merge(inboundOut.DataStore.Seal()); mergeErr != nil {
 			return fmt.Errorf("merge inbound rate limiter datastore output for selector %d: %w", remoteSelector, mergeErr)
 		}
-		inboundRL := contracts.MustNewInstanceID(inboundInstanceID).RawInstanceAddress(parsedPool.PoolOwner).Binding()
+		inboundRef, inboundRefErr := inboundOut.DataStore.Seal().Addresses().Get(datastore.NewAddressRefKey(
+			selector,
+			datastore.ContractType("RateLimiter"),
+			cantonChangesets.RateLimiterVersion,
+			inboundQualifier,
+		))
+		if inboundRefErr != nil {
+			return fmt.Errorf("resolve inbound rate limiter address ref for selector %d: %w", remoteSelector, inboundRefErr)
+		}
+		if len(inboundRef.Labels.List()) == 0 {
+			return fmt.Errorf("missing inbound rate limiter raw address label for selector %d", remoteSelector)
+		}
+		inboundRawAddr, parseInboundRawErr := contracts.RawInstanceAddressFromString(inboundRef.Labels.List()[0])
+		if parseInboundRawErr != nil {
+			return fmt.Errorf("parse inbound rate limiter raw address for selector %d: %w", remoteSelector, parseInboundRawErr)
+		}
+		inboundRL := inboundRawAddr.Binding()
 
 		updates = append(updates, lockreleasetokenpool.ChainUpdate{
 			RemoteChainSelector: types.NUMERIC(remoteSelectorKey),
@@ -1754,7 +1801,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	// Router for sender party.
-	routerAddress, err := c.DeployPerPartyRouter(ctx, c.participantIndexForParty(party), party)
+	routerAddress, err := c.DeployPerPartyRouter(ctx, party)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("deploy per-party router: %w", err)
 	}
@@ -2077,18 +2124,17 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse token pool contract: %w", err)
 		}
 		destSelectorKey := strconv.FormatUint(dest, 10)
+		remoteConfigKeys := make([]string, 0, len(parsedTokenPool.RemoteChainConfigs))
+		for k := range parsedTokenPool.RemoteChainConfigs {
+			remoteConfigKeys = append(remoteConfigKeys, k)
+		}
+		c.logger.Debug().
+			Str("DestSelector", destSelectorKey).
+			Strs("RemoteChainConfigKeys", remoteConfigKeys).
+			Msg("Resolved lock/release pool remote chain config keys before token transfer send")
 		destCfgAny, hasDestCfg := findRemoteChainConfigBySelector(parsedTokenPool.RemoteChainConfigs, destSelectorKey)
 		if !hasDestCfg {
-			if len(parsedTokenPool.RemoteChainConfigs) == 1 {
-				for _, onlyCfg := range parsedTokenPool.RemoteChainConfigs {
-					destCfgAny = onlyCfg
-					hasDestCfg = true
-					break
-				}
-			}
-		}
-		if !hasDestCfg {
-			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing lock/release pool remote chain config for selector %s", destSelectorKey)
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing lock/release pool remote chain config for selector %s (available keys: %v)", destSelectorKey, remoteConfigKeys)
 		}
 		destCfg, cfgOK := remoteChainConfigFromAny(destCfgAny)
 		if !cfgOK {
@@ -2104,7 +2150,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token amount must be greater than zero for token transfer")
 		}
 		tokenDestSelectorKey := strconv.FormatUint(dest, 10)
-		tokenDestSelectorNumericKey := tokenDestSelectorKey + "."
+		tokenDestSelectorNumericKey := tokenDestSelectorKey + ".0"
 		rateLimiterCID, rateLimiterDisclosure, err := resolveRateLimiterForSend(
 			ctx,
 			participant,
@@ -2185,7 +2231,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	sendArgs := ccipsender.Send{
 		Context:           sendContext,
 		RouterCid:         routerCID,
-		DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+		DestChainSelector: types.NUMERIC(fmt.Sprintf("%d.0", dest)),
 		Receiver:          types.TEXT(hex.EncodeToString(fields.Receiver)),
 		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
 		ExtraArgs: ccipsender.CantonExtraArgsV1{

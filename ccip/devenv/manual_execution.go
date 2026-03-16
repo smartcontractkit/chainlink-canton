@@ -7,21 +7,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
@@ -31,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -38,10 +37,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
-)
-
-const (
-	createArgFieldInstanceID = "instanceId"
 )
 
 func uniqueParties(parties ...string) []string {
@@ -93,33 +88,47 @@ func emptyMetadataValue() *apiv2.Value {
 	}}}}
 }
 
+func perPartyRouterQualifier(partyID string) string {
+	return fmt.Sprintf("party:%s", partyID)
+}
+
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // It returns the address of the newly created PerPartyRouter instance. If a router already exists for the party, it returns the existing router's address.
-func (c *Chain) DeployPerPartyRouter(ctx context.Context, participantIdx int, partyId string) (contracts.InstanceAddress, error) {
+func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
+	participantIdx := c.participantIndexForParty(partyId)
+	deps := dependencies.CantonDeps{
+		Chain:       c.chain,
+		Participant: participantIdx,
+	}
 	participant := c.chain.Participants[participantIdx]
-	// Create PerPartyRouter (ignore error if it exists already)
-	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(
-		datastore.NewAddressRefKey(
-			c.chainDetails.ChainSelector,
-			datastore.ContractType(per_party_router_factory.ContractType),
-			per_party_router_factory.Version,
-			"",
-		),
-	)
+
+	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
 	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to get canton per party router factory address ref: %w", err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to get per-party router dar: %w", err)
+	}
+	if _, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
+		DarFile:       perPartyRouterDar,
+		VettingChange: adminv2.UploadDarFileRequest_VETTING_CHANGE_VET_ALL_PACKAGES,
+	}); err != nil && !isAlreadyExistsError(err) {
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to upload per-party router dar file: %w", err)
+	}
+	// Create PerPartyRouter using the topology-deployed default factory.
+	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		c.chainDetails.ChainSelector,
+		datastore.ContractType(per_party_router_factory.ContractType),
+		per_party_router_factory.Version,
+		"",
+	))
+	if err != nil {
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to get per-party router factory address ref: %w", err)
 	}
 	c.logger.Debug().Str("CantonPerPartyRouterFactory", cantonPerPartyRouterFactoryRef.Address).Msg("Resolved per-party router factory address")
 	cantonPerPartyRouterFactory := contracts.HexToInstanceAddress(cantonPerPartyRouterFactoryRef.Address)
 
-	// Router instance addresses are already party-scoped; static instance ID is sufficient.
+	// Fixed instance ID keeps address derivation deterministic; InstanceAddress is still unique by party.
 	routerInstanceID := contracts.InstanceID("test-router")
-	expectedRouterAddress := routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
-	// Ignore errors because router creation is idempotent for a given party/instance ID.
-	_, _ = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, dependencies.CantonDeps{
-		Chain:       c.chain,
-		Participant: participantIdx,
-	}, contract.ChoiceInput[perpartyrouter.CreateRouter]{
+	// Ignore only idempotent create errors, since the router might already exist for this party.
+	_, err = operations.ExecuteOperation(c.e.OperationsBundle, per_party_router_factory.CreateRouter, deps, contract.ChoiceInput[perpartyrouter.CreateRouter]{
 		ChainSelector:   c.chainDetails.ChainSelector,
 		InstanceAddress: cantonPerPartyRouterFactory,
 		ActAs:           []string{partyId},
@@ -128,45 +137,53 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participantIdx int, pa
 			InstanceId: types.TEXT(routerInstanceID.String()),
 		},
 	})
-
-	// Always return the latest active router for this party owner to handle pre-existing instance IDs.
-	if routerAddr, lookupErr := findPerPartyRouterByOwner(ctx, participant, partyId); lookupErr == nil {
-		return routerAddr, nil
+	if err != nil && !isAlreadyExistsError(err) {
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to create per-party router: %w", err)
 	}
+	selectedAddress := routerInstanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
+	updatedDataStore := datastore.NewMemoryDataStore()
+	if err = updatedDataStore.Merge(c.e.DataStore); err != nil {
+		return contracts.InstanceAddress{}, fmt.Errorf("clone datastore for per-party router persistence: %w", err)
+	}
+	if err = updatedDataStore.AddressRefStore.Upsert(datastore.AddressRef{
+		Address:       selectedAddress.Hex(),
+		Type:          datastore.ContractType("PerPartyRouter"),
+		Version:       per_party_router_factory.Version,
+		Qualifier:     perPartyRouterQualifier(partyId),
+		ChainSelector: c.chainDetails.ChainSelector,
+	}); err != nil {
+		return contracts.InstanceAddress{}, fmt.Errorf("persist per-party router address ref: %w", err)
+	}
+	c.e.DataStore = updatedDataStore.Seal()
 
-	return expectedRouterAddress, nil
+	return selectedAddress, nil
 }
 
-func ensureParticipantDarVetted(ctx context.Context, participant canton.Participant, pkg contracts.Package) error {
-	dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
+	participantIdx := c.participantIndexForParty(partyId)
+	participant := c.chain.Participants[participantIdx]
+
+	receiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
 	if err != nil {
-		return fmt.Errorf("get %s dar: %w", pkg, err)
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to get receiver dar: %w", err)
 	}
 	if _, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile:       dar,
+		DarFile:       receiverDar,
 		VettingChange: adminv2.UploadDarFileRequest_VETTING_CHANGE_VET_ALL_PACKAGES,
 	}); err != nil && !isAlreadyExistsError(err) {
-		return fmt.Errorf("upload %s dar: %w", pkg, err)
-	}
-
-	return nil
-}
-
-func (c *Chain) DeployCCIPReceiver(ctx context.Context, participantIdx int, partyId string) (contracts.InstanceAddress, error) {
-	participant := c.chain.Participants[participantIdx]
-	if receiverAddr, lookupErr := findCCIPReceiverByOwner(ctx, participant, partyId); lookupErr == nil {
-		return receiverAddr, nil
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to upload receiver dar file: %w", err)
 	}
 
 	deps := dependencies.CantonDeps{
 		Chain:       c.chain,
 		Participant: participantIdx,
 	}
+	qualifier := perPartyRouterQualifier(partyId)
 
 	// Deploy receiver contract
 	out, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, deps, contract.DeployInput[ccipreceiver.CCIPReceiver]{
 		ChainSelector: c.chainDetails.ChainSelector,
-		Qualifier:     nil,
+		Qualifier:     &qualifier,
 		ActAs:         []string{partyId},
 		Template: ccipreceiver.CCIPReceiver{
 			Owner:        types.PARTY(partyId),
@@ -182,159 +199,26 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participantIdx int, part
 	return receiverAddress, nil
 }
 
-func findPerPartyRouterByOwner(ctx context.Context, participant canton.Participant, partyOwner string) (contracts.InstanceAddress, error) {
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("get ledger end for router owner lookup: %w", err)
-	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				partyOwner: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  "#ccip-perpartyrouter",
-										ModuleName: "CCIP.PerPartyRouter",
-										EntityName: "PerPartyRouter",
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("query active per-party routers: %w", err)
-	}
-	defer stream.CloseSend()
-
-	var latest *perpartyrouter.PerPartyRouter
-	var latestOffset int64 = -1
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return contracts.InstanceAddress{}, fmt.Errorf("receive active per-party routers: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[perpartyrouter.PerPartyRouter](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			continue
-		}
-		if string(parsed.PartyOwner) != partyOwner {
-			continue
-		}
-		if entry.ActiveContract.GetCreatedEvent().GetOffset() > latestOffset {
-			latestOffset = entry.ActiveContract.GetCreatedEvent().GetOffset()
-			latest = parsed
-		}
-	}
-	if latest == nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("no active per-party router found for owner %s", partyOwner)
-	}
-
-	return contracts.InstanceID(string(latest.InstanceId)).RawInstanceAddress(latest.PartyOwner).InstanceAddress(), nil
-}
-
-func findCCIPReceiverByOwner(ctx context.Context, participant canton.Participant, owner string) (contracts.InstanceAddress, error) {
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("get ledger end for receiver owner lookup: %w", err)
-	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				owner: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  "#ccip-receiver",
-										ModuleName: "CCIP.CCIPReceiver",
-										EntityName: "CCIPReceiver",
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("query active ccip receivers: %w", err)
-	}
-	defer stream.CloseSend()
-
-	var latest *ccipreceiver.CCIPReceiver
-	var latestOffset int64 = -1
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return contracts.InstanceAddress{}, fmt.Errorf("receive active ccip receivers: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[ccipreceiver.CCIPReceiver](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			continue
-		}
-		if string(parsed.Owner) != owner {
-			continue
-		}
-		if entry.ActiveContract.GetCreatedEvent().GetOffset() > latestOffset {
-			latestOffset = entry.ActiveContract.GetCreatedEvent().GetOffset()
-			latest = parsed
-		}
-	}
-	if latest == nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("no active ccip receiver found for owner %s", owner)
-	}
-
-	return contracts.InstanceID(string(latest.InstanceId)).RawInstanceAddress(latest.Owner).InstanceAddress(), nil
-}
-
 // ManuallyExecuteMessage implements cciptestinterfaces.CCIP17.
 func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Message, gasLimit uint64, verifiers []protocol.UnknownAddress, verifierResults [][]byte) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
 	receiverParty, err := c.resolvePartyFromHashedAddress(ctx, message.Receiver)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("resolve executing party from receiver %s: %w", hex.EncodeToString(message.Receiver), err)
 	}
+	// Execute on the receiver party so receiver hash/party checks line up with the message payload.
 	executingParty := receiverParty
 	participantIdx := c.participantIndexForParty(executingParty)
 	participant := c.chain.Participants[participantIdx]
 
 	// Deploy PerPartyRouter for the receiver party
-	routerAddress, err := c.DeployPerPartyRouter(ctx, participantIdx, executingParty)
+	routerAddress, err := c.DeployPerPartyRouter(ctx, executingParty)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 	c.logger.Debug().Str("RouterAddress", routerAddress.String()).Msg("Deployed PerPartyRouter")
 
 	// Deploy CCIPReceiver contract
-	receiverAddress, err := c.DeployCCIPReceiver(ctx, participantIdx, executingParty)
+	receiverAddress, err := c.DeployCCIPReceiver(ctx, executingParty)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to deploy CCIPReceiver contract: %w", err)
 	}
@@ -350,102 +234,28 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get disclosures for execution: %w", err)
 	}
 
-	// Resolve all necessary contracts
-	resolveActiveContractIDByAddress := func(templateID string, address contracts.InstanceAddress) (string, error) {
-		cid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, executingParty, templateID, address)
-		if err == nil {
-			return cid, nil
-		}
-		if !strings.Contains(err.Error(), "multiple active contracts found") && !strings.Contains(err.Error(), "no active contract found") {
-			return "", err
-		}
-
-		parts := strings.Split(templateID, ":")
-		if len(parts) != 3 {
-			return "", fmt.Errorf("invalid template ID %q", templateID)
-		}
-		ledgerEnd, endErr := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-		if endErr != nil {
-			return "", fmt.Errorf("get ledger end for duplicate contract fallback: %w", endErr)
-		}
-		latestForParty := func(party string) (*apiv2.ActiveContract, error) {
-			stream, streamErr := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-				ActiveAtOffset: ledgerEnd.GetOffset(),
-				EventFormat: &apiv2.EventFormat{
-					FiltersByParty: map[string]*apiv2.Filters{
-						party: {
-							Cumulative: []*apiv2.CumulativeFilter{
-								{
-									IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-										TemplateFilter: &apiv2.TemplateFilter{
-											TemplateId: &apiv2.Identifier{
-												PackageId:  parts[0],
-												ModuleName: parts[1],
-												EntityName: parts[2],
-											},
-											IncludeCreatedEventBlob: true,
-										},
-									},
-								},
-							},
-						},
-					},
-					Verbose: true,
-				},
-			})
-			if streamErr != nil {
-				return nil, fmt.Errorf("get active contracts for duplicate contract fallback: %w", streamErr)
-			}
-			defer stream.CloseSend()
-			var latest *apiv2.ActiveContract
-			for {
-				resp, recvErr := stream.Recv()
-				if recvErr != nil {
-					if errors.Is(recvErr, io.EOF) {
-						break
-					}
-
-					return nil, fmt.Errorf("receive active contracts for duplicate contract fallback: %w", recvErr)
-				}
-				entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-				if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-					continue
-				}
-				if latest == nil || entry.ActiveContract.GetCreatedEvent().GetOffset() > latest.GetCreatedEvent().GetOffset() {
-					latest = entry.ActiveContract
-				}
-			}
-
-			return latest, nil
-		}
-
-		latest, latestErr := latestForParty(executingParty)
-		if latestErr != nil {
-			return "", latestErr
-		}
-		if latest == nil && executingParty != participant.PartyID {
-			latest, latestErr = latestForParty(participant.PartyID)
-			if latestErr != nil {
-				return "", latestErr
-			}
-		}
-		if latest == nil || latest.GetCreatedEvent() == nil || latest.GetCreatedEvent().GetContractId() == "" {
-			return "", fmt.Errorf("no active contracts found for duplicate fallback")
-		}
-
-		return latest.GetCreatedEvent().GetContractId(), nil
-	}
-
-	routerCid, err := resolveActiveContractIDByAddress(perpartyrouter.PerPartyRouter{}.GetTemplateID(), routerAddress)
+	activeRouter, err := c.findLatestActiveContractByInstanceAddress(
+		ctx,
+		participant,
+		perpartyrouter.PerPartyRouter{}.GetTemplateID(),
+		routerAddress,
+	)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get router contract ID: %w", err)
 	}
+	routerCid := activeRouter.GetCreatedEvent().GetContractId()
 	c.logger.Debug().Str("InstanceAddress", routerAddress.String()).Str("ContractId", routerCid).Msg("Resolved PerPartyRouter contract")
 
-	receiverCid, err := resolveActiveContractIDByAddress(ccipreceiver.CCIPReceiver{}.GetTemplateID(), receiverAddress)
+	activeReceiver, err := c.findLatestActiveContractByInstanceAddress(
+		ctx,
+		participant,
+		ccipreceiver.CCIPReceiver{}.GetTemplateID(),
+		receiverAddress,
+	)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get receiver contract ID: %w", err)
 	}
+	receiverCid := activeReceiver.GetCreatedEvent().GetContractId()
 	c.logger.Debug().Str("InstanceAddress", receiverAddress.String()).Str("ContractId", receiverCid).Msg("Resolved CCIPReceiver contract")
 
 	emptyCCIPCtx := &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -468,9 +278,16 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		tokenTransferValue, tokenDisclosures, err = c.buildManualExecuteTokenTransferInput(
 			ctx,
 			participant,
-			executingParty,
+			receiverParty,
 			&message,
-			resolveActiveContractIDByAddress,
+			func(templateID string, address contracts.InstanceAddress) (string, error) {
+				active, findErr := c.findLatestActiveContractByInstanceAddress(ctx, participant, templateID, address)
+				if findErr != nil {
+					return "", findErr
+				}
+
+				return active.GetCreatedEvent().GetContractId(), nil
+			},
 		)
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("build token transfer execute input: %w", err)
@@ -478,10 +295,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		executeDisclosures = append(executeDisclosures, tokenDisclosures...)
 	}
 	// Execute message
-	if message.Finality == 0 {
-		// Receiver templates may enforce a positive minBlockDepth in newer package variants.
-		message.Finality = 1
-	}
 	encodedMessage, err := message.Encode()
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to encode message: %w", err)
@@ -510,7 +323,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 					}}}},
 				}},
 			}},
-			ActAs:              uniqueParties(executingParty, participant.PartyID),
+			ActAs:              []string{executingParty},
 			DisclosedContracts: executeDisclosures,
 		},
 	})
@@ -723,13 +536,11 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 }
 
 // BuildManualExecuteTokenTransferInput builds the input for the manual execute token transfer command.
-// - selecting the correct lock/release pool,
-// - matching by instrument hash vs destTokenAddress,
-// - ensuring exact source pool membership in remotePools,
-// - ensuring inbound rate limiter exists/resolves,
-// - collecting sender pool holdings CIDs + disclosures,
-// - fetching transfer factory + choice context/disclosures via scan-proxy,
-// - injecting rate limiter CID in poolExtraContext.
+// Assumes deploy/configure already produced a correct fresh environment and follows the direct path:
+// - find a lock/release pool with the source selector config and exact source pool match;
+// - if dest token address is provided, require exact remoteTokenAddress match;
+// - resolve configured inbound rate limiter and gather required disclosures;
+// - build transfer input using sender holdings plus transfer-factory context.
 func (c *Chain) buildManualExecuteTokenTransferInput(
 	ctx context.Context,
 	participant canton.Participant,
@@ -740,307 +551,73 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	if message == nil || message.TokenTransfer == nil {
 		return nil, nil, fmt.Errorf("token transfer message is required")
 	}
+	const tokenPoolQualifier = "TEST (LockReleaseTokenPool 1.7.0 [default] to BurnMintTokenPool 1.7.0 [default])"
 	sourceSelectorKey := fmt.Sprintf("%d", message.SourceChainSelector)
-	sourceSelectorNumericKey := sourceSelectorKey + "."
 	sourcePoolHex := strings.ToLower(hex.EncodeToString(message.TokenTransfer.SourcePoolAddress))
 	sourcePoolHex = strings.TrimPrefix(sourcePoolHex, "0x")
-	sourcePoolHexTail40 := sourcePoolHex
-	if len(sourcePoolHexTail40) > 40 {
-		sourcePoolHexTail40 = sourcePoolHexTail40[len(sourcePoolHexTail40)-40:]
-	}
-	destTokenHex := strings.ToLower(hex.EncodeToString(message.TokenTransfer.DestTokenAddress))
-	destTokenHex = strings.TrimPrefix(destTokenHex, "0x")
-	requireInstrumentMatch := len(destTokenHex) > 0
 
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("get ledger end for token pool lookup: %w", err)
-	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
-								TemplateFilter: &apiv2.TemplateFilter{
-									TemplateId: &apiv2.Identifier{
-										PackageId:  "#ccip-lockreleasetokenpool",
-										ModuleName: "CCIP.LockReleaseTokenPool",
-										EntityName: "LockReleaseTokenPool",
-									},
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("query active lock/release pools: %w", err)
-	}
-	defer stream.CloseSend()
-
-	var selectedPool *lockreleasetokenpool.LockReleaseTokenPool
-	var selectedPoolContractID string
-	var selectedPoolPackageID string
-	var selectedInstrumentFromCreateArgs string
-	var tokenMatchedPool *lockreleasetokenpool.LockReleaseTokenPool
-	var tokenMatchedPoolContractID string
-	var fallbackPool *lockreleasetokenpool.LockReleaseTokenPool
-	var fallbackPoolContractID string
-	var ensureSourcePoolErr error
-	debugPoolCandidates := make([]string, 0, 8)
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
+	var tokenPoolRef datastore.AddressRef
+	foundPoolRef := false
+	candidates := c.e.DataStore.Addresses().Filter(
+		datastore.AddressRefByChainSelector(c.chainDetails.ChainSelector),
+		datastore.AddressRefByQualifier(tokenPoolQualifier),
+	)
+	for _, candidate := range candidates {
+		if candidate.Type == datastore.ContractType("LockReleaseTokenPool") ||
+			candidate.Type == datastore.ContractType(lock_release_token_pool.ContractType) {
+			tokenPoolRef = candidate
+			foundPoolRef = true
 			break
 		}
-		if recvErr != nil {
-			return nil, nil, fmt.Errorf("receive lock/release pools: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			return nil, nil, fmt.Errorf("parse lock/release pool: %w", parseErr)
-		}
-		chainPoolCfgAny, ok := findChainPoolConfigBySelector(parsed.RemoteChainConfigs, sourceSelectorKey)
-		if !ok {
-			continue
-		}
-		remoteTokenMatch := false
-		instrumentCombined := fmt.Sprintf("%s@%s", string(parsed.InstrumentId.Id), string(parsed.InstrumentId.Admin))
-		instrumentRawHex := strings.ToLower(hex.EncodeToString([]byte(instrumentCombined)))
-		instrumentKeccakCombinedHex := strings.ToLower(hex.EncodeToString(crypto.Keccak256([]byte(instrumentCombined))))
-		instrumentTokenMatch := instrumentRawHex == destTokenHex ||
-			instrumentKeccakCombinedHex == destTokenHex ||
-			strings.HasSuffix(instrumentRawHex, destTokenHex) ||
-			strings.HasSuffix(destTokenHex, instrumentRawHex) ||
-			strings.HasSuffix(instrumentKeccakCombinedHex, destTokenHex) ||
-			strings.HasSuffix(destTokenHex, instrumentKeccakCombinedHex)
-		if instrumentTokenMatch && tokenMatchedPool == nil {
-			tokenMatchedPool = parsed
-			tokenMatchedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-		}
-		if cfg, cfgOK := chainPoolConfigFromAny(chainPoolCfgAny); cfgOK {
-			remoteTokenHex := strings.ToLower(strings.TrimPrefix(string(cfg.RemoteTokenAddress), "0x"))
-			if remoteTokenHex == destTokenHex || strings.HasSuffix(remoteTokenHex, destTokenHex) || strings.HasSuffix(destTokenHex, remoteTokenHex) {
-				remoteTokenMatch = true
-			}
-		}
-		if !remoteTokenMatch && strings.Contains(strings.ToLower(fmt.Sprint(chainPoolCfgAny)), destTokenHex) {
-			remoteTokenMatch = true
-		}
-		remotePools := extractRemotePools(chainPoolCfgAny)
-		if len(debugPoolCandidates) < 8 {
-			debugPoolCandidates = append(debugPoolCandidates, fmt.Sprintf(
-				"poolCID=%s instrumentRaw=%s instrumentKeccak=%s remotePools=%v",
-				entry.ActiveContract.GetCreatedEvent().GetContractId(),
-				instrumentRawHex,
-				instrumentKeccakCombinedHex,
-				remotePools,
-			))
-		}
-		remotePoolMatch := false
-		if len(remotePools) == 0 {
-			if requireInstrumentMatch {
-				continue
-			}
-			cfgText := strings.ToLower(fmt.Sprint(chainPoolCfgAny))
-			remotePoolMatch = strings.Contains(cfgText, sourcePoolHex) || strings.Contains(cfgText, sourcePoolHexTail40)
-		}
-		if len(remotePools) == 0 {
-			if remoteTokenMatch && tokenMatchedPool == nil {
-				tokenMatchedPool = parsed
-				tokenMatchedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-			if fallbackPool == nil {
-				fallbackPool = parsed
-				fallbackPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-
-			continue
-		}
-		for _, remotePool := range remotePools {
-			remotePoolHex := strings.ToLower(strings.TrimPrefix(remotePool, "0x"))
-			if remotePoolHex == sourcePoolHex ||
-				remotePoolHex == sourcePoolHexTail40 ||
-				strings.HasSuffix(remotePoolHex, sourcePoolHex) ||
-				strings.HasSuffix(sourcePoolHex, remotePoolHex) ||
-				strings.HasSuffix(remotePoolHex, sourcePoolHexTail40) ||
-				strings.HasSuffix(sourcePoolHexTail40, remotePoolHex) {
-				remotePoolMatch = true
-				break
-			}
-		}
-		if !remotePoolMatch {
-			if remoteTokenMatch && tokenMatchedPool == nil {
-				tokenMatchedPool = parsed
-				tokenMatchedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-			if fallbackPool == nil {
-				fallbackPool = parsed
-				fallbackPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			}
-
-			continue
-		}
-		if instrumentTokenMatch {
-			selectedPool = parsed
-			selectedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-			if tid := entry.ActiveContract.GetCreatedEvent().GetTemplateId(); tid != nil {
-				selectedPoolPackageID = tid.GetPackageId()
-			}
-			selectedInstrumentFromCreateArgs = extractInstrumentCombinedFromCreateArgs(entry.ActiveContract.GetCreatedEvent())
-
-			break
-		}
-		if requireInstrumentMatch {
-			continue
-		}
-		selectedPool = parsed
-		selectedPoolContractID = entry.ActiveContract.GetCreatedEvent().GetContractId()
-		if tid := entry.ActiveContract.GetCreatedEvent().GetTemplateId(); tid != nil {
-			selectedPoolPackageID = tid.GetPackageId()
-		}
-		selectedInstrumentFromCreateArgs = extractInstrumentCombinedFromCreateArgs(entry.ActiveContract.GetCreatedEvent())
-
-		break
 	}
-	if selectedPool == nil && tokenMatchedPool != nil && !requireInstrumentMatch {
-		selectedPool = tokenMatchedPool
-		selectedPoolContractID = tokenMatchedPoolContractID
+	if !foundPoolRef {
+		return nil, nil, fmt.Errorf("resolve source lock/release pool from datastore: no matching address ref for qualifier %q", tokenPoolQualifier)
 	}
-	if selectedPool == nil && tokenMatchedPool != nil && requireInstrumentMatch {
-		updatedPool, updatedCID, ensureErr := ensureManualExecuteSourcePoolAllowed(
-			ctx,
-			participant,
-			tokenMatchedPool,
-			tokenMatchedPoolContractID,
-			sourceSelectorKey,
-			sourceSelectorNumericKey,
-			sourcePoolHex,
-			resolveActiveContractIDByAddress,
-		)
-		if ensureErr == nil {
-			selectedPool = updatedPool
-			selectedPoolContractID = updatedCID
-			if d, dErr := getDisclosedContractByID(ctx, participant, updatedCID); dErr == nil && d.GetTemplateId() != nil {
-				selectedPoolPackageID = d.GetTemplateId().GetPackageId()
-			}
-			selectedInstrumentFromCreateArgs = ""
-		} else {
-			ensureSourcePoolErr = ensureErr
-		}
-	}
-	if selectedPool == nil && fallbackPool != nil && !requireInstrumentMatch {
-		selectedPool = fallbackPool
-		selectedPoolContractID = fallbackPoolContractID
-	}
-	if selectedPool == nil {
-		if len(debugPoolCandidates) == 0 && len(c.chain.Participants) > 0 && participant.PartyID != c.chain.Participants[0].PartyID {
-			return c.buildManualExecuteTokenTransferInput(
-				ctx,
-				c.chain.Participants[0],
-				tokenReceiverParty,
-				message,
-				resolveActiveContractIDByAddress,
-			)
-		}
-		if requireInstrumentMatch {
-			ensureSourcePoolErrMsg := "<nil>"
-			if ensureSourcePoolErr != nil {
-				ensureSourcePoolErrMsg = ensureSourcePoolErr.Error()
-			}
-
-			return nil, nil, fmt.Errorf(
-				"no lock/release pool found with instrument hash matching dest token %s for source selector %s and source pool %s; ensureSourcePoolErr=%s; candidates=%v",
-				destTokenHex,
-				sourceSelectorKey,
-				sourcePoolHex,
-				ensureSourcePoolErrMsg,
-				debugPoolCandidates,
-			)
-		}
-
-		return nil, nil, fmt.Errorf("no lock/release pool found for source selector %s and source pool %s", sourceSelectorKey, sourcePoolHex)
-	}
-	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.RemoteChainConfigs, sourceSelectorKey); ok {
-		remotePools := extractRemotePools(selectedCfgAny)
-		hasSourcePool := false
-		for _, rp := range remotePools {
-			rpHex := strings.ToLower(strings.TrimPrefix(rp, "0x"))
-			// Must be exact: on-ledger VerifyInboundMessage checks exact byte equality.
-			if rpHex == sourcePoolHex {
-				hasSourcePool = true
-				break
-			}
-		}
-		if !hasSourcePool {
-			updatedPool, updatedCID, ensureErr := ensureManualExecuteSourcePoolAllowed(
-				ctx,
-				participant,
-				selectedPool,
-				selectedPoolContractID,
-				sourceSelectorKey,
-				sourceSelectorNumericKey,
-				sourcePoolHex,
-				resolveActiveContractIDByAddress,
-			)
-			if ensureErr != nil {
-				return nil, nil, fmt.Errorf("ensure source pool is allowed for selected lock/release pool: %w", ensureErr)
-			}
-			selectedPool = updatedPool
-			selectedPoolContractID = updatedCID
-		}
-	}
-	selectedPool, selectedPoolContractID, err = ensureManualExecuteInboundRateLimiterConfigured(
-		ctx,
-		participant,
-		selectedPool,
-		selectedPoolContractID,
-		sourceSelectorKey,
-		sourceSelectorNumericKey,
-		resolveActiveContractIDByAddress,
+	tokenPoolAddress := contracts.HexToInstanceAddress(tokenPoolRef.Address)
+	selectedPoolContractID, err := resolveActiveContractIDByAddress(
+		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+		tokenPoolAddress,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("ensure inbound rate limiter is configured for selected lock/release pool: %w", err)
+		return nil, nil, fmt.Errorf("resolve lock/release pool contract ID by datastore address: %w", err)
 	}
-	// Inbound limiter reconciliation may select a different active pool version.
-	// Re-enforce exact 32-byte sourcePoolAddress membership in remotePools on that final version.
-	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.RemoteChainConfigs, sourceSelectorKey); ok {
-		remotePools := extractRemotePools(selectedCfgAny)
-		hasExactSourcePool := false
-		for _, rp := range remotePools {
-			if strings.EqualFold(strings.TrimPrefix(rp, "0x"), sourcePoolHex) {
-				hasExactSourcePool = true
-				break
-			}
+	activePool, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+		tokenPoolAddress,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("find lock/release pool active contract by datastore address: %w", err)
+	}
+	selectedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse selected lock/release pool: %w", err)
+	}
+
+	chainPoolCfgAny, ok := findChainPoolConfigBySelector(selectedPool.RemoteChainConfigs, sourceSelectorKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("selected lock/release pool has no remote config for source selector %s", sourceSelectorKey)
+	}
+	cfg, cfgOK := chainPoolConfigFromAny(chainPoolCfgAny)
+	if !cfgOK {
+		return nil, nil, fmt.Errorf("selected lock/release pool remote config is invalid for source selector %s", sourceSelectorKey)
+	}
+	remotePoolMatch := false
+	for _, remotePool := range cfg.RemotePools {
+		remotePoolHex := strings.ToLower(strings.TrimPrefix(string(remotePool), "0x"))
+		if remotePoolHex == sourcePoolHex {
+			remotePoolMatch = true
+			break
 		}
-		if !hasExactSourcePool {
-			updatedPool, updatedCID, ensureErr := ensureManualExecuteSourcePoolAllowed(
-				ctx,
-				participant,
-				selectedPool,
-				selectedPoolContractID,
-				sourceSelectorKey,
-				sourceSelectorNumericKey,
-				sourcePoolHex,
-				resolveActiveContractIDByAddress,
-			)
-			if ensureErr != nil {
-				return nil, nil, fmt.Errorf("re-ensure source pool is allowed on inbound-limiter-selected lock/release pool: %w", ensureErr)
-			}
-			selectedPool = updatedPool
-			selectedPoolContractID = updatedCID
-		}
+	}
+	if !remotePoolMatch {
+		return nil, nil, fmt.Errorf(
+			"selected lock/release pool is not configured for source pool %s on source selector %s",
+			sourcePoolHex,
+			sourceSelectorKey,
+		)
 	}
 
 	rateLimiterCID, rateLimiterDisclosure, err := resolveRateLimiterForManualExecute(
@@ -1048,7 +625,6 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		participant,
 		selectedPool,
 		sourceSelectorKey,
-		sourceSelectorNumericKey,
 		resolveActiveContractIDByAddress,
 	)
 	if err != nil {
@@ -1060,65 +636,19 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	expectedTransferAdmin := instrumentAdmin
 	transferSenderParty := string(selectedPool.PoolOwner)
 
-	collectPoolHoldings := func() ([]string, []*apiv2.DisclosedContract, error) {
-		holdings, holdingsErr := listHoldingContracts(ctx, participant)
-		if holdingsErr != nil {
-			return nil, nil, fmt.Errorf("list pool holdings: %w", holdingsErr)
-		}
-		poolHoldings := make([]string, 0, len(holdings))
-		poolHoldingDisclosures := make([]*apiv2.DisclosedContract, 0, len(holdings))
-		for _, holding := range holdings {
-			views := holding.GetCreatedEvent().GetInterfaceViews()
-			if len(views) == 0 || views[0].GetViewValue() == nil {
-				continue
-			}
-			fields := views[0].GetViewValue().GetFields()
-			if len(fields) < 4 {
-				continue
-			}
-			instrumentRecord := fields[1].GetValue().GetRecord()
-			if instrumentRecord == nil || len(instrumentRecord.GetFields()) < 2 {
-				continue
-			}
-			var holdingInstrumentAdmin, holdingInstrumentID string
-			holdingOwner := fields[0].GetValue().GetParty()
-			if holdingOwner != transferSenderParty {
-				continue
-			}
-			for _, instrumentField := range instrumentRecord.GetFields() {
-				if instrumentField == nil || instrumentField.GetValue() == nil {
-					continue
-				}
-				switch instrumentField.GetLabel() {
-				case "admin":
-					holdingInstrumentAdmin = instrumentField.GetValue().GetParty()
-				case "id":
-					holdingInstrumentID = instrumentField.GetValue().GetText()
-				}
-			}
-			isLocked := fields[3].GetValue().GetOptional().GetValue() != nil
-			if isLocked {
-				continue
-			}
-			disclosure := &apiv2.DisclosedContract{
-				TemplateId:       holding.GetCreatedEvent().GetTemplateId(),
-				ContractId:       holding.GetCreatedEvent().GetContractId(),
-				CreatedEventBlob: holding.GetCreatedEvent().GetCreatedEventBlob(),
-				SynchronizerId:   holding.GetSynchronizerId(),
-			}
-			if holdingInstrumentAdmin != instrumentAdmin || holdingInstrumentID != instrumentID {
-				continue
-			}
-			poolHoldings = append(poolHoldings, holding.GetCreatedEvent().GetContractId())
-			poolHoldingDisclosures = append(poolHoldingDisclosures, disclosure)
-		}
-
-		return poolHoldings, poolHoldingDisclosures, nil
-	}
-
-	poolHoldings, poolHoldingDisclosures, err := collectPoolHoldings()
+	holdings, err := listHoldingContracts(ctx, participant)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("list pool holdings: %w", err)
+	}
+	poolHoldingCIDs, poolHoldingDisclosures := selectUnlockedHoldingCIDs(
+		holdings,
+		transferSenderParty,
+		instrumentAdmin,
+		instrumentID,
+	)
+	poolHoldings := make([]string, 0, len(poolHoldingCIDs))
+	for _, cid := range poolHoldingCIDs {
+		poolHoldings = append(poolHoldings, string(cid))
 	}
 	if len(poolHoldings) == 0 {
 		return nil, nil, fmt.Errorf(
@@ -1216,141 +746,24 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		{Label: "poolExtraContext", Value: poolExtraContext},
 	}}}}}}}
 
-	poolDisclosure, err := getDisclosedContractByID(ctx, participant, selectedPoolContractID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("get token pool disclosure: %w", err)
+	poolDisclosure := &apiv2.DisclosedContract{
+		TemplateId:       activePool.GetCreatedEvent().GetTemplateId(),
+		ContractId:       activePool.GetCreatedEvent().GetContractId(),
+		CreatedEventBlob: activePool.GetCreatedEvent().GetCreatedEventBlob(),
+		SynchronizerId:   activePool.GetSynchronizerId(),
 	}
 	disclosures := make([]*apiv2.DisclosedContract, 0, 2+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
 	disclosures = append(disclosures, rateLimiterDisclosure, poolDisclosure)
 	disclosures = append(disclosures, transferFactoryDisclosures...)
 	disclosures = append(disclosures, poolHoldingDisclosures...)
-	finalRemotePools := []string{}
-	if selectedCfgAny, ok := findChainPoolConfigBySelector(selectedPool.RemoteChainConfigs, sourceSelectorKey); ok {
-		finalRemotePools = extractRemotePools(selectedCfgAny)
-	}
-	instrumentCombined := fmt.Sprintf("%s@%s", instrumentID, instrumentAdmin)
 	c.logger.Debug().
 		Str("SelectedTokenPoolCID", selectedPoolContractID).
 		Str("MessageSourcePoolHex", sourcePoolHex).
-		Any("FinalRemotePools", finalRemotePools).
-		Str("SelectedInstrumentCombined", instrumentCombined).
-		Str("SelectedInstrumentCombinedHex", hex.EncodeToString([]byte(instrumentCombined))).
-		Int("SelectedInstrumentCombinedLen", len([]byte(instrumentCombined))).
-		Str("SelectedInstrumentHashHex", strings.ToLower(hex.EncodeToString(crypto.Keccak256([]byte(instrumentCombined))))).
 		Str("SelectedPoolInstrumentAdmin", string(selectedPool.InstrumentId.Admin)).
 		Str("ExpectedTransferAdmin", expectedTransferAdmin).
-		Str("MessageDestTokenHex", destTokenHex).
-		Str("SelectedTokenPoolPackageID", selectedPoolPackageID).
-		Str("SelectedInstrumentFromCreateArgs", selectedInstrumentFromCreateArgs).
 		Msg("Prepared manual execute token transfer input")
 
 	return tokenTransferValue, disclosures, nil
-}
-
-func ensureManualExecuteInboundRateLimiterConfigured(
-	ctx context.Context,
-	participant canton.Participant,
-	pool *lockreleasetokenpool.LockReleaseTokenPool,
-	poolCID string,
-	sourceSelectorKey string,
-	_ string,
-	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
-) (*lockreleasetokenpool.LockReleaseTokenPool, string, error) {
-	if pool == nil || poolCID == "" {
-		return nil, "", fmt.Errorf("pool and poolCID are required")
-	}
-	cfgAny, ok := findChainPoolConfigBySelector(pool.RemoteChainConfigs, sourceSelectorKey)
-	if !ok {
-		return nil, "", fmt.Errorf("missing remote chain config for selector %s", sourceSelectorKey)
-	}
-	cfg, ok := chainPoolConfigFromAny(cfgAny)
-	if !ok {
-		return nil, "", fmt.Errorf("invalid remote chain config for selector %s", sourceSelectorKey)
-	}
-	if strings.TrimSpace(string(cfg.InboundRateLimiter.Unpack)) == "" {
-		return nil, "", fmt.Errorf("missing inbound rate limiter for selector %s", sourceSelectorKey)
-	}
-	if _, _, err := resolveRateLimiterFromRawAddress(
-		ctx,
-		participant,
-		cfg.InboundRateLimiter,
-		pool,
-		sourceSelectorKey,
-		resolveActiveContractIDByAddress,
-	); err != nil {
-		return nil, "", fmt.Errorf("resolve configured inbound rate limiter for selector %s: %w", sourceSelectorKey, err)
-	}
-
-	return pool, poolCID, nil
-}
-
-func extractRemotePools(chainPoolCfgAny any) []string {
-	switch cfg := chainPoolCfgAny.(type) {
-	case lockreleasetokenpool.RemoteChainConfig:
-		out := make([]string, 0, len(cfg.RemotePools))
-		for _, rp := range cfg.RemotePools {
-			out = append(out, string(rp))
-		}
-
-		return out
-	case map[string]any:
-		m := cfg
-		if data, ok := cfg["data"].(map[string]any); ok {
-			m = data
-		}
-		raw, ok := m["remotePools"]
-		if !ok || raw == nil {
-			return nil
-		}
-		switch pools := raw.(type) {
-		case []any:
-			out := make([]string, 0, len(pools))
-			for _, v := range pools {
-				out = append(out, fmt.Sprint(v))
-			}
-
-			return out
-		case []string:
-			return pools
-		}
-	}
-
-	return nil
-}
-
-func extractInstrumentCombinedFromCreateArgs(created *apiv2.CreatedEvent) string {
-	if created == nil || created.GetCreateArguments() == nil {
-		return ""
-	}
-	var instrumentRecord *apiv2.Record
-	for _, f := range created.GetCreateArguments().GetFields() {
-		if f.GetLabel() == "instrumentId" && f.GetValue() != nil {
-			instrumentRecord = f.GetValue().GetRecord()
-			break
-		}
-	}
-	if instrumentRecord == nil {
-		return ""
-	}
-	var admin string
-	var id string
-	for _, f := range instrumentRecord.GetFields() {
-		switch f.GetLabel() {
-		case "admin":
-			if f.GetValue() != nil {
-				admin = f.GetValue().GetParty()
-			}
-		case "id":
-			if f.GetValue() != nil {
-				id = f.GetValue().GetText()
-			}
-		}
-	}
-	if id == "" || admin == "" {
-		return ""
-	}
-
-	return id + "@" + admin
 }
 
 func parseRawInstanceAddress(v any) (string, error) {
@@ -1376,33 +789,37 @@ func parseRawInstanceAddress(v any) (string, error) {
 	return "", fmt.Errorf("unexpected raw instance address type %T", v)
 }
 
-func normalizeNumericText(v string) string {
+func normalizeSelectorKey(v string) (string, bool) {
 	v = strings.TrimSpace(v)
-	if v == "" {
-		return v
-	}
-	if strings.Contains(v, ".") {
-		parts := strings.SplitN(v, ".", 2)
-		frac := strings.TrimRight(parts[1], "0")
-		if frac == "" {
-			return parts[0]
-		}
-	}
-	if strings.ContainsAny(v, "eE") {
-		if f, _, err := big.ParseFloat(v, 10, 256, big.ToZero); err == nil {
-			if i, _ := f.Int(nil); i != nil {
-				return i.String()
-			}
-		}
+	if v == "" || strings.ContainsAny(v, "eE") {
+		return "", false
 	}
 
-	return strings.TrimSuffix(v, ".")
+	parts := strings.SplitN(v, ".", 2)
+	intPart := parts[0]
+	if intPart == "" {
+		return "", false
+	}
+	if len(parts) == 2 && strings.Trim(parts[1], "0") != "" {
+		return "", false
+	}
+
+	n, err := strconv.ParseUint(intPart, 10, 64)
+	if err != nil {
+		return "", false
+	}
+
+	return strconv.FormatUint(n, 10), true
 }
 
 func findChainPoolConfigBySelector(chainPoolConfigs map[string]any, sourceSelectorKey string) (any, bool) {
-	sourceSelectorNorm := normalizeNumericText(sourceSelectorKey)
+	sourceSelectorNorm, ok := normalizeSelectorKey(sourceSelectorKey)
+	if !ok {
+		return nil, false
+	}
 	for rawKey, cfg := range chainPoolConfigs {
-		if normalizeNumericText(rawKey) == sourceSelectorNorm {
+		rawKeyNorm, rawKeyOK := normalizeSelectorKey(rawKey)
+		if rawKeyOK && rawKeyNorm == sourceSelectorNorm {
 			return cfg, true
 		}
 	}
@@ -1467,117 +884,11 @@ func chainPoolConfigFromAny(v any) (lockreleasetokenpool.RemoteChainConfig, bool
 	}
 }
 
-func ensureManualExecuteSourcePoolAllowed(
-	ctx context.Context,
-	participant canton.Participant,
-	pool *lockreleasetokenpool.LockReleaseTokenPool,
-	poolCID string,
-	sourceSelectorKey string,
-	sourceSelectorNumericKey string,
-	sourcePoolHex string,
-	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
-) (*lockreleasetokenpool.LockReleaseTokenPool, string, error) {
-	updatedRemoteChainConfigs := types.GENMAP{}
-	maps.Copy(updatedRemoteChainConfigs, pool.RemoteChainConfigs)
-	existingCfgAny, _ := findChainPoolConfigBySelector(pool.RemoteChainConfigs, sourceSelectorKey)
-	existingCfg, ok := chainPoolConfigFromAny(existingCfgAny)
-	if !ok {
-		existingCfg = lockreleasetokenpool.RemoteChainConfig{
-			InboundCCVs:  []common.RawInstanceAddress{},
-			OutboundCCVs: []common.RawInstanceAddress{},
-			RemotePools:  []types.TEXT{},
-		}
-	}
-	existingCfg.RemotePools = []types.TEXT{types.TEXT(strings.TrimPrefix(strings.ToLower(sourcePoolHex), "0x"))}
-	updatedRemoteChainConfigs[sourceSelectorKey] = existingCfg
-	updatedRemoteChainConfigs[sourceSelectorNumericKey] = existingCfg
-
-	updateArgs := lockreleasetokenpool.ApplyChainUpdates{
-		RemoteChainSelectorsToRemove: []types.NUMERIC{},
-		ChainsToAdd: []lockreleasetokenpool.ChainUpdate{{
-			RemoteChainSelector: types.NUMERIC(sourceSelectorKey),
-			RemotePools:         existingCfg.RemotePools,
-			RemoteTokenAddress:  existingCfg.RemoteTokenAddress,
-			InboundCCVs:         existingCfg.InboundCCVs,
-			OutboundCCVs:        existingCfg.OutboundCCVs,
-			InboundRateLimiter:  existingCfg.InboundRateLimiter,
-			OutboundRateLimiter: existingCfg.OutboundRateLimiter,
-		}},
-	}
-	updateRes, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.New().String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{
-						PackageId:  "#ccip-lockreleasetokenpool",
-						ModuleName: "CCIP.LockReleaseTokenPool",
-						EntityName: "LockReleaseTokenPool",
-					},
-					ContractId:     poolCID,
-					Choice:         "ApplyChainUpdates",
-					ChoiceArgument: ledger.MapToValue(updateArgs.ToMap()),
-				}},
-			}},
-			ActAs: []string{string(pool.PoolOwner)},
-		},
-	})
-	if err != nil {
-		return nil, "", fmt.Errorf("patch lock/release pool source remote pool for manual execute: %w", err)
-	}
-
-	var latestCreated *apiv2.CreatedEvent
-	var identityMatchedPool *lockreleasetokenpool.LockReleaseTokenPool
-	var identityMatchedCID string
-	for _, ev := range updateRes.GetTransaction().GetEvents() {
-		created := ev.GetCreated()
-		if created == nil || created.GetTemplateId() == nil {
-			continue
-		}
-		tmpl := created.GetTemplateId()
-		if tmpl.GetModuleName() != "CCIP.LockReleaseTokenPool" || tmpl.GetEntityName() != "LockReleaseTokenPool" {
-			continue
-		}
-		if latestCreated == nil || created.GetOffset() > latestCreated.GetOffset() {
-			latestCreated = created
-		}
-		parsedCreated, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](created)
-		if parseErr != nil {
-			continue
-		}
-		if string(parsedCreated.InstanceId) == string(pool.InstanceId) && string(parsedCreated.PoolOwner) == string(pool.PoolOwner) {
-			identityMatchedPool = parsedCreated
-			identityMatchedCID = created.GetContractId()
-		}
-	}
-	if identityMatchedPool != nil && identityMatchedCID != "" {
-		return identityMatchedPool, identityMatchedCID, nil
-	}
-	if latestCreated != nil {
-		updatedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](latestCreated)
-		if parseErr == nil {
-			return updatedPool, latestCreated.GetContractId(), nil
-		}
-	}
-
-	raw := contracts.InstanceID(string(pool.InstanceId)).RawInstanceAddress(pool.PoolOwner)
-	updatedCID, err := resolveActiveContractIDByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), raw.InstanceAddress())
-	if err == nil {
-		updatedPool := *pool
-		updatedPool.RemoteChainConfigs = updatedRemoteChainConfigs
-
-		return &updatedPool, updatedCID, nil
-	}
-
-	return nil, "", fmt.Errorf("resolve updated lock/release pool contract id: %w", err)
-}
-
 func resolveRateLimiterForManualExecute(
 	ctx context.Context,
 	participant canton.Participant,
 	selectedPool *lockreleasetokenpool.LockReleaseTokenPool,
 	sourceSelectorKey string,
-	_ string,
 	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
 ) (string, *apiv2.DisclosedContract, error) {
 	cfgAny, ok := findChainPoolConfigBySelector(selectedPool.RemoteChainConfigs, sourceSelectorKey)
@@ -1591,26 +902,7 @@ func resolveRateLimiterForManualExecute(
 	if strings.TrimSpace(string(cfg.InboundRateLimiter.Unpack)) == "" {
 		return "", nil, fmt.Errorf("missing configured inbound rate limiter entry for source selector %s", sourceSelectorKey)
 	}
-
-	return resolveRateLimiterFromRawAddress(
-		ctx,
-		participant,
-		cfg.InboundRateLimiter,
-		selectedPool,
-		sourceSelectorKey,
-		resolveActiveContractIDByAddress,
-	)
-}
-
-func resolveRateLimiterFromRawAddress(
-	ctx context.Context,
-	participant canton.Participant,
-	inboundRateLimiterRaw any,
-	selectedPool *lockreleasetokenpool.LockReleaseTokenPool,
-	sourceSelectorKey string,
-	_ func(templateID string, address contracts.InstanceAddress) (string, error),
-) (string, *apiv2.DisclosedContract, error) {
-	rawRateLimiter, err := parseRawInstanceAddress(inboundRateLimiterRaw)
+	rawRateLimiter, err := parseRawInstanceAddress(cfg.InboundRateLimiter)
 	if err != nil {
 		return "", nil, err
 	}
@@ -1618,103 +910,27 @@ func resolveRateLimiterFromRawAddress(
 	if err != nil {
 		return "", nil, fmt.Errorf("parse rate limiter raw instance address: %w", err)
 	}
-
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return "", nil, fmt.Errorf("get ledger end for rate limiter lookup: %w", err)
-	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
-								WildcardFilter: &apiv2.WildcardFilter{
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: true,
-		},
-	})
-	if err != nil {
-		return "", nil, fmt.Errorf("query active rate limiters by raw address: %w", err)
-	}
-	defer stream.CloseSend()
-	selectorNorm := normalizeNumericText(sourceSelectorKey)
-	poolSelectorCandidates := make([]string, 0, 6)
-	instanceCandidates := make([]string, 0, 3)
-
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return "", nil, fmt.Errorf("receive active rate limiters by raw address: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-			continue
-		}
-		tmpl := entry.ActiveContract.GetCreatedEvent().GetTemplateId()
-		if tmpl == nil || tmpl.GetModuleName() != "CCIP.RateLimiter" || tmpl.GetEntityName() != "RateLimiter" {
-			continue
-		}
-		parsed, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](entry.ActiveContract.GetCreatedEvent())
-		if parseErr != nil {
-			continue
-		}
-		candidateRaw := contracts.InstanceID(string(parsed.InstanceId)).RawInstanceAddress(parsed.PoolOwner)
-		if parsed.Direction == common.RateLimitDirectionRateLimitDirection_Inbound &&
-			(selectedPool == nil || (string(parsed.PoolOwner) == string(selectedPool.PoolOwner) && string(parsed.PoolInstanceId) == string(selectedPool.InstanceId))) &&
-			(selectorNorm == "" || normalizeNumericText(string(parsed.RemoteChainSelector)) == selectorNorm) &&
-			len(poolSelectorCandidates) < cap(poolSelectorCandidates) {
-			poolSelectorCandidates = append(poolSelectorCandidates, fmt.Sprintf("%s=>%s", parsed.InstanceId, candidateRaw.InstanceAddress().String()))
-		}
-		if candidateRaw.InstanceAddress().String() != rateLimiterRawAddr.InstanceAddress().String() {
-			continue
-		}
-		if len(instanceCandidates) < cap(instanceCandidates) {
-			instanceCandidates = append(instanceCandidates, fmt.Sprintf("instanceId=%s pool=%s@%s selector=%s dir=%s", parsed.InstanceId, parsed.PoolInstanceId, parsed.PoolOwner, parsed.RemoteChainSelector, parsed.Direction))
-		}
-		if parsed.Direction != common.RateLimitDirectionRateLimitDirection_Inbound {
-			continue
-		}
-		if selectedPool != nil {
-			if string(parsed.PoolOwner) != string(selectedPool.PoolOwner) || string(parsed.PoolInstanceId) != string(selectedPool.InstanceId) {
-				continue
-			}
-		}
-		if selectorNorm != "" && normalizeNumericText(string(parsed.RemoteChainSelector)) != selectorNorm {
-			continue
-		}
-		cid := entry.ActiveContract.GetCreatedEvent().GetContractId()
-		disclosure := &apiv2.DisclosedContract{
-			TemplateId:       entry.ActiveContract.GetCreatedEvent().GetTemplateId(),
-			ContractId:       cid,
-			CreatedEventBlob: entry.ActiveContract.GetCreatedEvent().GetCreatedEventBlob(),
-			SynchronizerId:   entry.ActiveContract.GetSynchronizerId(),
-		}
-
-		return cid, disclosure, nil
-	}
-
-	return "", nil, fmt.Errorf(
-		"no active inbound rate limiter matched raw=%s instance address %s for pool %s@%s selector %s (poolSelectorCandidates=%v instanceCandidates=%v)",
-		rawRateLimiter,
-		rateLimiterRawAddr.InstanceAddress().String(),
-		selectedPool.InstanceId,
-		selectedPool.PoolOwner,
-		sourceSelectorKey,
-		poolSelectorCandidates,
-		instanceCandidates,
+	activeRateLimiter, err := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		common.RateLimiter{}.GetTemplateID(),
+		rateLimiterRawAddr.InstanceAddress(),
 	)
+	if err != nil {
+		return "", nil, fmt.Errorf("find inbound rate limiter active contract by configured raw address: %w", err)
+	}
+	cid, err := resolveActiveContractIDByAddress(common.RateLimiter{}.GetTemplateID(), rateLimiterRawAddr.InstanceAddress())
+	if err != nil {
+		return "", nil, fmt.Errorf("resolve inbound rate limiter contract ID by configured raw address: %w", err)
+	}
+
+	return cid, &apiv2.DisclosedContract{
+		TemplateId:       activeRateLimiter.GetCreatedEvent().GetTemplateId(),
+		ContractId:       activeRateLimiter.GetCreatedEvent().GetContractId(),
+		CreatedEventBlob: activeRateLimiter.GetCreatedEvent().GetCreatedEventBlob(),
+		SynchronizerId:   activeRateLimiter.GetSynchronizerId(),
+	}, nil
 }
 
 func listHoldingContracts(ctx context.Context, participant canton.Participant) ([]*apiv2.ActiveContract, error) {
@@ -1767,63 +983,6 @@ func listHoldingContracts(ctx context.Context, participant canton.Participant) (
 	}
 
 	return out, nil
-}
-
-func getDisclosedContractByID(ctx context.Context, participant canton.Participant, contractID string) (*apiv2.DisclosedContract, error) {
-	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
-	if err != nil {
-		return nil, fmt.Errorf("get ledger end for disclosure lookup: %w", err)
-	}
-	stream, err := participant.LedgerServices.State.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-		ActiveAtOffset: ledgerEnd.GetOffset(),
-		EventFormat: &apiv2.EventFormat{
-			FiltersByParty: map[string]*apiv2.Filters{
-				participant.PartyID: {
-					Cumulative: []*apiv2.CumulativeFilter{
-						{
-							IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{
-								WildcardFilter: &apiv2.WildcardFilter{
-									IncludeCreatedEventBlob: true,
-								},
-							},
-						},
-					},
-				},
-			},
-			Verbose: false,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("query contracts for disclosure lookup: %w", err)
-	}
-	defer stream.CloseSend()
-
-	for {
-		resp, recvErr := stream.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			return nil, fmt.Errorf("receive disclosure lookup contracts: %w", recvErr)
-		}
-		entry, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract)
-		if !ok {
-			continue
-		}
-		created := entry.ActiveContract.GetCreatedEvent()
-		if created.GetContractId() != contractID {
-			continue
-		}
-
-		return &apiv2.DisclosedContract{
-			TemplateId:       created.GetTemplateId(),
-			ContractId:       created.GetContractId(),
-			CreatedEventBlob: created.GetCreatedEventBlob(),
-			SynchronizerId:   entry.ActiveContract.GetSynchronizerId(),
-		}, nil
-	}
-
-	return nil, fmt.Errorf("contract id %s not found for disclosure lookup", contractID)
 }
 
 // This is copied from chainlink-canton, replace with EDS client once available.

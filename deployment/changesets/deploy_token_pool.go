@@ -105,6 +105,14 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
 	}
 
+	if len(out.Output.Labels.List()) == 0 {
+		return cldf.ChangesetOutput{}, fmt.Errorf("missing raw lock/release pool label in deploy output")
+	}
+	rawPoolAddr, err := contracts.RawInstanceAddressFromString(out.Output.Labels.List()[0])
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("failed to parse raw lock/release pool label: %w", err)
+	}
+
 	regInput := sequences.RegisterTokenPoolInput{
 		TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
 		InstrumentId: splice_api_token_holding_v1.InstrumentId{
@@ -113,7 +121,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		},
 		CcipParty:      cfg.CcipOwner,
 		PoolOwnerParty: cfg.PoolOwner,
-		PoolInstanceID: out.Output.Address,
+		PoolInstanceID: rawPoolAddr.InstanceID(),
 	}
 	_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
 	if err != nil {

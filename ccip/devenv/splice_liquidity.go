@@ -22,6 +22,34 @@ import (
 
 const instrumentFieldAdmin = "admin"
 
+func resolveRegistryAdmin(ctx context.Context, participant canton.Participant) (string, error) {
+	requestEditor := func(_ context.Context, req *http.Request) error {
+		token, err := participant.TokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("retrieve participant token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+	metadataClient, err := tokenMetadataV1.NewClientWithResponses(
+		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
+		tokenMetadataV1.WithRequestEditorFn(requestEditor),
+	)
+	if err != nil {
+		return "", fmt.Errorf("create token metadata client: %w", err)
+	}
+	registryResp, err := metadataClient.GetRegistryInfoWithResponse(ctx)
+	if err != nil {
+		return "", fmt.Errorf("get registry info: %w", err)
+	}
+	if registryResp.StatusCode() != http.StatusOK || registryResp.JSON200 == nil || registryResp.JSON200.AdminId == "" {
+		return "", fmt.Errorf("unexpected registry info response status=%d", registryResp.StatusCode())
+	}
+
+	return registryResp.JSON200.AdminId, nil
+}
+
 func seedAMTLiquidity(ctx context.Context, participant canton.Participant, ownerParty string, amount string) error {
 	requestEditor := func(reqCtx context.Context, req *http.Request) error {
 		token, err := participant.TokenSource.Token()
@@ -37,13 +65,6 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 	if err != nil {
 		return fmt.Errorf("create scan proxy client: %w", err)
 	}
-	metadataClient, err := tokenMetadataV1.NewClientWithResponses(
-		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
-		tokenMetadataV1.WithRequestEditorFn(requestEditor),
-	)
-	if err != nil {
-		return fmt.Errorf("create token metadata client: %w", err)
-	}
 	transferClient, err := transferInstructionV1.NewClientWithResponses(
 		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
 		transferInstructionV1.WithRequestEditorFn(requestEditor),
@@ -52,14 +73,10 @@ func seedAMTLiquidity(ctx context.Context, participant canton.Participant, owner
 		return fmt.Errorf("create transfer instruction client: %w", err)
 	}
 
-	registryInfoResponse, err := metadataClient.GetRegistryInfoWithResponse(ctx)
+	registryAdmin, err := resolveRegistryAdmin(ctx, participant)
 	if err != nil {
-		return fmt.Errorf("get registry info: %w", err)
+		return err
 	}
-	if registryInfoResponse.StatusCode() != http.StatusOK || registryInfoResponse.JSON200 == nil || registryInfoResponse.JSON200.AdminId == "" {
-		return fmt.Errorf("unexpected registry info response status=%d", registryInfoResponse.StatusCode())
-	}
-	registryAdmin := registryInfoResponse.JSON200.AdminId
 
 	transferFactoryResponse, err := transferClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{

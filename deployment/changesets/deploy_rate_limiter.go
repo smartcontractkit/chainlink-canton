@@ -22,17 +22,20 @@ type DeployRateLimiterConfig struct {
 	RemoteChainSelector string
 	Direction           common.RateLimitDirection
 	Mode                common.RateLimitMode
-	InstanceID          string
-	Qualifier           string
-	IsEnabled           bool
-	Capacity            string
-	Rate                string
-	Tokens              string
+	// Optional and ignored for deploy addressing; deploy operations generate canonical instance IDs.
+	InstanceID string
+	Qualifier  string
+	IsEnabled  bool
+	Capacity   string
+	Rate       string
+	Tokens     string
 }
 
 var _ cldf.ChangeSetV2[CantonCSDeps[DeployRateLimiterConfig]] = DeployRateLimiter{}
 
 type DeployRateLimiter struct{}
+
+var RateLimiterVersion = rate_limiter.Version
 
 func (d DeployRateLimiter) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployRateLimiterConfig]) error {
 	chain, ok := e.BlockChains.CantonChains()[config.ChainSelector]
@@ -61,10 +64,6 @@ func (d DeployRateLimiter) Apply(e cldf.Environment, config CantonCSDeps[DeployR
 	if cfg.RemoteChainSelector == "" {
 		return cldf.ChangesetOutput{}, fmt.Errorf("remote chain selector is required")
 	}
-	if cfg.InstanceID == "" {
-		return cldf.ChangesetOutput{}, fmt.Errorf("instance ID is required")
-	}
-
 	mode := cfg.Mode
 	if mode == "" {
 		mode = common.RateLimitModeRateLimitMode_DefaultFinality
@@ -83,7 +82,7 @@ func (d DeployRateLimiter) Apply(e cldf.Environment, config CantonCSDeps[DeployR
 	}
 
 	template := common.RateLimiter{
-		InstanceId:          types.TEXT(cfg.InstanceID),
+		InstanceId:          "",
 		PoolInstanceId:      types.TEXT(cfg.PoolInstanceID),
 		PoolOwner:           types.PARTY(cfg.PoolOwner),
 		RemoteChainSelector: types.NUMERIC(cfg.RemoteChainSelector),
