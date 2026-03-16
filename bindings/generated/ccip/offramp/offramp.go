@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "39b99737671791d3b47bde42e5a815e5ebbdb68d2dd30fd8de1b6f37eaa23597"
+	PackageID   = "8c609dab96040523eac11c38f554162bff924d20d3af294731ba5c5df9c4654f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -444,11 +445,11 @@ func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packa
 	}
 }
 
-// Archive exercises the Archive choice on this OffRamp contract
+// Archive exercises the Archive choice on this OffRamp contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -458,7 +459,7 @@ func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -467,7 +468,7 @@ func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *mode
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this OffRamp contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t OffRamp) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t OffRamp) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
@@ -477,7 +478,7 @@ func (t OffRamp) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntr
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t OffRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t OffRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
@@ -488,7 +489,7 @@ func (t OffRamp) MCMSReceiverEntrypointWithPackageID(contractID string, packageI
 
 // Verify interface implementations for OffRamp
 
-var _ IMCMSReceiver = (*OffRamp)(nil)
+var _ mcms.IMCMSReceiver = (*OffRamp)(nil)
 
 // OffRampDeps is a Record type
 type OffRampDeps struct {

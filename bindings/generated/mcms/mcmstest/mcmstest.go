@@ -131,11 +131,11 @@ func (t *Counter) UnmarshalHex(data string) error {
 
 // Choice methods for Counter
 
-// Archive exercises the Archive choice on this Counter contract
+// Archive exercises the Archive choice on this Counter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t Counter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.Counter", "Counter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.Counter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -145,7 +145,7 @@ func (t Counter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t Counter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.Counter", "Counter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.Counter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -382,11 +382,11 @@ func (t *ForgedReceiver) UnmarshalHex(data string) error {
 
 // Choice methods for ForgedReceiver
 
-// Archive exercises the Archive choice on this ForgedReceiver contract
+// Archive exercises the Archive choice on this ForgedReceiver contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t ForgedReceiver) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.ForgedReceiver", "ForgedReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Mock.ForgedReceiver", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -396,7 +396,7 @@ func (t ForgedReceiver) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t ForgedReceiver) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.ForgedReceiver", "ForgedReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Mock.ForgedReceiver", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "8955eaf456a1d44fba8acbc1ee02d45bbf66aa839b861ec2a2c560b6f13105fd"
+	PackageID   = "3eccbee0f4b51b2170096c14b149faa6eed7a0aa12043170b2dee213bda288ae"
 	SDKVersion  = "3.4.10"
 )
 
@@ -3034,11 +3035,11 @@ func (t GlobalConfig) ApplySourceChainConfigUpdatesWithPackageID(contractID stri
 	}
 }
 
-// Archive exercises the Archive choice on this GlobalConfig contract
+// Archive exercises the Archive choice on this GlobalConfig contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -3048,7 +3049,7 @@ func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t GlobalConfig) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -3099,7 +3100,7 @@ func (t GlobalConfig) GetSourceChainConfigWithPackageID(contractID string, packa
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this GlobalConfig contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
@@ -3109,7 +3110,7 @@ func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args MCMSReceive
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
@@ -3120,7 +3121,7 @@ func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, pac
 
 // Verify interface implementations for GlobalConfig
 
-var _ IMCMSReceiver = (*GlobalConfig)(nil)
+var _ mcms.IMCMSReceiver = (*GlobalConfig)(nil)
 
 // IssuerType is an enum type
 type IssuerType string
