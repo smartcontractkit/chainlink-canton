@@ -884,7 +884,6 @@ func buildTokenTransferV1(
 	destTokenAddress []byte,
 	tokenReceiverParty string,
 ) *TokenTransferV1 {
-
 	return &TokenTransferV1{
 		Amount:             amount,
 		SourcePoolAddress:  sourcePoolAddress,
