@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "905e408d355f0e3c706ef1a77b851addfe197401f022fe8eae1e499b2af30f7e"
+	PackageID   = "922976dc878b99b8f40f8ca5df3460cb36326d2dbcd4e92d005a445aed7558f0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -450,11 +450,11 @@ func (t CCIPFactory) SetOwnerToMCMSWithPackageID(contractID string, packageID st
 	}
 }
 
-// Archive exercises the Archive choice on this CCIPFactory contract
+// Archive exercises the Archive choice on this CCIPFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -464,7 +464,7 @@ func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CCIPFactory) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

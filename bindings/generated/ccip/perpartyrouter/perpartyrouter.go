@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "0d22d128dc521ceb00aad03db4c260fb5861d3bf6be315681ca73697ab3bc0c6"
+	PackageID   = "b2b69af59ea454c8d2dbfb392dc411fa53cad23784f7a86521fa97d427129136"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1004,11 +1004,11 @@ func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packag
 	}
 }
 
-// Archive exercises the Archive choice on this PerPartyRouter contract
+// Archive exercises the Archive choice on this PerPartyRouter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t PerPartyRouter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1018,7 +1018,7 @@ func (t PerPartyRouter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t PerPartyRouter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1308,11 +1308,11 @@ func (t PerPartyRouterFactory) CreateRouterWithPackageID(contractID string, pack
 	}
 }
 
-// Archive exercises the Archive choice on this PerPartyRouterFactory contract
+// Archive exercises the Archive choice on this PerPartyRouterFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t PerPartyRouterFactory) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1322,7 +1322,7 @@ func (t PerPartyRouterFactory) Archive(contractID string) *model.ExerciseCommand
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t PerPartyRouterFactory) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "ad2d4ea084fad3dcf3d326813f07fe995ecf867613b893650ac89140f9047626"
+	PackageID   = "36a7f9435c5e9500b078e09071956678be0fffc0d9bcdceeb1e9690d4e054f0d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -478,11 +478,11 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolCalculateFeeWithPackageID(cont
 	}
 }
 
-// Archive exercises the Archive choice on this LockReleaseTokenPool contract
+// Archive exercises the Archive choice on this LockReleaseTokenPool contract via the IITokenPool interface
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "TokenPool"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -492,7 +492,7 @@ func (t LockReleaseTokenPool) Archive(contractID string) *model.ExerciseCommand 
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t LockReleaseTokenPool) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "TokenPool"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

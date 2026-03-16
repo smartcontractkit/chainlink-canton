@@ -518,7 +518,7 @@ testDeployCommitteeVerifier_MCMS = script do
         owner = mcmsParty
         ccipOwner = mcmsParty
         versionTag = "01020304"
-        messageSentObservers = [mcmsParty]
+        messageSentObserver = mcmsParty
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2"]
         storageLocationsAdmin = mcmsParty
@@ -552,15 +552,12 @@ testDeployLockReleaseTokenPool_MCMS = script do
   let instAddr = makeInstanceAddress factoryInstanceId mcmsParty
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
   -- Use mcmsParty as poolOwner so authorization works within single party
-  let params = DeployLockReleaseTokenPoolParams with
+  let params : DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
         ccipOwner = mcmsParty
         poolOwner = mcmsParty
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "USDC"
         decimals = 6
-        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" mcmsParty
-        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" mcmsParty
-        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" mcmsParty
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   submit mcmsParty do
