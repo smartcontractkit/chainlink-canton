@@ -16,6 +16,40 @@ CCIP Canton enables cross-chain messaging between Canton and other blockchain ne
 | State model | Global shared state | Per-party isolated state |
 | Contract visibility | Public | Explicit disclosure required |
 
+## Quick Mental Model (Contract-Only)
+
+If you only need the contract interactions, use this:
+
+1. `PerPartyRouter` is the user entry point.
+2. `OnRamp` handles outbound message validation/encoding.
+3. `OffRamp` handles inbound message validation/decoding.
+4. `GlobalConfig` stores lane rules (which chains are allowed, required CCVs).
+5. `TokenAdminRegistry` authorizes token pool actions for token transfers.
+6. `CommitteeVerifier` validates CCV signatures and produces verifier tickets.
+7. Tickets prove that prerequisite actions happened (lock, verify, receive authorization).
+8. Events (`CCIPMessageSent`, `ExecutionStateChanged`) are the observable outputs.
+
+## Contract Flow in Plain English
+
+### Send (Canton -> remote)
+
+1. User optionally locks tokens in a pool, which yields a token ticket.
+2. User obtains CCV attestation ticket(s).
+3. User calls `PerPartyRouter.CCIPSend`.
+4. Router calls `OnRamp.CCIPSendFromRouter`.
+5. OnRamp checks config/tickets, builds and encodes message.
+6. Router increments sequence and emits `CCIPMessageSent`.
+
+### Receive (remote -> Canton)
+
+1. User obtains encoded message + CCV blobs from off-chain.
+2. User calls verifier(s) to append verification state to the executing message.
+3. User calls `PerPartyRouter.Execute`.
+4. Router calls `OffRamp.ExecuteFromRouter`.
+5. OffRamp validates source config + verifier tickets.
+6. For token transfer, OffRamp issues receive authorization via `TokenAdminRegistry`.
+7. Router marks execution state and emits `ExecutionStateChanged`.
+
 ## Architecture
 
 ```
@@ -83,7 +117,7 @@ contracts/ccip/
 ├── perpartyrouter/      # Per-user router (entry point)
 ├── onramp/              # Outbound message handling
 ├── offramp/             # Inbound message handling
-├── ccvRegistry/         # CCV ticket issuance authority
+├── ccipsender/          # Sender entrypoint that calls verifiers + OnRamp
 ├── ccvs/                # CommitteeVerifier implementation
 ├── tokenAdminRegistry/  # Token pool registry and ticket authority
 ├── feequoter/           # Fee calculation
@@ -194,19 +228,10 @@ data TokenConfig = TokenConfig
 - `TokenAdminRegistry_IssueReceiveTicket` - Called by OffRamp after verification
 - `TokenAdminRegistry_ConsumeReceiveTicket` - Called by pool to release tokens
 
-### CCVRegistry
+### CCVRegistry (Deprecated)
 
-Stateless ticket-issuing authority for Cross-Chain Verifiers. The `ccipOwner` signatory ensures ticket authenticity.
-
-```daml
-template CCVRegistry
-    with
-        ccipOwner : Party
-```
-
-**Key choices:**
-- `CCVRegistry_IssueCCVTicket` - Issue ticket for outbound attestation
-- `CCVRegistry_IssueVerifyTicket` - Issue ticket after inbound verification
+`CCVRegistry` is legacy terminology in older docs/tests.
+Current flow uses verifier interfaces directly (`CrossChainVerifier_ForwardToVerifier`, `CrossChainVerifier_VerifyMessage`) and appends verifier state to CCIP message contracts, instead of issuing standalone CCV ticket contracts.
 
 ### CommitteeVerifier
 
@@ -236,8 +261,8 @@ Canton's privacy model means CCIP infrastructure cannot directly call user contr
 | Ticket | Issued By | Consumed By | Purpose |
 |--------|-----------|-------------|---------|
 | `TokenSendTicket` | TokenPool via TokenAdminRegistry | OnRamp | Proves tokens were locked |
-| `CCVTicket` | CCV via CCVRegistry | OnRamp | Attestation for outbound message |
-| `CCVVerifyTicket` | CCV via CCVRegistry | OffRamp | Proves inbound message verified |
+| `VerifierData` | CCV (`ForwardToVerifier`) | OnRamp / message pipeline | Attestation data attached to outbound message |
+| `CCVVerification` | CCV (`VerifyMessage`) | OffRamp / execution pipeline | Proves inbound message verification |
 | `TokenReceiveTicket` | OffRamp via TokenAdminRegistry | TokenPool | Authorizes token release |
 
 ## CCV Identification
@@ -302,7 +327,6 @@ Canton participants maintain private contract stores. Users need **explicit disc
 - `OnRamp` (disclosed)
 - `GlobalConfig` (disclosed)
 - `TokenAdminRegistry` (disclosed)
-- `CCVRegistry` (disclosed)
 - User's tickets (stakeholder)
 
 **Execute:**
@@ -310,7 +334,6 @@ Canton participants maintain private contract stores. Users need **explicit disc
 - `OffRamp` (disclosed)
 - `GlobalConfig` (disclosed)
 - `TokenAdminRegistry` (disclosed)
-- `CCVRegistry` (disclosed)
 - User's tickets (stakeholder)
 
 ---
@@ -318,6 +341,8 @@ Canton participants maintain private contract stores. Users need **explicit disc
 ## Send Flow (Outbound)
 
 Sending a cross-chain message from Canton to another chain.
+
+Note: some legacy diagrams below still use `CCVTicket` naming. Current verifier integration is direct via verifier interface choices.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -408,7 +433,7 @@ Sending a cross-chain message from Canton to another chain.
 
 ```daml
 -- Step 1: Lock tokens and get TokenSendTicket (if transferring tokens)
-tokenSendTicket <- exercise tokenPoolCid TokenPool_Lock with
+tokenSendTicket <- exercise tokenPoolCid TokenPool_LockOrBurn with
     sender = userParty
     amount = 100.0
     destTokenAddress = destTokenAddr
@@ -416,8 +441,7 @@ tokenSendTicket <- exercise tokenPoolCid TokenPool_Lock with
     ...
 
 -- Step 2: Get CCV attestation
-ccvTicket <- exercise ccvCid CommitteeVerifier_ForwardToVerifier with
-    ccvRegistryCid = ccvRegistryCid
+_ <- exercise ccvCid CommitteeVerifier_ForwardToVerifier with
     message = messageToSend
     messageId = computedMessageId
     ...
@@ -434,7 +458,6 @@ result <- exercise routerCid CCIPSend with
     executionGasLimit = 200000
     ccipReceiveGasLimit = 100000
     tokenSendTicket = Some tokenSendTicket
-    ccvTickets = [ccvTicket]
 ```
 
 ---
@@ -546,8 +569,7 @@ Executing an inbound cross-chain message on Canton.
 -- encodedMessage, ccvDataList <- fetchFromStorage(messageId)
 
 -- Step 2: Verify with each required CCV
-verifyTicket <- exercise ccvCid CommitteeVerifier_VerifyMessage with
-    ccvRegistryCid = ccvRegistryCid
+_ <- exercise ccvCid CommitteeVerifier_VerifyMessage with
     message = decodedMessage
     messageId = messageId
     ccvData = ccvData  -- Version tag + signatures
@@ -560,13 +582,12 @@ result <- exercise routerCid Execute with
     globalConfigCid = globalConfigCid
     tokenAdminRegistryCid = tokenAdminRegistryCid
     encodedMessage = encodedMessage
-    ccvVerifyTickets = [verifyTicket]
     receiverRequiredCCVs = []
 
 -- Step 4: Release tokens (if message had token transfer)
 case result.tokenReceiveTicket of
     Some ticketCid -> do
-        exercise tokenPoolCid TokenPool_Release with
+        exercise tokenPoolCid TokenPool_ReleaseFromTicket with
             ticketCid = ticketCid
             ...
     None -> pure ()
@@ -687,7 +708,7 @@ cd contracts && dpm build --all
 Build a single package:
 
 ```bash
-cd contracts/ccip/router && dpm build
+cd contracts/ccip/perpartyrouter && dpm build
 ```
 
 Clean all build artifacts:
