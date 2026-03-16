@@ -195,11 +195,6 @@ data TokenConfig = TokenConfig
 - `TokenAdminRegistry_IssueReceiveTicket` - Called by OffRamp after verification
 - `TokenAdminRegistry_ConsumeReceiveTicket` - Called by pool to release tokens
 
-### CCVRegistry (Deprecated)
-
-`CCVRegistry` is legacy terminology in older docs/tests.
-Current flow uses verifier interfaces directly (`CrossChainVerifier_ForwardToVerifier`, `CrossChainVerifier_VerifyMessage`) and appends verifier state to CCIP message contracts, instead of issuing standalone CCV ticket contracts.
-
 ### CommitteeVerifier
 
 A CCV implementation using committee-based ECDSA signature verification.
