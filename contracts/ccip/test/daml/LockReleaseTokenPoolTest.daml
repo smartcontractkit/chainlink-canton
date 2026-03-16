@@ -1770,6 +1770,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar" "test-rmn" "test-fq" ccipOwner ccipOwner
 
     -- | ======== Test 1 ========
     -- | Add multiple chain configs
@@ -2042,6 +2043,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar" "test-rmn" "test-fq" ccipOwner ccipOwner
 
     -- | ========= Test 1 ========
     -- | Update multiple rate limiters for existing chain config
@@ -2157,4 +2159,3 @@ assertRateLimiterConfigArgsEqual : LockReleaseTokenPool.RemoteChainConfig -> Loc
 assertRateLimiterConfigArgsEqual got expected = do
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
-

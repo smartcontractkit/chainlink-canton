@@ -49,6 +49,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -116,6 +117,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = RelativeHours 24
+            deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -196,6 +198,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = RelativeHours 24
+            deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -254,6 +257,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -288,6 +292,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
 
     let instAddr = makeInstanceAddress instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
@@ -322,6 +327,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
             transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
 
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
@@ -367,4 +373,3 @@ assertRateLimiterConfigArgsEqual : RemoteChainConfig -> RateLimiterConfigArgs ->
 assertRateLimiterConfigArgsEqual got expected = do
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
-

@@ -56,6 +56,13 @@ data TransferTimeout
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
 
+data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
+    with
+        tokenAdminRegistry : RawInstanceAddress
+        rmnRemote : RawInstanceAddress
+        feeQuoter : RawInstanceAddress
+    deriving (Eq, Show)
+
 parseSourcePoolDecimals : Int -> BytesHex -> Int
 parseSourcePoolDecimals localDecimals sourcePoolData =
     if sourcePoolData == ""

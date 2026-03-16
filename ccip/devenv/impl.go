@@ -384,27 +384,15 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 
 	// Deploy and TAR-register the default lock/release pool for Canton source token transfers.
 	relativeHours := types.INT64(24)
-	lockPoolTemplate := lockreleasetokenpool.LockReleaseTokenPool{
-		CcipOwner: types.PARTY(participant.PartyID),
-		PoolOwner: types.PARTY(participant.PartyID),
-		InstrumentId: splice_api_token_holding_v1.InstrumentId{
-			Admin: types.PARTY(lockPoolInstrumentAdmin),
-			Id:    types.TEXT("Amulet"),
-		},
-		Decimals:                types.INT64(18),
-		RemoteChainConfigs:      types.GENMAP{},
-		TokenTransferFeeConfigs: types.GENMAP{},
-		PoolReceiveContext: common.CCIPContext{
-			Values: types.TEXTMAP{},
-		},
-		TransferTimeout: lockreleasetokenpool.TransferTimeout{
-			RelativeHours: &relativeHours,
-		},
-		Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
-			TokenAdminRegistry: tarRawAddr.Binding(),
-			RmnRemote:          rmnRawAddr.Binding(),
-			FeeQuoter:          fqRawAddr.Binding(),
-		},
+	lockPoolInstrumentID := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(lockPoolInstrumentAdmin),
+		Id:    types.TEXT("Amulet"),
+	}
+	lockPoolReceiveContext := common.CCIPContext{
+		Values: types.TEXTMAP{},
+	}
+	lockPoolTransferTimeout := lockreleasetokenpool.TransferTimeout{
+		RelativeHours: &relativeHours,
 	}
 	lockPoolQualifier := defaultLockReleaseQualifier
 	tokenAdminRegistryRef, tarErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
@@ -422,11 +410,11 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		Config: cantonChangesets.DeployTokenPoolConfig{
 			CcipOwner:                         participant.PartyID,
 			PoolOwner:                         participant.PartyID,
-			InstrumentId:                      lockPoolTemplate.InstrumentId,
-			Decimals:                          int64(lockPoolTemplate.Decimals),
+			InstrumentId:                      lockPoolInstrumentID,
+			Decimals:                          18,
 			Qualifier:                         lockPoolQualifier,
-			PoolReceiveContext:                lockPoolTemplate.PoolReceiveContext,
-			TransferTimeout:                   lockPoolTemplate.TransferTimeout,
+			PoolReceiveContext:                lockPoolReceiveContext,
+			TransferTimeout:                   lockPoolTransferTimeout,
 			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
 		},
 	})
@@ -1612,12 +1600,12 @@ func damlNumericToBigInt(v string) (*big.Int, error) {
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid decimal numeric %q", v)
 	}
-	if strings.TrimRight(parts[1], "0") != "" {
-		return nil, fmt.Errorf("non-integer DAML numeric %q cannot be represented as big.Int", v)
-	}
 	intPart := parts[0]
 	if intPart == "" {
 		intPart = "0"
+	}
+	if intPart == "-" {
+		intPart = "-0"
 	}
 	n, ok := new(big.Int).SetString(intPart, 10)
 	if !ok {

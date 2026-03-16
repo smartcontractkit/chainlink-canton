@@ -14,7 +14,6 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -100,18 +99,7 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 		Chain:       c.chain,
 		Participant: participantIdx,
 	}
-	participant := c.chain.Participants[participantIdx]
-
-	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to get per-party router dar: %w", err)
-	}
-	if _, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile:       perPartyRouterDar,
-		VettingChange: adminv2.UploadDarFileRequest_VETTING_CHANGE_VET_ALL_PACKAGES,
-	}); err != nil && !isAlreadyExistsError(err) {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to upload per-party router dar file: %w", err)
-	}
+	var err error
 	// Create PerPartyRouter using the topology-deployed default factory.
 	cantonPerPartyRouterFactoryRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
 		c.chainDetails.ChainSelector,
@@ -161,18 +149,6 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, partyId string) (contr
 
 func (c *Chain) DeployCCIPReceiver(ctx context.Context, partyId string) (contracts.InstanceAddress, error) {
 	participantIdx := c.participantIndexForParty(partyId)
-	participant := c.chain.Participants[participantIdx]
-
-	receiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
-	if err != nil {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to get receiver dar: %w", err)
-	}
-	if _, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
-		DarFile:       receiverDar,
-		VettingChange: adminv2.UploadDarFileRequest_VETTING_CHANGE_VET_ALL_PACKAGES,
-	}); err != nil && !isAlreadyExistsError(err) {
-		return contracts.InstanceAddress{}, fmt.Errorf("failed to upload receiver dar file: %w", err)
-	}
 
 	deps := dependencies.CantonDeps{
 		Chain:       c.chain,

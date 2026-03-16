@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "5c02d4ba24928a742b0fcff3a3cbfc03efa1eb1c9639a9dcc575cbcabab015f3"
+	PackageID   = "a78a4bea2a5fc4289c8bcf380197dc48a42fc3ecbcd2b407ecd1716f61217469"
 	SDKVersion  = "3.4.10"
 )
 
@@ -216,6 +216,7 @@ type LockReleaseTokenPool struct {
 	TokenTransferFeeConfigs types.GENMAP                             `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      common.CCIPContext                       `json:"poolReceiveContext"`
 	TransferTimeout         TransferTimeout                          `json:"transferTimeout"`
+	Deps                    LockReleaseTokenPoolDeps                 `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
