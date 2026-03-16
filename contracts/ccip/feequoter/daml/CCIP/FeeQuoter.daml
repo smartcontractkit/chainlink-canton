@@ -51,6 +51,12 @@ template FeeQuoter
         signatory owner
         observer priceUpdaters
 
+        nonconsuming choice Get : FeeQuoter
+            with
+                caller : Party
+            controller caller
+            do pure this
+
         -- ================================================================
         -- │                          Prices                              │
         -- ================================================================

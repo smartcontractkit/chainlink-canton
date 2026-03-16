@@ -520,6 +520,48 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 			lockPoolInstrumentAdmin = registryResp.JSON200.AdminId
 		}
 	}
+	// Look up chain contract addresses from the datastore for pool deps.
+	// These were deployed by DeployChainContracts above and merged into runningDS.
+	tarRef, tarRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(token_admin_registry.ContractType),
+		token_admin_registry.Version,
+		"",
+	))
+	if tarRefErr != nil {
+		return nil, fmt.Errorf("failed to get token admin registry for pool deps: %w", tarRefErr)
+	}
+	tarRawAddr, tarParseErr := contracts.RawInstanceAddressFromString(tarRef.Labels.List()[0])
+	if tarParseErr != nil {
+		return nil, fmt.Errorf("failed to parse token admin registry raw instance address for pool deps: %w", tarParseErr)
+	}
+	rmnRef, rmnRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(rmn_remote.ContractType),
+		rmn_remote.Version,
+		"",
+	))
+	if rmnRefErr != nil {
+		return nil, fmt.Errorf("failed to get rmn remote for pool deps: %w", rmnRefErr)
+	}
+	rmnRawAddr, rmnParseErr := contracts.RawInstanceAddressFromString(rmnRef.Labels.List()[0])
+	if rmnParseErr != nil {
+		return nil, fmt.Errorf("failed to parse rmn remote raw instance address for pool deps: %w", rmnParseErr)
+	}
+	feeQuoterRef, fqRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(fee_quoter.ContractType),
+		fee_quoter.Version,
+		"",
+	))
+	if fqRefErr != nil {
+		return nil, fmt.Errorf("failed to get fee quoter for pool deps: %w", fqRefErr)
+	}
+	fqRawAddr, fqParseErr := contracts.RawInstanceAddressFromString(feeQuoterRef.Labels.List()[0])
+	if fqParseErr != nil {
+		return nil, fmt.Errorf("failed to parse fee quoter raw instance address for pool deps: %w", fqParseErr)
+	}
+
 	lockPoolTemplate := lockreleasetokenpool.LockReleaseTokenPool{
 		CcipOwner: types.PARTY(participant.PartyID),
 		PoolOwner: types.PARTY(participant.PartyID),
@@ -536,6 +578,11 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		},
 		TransferTimeout: lockreleasetokenpool.TransferTimeout{
 			RelativeHours: &relativeHours,
+		},
+		Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
+			TokenAdminRegistry: tarRawAddr.Binding(),
+			RmnRemote:          rmnRawAddr.Binding(),
+			FeeQuoter:          fqRawAddr.Binding(),
 		},
 	}
 	lockPoolQualifier := defaultLockReleaseQualifier

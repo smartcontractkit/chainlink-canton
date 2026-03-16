@@ -552,11 +552,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccipReceiverCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Get disclosures for CCIPReceiver.Execute
+	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
+	// receiver-only; ccip-owned dependencies are only provided via disclosure.
 	disclosedContracts, choiceContext, ccvContractIDs, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
 	require.NoError(t, err)
 
-	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one transaction
+	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one
+	// receiver-authored transaction with disclosures for off-ramp dependencies.
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),

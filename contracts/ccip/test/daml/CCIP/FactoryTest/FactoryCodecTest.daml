@@ -27,6 +27,7 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.Factory
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import qualified CCIP.RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 
 -- ===========================================================================
@@ -101,6 +102,9 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeParty params.poolOwner
   <> encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.rmnRemote
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
 encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
@@ -377,6 +381,8 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
   ccipOwner <- allocateParty "ccip_owner"
   poolOwner <- allocateParty "pool_owner"
   tokenAdmin <- allocateParty "token_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
 
   let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
@@ -384,6 +390,9 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
         poolOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
+        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" rmnOwner
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   case decodeDeployLockReleaseTokenPoolParams encoded of
@@ -393,6 +402,9 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
       decoded.ccipOwner === params.ccipOwner
       decoded.poolOwner === params.poolOwner
       decoded.instrumentId === params.instrumentId
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.rmnRemote === params.rmnRemote
       decoded.decimals === params.decimals
 
   pure ()

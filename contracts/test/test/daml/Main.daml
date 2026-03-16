@@ -1,7 +1,7 @@
 module Main where
 
+import DA.Assert
 import DA.Optional
-
 import Daml.Script
 
 import qualified Interface
@@ -41,3 +41,99 @@ setup = script do
   
 
   pure()
+
+template DisclosedTarget
+  with
+    owner : Party
+    value : Int
+  where
+    signatory owner
+
+    nonconsuming choice Get : DisclosedTarget
+      with
+        p : Party
+      controller p
+      do pure this
+
+    nonconsuming choice GetWrapped : WrappedTarget
+      with
+        p : Party
+      controller p
+      do pure WrappedTarget with target = this
+
+data WrappedTarget = WrappedTarget
+  with
+    target : DisclosedTarget
+  deriving (Eq, Show)
+
+template ArbitraryCaller
+  with
+    owner : Party
+  where
+    signatory owner
+
+    nonconsuming choice UseFetch : Int
+      with
+        targetCid : ContractId DisclosedTarget
+        caller : Party
+      controller caller
+      do
+        target <- fetch targetCid
+        pure target.value
+
+    nonconsuming choice UseGet : Int
+      with
+        targetCid : ContractId DisclosedTarget
+        caller : Party
+      controller caller
+      do
+        target <- exercise targetCid Get with p = caller
+        pure target.value
+
+    nonconsuming choice UseGetWrapped : Int
+      with
+        targetCid : ContractId DisclosedTarget
+        caller : Party
+      controller caller
+      do
+        wrapped <- exercise targetCid GetWrapped with p = caller
+        pure wrapped.target.value
+
+testDisclosedFetchVsGet = script do
+  ownerA <- allocateParty "ownerA"
+  ownerB <- allocateParty "ownerB"
+  caller <- allocateParty "caller"
+
+  target <- submit ownerA do
+    createCmd DisclosedTarget with
+      owner = ownerA
+      value = 7
+
+  arbitrary <- submit ownerB do
+    createCmd ArbitraryCaller with
+      owner = ownerB
+
+  disclosedTarget <- fromSome <$> queryDisclosure ownerA target
+  disclosedArbitrary <- fromSome <$> queryDisclosure ownerB arbitrary
+
+  submitMustFail (actAs caller <> disclose disclosedArbitrary <> disclose disclosedTarget) do
+    exerciseCmd arbitrary UseFetch with
+      targetCid = target
+      caller = caller
+
+  directGet <- submit (actAs caller <> disclose disclosedTarget) do
+    exerciseCmd target Get with
+      p = caller
+  assertMsg "direct Get should return the disclosed template value" (directGet.value == 7)
+
+  nestedGet <- submit (actAs caller <> disclose disclosedArbitrary <> disclose disclosedTarget) do
+    exerciseCmd arbitrary UseGet with
+      targetCid = target
+      caller = caller
+  assertMsg "nested Get should work through arbitrary-caller contract" (nestedGet == 7)
+
+  nestedWrappedGet <- submit (actAs caller <> disclose disclosedArbitrary <> disclose disclosedTarget) do
+    exerciseCmd arbitrary UseGetWrapped with
+      targetCid = target
+      caller = caller
+  assertMsg "wrapped template Get should work if plain Get works" (nestedWrappedGet == 7)
