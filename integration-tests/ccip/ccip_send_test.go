@@ -615,6 +615,7 @@ func TestCCIPSend(t *testing.T) {
 		Payload:           types.TEXT(testPayloadHex),
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
+			BlockConfirmations: nil,
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
 			ExecutorCid:        types.CONTRACT_ID(executorCid),
 			ExecutorArgs:       nil,
