@@ -1770,6 +1770,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar" "test-rmn" "test-feequoter-pool" ccipOwner ccipOwner
 
     -- | ======== Test 1 ========
     -- | Add multiple chain configs
@@ -2042,6 +2043,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar" "test-rmn" "test-feequoter-pool" ccipOwner ccipOwner
 
     -- | ========= Test 1 ========
     -- | Update multiple rate limiters for existing chain config

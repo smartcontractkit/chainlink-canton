@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 )
 
 var ContractTypeInbound = deployment.ContractType("CantonTokenPoolInboundRateLimiter")
@@ -33,7 +34,7 @@ var DeployInbound = contract.NewDeploy(contract.DeployParams[common.RateLimiter]
 			return fmt.Errorf("cannot use this operation to deploy an outbound rate limiter")
 		}
 		if template.Mode == "" {
-			return fmt.Errorf("Mode is required")
+			return fmt.Errorf("mode is required")
 		}
 
 		return nil
@@ -56,11 +57,11 @@ var DeployOutbound = contract.NewDeploy(contract.DeployParams[common.RateLimiter
 		if template.RemoteChainSelector == "" {
 			return fmt.Errorf("RemoteChainSelector is required")
 		}
-		if template.Direction == common.RateLimitDirectionRateLimitDirection_Outbound {
-			return fmt.Errorf("cannot use this operation to deploy an outbound rate limiter")
+		if template.Direction == common.RateLimitDirectionRateLimitDirection_Inbound {
+			return fmt.Errorf("cannot use this operation to deploy an inbound rate limiter")
 		}
 		if template.Mode == "" {
-			return fmt.Errorf("Mode is required")
+			return fmt.Errorf("mode is required")
 		}
 
 		return nil

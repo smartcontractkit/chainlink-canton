@@ -499,7 +499,6 @@ template LockReleaseTokenPool
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
                 assertMsg "pool: sending message feeQuoter mismatch"
                     (sendingMsg.deps.feeQuoter == deps.feeQuoter)
-                (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector chainFeeConfigs of
                 -- Check if fee config is enabled for the destination chain.
                 -- If no config is set/it's disabled, use the FeeQuoter defaults. If enabled, use the specified fee parameters.
                 (feeUSDCents, destGasOverhead, destBytesOverhead) <- case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
