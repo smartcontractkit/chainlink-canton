@@ -5,19 +5,19 @@ module CCIP.LockReleaseTokenPoolCodec
   , encodeUpdateChainPoolConfigsParams
   ) where
 
-import CCIP.MCMSCodecUtils
+import MCMS.Codec
   ( extractBytes
   , encodeUint8
   , decodeUint8
   , encodeNumeric0
   , decodeNumeric0At
-  , encodeBytesHex
-  , decodeBytesHexAt
   , encodeInt64
   , decodeInt64At
   , encodeBytesHexList
   , decodeBytesHexList
-  , encodeRawInstanceAddressList
+  )
+import CCIP.Codec
+  ( encodeRawInstanceAddressList
   , decodeRawInstanceAddressList
   )
 

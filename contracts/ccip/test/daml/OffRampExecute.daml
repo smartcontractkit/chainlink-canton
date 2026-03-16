@@ -464,7 +464,6 @@ testExecuteMessageOnlyAllowsConfiguredFTF = script do
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
-            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(
                 sourceChainSelector,

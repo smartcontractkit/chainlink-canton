@@ -1397,6 +1397,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             remoteTokens = Map.empty
             outboundRateLimiters = Map.empty
             inboundRateLimiters = Map.empty
+            inboundCustomRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
@@ -1525,6 +1526,7 @@ testCalculateFeePrefersPoolOverride = script do
             remoteTokens = Map.empty
             outboundRateLimiters = Map.empty
             inboundRateLimiters = Map.empty
+            inboundCustomRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 
@@ -1653,6 +1655,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             remoteTokens = Map.empty
             outboundRateLimiters = Map.empty
             inboundRateLimiters = Map.empty
+            inboundCustomRateLimiters = Map.empty
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
 

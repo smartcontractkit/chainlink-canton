@@ -136,13 +136,17 @@ func typedChainPoolConfigs(cfgs types.GENMAP) types.GENMAP {
 		case lockreleasetokenpool.ChainPoolConfig:
 			out[key] = v
 		case map[string]any:
+			m := v
+			if data, ok := v["data"].(map[string]any); ok {
+				m = data
+			}
 			typed := lockreleasetokenpool.ChainPoolConfig{
 				InboundCCVs:   []common.RawInstanceAddress{},
 				OutboundCCVs:  []common.RawInstanceAddress{},
 				MinBlockDepth: types.INT64(0),
 				RemotePools:   []types.TEXT{},
 			}
-			if inbound, ok := v["inboundCCVs"].([]any); ok {
+			if inbound, ok := m["inboundCCVs"].([]any); ok {
 				for _, raw := range inbound {
 					switch c := raw.(type) {
 					case common.RawInstanceAddress:
@@ -154,7 +158,7 @@ func typedChainPoolConfigs(cfgs types.GENMAP) types.GENMAP {
 					}
 				}
 			}
-			if outbound, ok := v["outboundCCVs"].([]any); ok {
+			if outbound, ok := m["outboundCCVs"].([]any); ok {
 				for _, raw := range outbound {
 					switch c := raw.(type) {
 					case common.RawInstanceAddress:
@@ -166,15 +170,21 @@ func typedChainPoolConfigs(cfgs types.GENMAP) types.GENMAP {
 					}
 				}
 			}
-			switch m := v["minBlockDepth"].(type) {
+			switch minBlockDepth := m["minBlockDepth"].(type) {
 			case types.INT64:
-				typed.MinBlockDepth = m
+				typed.MinBlockDepth = minBlockDepth
 			case int64:
-				typed.MinBlockDepth = types.INT64(m)
+				typed.MinBlockDepth = types.INT64(minBlockDepth)
 			case int:
-				typed.MinBlockDepth = types.INT64(m)
+				typed.MinBlockDepth = types.INT64(minBlockDepth)
+			case float64:
+				typed.MinBlockDepth = types.INT64(int64(minBlockDepth))
+			case string:
+				if parsed, err := strconv.ParseInt(strings.TrimSpace(minBlockDepth), 10, 64); err == nil {
+					typed.MinBlockDepth = types.INT64(parsed)
+				}
 			}
-			if remotePools, ok := v["remotePools"].([]any); ok {
+			if remotePools, ok := m["remotePools"].([]any); ok {
 				for _, raw := range remotePools {
 					switch rp := raw.(type) {
 					case types.TEXT:
@@ -737,12 +747,14 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		poolInstanceId := string(parsedPool.InstanceId)
 		newOutbound := make(types.GENMAP)
 		newInbound := make(types.GENMAP)
+		newInboundCustom := make(types.GENMAP)
 		var createCommands []*ledgerv2.Command
 		for selectorKey := range parsedPool.ChainPoolConfigs {
 			// selectorKey may be DAML numeric text (e.g. "1234.") and instance IDs reject "."
 			selectorKeyForInstanceID := strings.ReplaceAll(selectorKey, ".", "-")
 			outboundInstanceId := "devenv-outbound-rl-" + selectorKeyForInstanceID
 			inboundInstanceId := "devenv-inbound-rl-" + selectorKeyForInstanceID
+			inboundCustomInstanceId := "devenv-inbound-custom-rl-" + selectorKeyForInstanceID
 			nowMicro := time.Now().UnixMicro()
 			createCommands = append(createCommands,
 				&ledgerv2.Command{Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
@@ -777,11 +789,29 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 						{Label: "lastUpdated", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Timestamp{Timestamp: nowMicro}}},
 					}},
 				}}},
+				&ledgerv2.Command{Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
+					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
+					CreateArguments: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
+						{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: inboundCustomInstanceId}}},
+						{Label: "poolInstanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: poolInstanceId}}},
+						{Label: "poolOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: poolOwnerParty}}},
+						{Label: "remoteChainSelector", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: selectorKey}}},
+						{Label: "direction", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Enum{Enum: &ledgerv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
+						{Label: "mode", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Enum{Enum: &ledgerv2.Enum{Constructor: "RateLimitMode_CustomFinality"}}}},
+						{Label: "isEnabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: true}}},
+						{Label: "capacity", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "999999999999999999"}}},
+						{Label: "rate", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "999999999999999999"}}},
+						{Label: "tokens", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "lastUpdated", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Timestamp{Timestamp: nowMicro}}},
+					}},
+				}}},
 			)
 			outboundRaw := contracts.MustNewInstanceID(outboundInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
 			inboundRaw := contracts.MustNewInstanceID(inboundInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
+			inboundCustomRaw := contracts.MustNewInstanceID(inboundCustomInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
 			newOutbound[selectorKey] = outboundRaw.Binding()
 			newInbound[selectorKey] = inboundRaw.Binding()
+			newInboundCustom[selectorKey] = inboundCustomRaw.Binding()
 		}
 		_, createErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
 			Commands: &ledgerv2.Commands{
@@ -794,8 +824,9 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 			return nil, fmt.Errorf("create rate limiters for lock/release pool: %w", createErr)
 		}
 		updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateRateLimiters{
-			NewOutboundRateLimiters: newOutbound,
-			NewInboundRateLimiters:  newInbound,
+			NewOutboundRateLimiters:      newOutbound,
+			NewInboundRateLimiters:       newInbound,
+			NewInboundCustomRateLimiters: newInboundCustom,
 		}
 		poolContractId := activePool.GetCreatedEvent().GetContractId()
 		_, exerciseErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
@@ -815,7 +846,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		if exerciseErr != nil {
 			return nil, fmt.Errorf("update lock/release pool rate limiters: %w", exerciseErr)
 		}
-		l.Info().Msg("Configured outbound and inbound rate limiters for Canton lock/release pool")
+		l.Info().Msg("Configured outbound, inbound, and inbound custom rate limiters for Canton lock/release pool")
 	}
 
 	// Add executor refs, storing raw instance addresses as labels so that
@@ -2487,6 +2518,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			maps.Copy(updatedOutboundRateLimiters, parsedTokenPool.OutboundRateLimiters)
 			updatedInboundRateLimiters := types.GENMAP{}
 			maps.Copy(updatedInboundRateLimiters, parsedTokenPool.InboundRateLimiters)
+			updatedInboundCustomRateLimiters := types.GENMAP{}
+			maps.Copy(updatedInboundCustomRateLimiters, parsedTokenPool.InboundCustomRateLimiters)
 			hasDestOutboundRateLimiter := false
 			if _, ok := updatedOutboundRateLimiters[destSelectorKey]; ok {
 				hasDestOutboundRateLimiter = true
@@ -2498,6 +2531,12 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				hasDestInboundRateLimiter = true
 			} else if _, ok := updatedInboundRateLimiters[destSelectorNumericKey]; ok {
 				hasDestInboundRateLimiter = true
+			}
+			hasDestInboundCustomRateLimiter := false
+			if _, ok := updatedInboundCustomRateLimiters[destSelectorKey]; ok {
+				hasDestInboundCustomRateLimiter = true
+			} else if _, ok := updatedInboundCustomRateLimiters[destSelectorNumericKey]; ok {
+				hasDestInboundCustomRateLimiter = true
 			}
 			if !hasDestOutboundRateLimiter {
 				var fallback any
@@ -2519,19 +2558,30 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 					updatedInboundRateLimiters[destSelectorKey] = fallback
 				}
 			}
+			if !hasDestInboundCustomRateLimiter {
+				var fallback any
+				for _, v := range updatedInboundCustomRateLimiters {
+					fallback = v
+					break
+				}
+				if fallback != nil {
+					updatedInboundCustomRateLimiters[destSelectorKey] = fallback
+				}
+			}
 			updatedPool := lockreleasetokenpool.LockReleaseTokenPool{
-				InstanceId:           parsedTokenPool.InstanceId,
-				CcipOwner:            parsedTokenPool.CcipOwner,
-				PoolOwner:            parsedTokenPool.PoolOwner,
-				InstrumentId:         parsedTokenPool.InstrumentId,
-				Decimals:             parsedTokenPool.Decimals,
-				ChainPoolConfigs:     updatedChainPoolConfigs,
-				ChainFeeConfigs:      updatedChainFeeConfigs,
-				RemoteTokens:         updatedRemoteTokens,
-				OutboundRateLimiters: updatedOutboundRateLimiters,
-				InboundRateLimiters:  updatedInboundRateLimiters,
-				PoolReceiveContext:   parsedTokenPool.PoolReceiveContext,
-				TransferTimeout:      parsedTokenPool.TransferTimeout,
+				InstanceId:                parsedTokenPool.InstanceId,
+				CcipOwner:                 parsedTokenPool.CcipOwner,
+				PoolOwner:                 parsedTokenPool.PoolOwner,
+				InstrumentId:              parsedTokenPool.InstrumentId,
+				Decimals:                  parsedTokenPool.Decimals,
+				ChainPoolConfigs:          updatedChainPoolConfigs,
+				ChainFeeConfigs:           updatedChainFeeConfigs,
+				RemoteTokens:              updatedRemoteTokens,
+				OutboundRateLimiters:      updatedOutboundRateLimiters,
+				InboundRateLimiters:       updatedInboundRateLimiters,
+				InboundCustomRateLimiters: updatedInboundCustomRateLimiters,
+				PoolReceiveContext:        parsedTokenPool.PoolReceiveContext,
+				TransferTimeout:           parsedTokenPool.TransferTimeout,
 			}
 			bundle := operations.NewBundle(
 				func() context.Context { return context.Background() },
@@ -2631,9 +2681,35 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing inbound rate limiter config for destination selector %d (inboundKeys=%v)", dest, inboundKeys)
 			}
+			var inboundCustomFallback any
+			for k, v := range parsedTokenPool.InboundCustomRateLimiters {
+				if k == destSelectorKey || k == destSelectorNumericKey {
+					continue
+				}
+				inboundCustomFallback = v
+
+				break
+			}
+			if inboundCustomFallback == nil {
+				for _, v := range parsedTokenPool.InboundCustomRateLimiters {
+					inboundCustomFallback = v
+
+					break
+				}
+			}
+			if inboundCustomFallback == nil {
+				inboundCustomKeys := make([]string, 0, len(parsedTokenPool.InboundCustomRateLimiters))
+				for k := range parsedTokenPool.InboundCustomRateLimiters {
+					inboundCustomKeys = append(inboundCustomKeys, k)
+				}
+				sort.Strings(inboundCustomKeys)
+
+				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing inbound custom rate limiter config for destination selector %d (inboundCustomKeys=%v)", dest, inboundCustomKeys)
+			}
 
 			replaceOutbound := false
 			replaceInbound := false
+			replaceInboundCustom := false
 			newFields := make([]*ledgerv2.RecordField, 0, len(created.GetCreateArguments().GetFields()))
 			for _, f := range created.GetCreateArguments().GetFields() {
 				switch f.GetLabel() {
@@ -2689,11 +2765,37 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						Label: "inboundRateLimiters",
 						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
 					})
+				case "inboundCustomRateLimiters":
+					replaceInboundCustom = true
+					var entries []*ledgerv2.GenMap_Entry
+					if gm := f.GetValue().GetGenMap(); gm != nil {
+						entries = append(entries, gm.GetEntries()...)
+					}
+					updated := false
+					for _, e := range entries {
+						keyNumeric := e.GetKey().GetNumeric()
+						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
+							e.Value = ledger.MapToValue(inboundCustomFallback)
+							updated = true
+
+							break
+						}
+					}
+					if !updated {
+						entries = append(entries, &ledgerv2.GenMap_Entry{
+							Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorNumericKey}},
+							Value: ledger.MapToValue(inboundCustomFallback),
+						})
+					}
+					newFields = append(newFields, &ledgerv2.RecordField{
+						Label: "inboundCustomRateLimiters",
+						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
+					})
 				default:
 					newFields = append(newFields, f)
 				}
 			}
-			if !replaceOutbound || !replaceInbound {
+			if !replaceOutbound || !replaceInbound || !replaceInboundCustom {
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token pool create arguments missing rate limiter fields")
 			}
 
