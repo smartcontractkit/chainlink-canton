@@ -404,6 +404,42 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	if tarErr != nil {
 		return nil, fmt.Errorf("failed to get token admin registry for token pool deployment: %w", tarErr)
 	}
+	rmnRemoteRef, rmnErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(rmn_remote.ContractType),
+		rmn_remote.Version,
+		"",
+	))
+	if rmnErr != nil {
+		return nil, fmt.Errorf("failed to get rmn remote for token pool deployment: %w", rmnErr)
+	}
+	feeQuoterRef, fqErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(fee_quoter.ContractType),
+		fee_quoter.Version,
+		"",
+	))
+	if fqErr != nil {
+		return nil, fmt.Errorf("failed to get fee quoter for token pool deployment: %w", fqErr)
+	}
+	var tokenAdminRegistryRawAddr common.RawInstanceAddress
+	if labels := tokenAdminRegistryRef.Labels.List(); len(labels) > 0 {
+		if rawAddr, parseErr := contracts.RawInstanceAddressFromString(labels[0]); parseErr == nil {
+			tokenAdminRegistryRawAddr = rawAddr.Binding()
+		}
+	}
+	var rmnRemoteRawAddr common.RawInstanceAddress
+	if labels := rmnRemoteRef.Labels.List(); len(labels) > 0 {
+		if rawAddr, parseErr := contracts.RawInstanceAddressFromString(labels[0]); parseErr == nil {
+			rmnRemoteRawAddr = rawAddr.Binding()
+		}
+	}
+	var feeQuoterRawAddr common.RawInstanceAddress
+	if labels := feeQuoterRef.Labels.List(); len(labels) > 0 {
+		if rawAddr, parseErr := contracts.RawInstanceAddressFromString(labels[0]); parseErr == nil {
+			feeQuoterRawAddr = rawAddr.Binding()
+		}
+	}
 	lockPoolChangeset, deployErr := (cantonChangesets.DeployTokenPool{}).Apply(*env, cantonChangesets.CantonCSDeps[cantonChangesets.DeployTokenPoolConfig]{
 		ChainSelector: selector,
 		Participant:   0,
@@ -416,6 +452,9 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 			PoolReceiveContext:                lockPoolReceiveContext,
 			TransferTimeout:                   lockPoolTransferTimeout,
 			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
+			TokenAdminRegistryRawAddress:      tokenAdminRegistryRawAddr,
+			RmnRemoteRawAddress:               rmnRemoteRawAddr,
+			FeeQuoterRawAddress:               feeQuoterRawAddr,
 		},
 	})
 	if deployErr != nil {
@@ -2110,6 +2149,23 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		parsedTokenPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activeTokenPool.GetCreatedEvent())
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse token pool contract: %w", err)
+		}
+		// Token transfer must use the TAR bound to the selected pool deps.
+		poolTARRaw := strings.TrimSpace(string(parsedTokenPool.Deps.TokenAdminRegistry.Unpack))
+		if poolTARRaw != "" {
+			poolTARRawAddr, parseErr := contracts.RawInstanceAddressFromString(poolTARRaw)
+			if parseErr != nil {
+				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse selected pool token admin registry address %q: %w", poolTARRaw, parseErr)
+			}
+			poolTARCID, poolTARDisclosure, resolveErr := resolveDisclosedByAddress(
+				tokenadminregistry.TokenAdminRegistry{}.GetTemplateID(),
+				poolTARRawAddr.InstanceAddress(),
+			)
+			if resolveErr != nil {
+				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve selected pool token admin registry disclosed contract: %w", resolveErr)
+			}
+			tokenAdminRegistryCID = poolTARCID
+			disclosedTokenAdminRegistry = poolTARDisclosure
 		}
 		destSelectorKey := strconv.FormatUint(dest, 10)
 		remoteConfigKeys := make([]string, 0, len(parsedTokenPool.RemoteChainConfigs))

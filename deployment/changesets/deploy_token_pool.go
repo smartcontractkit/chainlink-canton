@@ -2,6 +2,7 @@ package changesets
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/smithy-go/ptr"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -35,6 +36,12 @@ type DeployTokenPoolConfig struct {
 	TransferTimeout lockreleasetokenpool.TransferTimeout
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
 	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
+	// Optional raw TAR address to wire pool deps at deploy time.
+	TokenAdminRegistryRawAddress common.RawInstanceAddress
+	// Optional raw RMNRemote address to wire pool deps at deploy time.
+	RmnRemoteRawAddress common.RawInstanceAddress
+	// Optional raw FeeQuoter address to wire pool deps at deploy time.
+	FeeQuoterRawAddress common.RawInstanceAddress
 }
 
 var _ cldf.ChangeSetV2[CantonCSDeps[DeployTokenPoolConfig]] = DeployTokenPool{}
@@ -83,6 +90,15 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		TokenTransferFeeConfigs: types.GENMAP{},
 		PoolReceiveContext:      poolReceiveContext,
 		TransferTimeout:         transferTimeout,
+	}
+	if strings.TrimSpace(string(cfg.TokenAdminRegistryRawAddress.Unpack)) != "" {
+		template.Deps.TokenAdminRegistry = cfg.TokenAdminRegistryRawAddress
+	}
+	if strings.TrimSpace(string(cfg.RmnRemoteRawAddress.Unpack)) != "" {
+		template.Deps.RmnRemote = cfg.RmnRemoteRawAddress
+	}
+	if strings.TrimSpace(string(cfg.FeeQuoterRawAddress.Unpack)) != "" {
+		template.Deps.FeeQuoter = cfg.FeeQuoterRawAddress
 	}
 
 	qualifier := ptr.String(cfg.Qualifier)

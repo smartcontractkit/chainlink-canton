@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
@@ -251,7 +252,8 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	tokenTransferValue := &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}
 	if message.TokenTransfer != nil {
 		var tokenDisclosures []*apiv2.DisclosedContract
-		tokenTransferValue, tokenDisclosures, err = c.buildManualExecuteTokenTransferInput(
+		var poolTokenAdminRegistryCID string
+		tokenTransferValue, tokenDisclosures, poolTokenAdminRegistryCID, err = c.buildManualExecuteTokenTransferInput(
 			ctx,
 			participant,
 			receiverParty,
@@ -268,8 +270,14 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("build token transfer execute input: %w", err)
 		}
+		if poolTokenAdminRegistryCID != "" {
+			if err := overrideChoiceContextContractID(choiceContext, "token-admin-registry", poolTokenAdminRegistryCID); err != nil {
+				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("override token-admin-registry in execute context: %w", err)
+			}
+		}
 		executeDisclosures = append(executeDisclosures, tokenDisclosures...)
 	}
+	executeDisclosures = dedupeDisclosedContractsByID(executeDisclosures)
 	// Execute message
 	encodedMessage, err := message.Encode()
 	if err != nil {
@@ -523,9 +531,9 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 	tokenReceiverParty string,
 	message *protocol.Message,
 	resolveActiveContractIDByAddress func(templateID string, address contracts.InstanceAddress) (string, error),
-) (*apiv2.Value, []*apiv2.DisclosedContract, error) {
+) (*apiv2.Value, []*apiv2.DisclosedContract, string, error) {
 	if message == nil || message.TokenTransfer == nil {
-		return nil, nil, fmt.Errorf("token transfer message is required")
+		return nil, nil, "", fmt.Errorf("token transfer message is required")
 	}
 	const tokenPoolQualifier = "TEST (LockReleaseTokenPool 1.7.0 [default] to BurnMintTokenPool 1.7.0 [default])"
 	sourceSelectorKey := fmt.Sprintf("%d", message.SourceChainSelector)
@@ -547,7 +555,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		}
 	}
 	if !foundPoolRef {
-		return nil, nil, fmt.Errorf("resolve source lock/release pool from datastore: no matching address ref for qualifier %q", tokenPoolQualifier)
+		return nil, nil, "", fmt.Errorf("resolve source lock/release pool from datastore: no matching address ref for qualifier %q", tokenPoolQualifier)
 	}
 	tokenPoolAddress := contracts.HexToInstanceAddress(tokenPoolRef.Address)
 	selectedPoolContractID, err := resolveActiveContractIDByAddress(
@@ -555,7 +563,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		tokenPoolAddress,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("resolve lock/release pool contract ID by datastore address: %w", err)
+		return nil, nil, "", fmt.Errorf("resolve lock/release pool contract ID by datastore address: %w", err)
 	}
 	activePool, err := contract.FindActiveContractByInstanceAddress(
 		ctx,
@@ -565,20 +573,47 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		tokenPoolAddress,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("find lock/release pool active contract by datastore address: %w", err)
+		return nil, nil, "", fmt.Errorf("find lock/release pool active contract by datastore address: %w", err)
 	}
 	selectedPool, err := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse selected lock/release pool: %w", err)
+		return nil, nil, "", fmt.Errorf("parse selected lock/release pool: %w", err)
+	}
+	poolTokenAdminRegistryCID := ""
+	var poolTARDisclosure *apiv2.DisclosedContract
+	// Resolve TAR from the selected pool deps when present to avoid mismatches
+	// with globally looked-up/default TAR contracts.
+	if poolTARRaw, rawErr := parseRawInstanceAddress(selectedPool.Deps.TokenAdminRegistry); rawErr == nil && strings.TrimSpace(poolTARRaw) != "" {
+		poolTARRawAddr, err := contracts.RawInstanceAddressFromString(poolTARRaw)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("parse selected pool token admin registry address %q: %w", poolTARRaw, err)
+		}
+		poolTARActive, err := contract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			participant.PartyID,
+			tokenadminregistry.TokenAdminRegistry{}.GetTemplateID(),
+			poolTARRawAddr.InstanceAddress(),
+		)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("find selected pool token admin registry contract by address: %w", err)
+		}
+		poolTokenAdminRegistryCID = poolTARActive.GetCreatedEvent().GetContractId()
+		poolTARDisclosure = &apiv2.DisclosedContract{
+			TemplateId:       poolTARActive.GetCreatedEvent().GetTemplateId(),
+			ContractId:       poolTARActive.GetCreatedEvent().GetContractId(),
+			CreatedEventBlob: poolTARActive.GetCreatedEvent().GetCreatedEventBlob(),
+			SynchronizerId:   poolTARActive.GetSynchronizerId(),
+		}
 	}
 
 	chainPoolCfgAny, ok := findChainPoolConfigBySelector(selectedPool.RemoteChainConfigs, sourceSelectorKey)
 	if !ok {
-		return nil, nil, fmt.Errorf("selected lock/release pool has no remote config for source selector %s", sourceSelectorKey)
+		return nil, nil, "", fmt.Errorf("selected lock/release pool has no remote config for source selector %s", sourceSelectorKey)
 	}
 	cfg, cfgOK := chainPoolConfigFromAny(chainPoolCfgAny)
 	if !cfgOK {
-		return nil, nil, fmt.Errorf("selected lock/release pool remote config is invalid for source selector %s", sourceSelectorKey)
+		return nil, nil, "", fmt.Errorf("selected lock/release pool remote config is invalid for source selector %s", sourceSelectorKey)
 	}
 	remotePoolMatch := false
 	for _, remotePool := range cfg.RemotePools {
@@ -589,7 +624,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		}
 	}
 	if !remotePoolMatch {
-		return nil, nil, fmt.Errorf(
+		return nil, nil, "", fmt.Errorf(
 			"selected lock/release pool is not configured for source pool %s on source selector %s",
 			sourcePoolHex,
 			sourceSelectorKey,
@@ -604,7 +639,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		resolveActiveContractIDByAddress,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("resolve rate limiter disclosure: %w", err)
+		return nil, nil, "", fmt.Errorf("resolve rate limiter disclosure: %w", err)
 	}
 
 	instrumentAdmin := string(selectedPool.InstrumentId.Admin)
@@ -614,7 +649,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 
 	holdings, err := listHoldingContracts(ctx, participant)
 	if err != nil {
-		return nil, nil, fmt.Errorf("list pool holdings: %w", err)
+		return nil, nil, "", fmt.Errorf("list pool holdings: %w", err)
 	}
 	poolHoldingCIDs, poolHoldingDisclosures := selectUnlockedHoldingCIDs(
 		holdings,
@@ -627,7 +662,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		poolHoldings = append(poolHoldings, string(cid))
 	}
 	if len(poolHoldings) == 0 {
-		return nil, nil, fmt.Errorf(
+		return nil, nil, "", fmt.Errorf(
 			"no unlocked pool holdings found for transfer sender %s and instrument %s/%s",
 			transferSenderParty,
 			instrumentAdmin,
@@ -637,7 +672,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 
 	transferClient, err := newTransferInstructionClient(participant)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 	transferFactoryResp, err := transferClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
@@ -663,25 +698,25 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		},
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("get transfer factory: %w", err)
+		return nil, nil, "", fmt.Errorf("get transfer factory: %w", err)
 	}
 	if transferFactoryResp.StatusCode() != http.StatusOK {
-		return nil, nil, fmt.Errorf("transfer factory response status %d: %s", transferFactoryResp.StatusCode(), string(transferFactoryResp.Body))
+		return nil, nil, "", fmt.Errorf("transfer factory response status %d: %s", transferFactoryResp.StatusCode(), string(transferFactoryResp.Body))
 	}
 	transferFactoryCID := transferFactoryResp.JSON200.FactoryId
 	transferFactoryCtx, err := ChoiceContextFromData(transferFactoryResp.JSON200.ChoiceContext.ChoiceContextData)
 	if err != nil {
-		return nil, nil, fmt.Errorf("convert transfer factory context: %w", err)
+		return nil, nil, "", fmt.Errorf("convert transfer factory context: %w", err)
 	}
 	transferFactoryDisclosures := make([]*apiv2.DisclosedContract, 0, len(transferFactoryResp.JSON200.ChoiceContext.DisclosedContracts))
 	for _, d := range transferFactoryResp.JSON200.ChoiceContext.DisclosedContracts {
 		id, idErr := TemplateIdFromString(d.TemplateId)
 		if idErr != nil {
-			return nil, nil, fmt.Errorf("parse transfer factory disclosure template id: %w", idErr)
+			return nil, nil, "", fmt.Errorf("parse transfer factory disclosure template id: %w", idErr)
 		}
 		createdEventBlob, decodeErr := base64.StdEncoding.DecodeString(d.CreatedEventBlob)
 		if decodeErr != nil {
-			return nil, nil, fmt.Errorf("decode transfer factory disclosure created event blob: %w", decodeErr)
+			return nil, nil, "", fmt.Errorf("decode transfer factory disclosure created event blob: %w", decodeErr)
 		}
 		transferFactoryDisclosures = append(transferFactoryDisclosures, &apiv2.DisclosedContract{
 			TemplateId:       id,
@@ -700,7 +735,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		},
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("build pool extra context: %w", err)
+		return nil, nil, "", fmt.Errorf("build pool extra context: %w", err)
 	}
 	emptyMetadata := emptyMetadataValue()
 	tokenPoolHoldingValues := make([]*apiv2.Value, 0, len(poolHoldings))
@@ -728,8 +763,11 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		CreatedEventBlob: activePool.GetCreatedEvent().GetCreatedEventBlob(),
 		SynchronizerId:   activePool.GetSynchronizerId(),
 	}
-	disclosures := make([]*apiv2.DisclosedContract, 0, 2+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
+	disclosures := make([]*apiv2.DisclosedContract, 0, 3+len(transferFactoryDisclosures)+len(poolHoldingDisclosures))
 	disclosures = append(disclosures, rateLimiterDisclosure, poolDisclosure)
+	if poolTARDisclosure != nil {
+		disclosures = append(disclosures, poolTARDisclosure)
+	}
 	disclosures = append(disclosures, transferFactoryDisclosures...)
 	disclosures = append(disclosures, poolHoldingDisclosures...)
 	c.logger.Debug().
@@ -739,7 +777,7 @@ func (c *Chain) buildManualExecuteTokenTransferInput(
 		Str("ExpectedTransferAdmin", expectedTransferAdmin).
 		Msg("Prepared manual execute token transfer input")
 
-	return tokenTransferValue, disclosures, nil
+	return tokenTransferValue, disclosures, poolTokenAdminRegistryCID, nil
 }
 
 func parseRawInstanceAddress(v any) (string, error) {
@@ -763,6 +801,53 @@ func parseRawInstanceAddress(v any) (string, error) {
 	}
 
 	return "", fmt.Errorf("unexpected raw instance address type %T", v)
+}
+
+func dedupeDisclosedContractsByID(disclosures []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
+	out := make([]*apiv2.DisclosedContract, 0, len(disclosures))
+	seen := make(map[string]struct{}, len(disclosures))
+	for _, dc := range disclosures {
+		if dc == nil {
+			continue
+		}
+		cid := strings.TrimSpace(dc.GetContractId())
+		if cid == "" {
+			continue
+		}
+		if _, ok := seen[cid]; ok {
+			continue
+		}
+		seen[cid] = struct{}{}
+		out = append(out, dc)
+	}
+
+	return out
+}
+
+func overrideChoiceContextContractID(choiceContext *apiv2.Value, key string, contractID string) error {
+	if choiceContext == nil || choiceContext.GetRecord() == nil {
+		return fmt.Errorf("choice context record is nil")
+	}
+	fields := choiceContext.GetRecord().GetFields()
+	for _, field := range fields {
+		if field == nil || field.GetLabel() != "values" || field.GetValue() == nil || field.GetValue().GetTextMap() == nil {
+			continue
+		}
+		entries := field.GetValue().GetTextMap().GetEntries()
+		for _, entry := range entries {
+			if entry == nil || entry.GetKey() != key {
+				continue
+			}
+			entry.Value = &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
+				Constructor: "AV_ContractId",
+				Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: contractID}},
+			}}}
+
+			return nil
+		}
+	}
+
+	return fmt.Errorf("choice context key %q not found", key)
 }
 
 func normalizeSelectorKey(v string) (string, bool) {

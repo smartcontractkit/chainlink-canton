@@ -87,7 +87,7 @@ jobs:
       - name: Run CCIP TestEVM2Canton_Basic test
         working-directory: chainlink-canton/ccip/devenv/tests/e2e
         run: |
-          go test -timeout 5m -v -count 1 -run TestEVM2Canton_Basic
+          go test -timeout 5m -v -count 1 -run '^TestEVM2Canton_Basic$/^message_transfer$'
         continue-on-error: true
         id: test_run_evm2canton_basic
 
@@ -139,7 +139,7 @@ jobs:
           retention-days: 1
 
       - name: Check test results
-        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure' || steps.test_run_sourcereader_curse_detection.outcome == 'failure')
+        if: always() && (steps.test_run_evm2canton_basic.outcome == 'failure' || steps.test_run_canton2evm_basic.outcome == 'failure' || steps.test_run_sourcereader_curse_detection.outcome == 'failure' || steps.test_run_evm2canton_token_transfer.outcome == 'failure' || steps.test_run_canton2evm_token_transfer.outcome == 'failure')
         run: |
           echo "CCIP E2E tests failed."
           exit 1
