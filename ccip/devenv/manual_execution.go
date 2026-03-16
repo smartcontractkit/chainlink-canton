@@ -252,8 +252,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	tokenTransferValue := &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}
 	if message.TokenTransfer != nil {
 		var tokenDisclosures []*apiv2.DisclosedContract
-		var poolTokenAdminRegistryCID string
-		tokenTransferValue, tokenDisclosures, poolTokenAdminRegistryCID, err = c.buildManualExecuteTokenTransferInput(
+		tokenTransferValue, tokenDisclosures, _, err = c.buildManualExecuteTokenTransferInput(
 			ctx,
 			participant,
 			receiverParty,
@@ -269,11 +268,6 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		)
 		if err != nil {
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("build token transfer execute input: %w", err)
-		}
-		if poolTokenAdminRegistryCID != "" {
-			if err := overrideChoiceContextContractID(choiceContext, "token-admin-registry", poolTokenAdminRegistryCID); err != nil {
-				return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("override token-admin-registry in execute context: %w", err)
-			}
 		}
 		executeDisclosures = append(executeDisclosures, tokenDisclosures...)
 	}
@@ -822,32 +816,6 @@ func dedupeDisclosedContractsByID(disclosures []*apiv2.DisclosedContract) []*api
 	}
 
 	return out
-}
-
-func overrideChoiceContextContractID(choiceContext *apiv2.Value, key string, contractID string) error {
-	if choiceContext == nil || choiceContext.GetRecord() == nil {
-		return fmt.Errorf("choice context record is nil")
-	}
-	fields := choiceContext.GetRecord().GetFields()
-	for _, field := range fields {
-		if field == nil || field.GetLabel() != "values" || field.GetValue() == nil || field.GetValue().GetTextMap() == nil {
-			continue
-		}
-		entries := field.GetValue().GetTextMap().GetEntries()
-		for _, entry := range entries {
-			if entry == nil || entry.GetKey() != key {
-				continue
-			}
-			entry.Value = &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-				Constructor: "AV_ContractId",
-				Value:       &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: contractID}},
-			}}}
-
-			return nil
-		}
-	}
-
-	return fmt.Errorf("choice context key %q not found", key)
 }
 
 func normalizeSelectorKey(v string) (string, bool) {

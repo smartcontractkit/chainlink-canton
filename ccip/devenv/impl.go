@@ -2150,23 +2150,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse token pool contract: %w", err)
 		}
-		// Token transfer must use the TAR bound to the selected pool deps.
-		poolTARRaw := strings.TrimSpace(string(parsedTokenPool.Deps.TokenAdminRegistry.Unpack))
-		if poolTARRaw != "" {
-			poolTARRawAddr, parseErr := contracts.RawInstanceAddressFromString(poolTARRaw)
-			if parseErr != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse selected pool token admin registry address %q: %w", poolTARRaw, parseErr)
-			}
-			poolTARCID, poolTARDisclosure, resolveErr := resolveDisclosedByAddress(
-				tokenadminregistry.TokenAdminRegistry{}.GetTemplateID(),
-				poolTARRawAddr.InstanceAddress(),
-			)
-			if resolveErr != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve selected pool token admin registry disclosed contract: %w", resolveErr)
-			}
-			tokenAdminRegistryCID = poolTARCID
-			disclosedTokenAdminRegistry = poolTARDisclosure
-		}
 		destSelectorKey := strconv.FormatUint(dest, 10)
 		remoteConfigKeys := make([]string, 0, len(parsedTokenPool.RemoteChainConfigs))
 		for k := range parsedTokenPool.RemoteChainConfigs {
