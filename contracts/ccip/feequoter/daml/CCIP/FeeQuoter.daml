@@ -51,6 +51,12 @@ template FeeQuoter
         signatory owner
         observer priceUpdaters
 
+        nonconsuming choice Get : FeeQuoter
+            with
+                caller : Party
+            controller caller
+            do pure this
+
         -- ================================================================
         -- │                          Prices                              │
         -- ================================================================
@@ -126,7 +132,6 @@ template FeeQuoter
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
                 CCIP.RawInstanceAddress.assertEqual "feequoter: instance address mismatch"
                     instanceId owner sm.deps.feeQuoter

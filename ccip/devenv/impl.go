@@ -271,6 +271,16 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload ccip sender dar file")
 	}
+	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ccip executor dar file")
+	}
+	_, err = participant.LedgerServices.Admin.PackageManagement.UploadDarFile(ctx, &adminv2.UploadDarFileRequest{
+		DarFile: ccipExecutorDar,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload ccip executor dar file")
+	}
 	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ccip test dar file")
@@ -510,6 +520,48 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 			lockPoolInstrumentAdmin = registryResp.JSON200.AdminId
 		}
 	}
+	// Look up chain contract addresses from the datastore for pool deps.
+	// These were deployed by DeployChainContracts above and merged into runningDS.
+	tarRef, tarRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(token_admin_registry.ContractType),
+		token_admin_registry.Version,
+		"",
+	))
+	if tarRefErr != nil {
+		return nil, fmt.Errorf("failed to get token admin registry for pool deps: %w", tarRefErr)
+	}
+	tarRawAddr, tarParseErr := contracts.RawInstanceAddressFromString(tarRef.Labels.List()[0])
+	if tarParseErr != nil {
+		return nil, fmt.Errorf("failed to parse token admin registry raw instance address for pool deps: %w", tarParseErr)
+	}
+	rmnRef, rmnRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(rmn_remote.ContractType),
+		rmn_remote.Version,
+		"",
+	))
+	if rmnRefErr != nil {
+		return nil, fmt.Errorf("failed to get rmn remote for pool deps: %w", rmnRefErr)
+	}
+	rmnRawAddr, rmnParseErr := contracts.RawInstanceAddressFromString(rmnRef.Labels.List()[0])
+	if rmnParseErr != nil {
+		return nil, fmt.Errorf("failed to parse rmn remote raw instance address for pool deps: %w", rmnParseErr)
+	}
+	feeQuoterRef, fqRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(fee_quoter.ContractType),
+		fee_quoter.Version,
+		"",
+	))
+	if fqRefErr != nil {
+		return nil, fmt.Errorf("failed to get fee quoter for pool deps: %w", fqRefErr)
+	}
+	fqRawAddr, fqParseErr := contracts.RawInstanceAddressFromString(feeQuoterRef.Labels.List()[0])
+	if fqParseErr != nil {
+		return nil, fmt.Errorf("failed to parse fee quoter raw instance address for pool deps: %w", fqParseErr)
+	}
+
 	lockPoolTemplate := lockreleasetokenpool.LockReleaseTokenPool{
 		CcipOwner: types.PARTY(participant.PartyID),
 		PoolOwner: types.PARTY(participant.PartyID),
@@ -526,6 +578,11 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		},
 		TransferTimeout: lockreleasetokenpool.TransferTimeout{
 			RelativeHours: &relativeHours,
+		},
+		Deps: lockreleasetokenpool.LockReleaseTokenPoolDeps{
+			TokenAdminRegistry: tarRawAddr.Binding(),
+			RmnRemote:          rmnRawAddr.Binding(),
+			FeeQuoter:          fqRawAddr.Binding(),
 		},
 	}
 	lockPoolQualifier := defaultLockReleaseQualifier
@@ -1965,21 +2022,27 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			CommandId: uuid.New().String(),
 			Commands: []*ledgerv2.Command{{
 				Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-test", ModuleName: "TestExecutor", EntityName: "TestExecutor"},
+					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor"},
 					CreateArguments: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
 						{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: executorInstanceID.String()}}},
 						{Label: "owner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: party}}},
-						{Label: "minBlockConfirmations", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
 						{Label: "maxCCVsPerMsg", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 10}}},
-						{Label: "ccvAllowlistEnabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: false}}},
+						{Label: "dynamicConfig", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
+							{Label: "feeAggregator", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Optional{Optional: &ledgerv2.Optional{}}}},
+							{Label: "minBlockConfirmations", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Int64{Int64: 0}}},
+							{Label: "ccvAllowlistEnabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: false}}},
+						}}}}},
 						{Label: "allowedCCVs", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_List{List: &ledgerv2.List{Elements: []*ledgerv2.Value{}}}}},
 						{
-							Label: "remoteChainFeeUSDCents",
+							Label: "remoteChainConfigs",
 							Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{
 								Entries: []*ledgerv2.GenMap_Entry{
 									{
-										Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorText}},
-										Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "0.0"}},
+										Key: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorText}},
+										Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Record{Record: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
+											{Label: "feeUSDCents", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "0"}}},
+											{Label: "enabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: true}}},
+										}}}},
 									},
 								},
 							}}},
@@ -1991,15 +2054,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 	})
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("deploy test executor contract: %w", err)
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("deploy executor contract: %w", err)
 	}
 	executorInstanceAddress := executorInstanceID.RawInstanceAddress(types.PARTY(party)).InstanceAddress()
-	executorCID, disclosedExecutor, err := resolveDisclosedByAddress("#ccip-test:TestExecutor:TestExecutor", executorInstanceAddress)
+	executorCID, disclosedExecutor, err := resolveDisclosedByAddress("#ccip-executor:CCIP.Executor:Executor", executorInstanceAddress)
 	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve test executor disclosed contract: %w", err)
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve executor disclosed contract: %w", err)
 	}
 	if executorCID == "" {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolved empty test executor contract ID")
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolved empty executor contract ID")
 	}
 
 	// Keep fee token setup local and deterministic for devenv sends.

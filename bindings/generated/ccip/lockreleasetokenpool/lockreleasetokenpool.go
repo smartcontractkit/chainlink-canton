@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "d6807207452dd66e6ba467b1508c58a438109c2543b221a06d0236d3439fc10b"
+	PackageID   = "8ee25f6607526e6d8d8b1c5c307f4541306f1fc01ce0011d93632f78e863ec9a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -137,6 +137,7 @@ type LockReleaseTokenPool struct {
 	InboundRateLimiters  types.GENMAP                             `json:"inboundRateLimiters"`
 	PoolReceiveContext   CCIPContext                              `json:"poolReceiveContext"`
 	TransferTimeout      TransferTimeout                          `json:"transferTimeout"`
+	Deps                 LockReleaseTokenPoolDeps                 `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -232,6 +233,15 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 		return t.TransferTimeout
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["deps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Deps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Deps
+	}()
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -319,6 +329,15 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 			return m.toMap()
 		}
 		return t.TransferTimeout
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["deps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Deps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Deps
 	}()
 
 	return &model.CreateCommand{
@@ -692,6 +711,66 @@ func (t LockReleaseTokenPool) TokenPoolCalculateFeeWithPackageID(contractID stri
 var _ IMCMSReceiver = (*LockReleaseTokenPool)(nil)
 
 var _ interfaces.IITokenPool = (*LockReleaseTokenPool)(nil)
+
+// LockReleaseTokenPoolDeps is a Record type
+type LockReleaseTokenPoolDeps struct {
+	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
+}
+
+// ToMap converts LockReleaseTokenPoolDeps to a map for DAML arguments
+func (t LockReleaseTokenPoolDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
+
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
+
+	return m
+}
+
+func (t LockReleaseTokenPoolDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LockReleaseTokenPoolDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LockReleaseTokenPoolDeps to hex string (Canton MCMS format)
+func (t LockReleaseTokenPoolDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LockReleaseTokenPoolDeps from hex string (Canton MCMS format)
+func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // LockReleaseTokenPoolCalculateFee is a Record type
 type LockReleaseTokenPoolCalculateFee struct {

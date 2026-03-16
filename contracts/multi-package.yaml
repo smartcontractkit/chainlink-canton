@@ -3,6 +3,7 @@ packages:
   - ccip/ccipreceiver
   - ccip/ccipsender
   - ccip/ccvs
+  - ccip/executor
   - ccip/common
   - ccip/rmn
   - ccip/feequoter
