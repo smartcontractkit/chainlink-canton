@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "fdfb9a24e17d816f50b1bff822c09a7ce459eab8f0cff92de5b38bdef5faa996"
+	PackageID   = "e1301d4e296a28eb837ddb483682242456f404aad95126fb1ddce22b5d5b16c2"
 	SDKVersion  = "3.4.10"
 )
 
@@ -411,11 +411,11 @@ func (t CommitteeVerifier) CommitteeVerifierCalculateFeeWithPackageID(contractID
 	}
 }
 
-// Archive exercises the Archive choice on this CommitteeVerifier contract
+// Archive exercises the Archive choice on this CommitteeVerifier contract via the IICrossChainVerifier interface
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -425,7 +425,7 @@ func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

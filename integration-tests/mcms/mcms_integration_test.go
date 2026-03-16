@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/mcmstest"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
@@ -116,11 +117,11 @@ func createMCMSContract(
 func createCounterContract(
 	t *testing.T,
 	participant canton.Participant,
-	mcmsPkgID string,
+	mcmsTestPkgID string,
 	owner, instanceID string,
 ) string {
 	t.Helper()
-	counter := mcms.Counter{
+	counter := mcmstest.Counter{
 		Owner:      types.PARTY(owner),
 		InstanceId: types.TEXT(instanceID),
 		Value:      types.INT64(0),
@@ -133,8 +134,8 @@ func createCounterContract(
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Counter",
+							PackageId:  mcmsTestPkgID,
+							ModuleName: "MCMS.Mock.Counter",
 							EntityName: "Counter",
 						},
 						CreateArguments: ledger.ConvertToRecord(counter),
@@ -163,10 +164,16 @@ func TestMCMS_Execute(t *testing.T) {
 	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant, randomUserParticipant)
+	mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
 	require.NoError(t, err)
-	require.NotEmpty(t, packageIDs)
+
+	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant, randomUserParticipant)
+	require.NoError(t, err)
+	// Function returns package IDs for each DAR for each participant (2 DARs × 2 participants = 4)
+	// First 2 are the unique package IDs we need (same DAR has same package ID across participants)
+	require.GreaterOrEqual(t, len(packageIDs), 2)
 	mcmsPkgID := packageIDs[0]
+	mcmsTestPkgID := packageIDs[1]
 
 	ccipOwner := participant.PartyID
 	randomUser := randomUserParticipant.PartyID
@@ -179,7 +186,7 @@ func TestMCMS_Execute(t *testing.T) {
 	// Run tests
 	t.Run("ExecuteOp Flow", func(t *testing.T) {
 		t.Parallel()
-		testExecuteOpFlow(t, mcmsPkgID, config, chainId, sortedSigners, participant, ccipOwner)
+		testExecuteOpFlow(t, mcmsPkgID, mcmsTestPkgID, config, chainId, sortedSigners, participant, ccipOwner)
 	})
 	t.Run("Signature Verification Failure", func(t *testing.T) {
 		t.Parallel()
@@ -195,7 +202,7 @@ func TestMCMS_Execute(t *testing.T) {
 	})
 	t.Run("Signatory Check", func(t *testing.T) {
 		t.Parallel()
-		testSignatoryCheck(t, mcmsPkgID, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
+		testSignatoryCheck(t, mcmsPkgID, mcmsTestPkgID, config, chainId, sortedSigners, participant, randomUserParticipant, ccipOwner, randomUser)
 	})
 }
 
@@ -208,6 +215,7 @@ func TestMCMS_Execute(t *testing.T) {
 func testExecuteOpFlow(
 	t *testing.T,
 	mcmsPkgID string,
+	mcmsTestPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
@@ -315,7 +323,7 @@ func testExecuteOpFlow(
 
 	t.Log("Creating Counter contract with MCMSReceiver interface...")
 
-	counter := mcms.Counter{
+	counter := mcmstest.Counter{
 		Owner:      types.PARTY(ccipOwnerParty),
 		InstanceId: types.TEXT(counterBaseId),
 		Value:      types.INT64(0),
@@ -328,8 +336,8 @@ func testExecuteOpFlow(
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Counter",
+							PackageId:  mcmsTestPkgID,
+							ModuleName: "MCMS.Mock.Counter",
 							EntityName: "Counter",
 						},
 						CreateArguments: ledger.ConvertToRecord(counter),
@@ -522,7 +530,7 @@ func testExecuteOpFlow(
 		if created := event.GetCreated(); created != nil {
 			if created.GetTemplateId().GetEntityName() == "Counter" {
 				newCounterCid = created.GetContractId()
-				counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](created)
+				counter, err := bindings.UnmarshalCreatedEvent[mcmstest.Counter](created)
 				if err != nil {
 					t.Logf("Failed to unmarshal Counter: %v", err)
 				} else {
@@ -541,8 +549,8 @@ func testExecuteOpFlow(
 	// Also query the ACS to verify the counter value
 	t.Log("Querying counter via ACS...")
 	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
-		PackageId:  mcmsPkgID,
-		ModuleName: "MCMS.Counter",
+		PackageId:  mcmsTestPkgID,
+		ModuleName: "MCMS.Mock.Counter",
 		EntityName: "Counter",
 	})
 	require.NoError(t, err)
@@ -550,7 +558,7 @@ func testExecuteOpFlow(
 	var queriedValue int64 = -1
 	for _, contract := range counterContracts {
 		if contract.GetCreatedEvent().GetContractId() == newCounterCid {
-			counter, err := bindings.UnmarshalCreatedEvent[mcms.Counter](contract.GetCreatedEvent())
+			counter, err := bindings.UnmarshalCreatedEvent[mcmstest.Counter](contract.GetCreatedEvent())
 			if err != nil {
 				t.Logf("Failed to unmarshal Counter from ACS: %v", err)
 			} else {
@@ -772,7 +780,7 @@ func testReplayProtection(
 		}
 	}
 
-	// Second SetRoot with SAME signatures - should fail with E_ALREADY_SEEN_HASH
+	// Second SetRoot with SAME signatures - should fail with "signed hash already used"
 	t.Log("Second SetRoot call with same signatures (should fail)...")
 	_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -796,10 +804,10 @@ func testReplayProtection(
 	})
 
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "E_ALREADY_SEEN_HASH",
-		"Expected E_ALREADY_SEEN_HASH error, got: %v", err)
+	require.Contains(t, err.Error(), "mcms: signed hash already used:",
+		"Expected 'mcms: signed hash already used:' error, got: %v", err)
 
-	t.Log("✓ Second SetRoot correctly rejected with E_ALREADY_SEEN_HASH (replay protection working)")
+	t.Log("✓ Second SetRoot correctly rejected with replay protection (signed hash already used)")
 }
 
 // testExecuteMCMSOp tests self-dispatch MCMS operations (Aptos pattern)
@@ -1152,6 +1160,7 @@ func testExecuteMCMSOp(
 func testSignatoryCheck(
 	t *testing.T,
 	mcmsPkgID string,
+	mcmsTestPkgID string,
 	config MCMSConfig,
 	chainId int64,
 	sortedSigners []*MCMSSigner,
@@ -1191,7 +1200,7 @@ func testSignatoryCheck(
 	// - Signatory check: ccipOwnerParty `elem` signatory Counter ✓ PASSES
 
 	t.Log("Creating Counter contract also owned by ccipOwner (same as MCMS owner)...")
-	counterCid := createCounterContract(t, ccipParticipant, mcmsPkgID, ccipOwnerParty, counterBaseId)
+	counterCid := createCounterContract(t, ccipParticipant, mcmsTestPkgID, ccipOwnerParty, counterBaseId)
 	t.Logf("Created Counter contract: %s", counterCid)
 
 	// ========================
@@ -1360,7 +1369,7 @@ func testSignatoryCheck(
 	// Verify counter was Incremented
 	var counterValue int64 = -1
 	for _, event := range executeOpRes.GetTransaction().GetEvents() {
-		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcms.Counter{}.GetTemplateID()) {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == bindings.GetEntityName(mcmstest.Counter{}.GetTemplateID()) {
 			for _, field := range created.GetCreateArguments().GetFields() {
 				if field.GetLabel() == "value" {
 					counterValue = field.GetValue().GetInt64()

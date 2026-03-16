@@ -1,4 +1,4 @@
-module MCMS.Counter where
+module MCMS.Mock.Counter where
 
 import DA.Map qualified as Map
 import DA.Text qualified as T
@@ -36,7 +36,7 @@ template Counter
 
         -- Look up self CID from map using full address
         selfCid <- case Map.lookup instanceAddress contractIds of
-          None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instanceAddress
+          None -> abort $ "counter: contract ID not found in map: " <> instanceAddress
           Some cid -> pure (coerceContractId cid : ContractId Counter)
 
         case functionName of
@@ -49,13 +49,13 @@ template Counter
               Some newValue -> do
                 newCid <- exercise selfCid (SetValue newValue)
                 pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
-              None -> abort $ "E_INVALID_INT: " <> operationData
+              None -> abort $ "counter: invalid integer value: " <> operationData
 
           "Reset" -> do
             newCid <- exercise selfCid Reset
             pure (Map.insert instanceAddress (coerceContractId newCid) contractIds)
 
-          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+          _ -> abort $ "counter: unknown function: " <> functionName
 
     -- =========================================================================
     -- PUBLIC CHOICES (controlled by owner, callable directly or via MCMS)
