@@ -29,9 +29,6 @@ var DeployInbound = contract.NewDeploy(contract.DeployParams[common.RateLimiter]
 		if template.RemoteChainSelector == "" {
 			return fmt.Errorf("RemoteChainSelector is required")
 		}
-		if template.Direction == common.RateLimitDirectionRateLimitDirection_Outbound {
-			return fmt.Errorf("cannot use this operation to deploy an outbound rate limiter")
-		}
 		if template.Mode == "" {
 			return fmt.Errorf("Mode is required")
 		}
@@ -56,7 +53,7 @@ var DeployOutbound = contract.NewDeploy(contract.DeployParams[common.RateLimiter
 		if template.RemoteChainSelector == "" {
 			return fmt.Errorf("RemoteChainSelector is required")
 		}
-		if template.Direction == common.RateLimitDirectionRateLimitDirection_Outbound {
+		if template.Direction != common.RateLimitDirectionRateLimitDirection_Outbound {
 			return fmt.Errorf("cannot use this operation to deploy an outbound rate limiter")
 		}
 		if template.Mode == "" {

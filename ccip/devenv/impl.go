@@ -6,11 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"math/big"
-	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -75,7 +72,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 )
 
 var (
@@ -381,198 +377,18 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	const defaultLockReleaseQualifier = "TEST (LockReleaseTokenPool 1.7.0 [default] to BurnMintTokenPool 1.7.0 [default])"
 	const reverseLockReleaseQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
 
-	// Add synthetic destination pool refs needed by transfer-token lane configuration for Canton selector.
-	// Avoid creating LockReleaseTokenPool refs here to prevent clashes with the real deployed lock/release pool.
-	for i, combo := range devenvcommon.AllTokenCombinations() {
-		addressRef := combo.DestPoolAddressRef()
-		if addressRef.Type == datastore.ContractType(lock_release_token_pool.ContractType) {
-			continue
-		}
-		err = runningDS.AddressRefStore.Add(datastore.AddressRef{
-			Address:       contracts.MustNewInstanceID("dst-token-pool-" + strconv.Itoa(i)).RawInstanceAddress(types.PARTY(participant.PartyID)).InstanceAddress().Hex(),
-			Type:          addressRef.Type,
-			Version:       addressRef.Version,
-			Qualifier:     addressRef.Qualifier,
-			ChainSelector: selector,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to add dst token pool address ref: %w", err)
-		}
-	}
-
 	// Deploy and TAR-register the default lock/release pool for Canton source token transfers.
-	chainPoolConfigs := types.GENMAP{}
-	chainFeeConfigs := types.GENMAP{}
-	remoteTokens := types.GENMAP{}
-	defaultCCVRef, err := runningDS.Addresses().Get(datastore.NewAddressRefKey(
-		selector,
-		datastore.ContractType(committee_verifier.ContractType),
-		committee_verifier.Version,
-		devenvcommon.DefaultCommitteeVerifierQualifier,
-	))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get default committee verifier for lock/release pool config: %w", err)
-	}
-	outboundCCVs := make([]common.RawInstanceAddress, 0, 1)
-	if labels := defaultCCVRef.Labels.List(); len(labels) > 0 {
-		rawAddr, parseErr := contracts.RawInstanceAddressFromString(labels[0])
-		if parseErr == nil {
-			outboundCCVs = append(outboundCCVs, rawAddr.Binding())
-		}
-	}
-	// For Canton -> EVM sends from LockRelease source pool, pick the EVM token/pool pair
-	// whose destination counterpart is LockRelease.
-	const defaultBurnMintQualifier = reverseLockReleaseQualifier
-	sourceDS := runningDS.Addresses()
-	for _, bc := range env.BlockChains.All() {
-		remoteSelector := bc.ChainSelector()
-		if remoteSelector == selector {
-			continue
-		}
-		selectorKey := strconv.FormatUint(remoteSelector, 10)
-		chainFeeConfigs[selectorKey] = lockreleasetokenpool.PoolFeeConfig{
-			FeeUSDCents:       types.NUMERIC("0"),
-			DestGasOverhead:   types.INT64(0),
-			DestBytesOverhead: types.INT64(0),
-		}
-
-		var tokenRef *datastore.AddressRef
-		var firstBurnMint *datastore.AddressRef
-		var poolRef *datastore.AddressRef
-		var firstBurnMintPool *datastore.AddressRef
-		collectTokenRef := func(store datastore.AddressRefStore) {
-			for _, candidate := range store.Filter(
-				datastore.AddressRefByChainSelector(remoteSelector),
-				datastore.AddressRefByType(datastore.ContractType("BurnMintERC20WithDrip")),
-			) {
-				if firstBurnMint == nil {
-					c := candidate
-					firstBurnMint = &c
-				}
-				if candidate.Qualifier == defaultBurnMintQualifier {
-					c := candidate
-					tokenRef = &c
-
-					return
-				}
-			}
-		}
-		collectPoolRef := func(store datastore.AddressRefStore) {
-			for _, candidate := range store.Filter(
-				datastore.AddressRefByChainSelector(remoteSelector),
-				datastore.AddressRefByType(datastore.ContractType("BurnMintTokenPool")),
-			) {
-				if firstBurnMintPool == nil {
-					c := candidate
-					firstBurnMintPool = &c
-				}
-				if candidate.Qualifier == defaultBurnMintQualifier {
-					c := candidate
-					poolRef = &c
-
-					return
-				}
-			}
-		}
-		collectTokenRef(sourceDS)
-		collectPoolRef(sourceDS)
-		if tokenRef == nil && env.DataStore != nil {
-			collectTokenRef(env.DataStore.Addresses())
-		}
-		if poolRef == nil && env.DataStore != nil {
-			collectPoolRef(env.DataStore.Addresses())
-		}
-		if tokenRef == nil {
-			tokenRef = firstBurnMint
-		}
-		if poolRef == nil {
-			poolRef = firstBurnMintPool
-		}
-		remotePools := []types.TEXT{}
-		if poolRef != nil {
-			remotePools = []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(poolRef.Address))}
-		}
-		chainPoolConfigs[selectorKey] = lockreleasetokenpool.ChainPoolConfig{
-			InboundCCVs:  outboundCCVs,
-			OutboundCCVs: outboundCCVs,
-			RemotePools:  remotePools,
-		}
-		if tokenRef == nil {
-			continue
-		}
-		remoteTokens[selectorKey] = strings.TrimPrefix(tokenRef.Address, "0x")
-	}
 	relativeHours := types.INT64(24)
-	lockPoolInstrumentAdmin := participant.PartyID
-	if metadataClient, metadataErr := tokenMetadataV1.NewClientWithResponses(
-		fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL),
-		tokenMetadataV1.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
-			token, tokenErr := participant.TokenSource.Token()
-			if tokenErr != nil {
-				return fmt.Errorf("retrieve participant token: %w", tokenErr)
-			}
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
-
-			return nil
-		}),
-	); metadataErr == nil {
-		if registryResp, registryErr := metadataClient.GetRegistryInfoWithResponse(ctx); registryErr == nil && registryResp.StatusCode() == http.StatusOK && registryResp.JSON200 != nil && registryResp.JSON200.AdminId != "" {
-			lockPoolInstrumentAdmin = registryResp.JSON200.AdminId
-		}
-	}
-	// Look up chain contract addresses from the datastore for pool deps.
-	// These were deployed by DeployChainContracts above and merged into runningDS.
-	tarRef, tarRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
-		selector,
-		datastore.ContractType(token_admin_registry.ContractType),
-		token_admin_registry.Version,
-		"",
-	))
-	if tarRefErr != nil {
-		return nil, fmt.Errorf("failed to get token admin registry for pool deps: %w", tarRefErr)
-	}
-	tarRawAddr, tarParseErr := contracts.RawInstanceAddressFromString(tarRef.Labels.List()[0])
-	if tarParseErr != nil {
-		return nil, fmt.Errorf("failed to parse token admin registry raw instance address for pool deps: %w", tarParseErr)
-	}
-	rmnRef, rmnRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
-		selector,
-		datastore.ContractType(rmn_remote.ContractType),
-		rmn_remote.Version,
-		"",
-	))
-	if rmnRefErr != nil {
-		return nil, fmt.Errorf("failed to get rmn remote for pool deps: %w", rmnRefErr)
-	}
-	rmnRawAddr, rmnParseErr := contracts.RawInstanceAddressFromString(rmnRef.Labels.List()[0])
-	if rmnParseErr != nil {
-		return nil, fmt.Errorf("failed to parse rmn remote raw instance address for pool deps: %w", rmnParseErr)
-	}
-	feeQuoterRef, fqRefErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
-		selector,
-		datastore.ContractType(fee_quoter.ContractType),
-		fee_quoter.Version,
-		"",
-	))
-	if fqRefErr != nil {
-		return nil, fmt.Errorf("failed to get fee quoter for pool deps: %w", fqRefErr)
-	}
-	fqRawAddr, fqParseErr := contracts.RawInstanceAddressFromString(feeQuoterRef.Labels.List()[0])
-	if fqParseErr != nil {
-		return nil, fmt.Errorf("failed to parse fee quoter raw instance address for pool deps: %w", fqParseErr)
-	}
-
 	lockPoolTemplate := lockreleasetokenpool.LockReleaseTokenPool{
 		CcipOwner: types.PARTY(participant.PartyID),
 		PoolOwner: types.PARTY(participant.PartyID),
 		InstrumentId: splice_api_token_holding_v1.InstrumentId{
-			Admin: types.PARTY(lockPoolInstrumentAdmin),
+			Admin: types.PARTY(participant.PartyID),
 			Id:    types.TEXT("Amulet"),
 		},
-		Decimals:         types.INT64(18),
-		ChainPoolConfigs: chainPoolConfigs,
-		ChainFeeConfigs:  chainFeeConfigs,
-		RemoteTokens:     remoteTokens,
+		Decimals:                types.INT64(18),
+		RemoteChainConfigs:      types.GENMAP{},
+		TokenTransferFeeConfigs: types.GENMAP{},
 		PoolReceiveContext: common.CCIPContext{
 			Values: types.TEXTMAP{},
 		},
@@ -586,99 +402,6 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		},
 	}
 	lockPoolQualifier := defaultLockReleaseQualifier
-	lockPoolOutAddress := ""
-	lockPoolOutLabels := datastore.NewLabelSet()
-	existingLockPoolRefFromEnv := false
-	if env.DataStore != nil {
-		existingRef, getErr := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
-			selector,
-			datastore.ContractType("LockReleaseTokenPool"),
-			lock_release_token_pool.Version,
-			defaultLockReleaseQualifier,
-		))
-		if getErr == nil && existingRef.Address != "" {
-			existingLockPoolRefFromEnv = true
-			lockPoolOutAddress = existingRef.Address
-			lockPoolOutLabels = existingRef.Labels
-		}
-	}
-	if !existingLockPoolRefFromEnv {
-		lockPoolOut, deployErr := operations.ExecuteOperation(
-			env.OperationsBundle,
-			canton_lock_release_token_pool.Deploy,
-			dependencies.CantonDeps{Chain: chain},
-			contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-				ChainSelector: selector,
-				Qualifier:     &lockPoolQualifier,
-				ActAs:         []string{participant.PartyID},
-				Template:      lockPoolTemplate,
-				OwnerParty:    types.PARTY(participant.PartyID),
-			},
-		)
-		if deployErr != nil {
-			return nil, fmt.Errorf("failed to deploy canton lock/release pool: %w", deployErr)
-		}
-		lockPoolOutAddress = lockPoolOut.Output.Address
-		lockPoolOutLabels = lockPoolOut.Output.Labels
-		if err = runningDS.AddressRefStore.Add(lockPoolOut.Output); err != nil {
-			return nil, fmt.Errorf("failed to store deployed canton lock/release pool address ref: %w", err)
-		}
-	}
-	// Add alias expected by CCV token combinations/tests.
-	if err = runningDS.AddressRefStore.Upsert(datastore.AddressRef{
-		Address:       lockPoolOutAddress,
-		Labels:        lockPoolOutLabels,
-		Type:          datastore.ContractType(lock_release_token_pool.ContractType),
-		Version:       lock_release_token_pool.Version,
-		Qualifier:     defaultLockReleaseQualifier,
-		ChainSelector: selector,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to upsert lock/release pool alias address ref: %w", err)
-	}
-	if err = runningDS.AddressRefStore.Upsert(datastore.AddressRef{
-		Address:       lockPoolOutAddress,
-		Labels:        lockPoolOutLabels,
-		Type:          datastore.ContractType("LockReleaseTokenPool"),
-		Version:       lock_release_token_pool.Version,
-		Qualifier:     defaultLockReleaseQualifier,
-		ChainSelector: selector,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to upsert lock/release pool canonical alias address ref: %w", err)
-	}
-	if err = runningDS.AddressRefStore.Upsert(datastore.AddressRef{
-		Address:       lockPoolOutAddress,
-		Labels:        lockPoolOutLabels,
-		Type:          datastore.ContractType(lock_release_token_pool.ContractType),
-		Version:       lock_release_token_pool.Version,
-		Qualifier:     reverseLockReleaseQualifier,
-		ChainSelector: selector,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to upsert reverse lock/release pool alias address ref: %w", err)
-	}
-	if err = runningDS.AddressRefStore.Upsert(datastore.AddressRef{
-		Address:       lockPoolOutAddress,
-		Labels:        lockPoolOutLabels,
-		Type:          datastore.ContractType("LockReleaseTokenPool"),
-		Version:       lock_release_token_pool.Version,
-		Qualifier:     reverseLockReleaseQualifier,
-		ChainSelector: selector,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to upsert reverse lock/release pool canonical alias address ref: %w", err)
-	}
-	activePool, activeErr := contract.FindActiveContractByInstanceAddress(
-		ctx,
-		participant.LedgerServices.State,
-		participant.PartyID,
-		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-		contracts.HexToInstanceAddress(lockPoolOutAddress),
-	)
-	if activeErr != nil {
-		return nil, fmt.Errorf("failed to find active deployed lock/release pool: %w", activeErr)
-	}
-	parsedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
-	if parseErr != nil {
-		return nil, fmt.Errorf("failed to parse deployed lock/release pool: %w", parseErr)
-	}
 	tokenAdminRegistryRef, tarErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
 		selector,
 		datastore.ContractType(token_admin_registry.ContractType),
@@ -686,117 +409,72 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		"",
 	))
 	if tarErr != nil {
-		return nil, fmt.Errorf("failed to get token admin registry for pool registration: %w", tarErr)
+		return nil, fmt.Errorf("failed to get token admin registry for token pool deployment: %w", tarErr)
 	}
-	if !existingLockPoolRefFromEnv {
-		_, regErr := operations.ExecuteSequence(
-			env.OperationsBundle,
-			sequences.RegisterTokenPool,
-			dependencies.CantonDeps{Chain: chain},
-			sequences.RegisterTokenPoolInput{
-				TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
-				InstrumentId:                      parsedPool.InstrumentId,
-				PoolInstanceID:                    string(parsedPool.InstanceId),
-				CcipParty:                         participant.PartyID,
-				PoolOwnerParty:                    participant.PartyID,
-			},
-		)
-		if regErr != nil {
-			return nil, fmt.Errorf("failed to register lock/release pool in token admin registry: %w", regErr)
-		}
+	lockPoolChangeset, deployErr := (cantonChangesets.DeployTokenPool{}).Apply(*env, cantonChangesets.CantonCSDeps[cantonChangesets.DeployTokenPoolConfig]{
+		ChainSelector: selector,
+		Participant:   0,
+		Config: cantonChangesets.DeployTokenPoolConfig{
+			CcipOwner:                         participant.PartyID,
+			PoolOwner:                         participant.PartyID,
+			InstrumentId:                      lockPoolTemplate.InstrumentId,
+			Decimals:                          int64(lockPoolTemplate.Decimals),
+			Qualifier:                         lockPoolQualifier,
+			PoolReceiveContext:                lockPoolTemplate.PoolReceiveContext,
+			TransferTimeout:                   lockPoolTemplate.TransferTimeout,
+			TokenAdminRegistryInstanceAddress: contracts.HexToInstanceAddress(tokenAdminRegistryRef.Address),
+		},
+	})
+	if deployErr != nil {
+		return nil, fmt.Errorf("failed to deploy canton lock/release pool changeset: %w", deployErr)
 	}
+	if mergeErr := runningDS.Merge(lockPoolChangeset.DataStore.Seal()); mergeErr != nil {
+		return nil, fmt.Errorf("failed to merge deployed canton lock/release pool datastore: %w", mergeErr)
+	}
+	// ccv up token-transfer setup resolves the Canton remote pool by the canonical
+	// LockReleaseTokenPool type + qualifier. Alias the deployed CantonLockReleaseTokenPool
+	// ref to that key so remote pool lookup succeeds during EVM lane configuration.
+	lockPoolRef, getErr := runningDS.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(canton_lock_release_token_pool.ContractType),
+		canton_lock_release_token_pool.Version,
+		lockPoolQualifier,
+	))
+	if getErr == nil && lockPoolRef.Address != "" {
+		_ = runningDS.AddressRefStore.Upsert(datastore.AddressRef{
+			Address:       lockPoolRef.Address,
+			Labels:        lockPoolRef.Labels,
+			Type:          datastore.ContractType("LockReleaseTokenPool"),
+			Version:       lock_release_token_pool.Version,
+			Qualifier:     lockPoolQualifier,
+			ChainSelector: selector,
+		})
+	} else {
+		l.Warn().Err(getErr).Msg("Lock/release pool alias was not added because no deployed pool address ref was found")
+	}
+
+	l.Info().Msg("Deployed and registered lock/release pool via DeployTokenPool changeset")
 	// Pre-seed real AMT holdings for the lock/release pool owner so e2e token flows use
 	// existing liquidity (same model as ccip_execute_token_test.go) and never mint at execute time.
 	if seedErr := seedAMTLiquidity(ctx, participant, participant.PartyID, "1000000.00"); seedErr != nil {
 		return nil, fmt.Errorf("failed to pre-seed AMT liquidity for lock/release pool owner: %w", seedErr)
 	}
 
-	// If the pool has no outbound rate limiters but has remote chain configs, create rate limiters
-	// for each remote chain and update the pool so Canton→EVM token sends can exercise LockOrBurn.
-	if len(parsedPool.OutboundRateLimiters) == 0 && len(parsedPool.ChainPoolConfigs) > 0 {
-		poolOwnerParty := string(parsedPool.PoolOwner)
-		poolInstanceId := string(parsedPool.InstanceId)
-		newOutbound := make(types.GENMAP)
-		newInbound := make(types.GENMAP)
-		var createCommands []*ledgerv2.Command
-		for selectorKey := range parsedPool.ChainPoolConfigs {
-			// selectorKey may be DAML numeric text (e.g. "1234.") and instance IDs reject "."
-			selectorKeyForInstanceID := strings.ReplaceAll(selectorKey, ".", "-")
-			outboundInstanceId := "devenv-outbound-rl-" + selectorKeyForInstanceID
-			inboundInstanceId := "devenv-inbound-rl-" + selectorKeyForInstanceID
-			nowMicro := time.Now().UnixMicro()
-			createCommands = append(createCommands,
-				&ledgerv2.Command{Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
-					CreateArguments: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
-						{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: outboundInstanceId}}},
-						{Label: "poolInstanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: poolInstanceId}}},
-						{Label: "poolOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: poolOwnerParty}}},
-						{Label: "remoteChainSelector", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: selectorKey}}},
-						{Label: "direction", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Enum{Enum: &ledgerv2.Enum{Constructor: "RateLimitDirection_Outbound"}}}},
-						{Label: "mode", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Enum{Enum: &ledgerv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
-						{Label: "isEnabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: true}}},
-						{Label: "capacity", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "999999999999999999"}}},
-						{Label: "rate", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "999999999999999999"}}},
-						{Label: "tokens", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "lastUpdated", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Timestamp{Timestamp: nowMicro}}},
-					}},
-				}}},
-				&ledgerv2.Command{Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-					TemplateId: &ledgerv2.Identifier{PackageId: "#ccip-common", ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter"},
-					CreateArguments: &ledgerv2.Record{Fields: []*ledgerv2.RecordField{
-						{Label: "instanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: inboundInstanceId}}},
-						{Label: "poolInstanceId", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: poolInstanceId}}},
-						{Label: "poolOwner", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Party{Party: poolOwnerParty}}},
-						{Label: "remoteChainSelector", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: selectorKey}}},
-						{Label: "direction", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Enum{Enum: &ledgerv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
-						{Label: "mode", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Enum{Enum: &ledgerv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
-						{Label: "isEnabled", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Bool{Bool: true}}},
-						{Label: "capacity", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "999999999999999999"}}},
-						{Label: "rate", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "999999999999999999"}}},
-						{Label: "tokens", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "lastUpdated", Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Timestamp{Timestamp: nowMicro}}},
-					}},
-				}}},
-			)
-			outboundRaw := contracts.MustNewInstanceID(outboundInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
-			inboundRaw := contracts.MustNewInstanceID(inboundInstanceId).RawInstanceAddress(parsedPool.PoolOwner)
-			newOutbound[selectorKey] = outboundRaw.Binding()
-			newInbound[selectorKey] = inboundRaw.Binding()
+	// ccv up expects datastore refs for all destination token-pool combos during lane config.
+	// Canton does not deploy all BurnMint pool variants, so we add synthetic refs for the missing ones.
+	// Do not add a synthetic LockReleaseTokenPool ref: the real lock/release pool is already deployed.
+	for i, combo := range devenvcommon.AllTokenCombinations() {
+		addressRef := combo.DestPoolAddressRef()
+		if addressRef.Type == datastore.ContractType(lock_release_token_pool.ContractType) {
+			continue
 		}
-		_, createErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-			Commands: &ledgerv2.Commands{
-				CommandId: uuid.New().String(),
-				Commands:  createCommands,
-				ActAs:     []string{poolOwnerParty},
-			},
+		_ = runningDS.AddressRefStore.Upsert(datastore.AddressRef{
+			Address:       contracts.MustNewInstanceID("dst-token-pool-" + strconv.Itoa(i)).RawInstanceAddress(types.PARTY(participant.PartyID)).InstanceAddress().Hex(),
+			Type:          addressRef.Type,
+			Version:       addressRef.Version,
+			Qualifier:     addressRef.Qualifier,
+			ChainSelector: selector,
 		})
-		if createErr != nil {
-			return nil, fmt.Errorf("create rate limiters for lock/release pool: %w", createErr)
-		}
-		updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateRateLimiters{
-			NewOutboundRateLimiters: newOutbound,
-			NewInboundRateLimiters:  newInbound,
-		}
-		poolContractId := activePool.GetCreatedEvent().GetContractId()
-		_, exerciseErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-			Commands: &ledgerv2.Commands{
-				CommandId: uuid.New().String(),
-				Commands: []*ledgerv2.Command{{
-					Command: &ledgerv2.Command_Exercise{Exercise: &ledgerv2.ExerciseCommand{
-						TemplateId:     activePool.GetCreatedEvent().GetTemplateId(),
-						ContractId:     poolContractId,
-						Choice:         "LockReleaseTokenPool_UpdateRateLimiters",
-						ChoiceArgument: ledger.MapToValue(updateArgs.ToMap()),
-					}},
-				}},
-				ActAs: []string{poolOwnerParty},
-			},
-		})
-		if exerciseErr != nil {
-			return nil, fmt.Errorf("update lock/release pool rate limiters: %w", exerciseErr)
-		}
-		l.Info().Msg("Configured outbound and inbound rate limiters for Canton lock/release pool")
 	}
 
 	// Add executor refs, storing raw instance addresses as labels so that
@@ -1021,147 +699,159 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		return fmt.Errorf("failed to configure chain for lanes: %w", err)
 	}
 
-	// Keep lock/release remotePools aligned with currently deployed remote BurnMint pools.
-	// This must happen at lane-config time because remote refs may not exist yet during initial deploy.
+	// Configure lock/release pool remote chain configs only at lane-setup time.
 	const defaultLockReleaseQualifier = "TEST (LockReleaseTokenPool 1.7.0 [default] to BurnMintTokenPool 1.7.0 [default])"
 	const reverseLockReleaseQualifier = "TEST (BurnMintTokenPool 1.7.0 [default] to LockReleaseTokenPool 1.7.0 [default])"
 	chain := env.BlockChains.CantonChains()[selector]
 	participant := chain.Participants[0]
-	activePools := make([]*ledgerv2.ActiveContract, 0, 2)
-	if lockPoolRef, lockPoolErr := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+	addresses := env.DataStore.Addresses()
+
+	lockPoolRef, lockPoolErr := addresses.Get(datastore.NewAddressRefKey(
 		selector,
-		datastore.ContractType("LockReleaseTokenPool"),
+		datastore.ContractType(lock_release_token_pool.ContractType),
 		lock_release_token_pool.Version,
 		defaultLockReleaseQualifier,
-	)); lockPoolErr == nil && lockPoolRef.Address != "" {
-		lockPoolAddress := contracts.HexToInstanceAddress(lockPoolRef.Address)
-		activePool, activePoolErr := contract.FindActiveContractByInstanceAddress(
-			ctx,
-			participant.LedgerServices.State,
-			participant.PartyID,
-			lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-			lockPoolAddress,
-		)
-		if activePoolErr != nil {
-			return fmt.Errorf("find active lock/release pool for lane remotePools update: %w", activePoolErr)
-		}
-		activePools = append(activePools, activePool)
+	))
+	if lockPoolErr != nil || lockPoolRef.Address == "" {
+		return fmt.Errorf("get lock/release pool address ref for lane remote config update: %w", lockPoolErr)
 	}
-	if len(activePools) == 0 {
-		ledgerEnd, endErr := participant.LedgerServices.State.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
-		if endErr != nil {
-			return fmt.Errorf("get ledger end for lock/release pool lane update lookup: %w", endErr)
-		}
-		stream, streamErr := participant.LedgerServices.State.GetActiveContracts(ctx, &ledgerv2.GetActiveContractsRequest{
-			ActiveAtOffset: ledgerEnd.GetOffset(),
-			EventFormat: &ledgerv2.EventFormat{
-				FiltersByParty: map[string]*ledgerv2.Filters{
-					participant.PartyID: {
-						Cumulative: []*ledgerv2.CumulativeFilter{
-							{
-								IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
-									TemplateFilter: &ledgerv2.TemplateFilter{
-										TemplateId: &ledgerv2.Identifier{
-											PackageId:  "#ccip-lockreleasetokenpool",
-											ModuleName: "CCIP.LockReleaseTokenPool",
-											EntityName: "LockReleaseTokenPool",
-										},
-										IncludeCreatedEventBlob: true,
-									},
-								},
-							},
-						},
-					},
-				},
-				Verbose: true,
-			},
-		})
-		if streamErr != nil {
-			return fmt.Errorf("query active lock/release pools for lane remotePools update: %w", streamErr)
-		}
-		defer stream.CloseSend()
-		for {
-			resp, recvErr := stream.Recv()
-			if errors.Is(recvErr, io.EOF) {
+
+	activePool, activePoolErr := contract.FindActiveContractByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		participant.PartyID,
+		lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
+		contracts.HexToInstanceAddress(lockPoolRef.Address),
+	)
+	if activePoolErr != nil {
+		return fmt.Errorf("find active lock/release pool for lane remote config update: %w", activePoolErr)
+	}
+	parsedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
+	if parseErr != nil {
+		return fmt.Errorf("parse active lock/release pool for lane remote config update: %w", parseErr)
+	}
+
+	ccvRefs := []common.RawInstanceAddress{}
+	if committeeVerifierRawAddr != "" {
+		ccvRefs = append(ccvRefs, committeeVerifierRawAddr.Binding())
+	}
+
+	updatedDataStore := datastore.NewMemoryDataStore()
+	if mergeErr := updatedDataStore.Merge(env.DataStore); mergeErr != nil {
+		return fmt.Errorf("clone datastore before rate limiter address persistence: %w", mergeErr)
+	}
+
+	updates := make([]lockreleasetokenpool.ChainUpdate, 0, len(remoteSelectors))
+	for _, remoteSelector := range remoteSelectors {
+		remotePoolHex := ""
+		for _, candidate := range addresses.Filter(
+			datastore.AddressRefByChainSelector(remoteSelector),
+			datastore.AddressRefByType(datastore.ContractType("BurnMintTokenPool")),
+		) {
+			if candidate.Qualifier == reverseLockReleaseQualifier {
+				remotePoolHex = candidate.Address
 				break
 			}
-			if recvErr != nil {
-				return fmt.Errorf("receive active lock/release pools for lane remotePools update: %w", recvErr)
+		}
+		if remotePoolHex == "" {
+			return fmt.Errorf("missing remote BurnMintTokenPool with qualifier %q for selector %d", reverseLockReleaseQualifier, remoteSelector)
+		}
+
+		remoteTokenHex := ""
+		for _, candidate := range addresses.Filter(
+			datastore.AddressRefByChainSelector(remoteSelector),
+			datastore.AddressRefByType(datastore.ContractType("BurnMintERC20WithDrip")),
+		) {
+			if candidate.Qualifier == reverseLockReleaseQualifier {
+				remoteTokenHex = candidate.Address
+				break
 			}
-			entry, ok := resp.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
-			if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-				continue
-			}
-			activePools = append(activePools, entry.ActiveContract)
+		}
+		if remoteTokenHex == "" {
+			return fmt.Errorf("missing remote BurnMintERC20WithDrip token with qualifier %q for selector %d", reverseLockReleaseQualifier, remoteSelector)
+		}
+
+		remoteSelectorKey := strconv.FormatUint(remoteSelector, 10)
+		selectorForInstanceID := strings.ReplaceAll(remoteSelectorKey, ".", "-")
+
+		outboundInstanceID := fmt.Sprintf("devenv-outbound-rl-%s", selectorForInstanceID)
+		outboundQualifier := fmt.Sprintf("%s-outbound-%s", defaultLockReleaseQualifier, remoteSelectorKey)
+		outboundOut, outboundErr := (cantonChangesets.DeployRateLimiter{}).Apply(*env, cantonChangesets.CantonCSDeps[cantonChangesets.DeployRateLimiterConfig]{
+			ChainSelector: selector,
+			Participant:   0,
+			Config: cantonChangesets.DeployRateLimiterConfig{
+				PoolOwner:           string(parsedPool.PoolOwner),
+				PoolInstanceID:      string(parsedPool.InstanceId),
+				RemoteChainSelector: remoteSelectorKey,
+				Direction:           common.RateLimitDirectionRateLimitDirection_Outbound,
+				InstanceID:          outboundInstanceID,
+				Qualifier:           outboundQualifier,
+			},
+		})
+		if outboundErr != nil {
+			return fmt.Errorf("create outbound rate limiter for selector %d: %w", remoteSelector, outboundErr)
+		}
+		if mergeErr := updatedDataStore.Merge(outboundOut.DataStore.Seal()); mergeErr != nil {
+			return fmt.Errorf("merge outbound rate limiter datastore output for selector %d: %w", remoteSelector, mergeErr)
+		}
+		outboundRL := contracts.MustNewInstanceID(outboundInstanceID).RawInstanceAddress(parsedPool.PoolOwner).Binding()
+
+		inboundInstanceID := fmt.Sprintf("devenv-inbound-rl-%s", selectorForInstanceID)
+		inboundQualifier := fmt.Sprintf("%s-inbound-%s", defaultLockReleaseQualifier, remoteSelectorKey)
+		inboundOut, inboundErr := (cantonChangesets.DeployRateLimiter{}).Apply(*env, cantonChangesets.CantonCSDeps[cantonChangesets.DeployRateLimiterConfig]{
+			ChainSelector: selector,
+			Participant:   0,
+			Config: cantonChangesets.DeployRateLimiterConfig{
+				PoolOwner:           string(parsedPool.PoolOwner),
+				PoolInstanceID:      string(parsedPool.InstanceId),
+				RemoteChainSelector: remoteSelectorKey,
+				Direction:           common.RateLimitDirectionRateLimitDirection_Inbound,
+				InstanceID:          inboundInstanceID,
+				Qualifier:           inboundQualifier,
+			},
+		})
+		if inboundErr != nil {
+			return fmt.Errorf("create inbound rate limiter for selector %d: %w", remoteSelector, inboundErr)
+		}
+		if mergeErr := updatedDataStore.Merge(inboundOut.DataStore.Seal()); mergeErr != nil {
+			return fmt.Errorf("merge inbound rate limiter datastore output for selector %d: %w", remoteSelector, mergeErr)
+		}
+		inboundRL := contracts.MustNewInstanceID(inboundInstanceID).RawInstanceAddress(parsedPool.PoolOwner).Binding()
+
+		updates = append(updates, lockreleasetokenpool.ChainUpdate{
+			RemoteChainSelector: types.NUMERIC(remoteSelectorKey),
+			RemotePools:         []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
+			RemoteTokenAddress:  types.TEXT(strings.ToLower(strings.TrimPrefix(remoteTokenHex, "0x"))),
+			InboundCCVs:         ccvRefs,
+			OutboundCCVs:        ccvRefs,
+			InboundRateLimiter:  inboundRL,
+			OutboundRateLimiter: outboundRL,
+		})
+	}
+
+	if len(updates) > 0 {
+		updateArgs := lockreleasetokenpool.ApplyChainUpdates{
+			RemoteChainSelectorsToRemove: []types.NUMERIC{},
+			ChainsToAdd:                  updates,
+		}
+		poolInstanceAddr := contracts.InstanceID(string(parsedPool.InstanceId)).RawInstanceAddress(parsedPool.PoolOwner).InstanceAddress()
+		_, exerciseErr := operations.ExecuteOperation(
+			env.OperationsBundle,
+			canton_lock_release_token_pool.ApplyChainUpdates,
+			dependencies.CantonDeps{Chain: chain},
+			contract.ChoiceInput[lockreleasetokenpool.ApplyChainUpdates]{
+				ChainSelector:   selector,
+				InstanceAddress: poolInstanceAddr,
+				ActAs:           []string{string(parsedPool.PoolOwner)},
+				Args:            updateArgs,
+			},
+		)
+		if exerciseErr != nil {
+			return fmt.Errorf("apply lock/release pool chain updates operation for connected lanes: %w", exerciseErr)
 		}
 	}
 
-	outboundCCVs := []common.RawInstanceAddress{}
-	if committeeVerifierRawAddr != "" {
-		outboundCCVs = append(outboundCCVs, committeeVerifierRawAddr.Binding())
-	}
-	for _, activePool := range activePools {
-		parsedPool, parseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activePool.GetCreatedEvent())
-		if parseErr != nil {
-			return fmt.Errorf("parse active lock/release pool for lane remotePools update: %w", parseErr)
-		}
-		updatedChainPoolConfigs := types.GENMAP{}
-		maps.Copy(updatedChainPoolConfigs, parsedPool.ChainPoolConfigs)
-		needsPoolUpdate := false
-		for _, remoteSelector := range remoteSelectors {
-			remotePoolHex := ""
-			var fallbackPool *datastore.AddressRef
-			for _, candidate := range env.DataStore.Addresses().Filter(
-				datastore.AddressRefByChainSelector(remoteSelector),
-				datastore.AddressRefByType(datastore.ContractType("BurnMintTokenPool")),
-			) {
-				cand := candidate
-				if fallbackPool == nil {
-					fallbackPool = &cand
-				}
-				if candidate.Qualifier == reverseLockReleaseQualifier {
-					remotePoolHex = candidate.Address
-					break
-				}
-			}
-			if remotePoolHex == "" && fallbackPool != nil {
-				remotePoolHex = fallbackPool.Address
-			}
-			if remotePoolHex == "" {
-				continue
-			}
-			selectorKey := strconv.FormatUint(remoteSelector, 10)
-			updatedChainPoolConfigs[selectorKey] = lockreleasetokenpool.ChainPoolConfig{
-				InboundCCVs:  outboundCCVs,
-				OutboundCCVs: outboundCCVs,
-				RemotePools:  []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
-			}
-			needsPoolUpdate = true
-		}
-		if !needsPoolUpdate {
-			continue
-		}
-		updateArgs := lockreleasetokenpool.LockReleaseTokenPoolUpdateChainPoolConfigs{
-			NewChainPoolConfigs: updatedChainPoolConfigs,
-		}
-		_, exerciseErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-			Commands: &ledgerv2.Commands{
-				CommandId: uuid.New().String(),
-				Commands: []*ledgerv2.Command{{
-					Command: &ledgerv2.Command_Exercise{Exercise: &ledgerv2.ExerciseCommand{
-						TemplateId:     activePool.GetCreatedEvent().GetTemplateId(),
-						ContractId:     activePool.GetCreatedEvent().GetContractId(),
-						Choice:         "LockReleaseTokenPool_UpdateChainPoolConfigs",
-						ChoiceArgument: ledger.MapToValue(updateArgs.ToMap()),
-					}},
-				}},
-				ActAs: []string{string(parsedPool.PoolOwner)},
-			},
-		})
-		if exerciseErr != nil {
-			return fmt.Errorf("update lock/release pool remotePools for connected lanes: %w", exerciseErr)
-		}
-	}
+	env.DataStore = updatedDataStore.Seal()
 
 	return nil
 }
@@ -1456,6 +1146,71 @@ func canonicalCantonRemotePoolHex(remotePoolHex string) string {
 	return clean
 }
 
+func findRemoteChainConfigBySelector(remoteChainConfigs map[string]any, selectorKey string) (any, bool) {
+	selectorNorm := normalizeNumericForCompare(selectorKey)
+	for rawKey, cfg := range remoteChainConfigs {
+		if normalizeNumericForCompare(rawKey) == selectorNorm {
+			return cfg, true
+		}
+	}
+
+	return nil, false
+}
+
+func remoteChainConfigFromAny(v any) (lockreleasetokenpool.RemoteChainConfig, bool) {
+	switch cfg := v.(type) {
+	case lockreleasetokenpool.RemoteChainConfig:
+		return cfg, true
+	case map[string]any:
+		m := cfg
+		if data, ok := cfg["data"].(map[string]any); ok {
+			m = data
+		}
+		out := lockreleasetokenpool.RemoteChainConfig{
+			InboundCCVs:  []common.RawInstanceAddress{},
+			OutboundCCVs: []common.RawInstanceAddress{},
+			RemotePools:  []types.TEXT{},
+		}
+		if raw, ok := m["inboundRateLimiter"]; ok {
+			if unpack, err := extractRawRateLimiterAddress(raw); err == nil && unpack != "" {
+				out.InboundRateLimiter = common.RawInstanceAddress{Unpack: types.TEXT(unpack)}
+			}
+		}
+		if raw, ok := m["outboundRateLimiter"]; ok {
+			if unpack, err := extractRawRateLimiterAddress(raw); err == nil && unpack != "" {
+				out.OutboundRateLimiter = common.RawInstanceAddress{Unpack: types.TEXT(unpack)}
+			}
+		}
+		if remoteTokenAddress, ok := m["remoteTokenAddress"]; ok {
+			switch rv := remoteTokenAddress.(type) {
+			case string:
+				out.RemoteTokenAddress = types.TEXT(rv)
+			case map[string]any:
+				if val, ok := rv["value"].(string); ok {
+					out.RemoteTokenAddress = types.TEXT(val)
+				} else if data, ok := rv["data"].(map[string]any); ok {
+					if val, ok := data["value"].(string); ok {
+						out.RemoteTokenAddress = types.TEXT(val)
+					} else if text, ok := data["text"].(string); ok {
+						out.RemoteTokenAddress = types.TEXT(text)
+					}
+				}
+			default:
+				out.RemoteTokenAddress = types.TEXT(fmt.Sprint(rv))
+			}
+		}
+		if remoteRaw, ok := m["remotePools"].([]any); ok {
+			for _, rp := range remoteRaw {
+				out.RemotePools = append(out.RemotePools, types.TEXT(fmt.Sprint(rp)))
+			}
+		}
+
+		return out, true
+	default:
+		return lockreleasetokenpool.RemoteChainConfig{}, false
+	}
+}
+
 func resolveRateLimiterForSend(
 	ctx context.Context,
 	participant canton.Participant,
@@ -1466,36 +1221,23 @@ func resolveRateLimiterForSend(
 ) (types.CONTRACT_ID, *ledgerv2.DisclosedContract, error) {
 	var expectedRawAddress string
 	selectorNorm := normalizeNumericForCompare(destSelectorKey)
-
-	for key, outboundRateLimiterRaw := range parsedTokenPool.OutboundRateLimiters {
-		if normalizeNumericForCompare(key) != selectorNorm {
-			continue
-		}
-		if rawAddress, rawErr := extractRawRateLimiterAddress(outboundRateLimiterRaw); rawErr == nil && expectedRawAddress == "" {
-			expectedRawAddress = rawAddress
-		}
-		cid, disclosure, err := resolveRateLimiterFromRawAddressForSend(outboundRateLimiterRaw, resolveDisclosedByAddress)
-		if err == nil {
-			return cid, disclosure, nil
-		}
-	}
-
-	if outboundRateLimiterRaw, ok := parsedTokenPool.OutboundRateLimiters[destSelectorKey]; ok {
-		if rawAddress, rawErr := extractRawRateLimiterAddress(outboundRateLimiterRaw); rawErr == nil {
-			expectedRawAddress = rawAddress
-		}
-		cid, disclosure, err := resolveRateLimiterFromRawAddressForSend(outboundRateLimiterRaw, resolveDisclosedByAddress)
-		if err == nil {
-			return cid, disclosure, nil
+	if cfgAny, ok := findRemoteChainConfigBySelector(parsedTokenPool.RemoteChainConfigs, destSelectorKey); ok {
+		if cfg, cfgOK := remoteChainConfigFromAny(cfgAny); cfgOK {
+			outboundRateLimiterRaw := cfg.OutboundRateLimiter
+			if rawAddress, rawErr := extractRawRateLimiterAddress(outboundRateLimiterRaw); rawErr == nil {
+				expectedRawAddress = rawAddress
+			}
+			cid, disclosure, err := resolveRateLimiterFromRawAddressForSend(outboundRateLimiterRaw, resolveDisclosedByAddress)
+			if err == nil {
+				return cid, disclosure, nil
+			}
 		}
 	}
-	if outboundRateLimiterRaw, ok := parsedTokenPool.OutboundRateLimiters[destSelectorNumericKey]; ok {
-		if rawAddress, rawErr := extractRawRateLimiterAddress(outboundRateLimiterRaw); rawErr == nil && expectedRawAddress == "" {
-			expectedRawAddress = rawAddress
-		}
-		cid, disclosure, err := resolveRateLimiterFromRawAddressForSend(outboundRateLimiterRaw, resolveDisclosedByAddress)
-		if err == nil {
-			return cid, disclosure, nil
+	if cfgAny, ok := parsedTokenPool.RemoteChainConfigs[destSelectorNumericKey]; ok && expectedRawAddress == "" {
+		if cfg, cfgOK := remoteChainConfigFromAny(cfgAny); cfgOK {
+			if rawAddress, rawErr := extractRawRateLimiterAddress(cfg.OutboundRateLimiter); rawErr == nil {
+				expectedRawAddress = rawAddress
+			}
 		}
 	}
 
@@ -1658,6 +1400,13 @@ func (c *Chain) resolveInstrumentIDForRemoteToken(
 	tokenAddress protocol.UnknownAddress,
 ) (*splice_api_token_holding_v1.InstrumentId, error) {
 	participant := c.chain.Participants[0]
+	normalizeTokenHex := func(raw string) string {
+		clean := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "0x"))
+		if len(clean) > 40 {
+			clean = clean[len(clean)-40:]
+		}
+		return clean
+	}
 
 	ledgerEnd, err := participant.LedgerServices.State.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
 	if err != nil {
@@ -1692,7 +1441,7 @@ func (c *Chain) resolveInstrumentIDForRemoteToken(
 	}
 	defer stream.CloseSend()
 
-	want := strings.ToLower(strings.TrimPrefix(tokenAddress.String(), "0x"))
+	want := normalizeTokenHex(tokenAddress.String())
 	var found *splice_api_token_holding_v1.InstrumentId
 
 	for {
@@ -1713,8 +1462,12 @@ func (c *Chain) resolveInstrumentIDForRemoteToken(
 			return nil, fmt.Errorf("parse lock/release token pool created event: %w", parseErr)
 		}
 
-		for _, remoteTokenValue := range parsed.RemoteTokens {
-			remoteToken := strings.ToLower(strings.TrimPrefix(fmt.Sprint(remoteTokenValue), "0x"))
+		for _, cfgAny := range parsed.RemoteChainConfigs {
+			cfg, ok := remoteChainConfigFromAny(cfgAny)
+			if !ok {
+				continue
+			}
+			remoteToken := normalizeTokenHex(string(cfg.RemoteTokenAddress))
 			if remoteToken != want {
 				continue
 			}
@@ -1729,6 +1482,66 @@ func (c *Chain) resolveInstrumentIDForRemoteToken(
 	}
 
 	if found == nil {
+		// Devenv fallback: when mapping wasn't populated yet, use the single active lock/release pool instrument.
+		var singleton *splice_api_token_holding_v1.InstrumentId
+		ledgerEnd2, err2 := participant.LedgerServices.State.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
+		if err2 != nil {
+			return nil, fmt.Errorf("no lock/release pool mapping found for token %s", tokenAddress.String())
+		}
+		stream2, err2 := participant.LedgerServices.State.GetActiveContracts(ctx, &ledgerv2.GetActiveContractsRequest{
+			ActiveAtOffset: ledgerEnd2.GetOffset(),
+			EventFormat: &ledgerv2.EventFormat{
+				FiltersByParty: map[string]*ledgerv2.Filters{
+					participant.PartyID: {
+						Cumulative: []*ledgerv2.CumulativeFilter{
+							{
+								IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
+									TemplateFilter: &ledgerv2.TemplateFilter{
+										TemplateId: &ledgerv2.Identifier{
+											PackageId:  "#ccip-lockreleasetokenpool",
+											ModuleName: "CCIP.LockReleaseTokenPool",
+											EntityName: "LockReleaseTokenPool",
+										},
+										IncludeCreatedEventBlob: true,
+									},
+								},
+							},
+						},
+					},
+				},
+				Verbose: true,
+			},
+		})
+		if err2 == nil {
+			defer stream2.CloseSend()
+			for {
+				resp2, recvErr2 := stream2.Recv()
+				if errors.Is(recvErr2, io.EOF) {
+					break
+				}
+				if recvErr2 != nil {
+					break
+				}
+				entry2, ok2 := resp2.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
+				if !ok2 {
+					continue
+				}
+				parsed2, parseErr2 := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](entry2.ActiveContract.GetCreatedEvent())
+				if parseErr2 != nil {
+					continue
+				}
+				inst := parsed2.InstrumentId
+				if singleton != nil && (singleton.Admin != inst.Admin || singleton.Id != inst.Id) {
+					singleton = nil
+					break
+				}
+				singleton = &inst
+			}
+		}
+		if singleton != nil {
+			return singleton, nil
+		}
+
 		return nil, fmt.Errorf("no lock/release pool mapping found for token %s", tokenAddress.String())
 	}
 
@@ -2264,460 +2077,29 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse token pool contract: %w", err)
 		}
 		destSelectorKey := strconv.FormatUint(dest, 10)
-		destSelectorNumericKey := destSelectorKey + "."
-		_, hasDestRemoteToken := parsedTokenPool.RemoteTokens[destSelectorKey]
-		if !hasDestRemoteToken {
-			_, hasDestRemoteToken = parsedTokenPool.RemoteTokens[destSelectorNumericKey]
-		}
-		_, hasDestPoolCfg := parsedTokenPool.ChainPoolConfigs[destSelectorKey]
-		if !hasDestPoolCfg {
-			_, hasDestPoolCfg = parsedTokenPool.ChainPoolConfigs[destSelectorNumericKey]
-		}
-		if !hasDestRemoteToken || !hasDestPoolCfg {
-			keys := func(m types.GENMAP) []string {
-				out := make([]string, 0, len(m))
-				for k := range m {
-					out = append(out, k)
-				}
-				sort.Strings(out)
-
-				return out
-			}
-			if os.Getenv("CCIP_DEBUG_POOL_CONFIG") == "1" {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
-					"missing lock/release pool destination config for selector %s: hasRemoteToken=%t hasPoolCfg=%t remoteTokenKeys=%v poolCfgKeys=%v",
-					destSelectorKey,
-					hasDestRemoteToken,
-					hasDestPoolCfg,
-					keys(parsedTokenPool.RemoteTokens),
-					keys(parsedTokenPool.ChainPoolConfigs),
-				)
-			}
-			if !hasDestRemoteToken && hasDestPoolCfg {
-				const preferredQualifierRTPatch = remoteDestBurnMintQualifier
-				resolveRemoteTokenForDest := func(destSelector uint64) (string, error) {
-					var fallback *datastore.AddressRef
-					for _, candidate := range c.e.DataStore.Addresses().Filter(
-						datastore.AddressRefByChainSelector(destSelector),
-						datastore.AddressRefByType(datastore.ContractType("BurnMintERC20WithDrip")),
-					) {
-						cand := candidate
-						if fallback == nil {
-							fallback = &cand
-						}
-						if candidate.Qualifier == preferredQualifierRTPatch {
-							return strings.ToLower(strings.TrimPrefix(candidate.Address, "0x")), nil
-						}
-					}
-					if fallback == nil {
-						return "", fmt.Errorf("no BurnMintERC20WithDrip token refs found for destination selector %d", destSelector)
-					}
-
-					return strings.ToLower(strings.TrimPrefix(fallback.Address, "0x")), nil
-				}
-				remoteTokenHex, rtErr := resolveRemoteTokenForDest(dest)
-				if rtErr != nil {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve remote token address for destination selector %d: %w", dest, rtErr)
-				}
-				created := activeTokenPool.GetCreatedEvent()
-				if created == nil || created.GetCreateArguments() == nil || created.GetTemplateId() == nil {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token pool created event is missing required fields for remote token patch")
-				}
-				replaceRemoteTokens := false
-				newFields := make([]*ledgerv2.RecordField, 0, len(created.GetCreateArguments().GetFields()))
-				for _, f := range created.GetCreateArguments().GetFields() {
-					if f.GetLabel() != "remoteTokens" {
-						newFields = append(newFields, f)
-						continue
-					}
-					replaceRemoteTokens = true
-					var entries []*ledgerv2.GenMap_Entry
-					if gm := f.GetValue().GetGenMap(); gm != nil {
-						entries = append(entries, gm.GetEntries()...)
-					}
-					updated := false
-					for _, e := range entries {
-						keyNumeric := e.GetKey().GetNumeric()
-						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
-							e.Value = &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: remoteTokenHex}}
-							updated = true
-
-							break
-						}
-					}
-					if !updated {
-						entries = append(entries, &ledgerv2.GenMap_Entry{
-							Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorNumericKey}},
-							Value: &ledgerv2.Value{Sum: &ledgerv2.Value_Text{Text: remoteTokenHex}},
-						})
-					}
-					newFields = append(newFields, &ledgerv2.RecordField{
-						Label: "remoteTokens",
-						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
-					})
-				}
-				if !replaceRemoteTokens {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token pool create arguments missing remoteTokens field")
-				}
-				_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-					Commands: &ledgerv2.Commands{
-						CommandId: uuid.New().String(),
-						Commands: []*ledgerv2.Command{{
-							Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-								TemplateId: created.GetTemplateId(),
-								CreateArguments: &ledgerv2.Record{
-									Fields: newFields,
-								},
-							}},
-						}},
-						ActAs: []string{string(parsedTokenPool.PoolOwner)},
-					},
-				})
-				if err != nil {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("patch token pool remoteTokens for destination selector %d: %w", dest, err)
-				}
-				activeTokenPool, err = findLatestActiveByAddress(
-					lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-					tokenPoolAddress,
-				)
-				if err != nil {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve patched active token pool by configured address after remote token patch: %w", err)
-				}
-				if activeTokenPool == nil || activeTokenPool.GetCreatedEvent() == nil || activeTokenPool.GetCreatedEvent().GetContractId() == "" {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("patched token pool missing created event or contract id after remote token patch")
-				}
-				tokenPoolCID = types.CONTRACT_ID(activeTokenPool.GetCreatedEvent().GetContractId())
-				tokenPoolDisclosure = convertToDisclosedContract(activeTokenPool)
-				if tokenPoolDisclosure == nil {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to build disclosed token pool after remote token patch")
-				}
-				parsedTokenPool, err = bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activeTokenPool.GetCreatedEvent())
-				if err != nil {
-					return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse patched token pool after remote token patch: %w", err)
-				}
-				hasDestRemoteToken = true
-			}
-			if hasDestRemoteToken && hasDestPoolCfg {
-				goto tokenPoolConfigReady
-			}
-
-			const preferredQualifier = remoteDestBurnMintQualifier
-			resolveRemoteTokenForDest := func(destSelector uint64) (string, error) {
-				var fallback *datastore.AddressRef
-				for _, candidate := range c.e.DataStore.Addresses().Filter(
-					datastore.AddressRefByChainSelector(destSelector),
-					datastore.AddressRefByType(datastore.ContractType("BurnMintERC20WithDrip")),
-				) {
-					cand := candidate
-					if fallback == nil {
-						fallback = &cand
-					}
-					if candidate.Qualifier == preferredQualifier {
-						return strings.ToLower(strings.TrimPrefix(candidate.Address, "0x")), nil
-					}
-				}
-				if fallback == nil {
-					return "", fmt.Errorf("no BurnMintERC20WithDrip token refs found for destination selector %d", destSelector)
-				}
-
-				return strings.ToLower(strings.TrimPrefix(fallback.Address, "0x")), nil
-			}
-			resolveRemotePoolForDest := func(destSelector uint64) (string, error) {
-				var fallback *datastore.AddressRef
-				for _, candidate := range c.e.DataStore.Addresses().Filter(
-					datastore.AddressRefByChainSelector(destSelector),
-					datastore.AddressRefByType(datastore.ContractType("BurnMintTokenPool")),
-				) {
-					cand := candidate
-					if fallback == nil {
-						fallback = &cand
-					}
-					if candidate.Qualifier == remoteDestBurnMintQualifier {
-						return strings.ToLower(strings.TrimPrefix(candidate.Address, "0x")), nil
-					}
-				}
-				if fallback == nil {
-					return "", fmt.Errorf("no BurnMintTokenPool refs found for destination selector %d", destSelector)
-				}
-
-				return strings.ToLower(strings.TrimPrefix(fallback.Address, "0x")), nil
-			}
-			remoteTokenHex, err := resolveRemoteTokenForDest(dest)
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve remote token address for destination selector %d: %w", dest, err)
-			}
-			remotePoolHex, err := resolveRemotePoolForDest(dest)
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve remote pool address for destination selector %d: %w", dest, err)
-			}
-			updatedChainPoolConfigs := types.GENMAP{}
-			maps.Copy(updatedChainPoolConfigs, parsedTokenPool.ChainPoolConfigs)
-			updatedChainPoolConfigs[destSelectorKey] = lockreleasetokenpool.ChainPoolConfig{
-				InboundCCVs:  senderRequiredCCVs,
-				OutboundCCVs: senderRequiredCCVs,
-				RemotePools:  []types.TEXT{types.TEXT(canonicalCantonRemotePoolHex(remotePoolHex))},
-			}
-			updatedChainFeeConfigs := types.GENMAP{}
-			maps.Copy(updatedChainFeeConfigs, parsedTokenPool.ChainFeeConfigs)
-			updatedChainFeeConfigs[destSelectorKey] = lockreleasetokenpool.PoolFeeConfig{
-				FeeUSDCents:       types.NUMERIC("0"),
-				DestGasOverhead:   types.INT64(0),
-				DestBytesOverhead: types.INT64(0),
-			}
-			updatedRemoteTokens := types.GENMAP{}
-			maps.Copy(updatedRemoteTokens, parsedTokenPool.RemoteTokens)
-			updatedRemoteTokens[destSelectorKey] = types.TEXT(remoteTokenHex)
-			updatedOutboundRateLimiters := types.GENMAP{}
-			maps.Copy(updatedOutboundRateLimiters, parsedTokenPool.OutboundRateLimiters)
-			updatedInboundRateLimiters := types.GENMAP{}
-			maps.Copy(updatedInboundRateLimiters, parsedTokenPool.InboundRateLimiters)
-			hasDestOutboundRateLimiter := false
-			if _, ok := updatedOutboundRateLimiters[destSelectorKey]; ok {
-				hasDestOutboundRateLimiter = true
-			} else if _, ok := updatedOutboundRateLimiters[destSelectorNumericKey]; ok {
-				hasDestOutboundRateLimiter = true
-			}
-			hasDestInboundRateLimiter := false
-			if _, ok := updatedInboundRateLimiters[destSelectorKey]; ok {
-				hasDestInboundRateLimiter = true
-			} else if _, ok := updatedInboundRateLimiters[destSelectorNumericKey]; ok {
-				hasDestInboundRateLimiter = true
-			}
-			if !hasDestOutboundRateLimiter {
-				var fallback any
-				for _, v := range updatedOutboundRateLimiters {
-					fallback = v
-					break
-				}
-				if fallback != nil {
-					updatedOutboundRateLimiters[destSelectorKey] = fallback
-				}
-			}
-			if !hasDestInboundRateLimiter {
-				var fallback any
-				for _, v := range updatedInboundRateLimiters {
-					fallback = v
-					break
-				}
-				if fallback != nil {
-					updatedInboundRateLimiters[destSelectorKey] = fallback
-				}
-			}
-			updatedPool := lockreleasetokenpool.LockReleaseTokenPool{
-				InstanceId:           parsedTokenPool.InstanceId,
-				CcipOwner:            parsedTokenPool.CcipOwner,
-				PoolOwner:            parsedTokenPool.PoolOwner,
-				InstrumentId:         parsedTokenPool.InstrumentId,
-				Decimals:             parsedTokenPool.Decimals,
-				ChainPoolConfigs:     updatedChainPoolConfigs,
-				ChainFeeConfigs:      updatedChainFeeConfigs,
-				RemoteTokens:         updatedRemoteTokens,
-				OutboundRateLimiters: updatedOutboundRateLimiters,
-				InboundRateLimiters:  updatedInboundRateLimiters,
-				PoolReceiveContext:   parsedTokenPool.PoolReceiveContext,
-				TransferTimeout:      parsedTokenPool.TransferTimeout,
-			}
-			bundle := operations.NewBundle(
-				func() context.Context { return context.Background() },
-				c.e.Logger,
-				operations.NewMemoryReporter(),
-			)
-			_, deployErr := operations.ExecuteOperation(
-				bundle,
-				canton_lock_release_token_pool.Deploy,
-				dependencies.CantonDeps{Chain: c.chain},
-				contract.DeployInput[lockreleasetokenpool.LockReleaseTokenPool]{
-					ChainSelector: c.chain.ChainSelector(),
-					Qualifier: func() *string {
-						q := tokenPoolQualifier
-						return &q
-					}(),
-					ActAs:      []string{string(updatedPool.PoolOwner)},
-					Template:   updatedPool,
-					OwnerParty: updatedPool.PoolOwner,
-				},
-			)
-			if deployErr != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("configure lock/release pool for destination selector %d: %w", dest, deployErr)
-			}
-			_, _, err = resolveDisclosedByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), tokenPoolAddress)
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve updated token pool disclosed contract: %w", err)
-			}
-			activeTokenPool, err = contract.FindActiveContractByInstanceAddress(
-				ctx,
-				participant.LedgerServices.State,
-				participant.PartyID,
-				lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-				tokenPoolAddress,
-			)
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve updated active token pool by configured address: %w", err)
-			}
-			parsedTokenPool, err = bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activeTokenPool.GetCreatedEvent())
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse updated token pool contract: %w", err)
-			}
-		}
-		{
-			created := activeTokenPool.GetCreatedEvent()
-			if created == nil || created.GetCreateArguments() == nil || created.GetTemplateId() == nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token pool created event is missing required fields for rate limiter patch")
-			}
-
-			var outboundFallback any
-			for k, v := range parsedTokenPool.OutboundRateLimiters {
-				if k == destSelectorKey || k == destSelectorNumericKey {
-					continue
-				}
-				outboundFallback = v
-
-				break
-			}
-			if outboundFallback == nil {
-				for _, v := range parsedTokenPool.OutboundRateLimiters {
-					outboundFallback = v
-
+		destCfgAny, hasDestCfg := findRemoteChainConfigBySelector(parsedTokenPool.RemoteChainConfigs, destSelectorKey)
+		if !hasDestCfg {
+			if len(parsedTokenPool.RemoteChainConfigs) == 1 {
+				for _, onlyCfg := range parsedTokenPool.RemoteChainConfigs {
+					destCfgAny = onlyCfg
+					hasDestCfg = true
 					break
 				}
 			}
-			if outboundFallback == nil {
-				outboundKeys := make([]string, 0, len(parsedTokenPool.OutboundRateLimiters))
-				for k := range parsedTokenPool.OutboundRateLimiters {
-					outboundKeys = append(outboundKeys, k)
-				}
-				sort.Strings(outboundKeys)
-
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing outbound rate limiter config for destination selector %d (outboundKeys=%v)", dest, outboundKeys)
-			}
-			var inboundFallback any
-			for k, v := range parsedTokenPool.InboundRateLimiters {
-				if k == destSelectorKey || k == destSelectorNumericKey {
-					continue
-				}
-				inboundFallback = v
-
-				break
-			}
-			if inboundFallback == nil {
-				for _, v := range parsedTokenPool.InboundRateLimiters {
-					inboundFallback = v
-
-					break
-				}
-			}
-			if inboundFallback == nil {
-				inboundKeys := make([]string, 0, len(parsedTokenPool.InboundRateLimiters))
-				for k := range parsedTokenPool.InboundRateLimiters {
-					inboundKeys = append(inboundKeys, k)
-				}
-				sort.Strings(inboundKeys)
-
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing inbound rate limiter config for destination selector %d (inboundKeys=%v)", dest, inboundKeys)
-			}
-
-			replaceOutbound := false
-			replaceInbound := false
-			newFields := make([]*ledgerv2.RecordField, 0, len(created.GetCreateArguments().GetFields()))
-			for _, f := range created.GetCreateArguments().GetFields() {
-				switch f.GetLabel() {
-				case "outboundRateLimiters":
-					replaceOutbound = true
-					var entries []*ledgerv2.GenMap_Entry
-					if gm := f.GetValue().GetGenMap(); gm != nil {
-						entries = append(entries, gm.GetEntries()...)
-					}
-					updated := false
-					for _, e := range entries {
-						keyNumeric := e.GetKey().GetNumeric()
-						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
-							e.Value = ledger.MapToValue(outboundFallback)
-							updated = true
-
-							break
-						}
-					}
-					if !updated {
-						entries = append(entries, &ledgerv2.GenMap_Entry{
-							Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorNumericKey}},
-							Value: ledger.MapToValue(outboundFallback),
-						})
-					}
-					newFields = append(newFields, &ledgerv2.RecordField{
-						Label: "outboundRateLimiters",
-						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
-					})
-				case "inboundRateLimiters":
-					replaceInbound = true
-					var entries []*ledgerv2.GenMap_Entry
-					if gm := f.GetValue().GetGenMap(); gm != nil {
-						entries = append(entries, gm.GetEntries()...)
-					}
-					updated := false
-					for _, e := range entries {
-						keyNumeric := e.GetKey().GetNumeric()
-						if keyNumeric == destSelectorKey || keyNumeric == destSelectorNumericKey {
-							e.Value = ledger.MapToValue(inboundFallback)
-							updated = true
-
-							break
-						}
-					}
-					if !updated {
-						entries = append(entries, &ledgerv2.GenMap_Entry{
-							Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: destSelectorNumericKey}},
-							Value: ledger.MapToValue(inboundFallback),
-						})
-					}
-					newFields = append(newFields, &ledgerv2.RecordField{
-						Label: "inboundRateLimiters",
-						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
-					})
-				default:
-					newFields = append(newFields, f)
-				}
-			}
-			if !replaceOutbound || !replaceInbound {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token pool create arguments missing rate limiter fields")
-			}
-
-			_, err = participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-				Commands: &ledgerv2.Commands{
-					CommandId: uuid.New().String(),
-					Commands: []*ledgerv2.Command{{
-						Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-							TemplateId: created.GetTemplateId(),
-							CreateArguments: &ledgerv2.Record{
-								Fields: newFields,
-							},
-						}},
-					}},
-					ActAs: []string{string(parsedTokenPool.PoolOwner)},
-				},
-			})
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("patch token pool rate limiters for destination selector %d: %w", dest, err)
-			}
-			tokenPoolCID, tokenPoolDisclosure, err = resolveDisclosedByAddress(
-				lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-				tokenPoolAddress,
-			)
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve patched token pool disclosed contract after rate limiter patch: %w", err)
-			}
-			activeTokenPool, err = findLatestActiveByAddress(
-				lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(),
-				tokenPoolAddress,
-			)
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve patched active token pool by configured address after rate limiter patch: %w", err)
-			}
-			parsedTokenPool, err = bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activeTokenPool.GetCreatedEvent())
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("parse patched token pool after rate limiter patch: %w", err)
-			}
 		}
-	tokenPoolConfigReady:
+		if !hasDestCfg {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing lock/release pool remote chain config for selector %s", destSelectorKey)
+		}
+		destCfg, cfgOK := remoteChainConfigFromAny(destCfgAny)
+		if !cfgOK {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("invalid lock/release pool remote chain config for selector %s", destSelectorKey)
+		}
+		if len(destCfg.RemotePools) == 0 || strings.TrimSpace(string(destCfg.RemoteTokenAddress)) == "" {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("incomplete lock/release pool remote chain config for selector %s", destSelectorKey)
+		}
+		if strings.TrimSpace(string(destCfg.OutboundRateLimiter.Unpack)) == "" || strings.TrimSpace(string(destCfg.InboundRateLimiter.Unpack)) == "" {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("missing rate limiter config in lock/release pool for selector %s", destSelectorKey)
+		}
 		if fields.TokenAmount.Amount.Sign() == 0 {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("token amount must be greater than zero for token transfer")
 		}
@@ -2732,189 +2114,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			resolveDisclosedByAddress,
 		)
 		if err != nil {
-			findActiveRateLimiterRaw := func(direction common.RateLimitDirection) (any, error) {
-				ledgerEnd, leErr := participant.LedgerServices.State.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
-				if leErr != nil {
-					return nil, fmt.Errorf("get ledger end for rate limiter fallback: %w", leErr)
-				}
-				stream, streamErr := participant.LedgerServices.State.GetActiveContracts(ctx, &ledgerv2.GetActiveContractsRequest{
-					ActiveAtOffset: ledgerEnd.GetOffset(),
-					EventFormat: &ledgerv2.EventFormat{
-						FiltersByParty: map[string]*ledgerv2.Filters{
-							participant.PartyID: {
-								Cumulative: []*ledgerv2.CumulativeFilter{
-									{
-										IdentifierFilter: &ledgerv2.CumulativeFilter_TemplateFilter{
-											TemplateFilter: &ledgerv2.TemplateFilter{
-												TemplateId: &ledgerv2.Identifier{
-													PackageId:  "#ccip-common",
-													ModuleName: "CCIP.RateLimiter",
-													EntityName: "RateLimiter",
-												},
-												IncludeCreatedEventBlob: true,
-											},
-										},
-									},
-								},
-							},
-						},
-						Verbose: true,
-					},
-				})
-				if streamErr != nil {
-					return nil, fmt.Errorf("query active rate limiters for fallback: %w", streamErr)
-				}
-				defer stream.CloseSend()
-				selectorNorm := normalizeNumericForCompare(tokenDestSelectorKey)
-				var fallback any
-				for {
-					resp, recvErr := stream.Recv()
-					if errors.Is(recvErr, io.EOF) {
-						break
-					}
-					if recvErr != nil {
-						return nil, fmt.Errorf("receive active rate limiters for fallback: %w", recvErr)
-					}
-					entry, ok := resp.GetContractEntry().(*ledgerv2.GetActiveContractsResponse_ActiveContract)
-					if !ok || entry.ActiveContract == nil || entry.ActiveContract.GetCreatedEvent() == nil {
-						continue
-					}
-					parsedRateLimiter, parseErr := bindings.UnmarshalCreatedEvent[common.RateLimiter](entry.ActiveContract.GetCreatedEvent())
-					if parseErr != nil {
-						continue
-					}
-					if parsedRateLimiter.Direction != direction {
-						continue
-					}
-					if string(parsedRateLimiter.PoolOwner) != string(parsedTokenPool.PoolOwner) || string(parsedRateLimiter.PoolInstanceId) != string(parsedTokenPool.InstanceId) {
-						continue
-					}
-					raw := common.RawInstanceAddress{
-						Unpack: types.TEXT(fmt.Sprintf("%s@%s", parsedRateLimiter.InstanceId, parsedRateLimiter.PoolOwner)),
-					}
-					if normalizeNumericForCompare(string(parsedRateLimiter.RemoteChainSelector)) == selectorNorm {
-						return raw, nil
-					}
-					if fallback == nil {
-						fallback = raw
-					}
-				}
-				if fallback != nil {
-					return fallback, nil
-				}
-
-				return nil, fmt.Errorf("no active rate limiter found for direction %s", direction)
-			}
-
-			outboundFallback, outErr := findActiveRateLimiterRaw(common.RateLimitDirectionRateLimitDirection_Outbound)
-			if outErr != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve outbound rate limiter for token transfer: %w", err)
-			}
-			inboundFallback, inErr := findActiveRateLimiterRaw(common.RateLimitDirectionRateLimitDirection_Inbound)
-			if inErr != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve outbound rate limiter for token transfer: %w", err)
-			}
-			created := activeTokenPool.GetCreatedEvent()
-			if created == nil || created.GetCreateArguments() == nil || created.GetTemplateId() == nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve outbound rate limiter for token transfer: %w", err)
-			}
-			replaceOutbound := false
-			replaceInbound := false
-			newFields := make([]*ledgerv2.RecordField, 0, len(created.GetCreateArguments().GetFields()))
-			for _, f := range created.GetCreateArguments().GetFields() {
-				switch f.GetLabel() {
-				case "outboundRateLimiters":
-					replaceOutbound = true
-					var entries []*ledgerv2.GenMap_Entry
-					if gm := f.GetValue().GetGenMap(); gm != nil {
-						entries = append(entries, gm.GetEntries()...)
-					}
-					updated := false
-					for _, e := range entries {
-						keyNumeric := e.GetKey().GetNumeric()
-						if normalizeNumericForCompare(keyNumeric) == normalizeNumericForCompare(tokenDestSelectorKey) {
-							e.Value = ledger.MapToValue(outboundFallback)
-							updated = true
-
-							break
-						}
-					}
-					if !updated {
-						entries = append(entries, &ledgerv2.GenMap_Entry{
-							Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: tokenDestSelectorNumericKey}},
-							Value: ledger.MapToValue(outboundFallback),
-						})
-					}
-					newFields = append(newFields, &ledgerv2.RecordField{
-						Label: "outboundRateLimiters",
-						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
-					})
-				case "inboundRateLimiters":
-					replaceInbound = true
-					var entries []*ledgerv2.GenMap_Entry
-					if gm := f.GetValue().GetGenMap(); gm != nil {
-						entries = append(entries, gm.GetEntries()...)
-					}
-					updated := false
-					for _, e := range entries {
-						keyNumeric := e.GetKey().GetNumeric()
-						if normalizeNumericForCompare(keyNumeric) == normalizeNumericForCompare(tokenDestSelectorKey) {
-							e.Value = ledger.MapToValue(inboundFallback)
-							updated = true
-
-							break
-						}
-					}
-					if !updated {
-						entries = append(entries, &ledgerv2.GenMap_Entry{
-							Key:   &ledgerv2.Value{Sum: &ledgerv2.Value_Numeric{Numeric: tokenDestSelectorNumericKey}},
-							Value: ledger.MapToValue(inboundFallback),
-						})
-					}
-					newFields = append(newFields, &ledgerv2.RecordField{
-						Label: "inboundRateLimiters",
-						Value: &ledgerv2.Value{Sum: &ledgerv2.Value_GenMap{GenMap: &ledgerv2.GenMap{Entries: entries}}},
-					})
-				default:
-					newFields = append(newFields, f)
-				}
-			}
-			if replaceOutbound && replaceInbound {
-				_, createErr := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &ledgerv2.SubmitAndWaitForTransactionRequest{
-					Commands: &ledgerv2.Commands{
-						CommandId: uuid.New().String(),
-						Commands: []*ledgerv2.Command{{
-							Command: &ledgerv2.Command_Create{Create: &ledgerv2.CreateCommand{
-								TemplateId: created.GetTemplateId(),
-								CreateArguments: &ledgerv2.Record{
-									Fields: newFields,
-								},
-							}},
-						}},
-						ActAs: []string{string(parsedTokenPool.PoolOwner)},
-					},
-				})
-				if createErr == nil {
-					tokenPoolCID, tokenPoolDisclosure, _ = resolveDisclosedByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), tokenPoolAddress)
-					activeTokenPool, _ = findLatestActiveByAddress(lockreleasetokenpool.LockReleaseTokenPool{}.GetTemplateID(), tokenPoolAddress)
-					if activeTokenPool != nil && activeTokenPool.GetCreatedEvent() != nil {
-						if reparsed, reparseErr := bindings.UnmarshalCreatedEvent[lockreleasetokenpool.LockReleaseTokenPool](activeTokenPool.GetCreatedEvent()); reparseErr == nil {
-							parsedTokenPool = reparsed
-							rateLimiterCID, rateLimiterDisclosure, err = resolveRateLimiterForSend(
-								ctx,
-								participant,
-								parsedTokenPool,
-								tokenDestSelectorKey,
-								tokenDestSelectorNumericKey,
-								resolveDisclosedByAddress,
-							)
-						}
-					}
-				}
-			}
-			if err != nil {
-				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve outbound rate limiter for token transfer: %w", err)
-			}
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve outbound rate limiter for token transfer: %w", err)
 		}
 		disclosedRateLimiter = rateLimiterDisclosure
 
