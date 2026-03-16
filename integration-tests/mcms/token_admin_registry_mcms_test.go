@@ -577,6 +577,7 @@ func queryTokenConfigFromContract(
 func encodeInstrumentId(instrumentId splice.InstrumentId) string {
 	combined := string(instrumentId.Id) + "@" + string(instrumentId.Admin)
 	hash := crypto.Keccak256([]byte(combined))
+
 	return hex.EncodeToString(hash)
 }
 
