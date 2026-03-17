@@ -448,10 +448,15 @@ template LockReleaseTokenPool
                     assertMsg "ApplyChainUpdates: inbound and outbound CCV lists cannot contain duplicates" (length inboundCCVs == length (dedup inboundCCVs) && length outboundCCVs == length (dedup outboundCCVs))
                 -- Add new chain configs
                 let remoteChainConfigsAdded = foldl
-                        (\configs ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, inboundRateLimiter, outboundRateLimiter} ->
-                            Map.insert remoteChainSelector RemoteChainConfig{remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, inboundRateLimiter, outboundRateLimiter} configs)
-                        remoteChainConfigsRemoved
-                        chainsToAdd
+                        (\configs args ->
+                            Map.insert args.remoteChainSelector RemoteChainConfig with
+                                    remotePools = args.remotePools
+                                    remoteTokenAddress = args.remoteTokenAddress
+                                    inboundCCVs = args.inboundCCVs
+                                    outboundCCVs = args.outboundCCVs
+                                    inboundRateLimiter = args.inboundRateLimiter
+                                    outboundRateLimiter = args.outboundRateLimiter
+                                configs) remoteChainConfigsRemoved chainsToAdd
                 create this with
                     remoteChainConfigs = remoteChainConfigsAdded
 
