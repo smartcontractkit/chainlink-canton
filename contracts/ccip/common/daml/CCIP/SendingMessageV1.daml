@@ -78,8 +78,8 @@ data SendingMessageDeps = SendingMessageDeps
     deriving (Eq, Show)
 
 data SendingMessageState
-    = SendingMessageState_Prepared
-    | SendingMessageState_PoolVerified
+    = SendingMessageState_RequirePoolCCVs
+    | SendingMessageState_Prepared
     | SendingMessageState_TokenLocked
     | SendingMessageState_ExecutorFinalized
     | SendingMessageState_FeeFinalized
@@ -102,6 +102,18 @@ sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
             None -> 0
     in
         ccvGasLimit + poolGasLimit + executorDestGasLimit
+
+assertCCVInstanceId
+    : Text
+    -> [CCIP.RawInstanceAddress.RawInstanceAddress]
+    -> Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
+    -> Text
+    -> Party
+    -> Update ()
+assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
+    let claimed = CCIP.RawInstanceAddress.make ccvInstanceId caller
+        allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
+    in assertMsg msg (claimed `elem` allowedCCVs)
 
 template SendingMessageV1
     with
@@ -170,8 +182,12 @@ template SendingMessageV1
         encodedMessage : BytesHex
         messageId : BytesHex
         -- State machine:
-        --   message-only: Prepared -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
-        --   token-send: Prepared -> PoolVerified -> TokenLocked -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
+        --   message-only: PrepareSend -> Prepared -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
+        --   token-send: PrepareSend -> RequirePoolCCVs -> Prepared -> TokenLocked
+        --               -> ExecutorFinalized -> FeeFinalized -(FinalizeSend)-> consumed
+        -- `Prepared` means the full allowed CCV set is known. For token sends,
+        -- TAR-mediated SetOutboundPoolCCVs is the only transition that can move
+        -- the message into Prepared.
         state : SendingMessageState
     where
         signatory dedup (ccipOwner :: ccvOwners)
@@ -188,6 +204,12 @@ template SendingMessageV1
             do
                 assertMsg "sendingMessage: AddCCVFee only allowed in Prepared"
                     (state == SendingMessageState_Prepared)
+                assertCCVInstanceId
+                    "sendingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    outboundPoolCCVs
+                    ccvInstanceId
+                    caller
                 assertMsg "sendingMessage: duplicate CCV fee"
                     (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
                 let fee = CCVFee with
@@ -204,11 +226,12 @@ template SendingMessageV1
                 feeUSDCents : Numeric 0
                 destGasOverhead : Int
                 destBytesOverhead : Int
-                caller : Party
-            controller caller
+            controller ccipOwner
             do
-                assertMsg "sendingMessage: AddTokenSendFee only allowed in Prepared"
+                assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved"
                     (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: AddTokenSendFee only valid for token sends"
+                    (expectedTokenInstrumentId /= None)
                 assertMsg "token send fee already set"
                     (isNone tokenSendFee)
                 let fee = TokenSendFee with
@@ -222,14 +245,14 @@ template SendingMessageV1
                 poolCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
-                assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed in Prepared"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: outbound pool verification only valid for token sends"
+                assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required"
+                    (state == SendingMessageState_RequirePoolCCVs)
+                assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends"
                     (expectedTokenInstrumentId /= None)
                 assertMsg "setOutboundPoolCCVs: already set" (outboundPoolCCVs == None)
                 create this with
                     outboundPoolCCVs = Some poolCCVs
-                    state = SendingMessageState_PoolVerified
+                    state = SendingMessageState_Prepared
 
         -- Executor fee, final CCV/executor hash computation, and message finalization.
         -- Merges outbound pool CCVs into requiredCCVs, derives executor address from
@@ -250,7 +273,7 @@ template SendingMessageV1
                         then state == SendingMessageState_TokenLocked
                         else state == SendingMessageState_Prepared)
                 assertMsg "addExecutorWithFee: already set" (executorFee == None)
-                assertMsg "sendingMessage: token sends require outbound pool verification"
+                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved"
                     (if isTokenSend then outboundPoolCCVs /= None else True)
 
                 let poolCCVs = fromOptional [] outboundPoolCCVs
@@ -322,6 +345,12 @@ template SendingMessageV1
             do
                 assertMsg "sendingMessage: AddVerifierData only allowed after fee finalization"
                     (state == SendingMessageState_FeeFinalized)
+                assertCCVInstanceId
+                    "sendingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    outboundPoolCCVs
+                    ccvInstanceId
+                    caller
                 assertMsg "version tag must be 4 bytes"
                     (byteCount versionTag == 4)
                 assertMsg "sendingMessage: duplicate verifier data for CCV"
@@ -345,11 +374,10 @@ template SendingMessageV1
                 amount : Numeric 0
                 destTokenAddress : BytesHex
                 extraData : BytesHex
-                caller : Party
-            controller caller
+            controller ccipOwner
             do
-                assertMsg "sendingMessage: AddTokenSend only allowed after pool verification"
-                    (state == SendingMessageState_PoolVerified)
+                assertMsg "sendingMessage: AddTokenSend only allowed after pool CCVs are resolved"
+                    (state == SendingMessageState_Prepared)
                 assertMsg "sendingMessage: token send requires expected instrument"
                     (expectedTokenInstrumentId /= None)
                 assertMsg "token send already set" (isNone tokenSendData)

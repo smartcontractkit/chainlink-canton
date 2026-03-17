@@ -204,6 +204,7 @@ template LockReleaseTokenPool
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_LockOrBurn
                     with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
@@ -215,6 +216,7 @@ template LockReleaseTokenPool
             tokenPool_calculateFeeImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_CalculateFee
                     with
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         sendingMessageCid = arg.sendingMessageCid
                         feeQuoterCid = arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
@@ -515,6 +517,7 @@ template LockReleaseTokenPool
         nonconsuming choice LockReleaseTokenPool_CalculateFee
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -522,6 +525,13 @@ template LockReleaseTokenPool
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: sending message tokenAdminRegistry mismatch"
+                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                assertMsg "pool: tokenInstrumentId mismatch"
+                    (tokenInstrumentId == instrumentId)
                 feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
@@ -542,13 +552,13 @@ template LockReleaseTokenPool
                             token = tokenInstrumentId
                             caller = poolOwner
 
-                exercise sendingMessageCid
-                    CCIP.SendingMessageV1.AddTokenSendFee with
+                exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSendFee with
+                        sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
-                        poolOwner = poolOwner
-                        feeUSDCents
-                        destGasOverhead
-                        destBytesOverhead
+                        feeUSDCents = feeUSDCents
+                        destGasOverhead = destGasOverhead
+                        destBytesOverhead = destBytesOverhead
                         caller = poolOwner
 
         -- Lock tokens for outbound transfer and append token send data.
@@ -556,6 +566,7 @@ template LockReleaseTokenPool
         -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
         nonconsuming choice LockReleaseTokenPool_LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
                 extraContext : CCIP.Context.CCIPContext
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -566,6 +577,11 @@ template LockReleaseTokenPool
             controller caller, poolOwner
             do
                 sendingMsg <- fetch sendingMessageCid
+                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                CCIP.RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
+                    (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
@@ -628,10 +644,10 @@ template LockReleaseTokenPool
                         extraArgs = mergedExtraArgs
 
                 let extraData = fromOptional "" destPoolData
-                newSendingMessageCid <- exercise sendingMessageCid
-                    CCIP.SendingMessageV1.AddTokenSend with
+                newSendingMessageCid <- exercise tokenAdminRegistryCid
+                    CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSend with
+                        sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
-                        poolOwner = poolOwner
                         instrumentId = instrumentId
                         amount = amount
                         destTokenAddress = destTokenAddr

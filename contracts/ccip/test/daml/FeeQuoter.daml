@@ -225,6 +225,7 @@ setup = script do
 testFinalizeFeeUsesEVMScaledPrices = script do
     owner <- allocateParty "owner-finalize-fee"
     sender <- allocateParty "sender-finalize-fee"
+    ccvOwner <- allocateParty "ccv-owner-finalize-fee"
     executor <- allocateParty "executor-finalize-fee"
 
     let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
@@ -257,7 +258,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
             sender = sender
             destChainSelector = 456.0
             sequenceNumber = 1.0
-            requiredCCVs = []
+            requiredCCVs = [RawInstanceAddress.make "ccv-premium" ccvOwner]
             executorAddress = RawInstanceAddress.make "executor-finalize-fee" executor
             sourceChainSelector = 123.0
             senderAddress = "01"
@@ -304,6 +305,83 @@ testFinalizeFeeUsesEVMScaledPrices = script do
 
 -- H-1: Non-unity premium (90% = LINK discount) applies only to premium fees.
 -- Executor fee is converted at par (no premium).
+testAddCCVFeeRejectsWrongRawInstanceAddress : Script ()
+testAddCCVFeeRejectsWrongRawInstanceAddress = script do
+    owner <- allocateParty "owner-raw-ccv"
+    sender <- allocateParty "sender-raw-ccv"
+    ccvOwner <- allocateParty "ccv-owner-raw-ccv"
+
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+
+    sendingMessageCid <- submit owner do
+        createCmd SendingMessageV1.SendingMessageV1 with
+            deps = SendingMessageV1.SendingMessageDeps with
+                router = RawInstanceAddress.make "router-raw-ccv" sender
+                onRamp = RawInstanceAddress.make "onramp-raw-ccv" owner
+                globalConfig = RawInstanceAddress.make "globalconfig-raw-ccv" owner
+                rmnRemote = RawInstanceAddress.make "rmn-raw-ccv" owner
+                tokenAdminRegistry = RawInstanceAddress.make "tar-raw-ccv" owner
+                feeQuoter = RawInstanceAddress.make "feequoter-raw-ccv" owner
+            ccipOwner = owner
+            sender = sender
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            requiredCCVs = [RawInstanceAddress.make "ccv-allowed" ccvOwner]
+            executorAddress = RawInstanceAddress.make "executor-raw-ccv" owner
+            sourceChainSelector = 123.0
+            senderAddress = "01"
+            receiver = "02"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = "03"
+            offRampAddress = "04"
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = cents 0.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorFeeTokenAmount = 0.0
+            observingParties = [sender]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = SendingMessageV1.SendingMessageState_Prepared
+
+    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
+    submitMustFail (actAs ccvOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-wrong"
+            feeUSDCents = cents 1.0
+            destGasLimit = 10000
+            destBytesOverhead = 0
+            caller = ccvOwner
+
+    sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+            ccvInstanceId = "ccv-allowed"
+            feeUSDCents = cents 1.0
+            destGasLimit = 10000
+            destBytesOverhead = 0
+            caller = ccvOwner
+
+    assertMsg "allowed raw instance should be accepted" True
+    debug "testAddCCVFeeRejectsWrongRawInstanceAddress: PASSED"
+
 testFinalizeFee_PremiumAndExecutor = script do
     owner <- allocateParty "owner-premium"
     sender <- allocateParty "sender-premium"
@@ -344,7 +422,7 @@ testFinalizeFee_PremiumAndExecutor = script do
             sender = sender
             destChainSelector = 456.0
             sequenceNumber = 1.0
-            requiredCCVs = []
+            requiredCCVs = [RawInstanceAddress.make "ccv-premium" ccvOwner]
             executorAddress = RawInstanceAddress.make "executor-premium" executorOwner
             sourceChainSelector = 123.0
             senderAddress = senderAddr
@@ -795,7 +873,7 @@ testFinalizeFee_LinkCapMixedFees = script do
             sender = sender
             destChainSelector = 456.0
             sequenceNumber = 1.0
-            requiredCCVs = []
+            requiredCCVs = [RawInstanceAddress.make "ccv-link-mixed-cap" ccvOwner]
             executorAddress = RawInstanceAddress.make "executor-link-mixed-cap" executorOwner
             sourceChainSelector = 123.0
             senderAddress = "01"
@@ -810,8 +888,8 @@ testFinalizeFee_LinkCapMixedFees = script do
             tokenArgs = ""
             feeToken = linkToken
             networkFeeUSDCents = cents 100.0
-            expectedTokenInstrumentId = None
-            outboundPoolCCVs = None
+            expectedTokenInstrumentId = Some linkToken
+            outboundPoolCCVs = Some []
             executorArgs = ""
             executorFee = None
             executorFeeTokenAmount = 0.0
@@ -838,15 +916,22 @@ testFinalizeFee_LinkCapMixedFees = script do
             destBytesOverhead = 0
             caller = ccvOwner
 
-    disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
-    sendingMessageCid <- submit (actAs poolOwner <> disclose disclosedSm) do
+    sendingMessageCid <- submit owner do
         exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
             poolInstanceId = "pool-link-mixed-cap"
             poolOwner = poolOwner
             feeUSDCents = cents 100.0
             destGasOverhead = 50000
             destBytesOverhead = 0
-            caller = poolOwner
+
+    sendingMessageCid <- submit owner do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSend with
+            poolInstanceId = "pool-link-mixed-cap"
+            poolOwner = poolOwner
+            instrumentId = linkToken
+            amount = 1.0
+            destTokenAddress = "05"
+            extraData = ""
 
     disclosedSm <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm) do

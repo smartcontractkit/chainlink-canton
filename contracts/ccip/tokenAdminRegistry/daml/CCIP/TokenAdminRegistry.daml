@@ -240,6 +240,90 @@ template TokenAdminRegistry
                 exercise sendingMessageCid CCIP.SendingMessageV1.SetOutboundPoolCCVs with
                     poolCCVs
 
+        -- | Record pool's outbound token-send fee on a SendingMessageV1.
+        -- Validates the caller is the registered pool for the expected token instrument,
+        -- then exercises AddTokenSendFee under TAR/ccipOwner authority.
+        nonconsuming choice TokenAdminRegistry_AddTokenSendFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                poolInstanceId : Text
+                feeUSDCents : Numeric 0
+                destGasOverhead : Int
+                destBytesOverhead : Int
+                caller : Party
+            controller caller
+            do
+                sm <- fetch sendingMessageCid
+                assertMsg "TAR outbound fee: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
+                CCIP.RawInstanceAddress.assertEqual "TAR outbound fee: instance address mismatch"
+                    instanceId owner sm.deps.tokenAdminRegistry
+
+                instrumentId <- case sm.expectedTokenInstrumentId of
+                    None -> abort "TAR outbound fee: missing expected token instrument"
+                    Some iid -> pure iid
+
+                config <- case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
+                    None -> abort "TAR outbound fee: no config for instrument"
+                    Some c -> pure c
+
+                pool <- case config.tokenPool of
+                    None -> abort "TAR outbound fee: no pool registered for instrument"
+                    Some p -> pure p
+
+                assertMsg "TAR outbound fee: caller is not registered pool"
+                    (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddTokenSendFee with
+                    poolInstanceId = poolInstanceId
+                    poolOwner = caller
+                    feeUSDCents = feeUSDCents
+                    destGasOverhead = destGasOverhead
+                    destBytesOverhead = destBytesOverhead
+
+        -- | Record pool's outbound token send data on a SendingMessageV1.
+        -- Validates the caller is the registered pool for the expected token instrument,
+        -- then exercises AddTokenSend under TAR/ccipOwner authority.
+        nonconsuming choice TokenAdminRegistry_AddTokenSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                poolInstanceId : Text
+                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                amount : Numeric 0
+                destTokenAddress : BytesHex
+                extraData : BytesHex
+                caller : Party
+            controller caller
+            do
+                sm <- fetch sendingMessageCid
+                assertMsg "TAR outbound send: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
+                CCIP.RawInstanceAddress.assertEqual "TAR outbound send: instance address mismatch"
+                    instanceId owner sm.deps.tokenAdminRegistry
+
+                expectedInstrumentId <- case sm.expectedTokenInstrumentId of
+                    None -> abort "TAR outbound send: missing expected token instrument"
+                    Some iid -> pure iid
+                assertMsg "TAR outbound send: instrumentId mismatch"
+                    (instrumentId == expectedInstrumentId)
+
+                config <- case Map.lookup (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) tokenConfigs of
+                    None -> abort "TAR outbound send: no config for instrument"
+                    Some c -> pure c
+
+                pool <- case config.tokenPool of
+                    None -> abort "TAR outbound send: no pool registered for instrument"
+                    Some p -> pure p
+
+                assertMsg "TAR outbound send: caller is not registered pool"
+                    (caller == pool.poolOwner && poolInstanceId == pool.poolInstanceId)
+
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddTokenSend with
+                    poolInstanceId = poolInstanceId
+                    poolOwner = caller
+                    instrumentId = instrumentId
+                    amount = amount
+                    destTokenAddress = destTokenAddress
+                    extraData = extraData
+
         -- | Record pool's inbound CCV requirements on an ExecutingMessageV1.
         -- Validates the caller is the registered pool for the token in the message,
         -- then exercises SetInboundPoolCCVs (authorized via TAR's signatory = ccipOwner).
