@@ -502,6 +502,8 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NotEmpty(t, routerCid)
 	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
 
+	localOffRampAddress := contracts.HexToInstanceAddress(offRamp.Address).Bytes()
+
 	// Build message (no token transfer, just payload data)
 	testPayload := []byte("Hello CCIP - this is a test message payload!")
 	msg := &MessageV1{
@@ -513,7 +515,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
 		OnRampAddress:       hexToBytes("000000000000000000000000f6eced5e96fff2de4f0ecd722beb57556fc443fd"), // left-padded to 32 bytes
-		OffRampAddress:      hexToBytes("0000000000000000000000000000000000000002"),
+		OffRampAddress:      localOffRampAddress,
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),
 		DestBlob:            []byte{},

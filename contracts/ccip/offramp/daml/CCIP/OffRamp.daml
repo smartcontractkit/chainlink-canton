@@ -224,6 +224,12 @@ template OffRamp
                 globalConfig <- fetch globalConfigCid
                 CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner execMsg.deps.globalConfig
+                assertMsg "offramp: invalid destination chain selector"
+                    (message.destChainSelector == globalConfig.chainSelector)
+                let expectedOffRampAddress =
+                        CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
+                assertMsg "offramp: invalid offRampAddress for this lane"
+                    (message.offRampAddress == expectedOffRampAddress)
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "offramp: tokenadminregistry instance address mismatch"

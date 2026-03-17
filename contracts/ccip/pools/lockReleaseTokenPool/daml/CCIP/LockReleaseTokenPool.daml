@@ -342,6 +342,8 @@ template LockReleaseTokenPool
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
+                assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
+                    (ticket.instrumentId == instrumentId)
 
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = poolOwner
