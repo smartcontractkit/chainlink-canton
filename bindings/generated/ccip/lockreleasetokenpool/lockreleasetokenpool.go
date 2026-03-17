@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "097d39090baaa5b3b59618b5b9621b3ba9e57d9067ca2f277c4c2d6156738838"
+	PackageID   = "10c75b247a0b2893b503c67533416163a05522b971b9a16fa3283ae1c2953d67"
 	SDKVersion  = "3.4.10"
 )
 
@@ -113,15 +113,15 @@ func (t *ApplyChainUpdates) UnmarshalHex(data string) error {
 
 // ChainUpdate is a Record type
 type ChainUpdate struct {
-	RemoteChainSelector      types.NUMERIC               `json:"remoteChainSelector"`
-	RemotePools              []types.TEXT                `json:"remotePools"`
-	RemoteTokenAddress       types.TEXT                  `json:"remoteTokenAddress"`
-	InboundCCVs              []common.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs             []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockDepth            types.INT64                 `json:"minBlockDepth"`
-	InboundRateLimiter       common.RawInstanceAddress   `json:"inboundRateLimiter"`
-	InboundCustomRateLimiter common.RawInstanceAddress   `json:"inboundCustomRateLimiter"`
-	OutboundRateLimiter      common.RawInstanceAddress   `json:"outboundRateLimiter"`
+	RemoteChainSelector                        types.NUMERIC               `json:"remoteChainSelector"`
+	RemotePools                                []types.TEXT                `json:"remotePools"`
+	RemoteTokenAddress                         types.TEXT                  `json:"remoteTokenAddress"`
+	InboundCCVs                                []common.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs                               []common.RawInstanceAddress `json:"outboundCCVs"`
+	MinBlockDepth                              types.INT64                 `json:"minBlockDepth"`
+	InboundRateLimiter                         common.RawInstanceAddress   `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        common.RawInstanceAddress   `json:"outboundRateLimiter"`
 }
 
 // ToMap converts ChainUpdate to a map for DAML arguments
@@ -176,12 +176,12 @@ func (t ChainUpdate) ToMap() map[string]any {
 		return t.InboundRateLimiter
 	}()
 
-	m["inboundCustomRateLimiter"] = func() any {
+	m["inboundCustomBlockConfirmationsRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InboundCustomRateLimiter).(mapper); ok {
+		if m, ok := any(t.InboundCustomBlockConfirmationsRateLimiter).(mapper); ok {
 			return m.toMap()
 		}
-		return t.InboundCustomRateLimiter
+		return t.InboundCustomBlockConfirmationsRateLimiter
 	}()
 
 	m["outboundRateLimiter"] = func() any {
@@ -1359,10 +1359,10 @@ func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data str
 
 // RateLimiterConfigArgs is a Record type
 type RateLimiterConfigArgs struct {
-	RemoteChainSelector      types.NUMERIC             `json:"remoteChainSelector"`
-	InboundRateLimiter       common.RawInstanceAddress `json:"inboundRateLimiter"`
-	InboundCustomRateLimiter common.RawInstanceAddress `json:"inboundCustomRateLimiter"`
-	OutboundRateLimiter      common.RawInstanceAddress `json:"outboundRateLimiter"`
+	RemoteChainSelector                        types.NUMERIC             `json:"remoteChainSelector"`
+	InboundRateLimiter                         common.RawInstanceAddress `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        common.RawInstanceAddress `json:"outboundRateLimiter"`
 }
 
 // ToMap converts RateLimiterConfigArgs to a map for DAML arguments
@@ -1379,12 +1379,12 @@ func (t RateLimiterConfigArgs) ToMap() map[string]any {
 		return t.InboundRateLimiter
 	}()
 
-	m["inboundCustomRateLimiter"] = func() any {
+	m["inboundCustomBlockConfirmationsRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InboundCustomRateLimiter).(mapper); ok {
+		if m, ok := any(t.InboundCustomBlockConfirmationsRateLimiter).(mapper); ok {
 			return m.toMap()
 		}
-		return t.InboundCustomRateLimiter
+		return t.InboundCustomBlockConfirmationsRateLimiter
 	}()
 
 	m["outboundRateLimiter"] = func() any {
@@ -1422,14 +1422,14 @@ func (t *RateLimiterConfigArgs) UnmarshalHex(data string) error {
 
 // RemoteChainConfig is a Record type
 type RemoteChainConfig struct {
-	RemotePools              []types.TEXT                `json:"remotePools"`
-	RemoteTokenAddress       types.TEXT                  `json:"remoteTokenAddress"`
-	InboundCCVs              []common.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs             []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockDepth            types.INT64                 `json:"minBlockDepth"`
-	InboundRateLimiter       common.RawInstanceAddress   `json:"inboundRateLimiter"`
-	InboundCustomRateLimiter common.RawInstanceAddress   `json:"inboundCustomRateLimiter"`
-	OutboundRateLimiter      common.RawInstanceAddress   `json:"outboundRateLimiter"`
+	RemotePools                                []types.TEXT                `json:"remotePools"`
+	RemoteTokenAddress                         types.TEXT                  `json:"remoteTokenAddress"`
+	InboundCCVs                                []common.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs                               []common.RawInstanceAddress `json:"outboundCCVs"`
+	MinBlockDepth                              types.INT64                 `json:"minBlockDepth"`
+	InboundRateLimiter                         common.RawInstanceAddress   `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        common.RawInstanceAddress   `json:"outboundRateLimiter"`
 }
 
 // ToMap converts RemoteChainConfig to a map for DAML arguments
@@ -1482,12 +1482,12 @@ func (t RemoteChainConfig) ToMap() map[string]any {
 		return t.InboundRateLimiter
 	}()
 
-	m["inboundCustomRateLimiter"] = func() any {
+	m["inboundCustomBlockConfirmationsRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.InboundCustomRateLimiter).(mapper); ok {
+		if m, ok := any(t.InboundCustomBlockConfirmationsRateLimiter).(mapper); ok {
 			return m.toMap()
 		}
-		return t.InboundCustomRateLimiter
+		return t.InboundCustomBlockConfirmationsRateLimiter
 	}()
 
 	m["outboundRateLimiter"] = func() any {

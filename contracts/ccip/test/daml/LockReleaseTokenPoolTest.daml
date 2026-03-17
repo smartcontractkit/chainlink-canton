@@ -42,10 +42,10 @@ mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
 mkInboundRateLimiterContext : ContractId RateLimiter.RateLimiter -> ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
-mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomRateLimiterCid = CCIP.Context.CCIPContext with
+mkInboundRateLimiterContext inboundRateLimiterCid inboundCustomBlockConfirmationsRateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
         [ (RateLimiter.inboundRateLimiterKey, CCIP.Context.toAnyValue inboundRateLimiterCid)
-        , (RateLimiter.inboundCustomRateLimiterKey, CCIP.Context.toAnyValue inboundCustomRateLimiterCid)
+        , (RateLimiter.inboundCustomBlockConfirmationsRateLimiterKey, CCIP.Context.toAnyValue inboundCustomBlockConfirmationsRateLimiterCid)
         ]
 
 mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPContext
@@ -182,7 +182,7 @@ testLockOrBurn = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = outboundRateLimiterAddr
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -386,7 +386,7 @@ testReleaseFromTicket = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = inboundRateLimiterAddr
-            inboundCustomRateLimiter = inboundRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -551,7 +551,7 @@ testReleaseFromTicketDecimalConversion = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = inboundRateLimiterAddr
-            inboundCustomRateLimiter = inboundRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -928,7 +928,7 @@ testVerifyInboundMessage = script do
             outboundCCVs = []
             minBlockDepth = 2000
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -1063,7 +1063,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -1188,7 +1188,7 @@ testVerifyInboundMessageMissingChainConfig = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -1312,7 +1312,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -1444,7 +1444,7 @@ testCalculateFeePrefersPoolOverride = script do
             outboundCCVs = []
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-            inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
             outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -1579,7 +1579,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@owner" -- placeholder
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner" -- placeholder
     tokenPool <- submit poolOwner do
         createCmd LockReleaseTokenPool.LockReleaseTokenPool with
@@ -1804,7 +1804,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
             ,LockReleaseTokenPool.ChainUpdate with
                 remoteChainSelector = 456.0
@@ -1814,7 +1814,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
             ]
     tokenPoolCid <- submit owner do
@@ -1844,7 +1844,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                 outboundCCVs = [RawInstanceAddress.RawInstanceAddress "outbound-ccv-1@owner"]
                 minBlockDepth = 12
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner"
             ,LockReleaseTokenPool.ChainUpdate with
                 remoteChainSelector = 789.0
@@ -1854,7 +1854,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
             ]
     tokenPoolCid <- submit owner do
@@ -1917,7 +1917,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to add a chain with an invalid chain selector (negative)
@@ -1933,7 +1933,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to add an invalid chain config (empty remote token address)
@@ -1949,7 +1949,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to add an invalid chain config (duplicate CCVs in inboundCCVs)
@@ -1965,7 +1965,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to add an invalid chain config (duplicate CCVs in outboundCCVs)
@@ -1981,7 +1981,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = [RawInstanceAddress.RawInstanceAddress "outbound-ccv-1@owner", RawInstanceAddress.RawInstanceAddress "outbound-ccv-1@owner"] -- duplicate
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
 
@@ -1998,7 +1998,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to add an invalid chain config (empty outbound rate limiter address)
@@ -2014,7 +2014,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
                 ]
     -- Attempt to add an invalid chain config (duplicate remote pool addresses)
@@ -2030,7 +2030,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to add an invalid chain config (identical rate limiter for inbound and outbound)
@@ -2046,7 +2046,7 @@ testLockReleaseTokenPool_ApplyChainUpdates = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
                 ]
 
@@ -2076,7 +2076,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner")
                 ,(456.0, LockReleaseTokenPool.RemoteChainConfig with
                     remotePools = ["11111111"]
@@ -2085,7 +2085,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                     outboundCCVs = []
                     minBlockDepth = 0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 )
                 ]
@@ -2101,12 +2101,12 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
             LockReleaseTokenPool.RateLimiterConfigArgs with
                 remoteChainSelector = 123.0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner"
             ,LockReleaseTokenPool.RateLimiterConfigArgs with
                 remoteChainSelector = 456.0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner"
             ]
     tokenPoolCid <- submit owner do
@@ -2129,7 +2129,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
             LockReleaseTokenPool.RateLimiterConfigArgs with
                 remoteChainSelector = 123.0
                 inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated-again@owner"
-                inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated-again@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated-again@owner"
                 outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated@owner" -- unchanged
             ]
     tokenPoolCid <- submit owner do
@@ -2155,7 +2155,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                 LockReleaseTokenPool.RateLimiterConfigArgs with
                     remoteChainSelector = 999.0 -- does not exist
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to update with an invalid chain selector (negative)
@@ -2165,7 +2165,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                 LockReleaseTokenPool.RateLimiterConfigArgs with
                     remoteChainSelector = -1.0 -- invalid
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to update with an invalid inbound rate limiter address (empty)
@@ -2175,7 +2175,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                 LockReleaseTokenPool.RateLimiterConfigArgs with
                     remoteChainSelector = 123.0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
                 ]
     -- Attempt to update with an invalid outbound rate limiter address (empty)
@@ -2185,7 +2185,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                 LockReleaseTokenPool.RateLimiterConfigArgs with
                     remoteChainSelector = 123.0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "" -- invalid
                 ]   
     -- Attempt to update with an identical rate limiter for both inbound and outbound (invalid)
@@ -2195,7 +2195,7 @@ testLockReleaseTokenPool_UpdateRateLimiters = script do
                 LockReleaseTokenPool.RateLimiterConfigArgs with
                     remoteChainSelector = 123.0
                     inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
-                    inboundCustomRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner"
                     outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "same-rl@owner" -- invalid
                 ]
 
@@ -2211,11 +2211,11 @@ assertChainUpdateEqual got expected = do
     assertMsg ("outboundCCVs mismatch, got: " <> show got.outboundCCVs <> ", expected: " <> show expected.outboundCCVs) (got.outboundCCVs == expected.outboundCCVs)
     assertMsg ("minBlockDepth mismatch, got: " <> show got.minBlockDepth <> ", expected: " <> show expected.minBlockDepth) (got.minBlockDepth == expected.minBlockDepth)
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
-    assertMsg ("inboundCustomRateLimiter mismatch, got: " <> show got.inboundCustomRateLimiter <> ", expected: " <> show expected.inboundCustomRateLimiter) (got.inboundCustomRateLimiter == expected.inboundCustomRateLimiter)
+    assertMsg ("inboundCustomBlockConfirmationsRateLimiter mismatch, got: " <> show got.inboundCustomBlockConfirmationsRateLimiter <> ", expected: " <> show expected.inboundCustomBlockConfirmationsRateLimiter) (got.inboundCustomBlockConfirmationsRateLimiter == expected.inboundCustomBlockConfirmationsRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
 
 assertRateLimiterConfigArgsEqual : LockReleaseTokenPool.RemoteChainConfig -> LockReleaseTokenPool.RateLimiterConfigArgs -> Script ()
 assertRateLimiterConfigArgsEqual got expected = do
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
-    assertMsg ("inboundCustomRateLimiter mismatch, got: " <> show got.inboundCustomRateLimiter <> ", expected: " <> show expected.inboundCustomRateLimiter) (got.inboundCustomRateLimiter == expected.inboundCustomRateLimiter)
+    assertMsg ("inboundCustomBlockConfirmationsRateLimiter mismatch, got: " <> show got.inboundCustomBlockConfirmationsRateLimiter <> ", expected: " <> show expected.inboundCustomBlockConfirmationsRateLimiter) (got.inboundCustomBlockConfirmationsRateLimiter == expected.inboundCustomBlockConfirmationsRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)

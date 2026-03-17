@@ -54,7 +54,7 @@ encodeChainUpdate chainUpdate =
     encodeRawInstanceAddressList chainUpdate.outboundCCVs <>
     fromSome (encodeInt64 chainUpdate.minBlockDepth) <>
     encodeRawInstanceAddress chainUpdate.inboundRateLimiter <>
-    encodeRawInstanceAddress chainUpdate.inboundCustomRateLimiter <>
+    encodeRawInstanceAddress chainUpdate.inboundCustomBlockConfirmationsRateLimiter <>
     encodeRawInstanceAddress chainUpdate.outboundRateLimiter
 
 decodeChainUpdateAt : BytesHex -> Int -> Optional (ChainUpdate, Int)
@@ -66,9 +66,9 @@ decodeChainUpdateAt encoded offset = do
     (outboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (minBlockDepth, offset) <- decodeInt64At encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    (inboundCustomRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter}, offset)
+    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)
 
 -- UpdateRateLimiters
 
@@ -85,13 +85,13 @@ encodeRateLimiterConfigArgs : RateLimiterConfigArgs -> BytesHex
 encodeRateLimiterConfigArgs args =
     encodeNumeric0 args.remoteChainSelector <>
     encodeRawInstanceAddress args.inboundRateLimiter <>
-    encodeRawInstanceAddress args.inboundCustomRateLimiter <>
+    encodeRawInstanceAddress args.inboundCustomBlockConfirmationsRateLimiter <>
     encodeRawInstanceAddress args.outboundRateLimiter
 
 decodeRateLimiterConfigArgsAt : BytesHex -> Int -> Optional (RateLimiterConfigArgs, Int)
 decodeRateLimiterConfigArgsAt encoded offset = do
     (remoteChainSelector, offset) <- decodeNumeric0At encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    (inboundCustomRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    Some (RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter}, offset)
+    Some (RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)
