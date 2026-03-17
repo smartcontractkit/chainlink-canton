@@ -2,8 +2,8 @@
 module CCIP.OffRamp where
 
 import DA.Foldable qualified as Foldable
-import DA.Crypto.Text (BytesHex, keccak256, byteCount)
-import DA.List (dedup)
+import DA.Crypto.Text (BytesHex, keccak256)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
 
@@ -83,6 +83,9 @@ template OffRamp
                 globalConfig <- fetch globalConfigCid
                 CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                -- The receiver required CCVs are passed in and cannot contain duplicates
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in receiver required CCVs" (unique receiverRequiredCCVs)
 
                 -- Get lane-mandated CCVs from GlobalConfig
                 sourceConfigOpt <- exercise globalConfigCid
@@ -177,6 +180,7 @@ template OffRamp
             with
                 routerPartyOwner : Party
                 receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverMinBlockDepth : Int
 
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
 
@@ -237,6 +241,9 @@ template OffRamp
                             (message.onRampAddress `elem` c.onRampAddresses)
                         pure c
 
+                -- The receiver required CCVs are passed in and cannot contain duplicates
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in receiver required CCVs" (unique receiverRequiredCCVs)
+
                 -- Get pool's declared CCV requirements from ExecutingMessageV1.
                 -- Pool records these via SetInboundPoolCCVs; None means pool wasn't called.
                 poolCCVs <- case execMsg.tokenReceiver of
@@ -252,6 +259,15 @@ template OffRamp
                         message.messageData == ""
                         && message.ccipReceiveGasLimit == 0
                         && isSome message.tokenTransfer
+                if isTokenOnlyTransfer
+                    then pure ()
+                    else if message.finality /= 0
+                        then do
+                            assertMsg "offramp: finalized-only receiver rejects FTF messages"
+                                (receiverMinBlockDepth /= 0)
+                            assertMsg "offramp: message finality below receiver minBlockDepth"
+                                (message.finality >= receiverMinBlockDepth)
+                        else pure ()
                 let resolvedReceiverRequiredCCVs = if isTokenOnlyTransfer
                         then []
                         else receiverRequiredCCVs
@@ -326,11 +342,9 @@ template OffRamp
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParamsWithOffset operationData of
+                case decodeSetDepsParams operationData of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
-                  Some (newDeps, finalOffset) -> do
-                    assertMsg "E_TRAILING_BYTES: SetDeps" $
-                      finalOffset == byteCount operationData
+                  Some newDeps -> do
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
@@ -351,20 +365,14 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
 -- ===========================================================================
 
--- | Decode SetDeps params with final offset (Optional fields)
+-- | Decode SetDeps params (Optional fields)
 -- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry]
-decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
-decodeSetDepsParamsWithOffset encoded = do
-  (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
-  (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
-  (tokenAdminRegistry, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset2
-  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry, finalOffset)
-
--- | Decode SetDeps params (discards final offset)
 decodeSetDepsParams : BytesHex -> Optional SetDepsParams
 decodeSetDepsParams encoded = do
-  (result, _) <- decodeSetDepsParamsWithOffset encoded
-  Some result
+  (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
+  (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
+  (tokenAdminRegistry, _offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
+  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry)
 
 -- | Encode SetDeps params (Optional fields)
 encodeSetDepsParams : SetDepsParams -> BytesHex

@@ -246,10 +246,10 @@ var DeployChainContracts = operations.NewSequence(
 					StorageLocations:             committeeVerifier.Template.StorageLocations,
 					StorageLocationsAdmin:        committeeVerifier.Template.StorageLocationsAdmin,
 					PendingStorageLocationsAdmin: committeeVerifier.Template.PendingStorageLocationsAdmin,
+					RemoteChainConfigs:           committeeVerifier.Template.RemoteChainConfigs,
 					SignerConfigs:                committeeVerifier.Template.SignerConfigs,
 					Deps: ccvs.CommitteeVerifierDeps{
 						RmnRemote: rmnRemoteRawInstanceAddress.Binding()},
-					RemoteChainFeeConfigs: committeeVerifier.Template.RemoteChainFeeConfigs,
 				},
 				OwnerParty: committeeVerifier.Template.Owner,
 				Qualifier:  &committeeVerifier.Qualifier,

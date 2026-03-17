@@ -20,6 +20,8 @@ module MCMS.Codec
   , decodeTextAt
   , encodeList
   , decodeList
+  , encodeOptional
+  , decodeOptional
   , encodeBool
   , decodeBool
   , decodeBoolAt
@@ -321,6 +323,19 @@ decodeListItems encoded offset 0 _ acc = Some (reverse acc, offset)
 decodeListItems encoded offset remaining decoder acc = do
   (item, newOffset) <- decoder encoded offset
   decodeListItems encoded newOffset (remaining - 1) decoder (item :: acc)
+
+encodeOptional : Optional a -> (a -> BytesHex) -> BytesHex
+encodeOptional None _ = "00"
+encodeOptional (Some x) encoder = "01" <> encoder x
+
+decodeOptional : BytesHex -> Int -> (BytesHex -> Int -> Optional (a, Int)) -> Optional (Optional a, Int)
+decodeOptional encoded offset decoder = do
+  tagHex <- extractBytes encoded offset 1
+  if tagHex == "00" then Some (None, offset + 1)
+  else if tagHex == "01" then do
+    (value, newOffset) <- decoder encoded (offset + 1)
+    Some (Some value, newOffset)
+  else None
 
 -- ===========================================================================
 -- HELPERS

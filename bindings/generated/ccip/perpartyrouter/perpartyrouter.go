@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "e9ce9e890d32e794a7093287bb4f44b927eee27098b9a95866adbc6c5435d9b2"
+	PackageID   = "3065f52e18c6ed15c818f122ce7bd4df47c20d62a81ea79948e9db958a1b7a88"
 	SDKVersion  = "3.4.10"
 )
 
@@ -278,9 +279,10 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context              common.CCIPContext          `json:"context"`
-	ExecutingMessageCid  types.CONTRACT_ID           `json:"executingMessageCid"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	Context               common.CCIPContext          `json:"context"`
+	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
+	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverMinBlockDepth types.INT64                 `json:"receiverMinBlockDepth"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -315,6 +317,8 @@ func (t Execute) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["receiverMinBlockDepth"] = int64(t.ReceiverMinBlockDepth)
 
 	return m
 }
@@ -1000,11 +1004,11 @@ func (t PerPartyRouter) GetExecutionStateWithPackageID(contractID string, packag
 	}
 }
 
-// Archive exercises the Archive choice on this PerPartyRouter contract
+// Archive exercises the Archive choice on this PerPartyRouter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t PerPartyRouter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1014,7 +1018,7 @@ func (t PerPartyRouter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t PerPartyRouter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1044,7 +1048,7 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this PerPartyRouter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t PerPartyRouter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -1054,7 +1058,7 @@ func (t PerPartyRouter) MCMSReceiverEntrypoint(contractID string, args MCMSRecei
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t PerPartyRouter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t PerPartyRouter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -1065,7 +1069,7 @@ func (t PerPartyRouter) MCMSReceiverEntrypointWithPackageID(contractID string, p
 
 // Verify interface implementations for PerPartyRouter
 
-var _ IMCMSReceiver = (*PerPartyRouter)(nil)
+var _ mcms.IMCMSReceiver = (*PerPartyRouter)(nil)
 
 // PerPartyRouterDeps is a Record type
 type PerPartyRouterDeps struct {
@@ -1304,11 +1308,11 @@ func (t PerPartyRouterFactory) CreateRouterWithPackageID(contractID string, pack
 	}
 }
 
-// Archive exercises the Archive choice on this PerPartyRouterFactory contract
+// Archive exercises the Archive choice on this PerPartyRouterFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t PerPartyRouterFactory) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1318,7 +1322,7 @@ func (t PerPartyRouterFactory) Archive(contractID string) *model.ExerciseCommand
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t PerPartyRouterFactory) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouterFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -1348,7 +1352,7 @@ func (t PerPartyRouterFactory) HasRouterWithPackageID(contractID string, package
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this PerPartyRouterFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t PerPartyRouterFactory) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t PerPartyRouterFactory) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -1358,7 +1362,7 @@ func (t PerPartyRouterFactory) MCMSReceiverEntrypoint(contractID string, args MC
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t PerPartyRouterFactory) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t PerPartyRouterFactory) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "MCMSReceiver"),
 		ContractID: contractID,
@@ -1369,7 +1373,7 @@ func (t PerPartyRouterFactory) MCMSReceiverEntrypointWithPackageID(contractID st
 
 // Verify interface implementations for PerPartyRouterFactory
 
-var _ IMCMSReceiver = (*PerPartyRouterFactory)(nil)
+var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
@@ -1462,7 +1466,6 @@ type PrepareSend struct {
 	Receiver            types.TEXT                                `json:"receiver"`
 	Payload             types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations  *types.INT64                              `json:"blockConfirmations" hex:"optional"`
 	SenderRequiredCCVs  []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
 	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
@@ -1489,17 +1492,6 @@ func (t PrepareSend) ToMap() map[string]any {
 	m["payload"] = string(t.Payload)
 
 	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	if t.BlockConfirmations != nil {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-			"value": int64(*t.BlockConfirmations),
-		}
-	} else {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-		}
-	}
 
 	m["senderRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.SenderRequiredCCVs))

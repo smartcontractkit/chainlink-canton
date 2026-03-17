@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "e52a333bc9bb645b922481d1980f0015177277a446ea10f3e48a88a0c6fbb927"
+	PackageID   = "23fea5d62a29489fd7138abf6c3e3b7a16e93b0aa31d31f72dcba829b76a7603"
 	SDKVersion  = "3.4.10"
 )
 
@@ -212,7 +213,6 @@ func (t *AddCCVVerificationMCMSParams) UnmarshalHex(data string) error {
 type AddExecutorWithFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
@@ -226,8 +226,6 @@ func (t AddExecutorWithFee) ToMap() map[string]any {
 	m["executorInstanceId"] = string(t.ExecutorInstanceId)
 
 	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	m["feeUSDCents"] = t.FeeUSDCents
 
@@ -267,7 +265,6 @@ func (t *AddExecutorWithFee) UnmarshalHex(data string) error {
 type AddExecutorWithFeeMCMSParams struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
@@ -3034,11 +3031,11 @@ func (t GlobalConfig) ApplySourceChainConfigUpdatesWithPackageID(contractID stri
 	}
 }
 
-// Archive exercises the Archive choice on this GlobalConfig contract
+// Archive exercises the Archive choice on this GlobalConfig contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -3048,7 +3045,7 @@ func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t GlobalConfig) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -3099,7 +3096,7 @@ func (t GlobalConfig) GetSourceChainConfigWithPackageID(contractID string, packa
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this GlobalConfig contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
@@ -3109,7 +3106,7 @@ func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args MCMSReceive
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
@@ -3120,7 +3117,7 @@ func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, pac
 
 // Verify interface implementations for GlobalConfig
 
-var _ IMCMSReceiver = (*GlobalConfig)(nil)
+var _ mcms.IMCMSReceiver = (*GlobalConfig)(nil)
 
 // IssuerType is an enum type
 type IssuerType string
@@ -3881,7 +3878,6 @@ type SendingMessageV1 struct {
 	Payload                   types.TEXT                                `json:"payload"`
 	ExecutionGasLimit         types.INT64                               `json:"executionGasLimit"`
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations        types.INT64                               `json:"blockConfirmations"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
 	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
@@ -3987,9 +3983,6 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4245,9 +4238,6 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4967,6 +4957,7 @@ type TokenReceiveTicket struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageHash                  types.TEXT                               `json:"messageHash"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
+	Finality                     types.INT64                              `json:"finality"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -5030,6 +5021,9 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["finality"] = int64(t.Finality)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -5086,6 +5080,9 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	if t.SourceChainSelector != "" {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["finality"] = int64(t.Finality)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

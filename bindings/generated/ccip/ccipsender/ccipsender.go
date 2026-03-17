@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "915e7de48ccbbed2e573e123001e92cbbbcc4d6b6a764d23352e95b403ffd4c7"
+	PackageID   = "6b871bba025c79bd670696a358a492c0ec1fd2b4bc835f62986c6225d28f2ed0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -225,7 +225,6 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 // CantonExtraArgsV1 is a Record type
 type CantonExtraArgsV1 struct {
 	GasLimit           types.INT64                 `json:"gasLimit"`
-	BlockConfirmations *types.INT64                `json:"blockConfirmations" hex:"optional"`
 	SenderRequiredCCVs []common.RawInstanceAddress `json:"senderRequiredCCVs"`
 	ExecutorCid        types.CONTRACT_ID           `json:"executorCid"`
 	ExecutorArgs       *types.TEXT                 `json:"executorArgs" hex:"optional"`
@@ -238,17 +237,6 @@ func (t CantonExtraArgsV1) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["gasLimit"] = int64(t.GasLimit)
-
-	if t.BlockConfirmations != nil {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-			"value": int64(*t.BlockConfirmations),
-		}
-	} else {
-		m["blockConfirmations"] = map[string]any{
-			"_type": "optional",
-		}
-	}
 
 	m["senderRequiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.SenderRequiredCCVs))

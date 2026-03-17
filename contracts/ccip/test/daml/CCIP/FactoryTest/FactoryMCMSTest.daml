@@ -518,6 +518,7 @@ testDeployCommitteeVerifier_MCMS = script do
         owner = mcmsParty
         ccipOwner = mcmsParty
         versionTag = "01020304"
+        allowListAdmin = None
         messageSentObservers = [mcmsParty]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2"]
@@ -665,6 +666,7 @@ testDeployCCIPReceiver_MCMS = script do
         instanceId = "receiver-1"
         owner = mcmsParty
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        minBlockDepth = 7
       encoded = encodeDeployCCIPReceiverParams params
 
   submit mcmsParty do

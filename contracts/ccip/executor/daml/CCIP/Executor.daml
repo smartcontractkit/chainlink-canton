@@ -143,10 +143,6 @@ template Executor
 
                 let canonicalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
 
-                assertMsg "executor: requested block confirmations too low"
-                    (sm.blockConfirmations == 0
-                        || sm.blockConfirmations >= dynamicConfig.minBlockConfirmations)
-
                 if dynamicConfig.ccvAllowlistEnabled
                     then Foldable.forA_ canonicalCCVs (\ccv ->
                         assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVs)
@@ -159,7 +155,6 @@ template Executor
                 exercise sendingMessageCid CCIP.SendingMessageV1.AddExecutorWithFee with
                     executorInstanceId = instanceId
                     executorArgs = executorArgs
-                    blockConfirmations = sm.blockConfirmations
                     feeUSDCents = remoteCfg.feeUSDCents
                     destGasLimit = 0
                     destBytesOverhead = 0

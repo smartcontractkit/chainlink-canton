@@ -95,11 +95,13 @@ func TestCCIPSend(t *testing.T) {
 
 	// CCV Setup
 	ccvSignerKeys := make([]*ecdsa.PrivateKey, 0, 3)
+	ccvSignerPubKeys := make([]string, 0, 3)
 	for range 3 {
 		pk, err := crypto.GenerateKey()
 		require.NoError(t, err)
 		ccvSignerKeys = append(ccvSignerKeys, pk)
-		_ = hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
+		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
+		ccvSignerPubKeys = append(ccvSignerPubKeys, pubKeyHex)
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
@@ -140,14 +142,6 @@ func TestCCIPSend(t *testing.T) {
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
 							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
-							// MUST be a real GENMAP, not a Go map.
-							RemoteChainFeeConfigs: types.GENMAP{
-								strconv.FormatUint(remoteSelector, 10): ccvs.CCVFeeConfig{
-									FeeUSDCents:        types.NUMERIC("0"),
-									GasForVerification: types.INT64(0),
-									PayloadSizeBytes:   types.INT64(0),
-								}.ToMap(),
-							},
 						},
 					},
 				},
@@ -204,12 +198,28 @@ func TestCCIPSend(t *testing.T) {
 		Participant:   0,
 		Config: changesets.ConfigureChainForLanesConfig{
 			Input: sequences.ConfigureChainForLanesInput{
-				ChainSelector:      env.Chain.ChainSelector(),
-				GlobalConfig:       contracts.HexToInstanceAddress(globalConfig.Address),
-				FeeQuoter:          contracts.HexToInstanceAddress(feeQuoter.Address),
-				OnRamp:             contracts.HexToInstanceAddress(onRamp.Address),
-				OffRamp:            contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: nil,
+				ChainSelector: env.Chain.ChainSelector(),
+				GlobalConfig:  contracts.HexToInstanceAddress(globalConfig.Address),
+				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
+				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
+				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
+				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+					{
+						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
+						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+							remoteSelector: {
+								AllowlistEnabled:   false,
+								FeeUSDCents:        0,
+								GasForVerification: 50_000,
+								PayloadSizeBytes:   6*64 + 2*32,
+								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+									Signers:   ccvSignerPubKeys,
+									Threshold: 2,
+								},
+							},
+						},
+					},
+				},
 				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 					remoteSelector: {
 						AllowTrafficFrom:         true,
@@ -615,7 +625,6 @@ func TestCCIPSend(t *testing.T) {
 		Payload:           types.TEXT(testPayloadHex),
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
-			BlockConfirmations: nil,
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
 			ExecutorCid:        types.CONTRACT_ID(executorCid),
 			ExecutorArgs:       nil,

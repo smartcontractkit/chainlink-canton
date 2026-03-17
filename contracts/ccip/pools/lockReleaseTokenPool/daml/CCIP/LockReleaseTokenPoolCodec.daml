@@ -13,6 +13,8 @@ import MCMS.Codec
   (
     encodeNumeric0
   , decodeNumeric0At
+  , encodeInt64
+  , decodeInt64At
   , encodeBytesHex
   , decodeBytesHexAt
   , encodeBytesHexList
@@ -29,6 +31,7 @@ import CCIP.Codec
   )
 
 import DA.Crypto.Text (BytesHex)
+import DA.Optional (fromSome)
 import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RateLimiterConfigArgs(..))
 
 -- ApplyChainUpdates
@@ -58,7 +61,9 @@ encodeChainUpdate chainUpdate =
     encodeBytesHex chainUpdate.remoteTokenAddress <>
     encodeRawInstanceAddressList chainUpdate.inboundCCVs <>
     encodeRawInstanceAddressList chainUpdate.outboundCCVs <>
+    fromSome (encodeInt64 chainUpdate.minBlockDepth) <>
     encodeRawInstanceAddress chainUpdate.inboundRateLimiter <>
+    encodeRawInstanceAddress chainUpdate.inboundCustomBlockConfirmationsRateLimiter <>
     encodeRawInstanceAddress chainUpdate.outboundRateLimiter
 
 decodeChainUpdateAt : BytesHex -> Int -> Optional (ChainUpdate, Int)
@@ -68,9 +73,11 @@ decodeChainUpdateAt encoded offset = do
     (remoteTokenAddress, offset) <- decodeBytesHexAt encoded offset
     (inboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (outboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
+    (minBlockDepth, offset) <- decodeInt64At encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, inboundRateLimiter, outboundRateLimiter}, offset)
+    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)
 
 -- UpdateRateLimiters
 
@@ -94,11 +101,13 @@ encodeRateLimiterConfigArgs : RateLimiterConfigArgs -> BytesHex
 encodeRateLimiterConfigArgs args =
     encodeNumeric0 args.remoteChainSelector <>
     encodeRawInstanceAddress args.inboundRateLimiter <>
+    encodeRawInstanceAddress args.inboundCustomBlockConfirmationsRateLimiter <>
     encodeRawInstanceAddress args.outboundRateLimiter
 
 decodeRateLimiterConfigArgsAt : BytesHex -> Int -> Optional (RateLimiterConfigArgs, Int)
 decodeRateLimiterConfigArgsAt encoded offset = do
     (remoteChainSelector, offset) <- decodeNumeric0At encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
+    (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    Some (RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, outboundRateLimiter}, offset)
+    Some (RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)

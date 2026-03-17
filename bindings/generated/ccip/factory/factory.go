@@ -17,6 +17,7 @@ import (
 	perpartyrouter "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	rmn "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	tokenadminregistry "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -35,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "ecb52398faf4e418a13be33ae306eece4f3c49f588512aead12835ec7dd72018"
+	PackageID   = "4497de9deaa83c9e017922328092448bb4ae32632636eee49de31858d7ed59e5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -449,11 +450,11 @@ func (t CCIPFactory) SetOwnerToMCMSWithPackageID(contractID string, packageID st
 	}
 }
 
-// Archive exercises the Archive choice on this CCIPFactory contract
+// Archive exercises the Archive choice on this CCIPFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -463,7 +464,7 @@ func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CCIPFactory) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -493,7 +494,7 @@ func (t CCIPFactory) GetFactoryStateWithPackageID(contractID string, packageID s
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this CCIPFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t CCIPFactory) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t CCIPFactory) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
@@ -503,7 +504,7 @@ func (t CCIPFactory) MCMSReceiverEntrypoint(contractID string, args MCMSReceiver
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t CCIPFactory) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t CCIPFactory) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
@@ -514,7 +515,7 @@ func (t CCIPFactory) MCMSReceiverEntrypointWithPackageID(contractID string, pack
 
 // Verify interface implementations for CCIPFactory
 
-var _ IMCMSReceiver = (*CCIPFactory)(nil)
+var _ mcms.IMCMSReceiver = (*CCIPFactory)(nil)
 
 // DeployCCIPReceiver is a Record type
 type DeployCCIPReceiver struct {
@@ -560,9 +561,10 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId   types.TEXT                  `json:"instanceId"`
-	Owner        types.PARTY                 `json:"owner"`
-	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId    types.TEXT                  `json:"instanceId"`
+	Owner         types.PARTY                 `json:"owner"`
+	RequiredCCVs  []common.RawInstanceAddress `json:"requiredCCVs"`
+	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -585,6 +587,8 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return m
 }
@@ -740,6 +744,7 @@ type DeployCommitteeVerifierParams struct {
 	Owner                        types.PARTY               `json:"owner"`
 	CcipOwner                    types.PARTY               `json:"ccipOwner"`
 	VersionTag                   types.TEXT                `json:"versionTag"`
+	AllowListAdmin               *types.PARTY              `json:"allowListAdmin" hex:"optional"`
 	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
 	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
 	StorageLocations             []types.TEXT              `json:"storageLocations"`
@@ -758,6 +763,17 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["versionTag"] = string(t.VersionTag)
+
+	if t.AllowListAdmin != nil {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.AllowListAdmin).ToMap(),
+		}
+	} else {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["messageSentObservers"] = func() []any {
 		res := make([]any, 0, len(t.MessageSentObservers))

@@ -295,9 +295,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							SignerConfigs:                nil,                          // Will be configured later during lane setup
 							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
-							RemoteChainFeeConfigs:        nil,
 						},
 					},
 				},
@@ -433,6 +431,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 							remoteSelector: {
+								AllowlistEnabled:   false,
+								FeeUSDCents:        50,
+								GasForVerification: 50_000,
+								PayloadSizeBytes:   6*64 + 2*32,
 								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 									Signers:   ccvSignerPubKeys,
 									Threshold: 2,
@@ -541,6 +543,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "minBlockDepth", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}},
 				}},

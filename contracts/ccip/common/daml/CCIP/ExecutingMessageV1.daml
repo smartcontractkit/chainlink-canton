@@ -156,6 +156,7 @@ template ExecutingMessageV1
                             sourcePoolData
                             messageHash = messageId
                             sourceChainSelector = message.sourceChainSelector
+                            finality = message.finality
                         pure (Some ticketCid)
                     (None, None, None, None, None) ->
                         pure None
