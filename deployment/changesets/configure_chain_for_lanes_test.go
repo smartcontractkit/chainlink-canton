@@ -182,6 +182,10 @@ func TestConfigureChainForLanes(t *testing.T) {
 						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 							chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector: {
+								AllowlistEnabled:   false,
+								FeeUSDCents:        50,
+								GasForVerification: 50_000,
+								PayloadSizeBytes:   6*64 + 2*32,
 								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 									Signers:   ccvSignerPubKeys,
 									Threshold: 2,

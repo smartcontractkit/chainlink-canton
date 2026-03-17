@@ -1,6 +1,9 @@
 module CCIP.CommitteeVerifier where
 
+import qualified DA.Action
 import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1WithEcdsaOnly)
+import DA.Foldable (forA_)
+import DA.List (dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
@@ -19,13 +22,36 @@ versionTagV1_7_0 : BytesHex = "49ff34ed"
 signature_length : Int = 64
 signature_component_length : Int = 32
 
--- | Per-chain fee config for outbound fee calculation.
--- Mirrors EVM's BaseVerifier.s_remoteChainConfigs.
-data CCVFeeConfig = CCVFeeConfig
+data DynamicConfig = DynamicConfig
     with
-        feeUSDCents : Numeric 0
-        gasForVerification : Int
-        payloadSizeBytes : Int
+        allowListAdmin : Optional Party -- Party capable of adding or removing allowed senders
+        messageSentObservers : [Party]  -- List of parties that will be added to CCIPMessageSent contracts as additional observers
+    deriving (Eq, Show)
+
+data RemoteChainConfigArgs = RemoteChainConfigArgs
+    with
+        remoteChainSelector : Numeric 0 -- The chain selector that this config applies to.
+        feeUSDCents : Numeric 0         -- The fee in USD cents for messages to this remote chain.
+        gasForVerification : Int        -- The gas to reserve for verification of messages on the remote chain.
+        payloadSizeBytes : Int          -- The size of the verification payload on the remote chain.
+        allowListEnabled : Bool         -- True if the allowlist is enabled. To update the list of allowed senders, see ApplyAllowlistUpdates.
+    deriving (Eq, Show)
+
+data RemoteChainConfig = RemoteChainConfig
+    with
+        feeUSDCents : Numeric 0      -- The fee in USD cents for messages to this remote chain.
+        gasForVerification : Int     -- The gas to reserve for verification of messages on the remote chain.
+        payloadSizeBytes : Int       -- The size of the verification payload on the remote chain.
+        allowListEnabled : Bool      -- True if the allowlist is enabled
+        allowedSendersList : [Party] -- The list of parties allowed to send messages.
+    deriving (Eq, Show)
+
+data AllowListConfigArgs = AllowListConfigArgs
+    with
+        destChainSelector : Numeric 0       -- The chain selector that this allowlist config applies to.
+        allowListEnabled : Bool             -- True if the allowlist is enabled for the destination chain.
+        addedAllowListedSenders : [Party]   -- List of parties to add to the allowlist for the destination chain.
+        removedAllowListedSenders : [Party] -- List of parties to remove from the allowlist for the destination chain.
     deriving (Eq, Show)
 
 -- | Per-source-chain signature config for inbound message verification.
@@ -48,6 +74,11 @@ template CommitteeVerifier
 
         ccipOwner : Party
         versionTag : BytesHex              -- Version tag for this CCV (e.g., "49ff34ed")
+        
+        -- | Dynamic config
+        -- Party capable of adding or removing allowed senders
+        allowListAdmin : Optional Party
+        -- Additional observers that will be added to CCIPMessageSent contracts
         messageSentObservers : [Party]
 
         -- | Storage locations for off-chain components to read from.
@@ -58,12 +89,14 @@ template CommitteeVerifier
         -- | pendingStorageLocationsAdmin /= storageLocationsAdmin indicates that a transfer is in progress.
         pendingStorageLocationsAdmin : Party
 
+        -- | The remote chain specific configs. Keyed by remote chain selector.
+        remoteChainConfigs : Map.Map (Numeric 0) RemoteChainConfig
+
         signerConfigs : Map.Map (Numeric 0) SignatureConfig
         deps : CommitteeVerifierDeps
-        remoteChainFeeConfigs : Map.Map (Numeric 0) CCVFeeConfig
     where
         signatory owner
-        observer [storageLocationsAdmin, pendingStorageLocationsAdmin]
+        observer storageLocationsAdmin :: pendingStorageLocationsAdmin :: optional [] pure allowListAdmin
 
         -- Ensure that for each signerConfig the number of signer keys is >= threshold and that threshold > 0
         ensure versionTag /= "" && all (\config -> (length config.signerKeys >= config.threshold) && (config.threshold > 0)) (Map.values signerConfigs)
@@ -97,6 +130,80 @@ template CommitteeVerifier
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
 
+        -- =========================================
+        -- |                Config                 |
+        -- =========================================
+
+        choice SetDynamicConfig : ContractId CommitteeVerifier
+            with
+                dynamicConfig : DynamicConfig
+            controller owner
+            do
+                create this with 
+                    allowListAdmin = dynamicConfig.allowListAdmin
+                    messageSentObservers = dynamicConfig.messageSentObservers
+
+        choice ApplyAllowListUpdates : ContractId CommitteeVerifier
+            with
+                allowListConfigArgsItems : [AllowListConfigArgs]
+                caller : Party
+            controller caller
+            do
+                -- Callable by both the owner and allowListAdmin (if set in dynamicConfig)
+                assertMsg "ApplyAllowListUpdates: only callable by owner or allowlist admin" (caller == owner || (allowListAdmin == Some caller))
+                -- Validate
+                forA_ allowListConfigArgsItems $ \args -> do
+                    assertMsg ("ApplyAllowListUpdates: invalid chain selector: " <> show args.destChainSelector ) (args.destChainSelector >= 0.0)
+                    DA.Action.unless args.allowListEnabled $ do
+                        assertMsg "ApplyAllowListUpdates: cannot add allowed senders if allowlist is not enabled" (null args.addedAllowListedSenders)
+                -- Update
+                let updatedRemoteChainConfigs = foldl
+                        (\configs args -> do
+                            let remoteChainConfig = case Map.lookup args.destChainSelector configs of
+                                    Some config -> config with
+                                                allowListEnabled = args.allowListEnabled
+                                                -- remove senders in removedAllowListedSenders from the existing list, then add senders in addedAllowListedSenders, and dedup the final list
+                                                allowedSendersList = dedup ((config.allowedSendersList \\ args.removedAllowListedSenders) <> args.addedAllowListedSenders)
+                                    None -> RemoteChainConfig with
+                                                feeUSDCents = 0.0
+                                                gasForVerification = 0
+                                                payloadSizeBytes = 0
+                                                allowListEnabled = args.allowListEnabled
+                                                -- no need to remove from the existing list since it doesn't exist, just add senders in addedAllowListedSenders and dedup
+                                                allowedSendersList = dedup (args.addedAllowListedSenders)
+                            Map.insert args.destChainSelector remoteChainConfig configs
+                            ) remoteChainConfigs allowListConfigArgsItems
+                create this with
+                    remoteChainConfigs = updatedRemoteChainConfigs
+
+
+        choice ApplyRemoteChainConfigUpdates : ContractId CommitteeVerifier
+            with
+                remoteChainConfigArgs : [RemoteChainConfigArgs]
+            controller owner
+            do
+                -- Validate
+                forA_ remoteChainConfigArgs $ \args -> do
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
+                -- Update
+                let updatedRemoteChainConfigs = foldl
+                        (\configs args -> do
+                            -- don't override allowedSendersList if it already exists for the chain, otherwise set to empty list
+                            let allowedSendersList = case Map.lookup args.remoteChainSelector configs of
+                                    Some config -> config.allowedSendersList
+                                    None -> []
+                            Map.insert args.remoteChainSelector RemoteChainConfig
+                                    with
+                                        feeUSDCents = args.feeUSDCents
+                                        gasForVerification = args.gasForVerification
+                                        payloadSizeBytes = args.payloadSizeBytes
+                                        allowListEnabled = args.allowListEnabled
+                                        allowedSendersList = allowedSendersList
+                                configs) remoteChainConfigs remoteChainConfigArgs
+                create this with
+                    remoteChainConfigs = updatedRemoteChainConfigs
+
         choice CommitteeVerifier_ApplySignatureConfigs : ContractId CommitteeVerifier
             with
                 sourceChainSelectorsToRemove : [Numeric 0]
@@ -110,6 +217,10 @@ template CommitteeVerifier
                     (all (\config -> (config.threshold > 0) && (length config.signerKeys >= config.threshold)) signatureConfigs)
                 let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
                 create this with signerConfigs = newSignerConfigs
+
+        -- ==========================================
+        -- |           Storage Locations            |
+        -- ==========================================
 
         -- | Initiates the two-step transfer for the storage locations admin role.
         -- Caller must be the current storage locations admin.
@@ -138,6 +249,10 @@ template CommitteeVerifier
             controller storageLocationsAdmin
             do
                 create this with storageLocations = newLocations
+
+        -- ==========================================
+        -- |   CrossChainVerifier implementation    |
+        -- ==========================================
 
         -- | Verify an inbound message and append CCV verification to ExecutingMessageV1.
         -- Fetches ExecutingMessageV1 for decoded message content and re-encodes
@@ -211,14 +326,14 @@ template CommitteeVerifier
             controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
-                let feeConfig = fromSomeNote "no fee config for dest chain"
-                        (Map.lookup sendingMsg.destChainSelector remoteChainFeeConfigs)
+                let chainConfig = fromSomeNote "no fee config for dest chain"
+                        (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
 
                 exercise sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
                     ccvInstanceId = instanceId
-                    feeUSDCents = feeConfig.feeUSDCents
-                    destGasLimit = feeConfig.gasForVerification
-                    destBytesOverhead = feeConfig.payloadSizeBytes
+                    feeUSDCents = chainConfig.feeUSDCents
+                    destGasLimit = chainConfig.gasForVerification
+                    destBytesOverhead = chainConfig.payloadSizeBytes
                     caller = owner
 
         -- | Forward message for verification. Exercises AddVerifierData
@@ -245,6 +360,11 @@ template CommitteeVerifier
                     caller = owner
                     chainSelector = sendingMsg.destChainSelector
                 assertMsg "verifier: destination chain is cursed" (not isCursed)
+
+                -- Assert that the sender is allowed to send messages if allowlist is enabled for the destination chain
+                let destChainConfig = fromSomeNote "no config for dest chain" (Map.lookup sendingMsg.destChainSelector remoteChainConfigs)
+                DA.Action.when destChainConfig.allowListEnabled
+                    $ assertMsg "Sender not allowed to send messages to destination chain" (caller `elem` destChainConfig.allowedSendersList)
 
                 let verifierBlob = versionTag
 

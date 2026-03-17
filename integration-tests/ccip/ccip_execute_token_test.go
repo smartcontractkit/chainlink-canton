@@ -197,7 +197,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
 						}}}}},
-						{Label: "remoteChainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
 				}},
 			}},

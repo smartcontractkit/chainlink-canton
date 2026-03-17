@@ -322,19 +322,6 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		},
 	}
 
-	remoteChainFeeConfigs := types.GENMAP{}
-	for _, bc := range env.BlockChains.All() {
-		sel := bc.ChainSelector()
-		if sel == selector {
-			continue
-		}
-		remoteChainFeeConfigs[strconv.FormatUint(sel, 10)] = ccvs.CCVFeeConfig{
-			FeeUSDCents:        types.NUMERIC("0"),
-			GasForVerification: types.INT64(0),
-			PayloadSizeBytes:   types.INT64(0),
-		}.ToMap()
-	}
-
 	// Get committees
 	for qualifier, committeeConfig := range topology.NOPTopology.Committees {
 		storageLocations := make([]types.TEXT, len(committeeConfig.StorageLocations))
@@ -352,8 +339,6 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 				StorageLocationsAdmin:        types.PARTY(participant.PartyID),
 				PendingStorageLocationsAdmin: types.PARTY(participant.PartyID),
 				Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
-				// MUST be a real GENMAP, not a Go map.
-				RemoteChainFeeConfigs: remoteChainFeeConfigs,
 			},
 		}
 		config.Config.Params.CommitteeVerifiers = append(config.Config.Params.CommitteeVerifiers, cv)
@@ -590,7 +575,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				AddedAllowlistedSenders:   nil,
 				RemovedAllowlistedSenders: nil,
 				FeeUSDCents:               0,
-				GasForVerification:        0,
+				GasForVerification:        50_000,
 				PayloadSizeBytes:          0,
 				SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 					Signers:   signers,
