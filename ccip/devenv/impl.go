@@ -575,7 +575,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				AddedAllowlistedSenders:   nil,
 				RemovedAllowlistedSenders: nil,
 				FeeUSDCents:               0,
-				GasForVerification:        0,
+				GasForVerification:        50_000,
 				PayloadSizeBytes:          0,
 				SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 					Signers:   signers,
