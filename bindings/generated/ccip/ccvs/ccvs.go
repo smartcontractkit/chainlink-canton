@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "fdfb9a24e17d816f50b1bff822c09a7ce459eab8f0cff92de5b38bdef5faa996"
+	PackageID   = "de27e3d244d31297d708e5517a6a6c87eba40e6e0bff441758f89037d8885362"
 	SDKVersion  = "3.4.10"
 )
 
@@ -52,44 +52,174 @@ func argsToMap(args any) map[string]any {
 	return map[string]any{"args": args}
 }
 
-// CCVFeeConfig is a Record type
-type CCVFeeConfig struct {
-	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
-	GasForVerification types.INT64   `json:"gasForVerification"`
-	PayloadSizeBytes   types.INT64   `json:"payloadSizeBytes"`
+// AllowListConfigArgs is a Record type
+type AllowListConfigArgs struct {
+	DestChainSelector         types.NUMERIC `json:"destChainSelector"`
+	AllowListEnabled          types.BOOL    `json:"allowListEnabled"`
+	AddedAllowListedSenders   []types.PARTY `json:"addedAllowListedSenders"`
+	RemovedAllowListedSenders []types.PARTY `json:"removedAllowListedSenders"`
 }
 
-// ToMap converts CCVFeeConfig to a map for DAML arguments
-func (t CCVFeeConfig) ToMap() map[string]any {
+// ToMap converts AllowListConfigArgs to a map for DAML arguments
+func (t AllowListConfigArgs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["feeUSDCents"] = t.FeeUSDCents
+	m["destChainSelector"] = t.DestChainSelector
 
-	m["gasForVerification"] = int64(t.GasForVerification)
+	m["allowListEnabled"] = bool(t.AllowListEnabled)
 
-	m["payloadSizeBytes"] = int64(t.PayloadSizeBytes)
+	m["addedAllowListedSenders"] = func() []any {
+		res := make([]any, 0, len(t.AddedAllowListedSenders))
+		for _, e := range t.AddedAllowListedSenders {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["removedAllowListedSenders"] = func() []any {
+		res := make([]any, 0, len(t.RemovedAllowListedSenders))
+		for _, e := range t.RemovedAllowListedSenders {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	return m
 }
 
-func (t CCVFeeConfig) MarshalJSON() ([]byte, error) {
+func (t AllowListConfigArgs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *CCVFeeConfig) UnmarshalJSON(data []byte) error {
+func (t *AllowListConfigArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes CCVFeeConfig to hex string (Canton MCMS format)
-func (t CCVFeeConfig) MarshalHex() (string, error) {
+// MarshalHex encodes AllowListConfigArgs to hex string (Canton MCMS format)
+func (t AllowListConfigArgs) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes CCVFeeConfig from hex string (Canton MCMS format)
-func (t *CCVFeeConfig) UnmarshalHex(data string) error {
+// UnmarshalHex decodes AllowListConfigArgs from hex string (Canton MCMS format)
+func (t *AllowListConfigArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyAllowListUpdates is a Record type
+type ApplyAllowListUpdates struct {
+	AllowListConfigArgsItems []AllowListConfigArgs `json:"allowListConfigArgsItems"`
+	Caller                   types.PARTY           `json:"caller"`
+}
+
+// ToMap converts ApplyAllowListUpdates to a map for DAML arguments
+func (t ApplyAllowListUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["allowListConfigArgsItems"] = func() []any {
+		res := make([]any, 0, len(t.AllowListConfigArgsItems))
+		for _, e := range t.AllowListConfigArgsItems {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ApplyAllowListUpdates) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyAllowListUpdates) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyAllowListUpdates to hex string (Canton MCMS format)
+func (t ApplyAllowListUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyAllowListUpdates from hex string (Canton MCMS format)
+func (t *ApplyAllowListUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyAllowListUpdatesMCMSParams is ApplyAllowListUpdates without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type ApplyAllowListUpdatesMCMSParams struct {
+	AllowListConfigArgsItems []AllowListConfigArgs `json:"allowListConfigArgsItems"`
+}
+
+// MarshalHex encodes ApplyAllowListUpdatesMCMSParams to hex string for MCMS operationData.
+func (t ApplyAllowListUpdatesMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyAllowListUpdatesMCMSParams from hex string.
+func (t *ApplyAllowListUpdatesMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyRemoteChainConfigUpdates is a Record type
+type ApplyRemoteChainConfigUpdates struct {
+	RemoteChainConfigArgs []RemoteChainConfigArgs `json:"remoteChainConfigArgs"`
+}
+
+// ToMap converts ApplyRemoteChainConfigUpdates to a map for DAML arguments
+func (t ApplyRemoteChainConfigUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["remoteChainConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.RemoteChainConfigArgs))
+		for _, e := range t.RemoteChainConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyRemoteChainConfigUpdates) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyRemoteChainConfigUpdates) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyRemoteChainConfigUpdates to hex string (Canton MCMS format)
+func (t ApplyRemoteChainConfigUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyRemoteChainConfigUpdates from hex string (Canton MCMS format)
+func (t *ApplyRemoteChainConfigUpdates) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -100,13 +230,14 @@ type CommitteeVerifier struct {
 	Owner                        types.PARTY           `json:"owner"`
 	CcipOwner                    types.PARTY           `json:"ccipOwner"`
 	VersionTag                   types.TEXT            `json:"versionTag"`
+	AllowListAdmin               *types.PARTY          `json:"allowListAdmin" hex:"optional"`
 	MessageSentObservers         []types.PARTY         `json:"messageSentObservers"`
 	StorageLocations             []types.TEXT          `json:"storageLocations"`
 	StorageLocationsAdmin        types.PARTY           `json:"storageLocationsAdmin"`
 	PendingStorageLocationsAdmin types.PARTY           `json:"pendingStorageLocationsAdmin"`
+	RemoteChainConfigs           types.GENMAP          `json:"remoteChainConfigs"`
 	SignerConfigs                types.GENMAP          `json:"signerConfigs"`
 	Deps                         CommitteeVerifierDeps `json:"deps"`
-	RemoteChainFeeConfigs        types.GENMAP          `json:"remoteChainFeeConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -135,6 +266,17 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["versionTag"] = string(t.VersionTag)
 
+	if t.AllowListAdmin != nil {
+		args["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.AllowListAdmin).ToMap(),
+		}
+	} else {
+		args["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["messageSentObservers"] = func() []any {
 		res := make([]any, 0, len(t.MessageSentObservers))
@@ -160,6 +302,14 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 	args["pendingStorageLocationsAdmin"] = t.PendingStorageLocationsAdmin.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["remoteChainConfigs"] = func() any {
+		if t.RemoteChainConfigs == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.RemoteChainConfigs}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["signerConfigs"] = func() any {
 		if t.SignerConfigs == nil {
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
@@ -174,14 +324,6 @@ func (t CommitteeVerifier) CreateCommand() *model.CreateCommand {
 			return m.toMap()
 		}
 		return t.Deps
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["remoteChainFeeConfigs"] = func() any {
-		if t.RemoteChainFeeConfigs == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.RemoteChainFeeConfigs}
 	}()
 
 	return &model.CreateCommand{
@@ -206,6 +348,17 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["versionTag"] = string(t.VersionTag)
 
+	if t.AllowListAdmin != nil {
+		args["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.AllowListAdmin).ToMap(),
+		}
+	} else {
+		args["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["messageSentObservers"] = func() []any {
 		res := make([]any, 0, len(t.MessageSentObservers))
@@ -231,6 +384,14 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 	args["pendingStorageLocationsAdmin"] = t.PendingStorageLocationsAdmin.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["remoteChainConfigs"] = func() any {
+		if t.RemoteChainConfigs == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		}
+		return map[string]any{"_type": "genmap", "value": t.RemoteChainConfigs}
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["signerConfigs"] = func() any {
 		if t.SignerConfigs == nil {
 			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
@@ -245,14 +406,6 @@ func (t CommitteeVerifier) CreateCommandWithPackageID(packageID string) *model.C
 			return m.toMap()
 		}
 		return t.Deps
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["remoteChainFeeConfigs"] = func() any {
-		if t.RemoteChainFeeConfigs == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
-		}
-		return map[string]any{"_type": "genmap", "value": t.RemoteChainFeeConfigs}
 	}()
 
 	return &model.CreateCommand{
@@ -302,6 +455,69 @@ func (t CommitteeVerifier) CommitteeVerifierVerifyMessageWithPackageID(contractI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_VerifyMessage",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfig exercises the SetDynamicConfig choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t CommitteeVerifier) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyAllowListUpdates exercises the ApplyAllowListUpdates choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplyAllowListUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyAllowListUpdatesWithPackageID exercises the ApplyAllowListUpdates choice using the provided package ID instead of package name
+func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplyAllowListUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyRemoteChainConfigUpdates exercises the ApplyRemoteChainConfigUpdates choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) ApplyRemoteChainConfigUpdates(contractID string, args ApplyRemoteChainConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplyRemoteChainConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyRemoteChainConfigUpdatesWithPackageID exercises the ApplyRemoteChainConfigUpdates choice using the provided package ID instead of package name
+func (t CommitteeVerifier) ApplyRemoteChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyRemoteChainConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplyRemoteChainConfigUpdates",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -965,6 +1181,204 @@ func (t *CommitteeVerifierVerifyMessageMCMSParams) UnmarshalHex(data string) err
 	return hexCodec.Unmarshal(data, t)
 }
 
+// DynamicConfig is a Record type
+type DynamicConfig struct {
+	AllowListAdmin       *types.PARTY  `json:"allowListAdmin" hex:"optional"`
+	MessageSentObservers []types.PARTY `json:"messageSentObservers"`
+}
+
+// ToMap converts DynamicConfig to a map for DAML arguments
+func (t DynamicConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.AllowListAdmin != nil {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.AllowListAdmin).ToMap(),
+		}
+	} else {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["messageSentObservers"] = func() []any {
+		res := make([]any, 0, len(t.MessageSentObservers))
+		for _, e := range t.MessageSentObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t DynamicConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DynamicConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DynamicConfig to hex string (Canton MCMS format)
+func (t DynamicConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DynamicConfig from hex string (Canton MCMS format)
+func (t *DynamicConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemoteChainConfig is a Record type
+type RemoteChainConfig struct {
+	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+	GasForVerification types.INT64   `json:"gasForVerification"`
+	PayloadSizeBytes   types.INT64   `json:"payloadSizeBytes"`
+	AllowListEnabled   types.BOOL    `json:"allowListEnabled"`
+	AllowedSendersList []types.PARTY `json:"allowedSendersList"`
+}
+
+// ToMap converts RemoteChainConfig to a map for DAML arguments
+func (t RemoteChainConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["gasForVerification"] = int64(t.GasForVerification)
+
+	m["payloadSizeBytes"] = int64(t.PayloadSizeBytes)
+
+	m["allowListEnabled"] = bool(t.AllowListEnabled)
+
+	m["allowedSendersList"] = func() []any {
+		res := make([]any, 0, len(t.AllowedSendersList))
+		for _, e := range t.AllowedSendersList {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoteChainConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoteChainConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoteChainConfig to hex string (Canton MCMS format)
+func (t RemoteChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoteChainConfig from hex string (Canton MCMS format)
+func (t *RemoteChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemoteChainConfigArgs is a Record type
+type RemoteChainConfigArgs struct {
+	RemoteChainSelector types.NUMERIC `json:"remoteChainSelector"`
+	FeeUSDCents         types.NUMERIC `json:"feeUSDCents"`
+	GasForVerification  types.INT64   `json:"gasForVerification"`
+	PayloadSizeBytes    types.INT64   `json:"payloadSizeBytes"`
+	AllowListEnabled    types.BOOL    `json:"allowListEnabled"`
+}
+
+// ToMap converts RemoteChainConfigArgs to a map for DAML arguments
+func (t RemoteChainConfigArgs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["remoteChainSelector"] = t.RemoteChainSelector
+
+	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["gasForVerification"] = int64(t.GasForVerification)
+
+	m["payloadSizeBytes"] = int64(t.PayloadSizeBytes)
+
+	m["allowListEnabled"] = bool(t.AllowListEnabled)
+
+	return m
+}
+
+func (t RemoteChainConfigArgs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoteChainConfigArgs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoteChainConfigArgs to hex string (Canton MCMS format)
+func (t RemoteChainConfigArgs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoteChainConfigArgs from hex string (Canton MCMS format)
+func (t *RemoteChainConfigArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetDynamicConfig is a Record type
+type SetDynamicConfig struct {
+	DynamicConfig DynamicConfig `json:"dynamicConfig"`
+}
+
+// ToMap converts SetDynamicConfig to a map for DAML arguments
+func (t SetDynamicConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["dynamicConfig"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DynamicConfig).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DynamicConfig
+	}()
+
+	return m
+}
+
+func (t SetDynamicConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDynamicConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDynamicConfig to hex string (Canton MCMS format)
+func (t SetDynamicConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDynamicConfig from hex string (Canton MCMS format)
+func (t *SetDynamicConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SignatureConfig is a Record type
 type SignatureConfig struct {
 	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
@@ -1016,6 +1430,9 @@ func (t *SignatureConfig) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	ApplyAllowListUpdates(args ApplyAllowListUpdates) (*bind.EncodedChoice, error)
+	ApplyAllowListUpdatesMCMSParams(args ApplyAllowListUpdatesMCMSParams) (*bind.EncodedChoice, error)
+	ApplyRemoteChainConfigUpdates(args ApplyRemoteChainConfigUpdates) (*bind.EncodedChoice, error)
 	CommitteeVerifierAcceptStorageLocationsAdmin(args CommitteeVerifierAcceptStorageLocationsAdmin) (*bind.EncodedChoice, error)
 	CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
@@ -1026,6 +1443,7 @@ type MCMSEncoder interface {
 	CommitteeVerifierUpdateStorageLocations(args CommitteeVerifierUpdateStorageLocations) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error)
+	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1053,6 +1471,21 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// ApplyAllowListUpdates encodes parameters for the ApplyAllowListUpdates choice.
+func (e *encoder) ApplyAllowListUpdates(args ApplyAllowListUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyAllowListUpdates", args)
+}
+
+// ApplyAllowListUpdatesMCMSParams encodes MCMS parameters (without Caller) for the ApplyAllowListUpdates choice.
+func (e *encoder) ApplyAllowListUpdatesMCMSParams(args ApplyAllowListUpdatesMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyAllowListUpdates", args)
+}
+
+// ApplyRemoteChainConfigUpdates encodes parameters for the ApplyRemoteChainConfigUpdates choice.
+func (e *encoder) ApplyRemoteChainConfigUpdates(args ApplyRemoteChainConfigUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyRemoteChainConfigUpdates", args)
 }
 
 // CommitteeVerifierAcceptStorageLocationsAdmin encodes parameters for the CommitteeVerifierAcceptStorageLocationsAdmin choice.
@@ -1103,6 +1536,11 @@ func (e *encoder) CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMes
 // CommitteeVerifierVerifyMessageMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierVerifyMessage choice.
 func (e *encoder) CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
+}
+
+// SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
+func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDynamicConfig", args)
 }
 
 // Verify MCMSEncoder interface implementation

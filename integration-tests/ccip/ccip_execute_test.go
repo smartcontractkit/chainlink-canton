@@ -295,9 +295,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							SignerConfigs:                nil,                          // Will be configured later during lane setup
 							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
-							RemoteChainFeeConfigs:        nil,
 						},
 					},
 				},
@@ -433,6 +431,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 							remoteSelector: {
+								AllowlistEnabled:   false,
+								FeeUSDCents:        50,
+								GasForVerification: 50_000,
+								PayloadSizeBytes:   6*64 + 2*32,
 								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 									Signers:   ccvSignerPubKeys,
 									Threshold: 2,

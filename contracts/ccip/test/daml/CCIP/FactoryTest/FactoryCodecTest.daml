@@ -17,6 +17,7 @@ import MCMS.Codec
   , encodeInt64
   , encodeUint8
   , encodeList
+  , encodeOptional
   )
 import CCIP.Codec
   ( encodeInstrumentId
@@ -89,6 +90,7 @@ encodeDeployCommitteeVerifierParams params =
   <> encodeParty params.owner
   <> encodeParty params.ccipOwner
   <> encodeBytesHex params.versionTag
+  <> encodeOptional params.allowListAdmin encodeParty
   <> encodePartyList params.messageSentObservers
   <> encodeRawInstanceAddress params.rmnRemote
   <> encodeList params.storageLocations encodeText
@@ -323,12 +325,15 @@ testDecodeDeployCommitteeVerifierParams = script do
   messageSentObserver <- allocateParty "msg_observer"
   storageAdmin <- allocateParty "storage_admin"
   pendingAdmin <- allocateParty "pending_admin"
+  allowListAdmin <- allocateParty "allow_list_admin"
 
   let params = DeployCommitteeVerifierParams with
         instanceId = "ccv-1"
         owner
         ccipOwner
         versionTag = "01020304"
+        allowListAdmin = Some allowListAdmin
+        --allowListAdmin = None
         messageSentObservers = [messageSentObserver]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2", "loc3"]
@@ -343,6 +348,7 @@ testDecodeDeployCommitteeVerifierParams = script do
       decoded.owner === params.owner
       decoded.ccipOwner === params.ccipOwner
       decoded.versionTag === params.versionTag
+      decoded.allowListAdmin === params.allowListAdmin
       decoded.messageSentObservers === params.messageSentObservers
       decoded.rmnRemote === params.rmnRemote
       decoded.storageLocations === params.storageLocations
@@ -363,6 +369,7 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
         owner
         ccipOwner
         versionTag = ""
+        allowListAdmin = None
         messageSentObservers = [messageSentObserver]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = []
@@ -372,7 +379,9 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
 
   case decodeDeployCommitteeVerifierParams encoded of
     None -> abort "Failed to decode with empty storage locations"
-    Some decoded -> decoded.storageLocations === []
+    Some decoded -> do
+      decoded.storageLocations === []
+      decoded.allowListAdmin === None
 
   pure ()
 
