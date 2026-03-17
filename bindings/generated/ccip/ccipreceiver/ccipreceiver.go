@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "a2d77b027109200b2bf3b3c191762567df14d6fd13af7d6b09d1118c6495518c"
+	PackageID   = "32e101ed1f6000594308995b48c89fae68ea02e26b1a1d1bcf32cd9a52febd8d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -209,9 +209,10 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId   types.TEXT                  `json:"instanceId"`
-	Owner        types.PARTY                 `json:"owner"`
-	RequiredCCVs []common.RawInstanceAddress `json:"requiredCCVs"`
+	InstanceId    types.TEXT                  `json:"instanceId"`
+	Owner         types.PARTY                 `json:"owner"`
+	RequiredCCVs  []common.RawInstanceAddress `json:"requiredCCVs"`
+	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -248,6 +249,9 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minBlockDepth"] = int64(t.MinBlockDepth)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -277,6 +281,9 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 		}
 		return res
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

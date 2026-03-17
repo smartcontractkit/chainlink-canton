@@ -177,6 +177,7 @@ template OffRamp
             with
                 routerPartyOwner : Party
                 receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverMinBlockDepth : Int
 
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
 
@@ -252,6 +253,15 @@ template OffRamp
                         message.messageData == ""
                         && message.ccipReceiveGasLimit == 0
                         && isSome message.tokenTransfer
+                if isTokenOnlyTransfer
+                    then pure ()
+                    else if message.finality /= 0
+                        then do
+                            assertMsg "offramp: finalized-only receiver rejects FTF messages"
+                                (receiverMinBlockDepth /= 0)
+                            assertMsg "offramp: message finality below receiver minBlockDepth"
+                                (message.finality >= receiverMinBlockDepth)
+                        else pure ()
                 let resolvedReceiverRequiredCCVs = if isTokenOnlyTransfer
                         then []
                         else receiverRequiredCCVs

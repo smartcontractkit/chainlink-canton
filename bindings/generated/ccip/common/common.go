@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "d0e5d1b09e7ef9288e5f094cf40938cdece297a7cfeef58f6b30eed189b113f2"
+	PackageID   = "25fe6e33b6b2de3dddc3a1843596981541afeffa5c21b8432c8eab245028a384"
 	SDKVersion  = "3.4.10"
 )
 
@@ -213,7 +213,6 @@ func (t *AddCCVVerificationMCMSParams) UnmarshalHex(data string) error {
 type AddExecutorWithFee struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
@@ -227,8 +226,6 @@ func (t AddExecutorWithFee) ToMap() map[string]any {
 	m["executorInstanceId"] = string(t.ExecutorInstanceId)
 
 	m["executorArgs"] = string(t.ExecutorArgs)
-
-	m["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	m["feeUSDCents"] = t.FeeUSDCents
 
@@ -268,7 +265,6 @@ func (t *AddExecutorWithFee) UnmarshalHex(data string) error {
 type AddExecutorWithFeeMCMSParams struct {
 	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
 	ExecutorArgs       types.TEXT    `json:"executorArgs"`
-	BlockConfirmations types.INT64   `json:"blockConfirmations"`
 	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
 	DestGasLimit       types.INT64   `json:"destGasLimit"`
 	DestBytesOverhead  types.INT64   `json:"destBytesOverhead"`
@@ -3882,7 +3878,6 @@ type SendingMessageV1 struct {
 	Payload                   types.TEXT                                `json:"payload"`
 	ExecutionGasLimit         types.INT64                               `json:"executionGasLimit"`
 	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
-	BlockConfirmations        types.INT64                               `json:"blockConfirmations"`
 	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
 	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
 	OffRampAddress            types.TEXT                                `json:"offRampAddress"`
@@ -3988,9 +3983,6 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4246,9 +4238,6 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["blockConfirmations"] = int64(t.BlockConfirmations)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccvAndExecutorHash"] = string(t.CcvAndExecutorHash)
@@ -4968,6 +4957,7 @@ type TokenReceiveTicket struct {
 	SourcePoolData               types.TEXT                               `json:"sourcePoolData"`
 	MessageHash                  types.TEXT                               `json:"messageHash"`
 	SourceChainSelector          types.NUMERIC                            `json:"sourceChainSelector"`
+	Finality                     types.INT64                              `json:"finality"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -5031,6 +5021,9 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["finality"] = int64(t.Finality)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -5087,6 +5080,9 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 	if t.SourceChainSelector != "" {
 		args["sourceChainSelector"] = t.SourceChainSelector
 	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["finality"] = int64(t.Finality)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

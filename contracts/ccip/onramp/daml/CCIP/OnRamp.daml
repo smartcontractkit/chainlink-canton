@@ -111,7 +111,6 @@ template OnRamp
                 receiver : BytesHex
                 payload : BytesHex
                 ccipReceiveGasLimit : Int
-                blockConfirmations : Optional Int
                 currentSequenceNumber : Numeric 0
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
@@ -173,8 +172,6 @@ template OnRamp
                 let resolvedTokenReceiver = if hasTokenTransfer
                         then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
                         else ""
-                let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
-
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
@@ -198,7 +195,6 @@ template OnRamp
                     payload = payload
                     executionGasLimit = 0
                     ccipReceiveGasLimit
-                    blockConfirmations = resolvedBlockConfirmations
                     ccvAndExecutorHash = ""
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress

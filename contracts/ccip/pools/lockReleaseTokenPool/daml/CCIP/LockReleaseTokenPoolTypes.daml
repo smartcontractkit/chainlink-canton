@@ -11,7 +11,9 @@ data ChainUpdate = ChainUpdate
         remoteTokenAddress : BytesHex            -- The token address on the remote chain
         inboundCCVs : [RawInstanceAddress]       -- Required CCVs for incoming transfers
         outboundCCVs : [RawInstanceAddress]      -- Required CCVs for outgoing transfers
+        minBlockDepth : Int                      -- Minimum accepted source-chain depth; 0 means finalized-only
         inboundRateLimiter : RawInstanceAddress  -- Required rate limiter for incoming transfers
+        inboundCustomRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
         outboundRateLimiter : RawInstanceAddress -- Required rate limiter for outgoing transfers
     deriving (Eq, Show)
 
@@ -21,7 +23,9 @@ data RemoteChainConfig = RemoteChainConfig
         remoteTokenAddress : BytesHex            -- The token address on the remote chain
         inboundCCVs : [RawInstanceAddress]       -- Required CCVs for incoming transfers
         outboundCCVs : [RawInstanceAddress]      -- Required CCVs for outgoing transfers
+        minBlockDepth : Int                      -- Minimum accepted source-chain depth; 0 means finalized-only
         inboundRateLimiter : RawInstanceAddress  -- Required rate limiter for incoming transfers
+        inboundCustomRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
         outboundRateLimiter : RawInstanceAddress -- Required rate limiter for outgoing transfers
     deriving (Eq, Show)
 
@@ -37,5 +41,6 @@ data RateLimiterConfigArgs = RateLimiterConfigArgs
     with
         remoteChainSelector : Numeric 0
         inboundRateLimiter : RawInstanceAddress
+        inboundCustomRateLimiter : RawInstanceAddress
         outboundRateLimiter : RawInstanceAddress
     deriving (Eq, Show)

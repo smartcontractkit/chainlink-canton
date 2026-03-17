@@ -119,7 +119,6 @@ template SendingMessageV1
         payload : BytesHex
         executionGasLimit : Int
         ccipReceiveGasLimit : Int
-        blockConfirmations : Int
         ccvAndExecutorHash : BytesHex
         onRampAddress : BytesHex
         offRampAddress : BytesHex
@@ -239,7 +238,6 @@ template SendingMessageV1
             with
                 executorInstanceId : Text
                 executorArgs : BytesHex
-                blockConfirmations : Int
                 feeUSDCents : Numeric 0
                 destGasLimit : Int
                 destBytesOverhead : Int
@@ -288,7 +286,7 @@ template SendingMessageV1
                         sequenceNumber
                         executionGasLimit = finalExecutionGasLimit
                         ccipReceiveGasLimit
-                        finality = blockConfirmations
+                        finality = 0
                         ccvAndExecutorHash = finalHash
                         onRampAddress
                         offRampAddress
@@ -306,7 +304,6 @@ template SendingMessageV1
                     executorAddress = derivedExecutor
                     executorArgs = executorArgs
                     executionGasLimit = finalExecutionGasLimit
-                    blockConfirmations = blockConfirmations
                     ccvAndExecutorHash = finalHash
                     executorFee = Some ef
                     message = Some messageV1
