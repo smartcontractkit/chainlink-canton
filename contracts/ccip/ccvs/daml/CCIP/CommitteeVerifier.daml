@@ -155,7 +155,7 @@ template CommitteeVerifier
                 forA_ allowListConfigArgsItems $ \args -> do
                     assertMsg ("ApplyAllowListUpdates: invalid chain selector: " <> show args.destChainSelector ) (args.destChainSelector >= 0.0)
                     DA.Action.unless args.allowListEnabled $ do
-                        assertMsg "ApplyAllowListUpdates: cannot add allowed senders if allowlist is not enabled" (not (null args.addedAllowListedSenders))
+                        assertMsg "ApplyAllowListUpdates: cannot add allowed senders if allowlist is not enabled" (null args.addedAllowListedSenders)
                 -- Update
                 let updatedRemoteChainConfigs = foldl
                         (\configs args -> do
