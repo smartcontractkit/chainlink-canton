@@ -106,7 +106,7 @@ intToHexDigit n = case n of
   4 -> "4"; 5 -> "5"; 6 -> "6"; 7 -> "7"
   8 -> "8"; 9 -> "9"; 10 -> "a"; 11 -> "b"
   12 -> "c"; 13 -> "d"; 14 -> "e"; 15 -> "f"
-  _ -> "0"
+  _ -> error ("intToHexDigit: invalid digit: " <> show n)
 
 -- ===========================================================================
 -- NATIVE HASH FUNCTIONS (Replace placeholders in Types.daml)
@@ -125,24 +125,35 @@ computeSignedHashNative root validUntil =
     keccak256 prefixedData
 
 -- | Hash an operation to get its Merkle leaf using keccak256
+-- Uses length-prefixed encoding for variable-length fields to prevent preimage collisions
 hashOpLeafNative : Op -> BytesHex
 hashOpLeafNative op =
   let
+    multisigIdHex = asciiToHex op.multisigId
+    targetAddressHex = asciiToHex op.targetInstanceAddress
+    functionNameHex = asciiToHex op.functionName
     encoded = padLeft32 (intToHex op.chainId)
-           <> asciiToHex op.multisigId
+           <> padLeft32 (intToHex (T.length op.multisigId))  -- Length prefix for multisigId
+           <> multisigIdHex
            <> padLeft32 (intToHex op.nonce)
-           <> asciiToHex op.targetInstanceAddress
-           <> asciiToHex op.functionName
+           <> padLeft32 (intToHex (T.length op.targetInstanceAddress))  -- Length prefix for targetInstanceAddress
+           <> targetAddressHex
+           <> padLeft32 (intToHex (T.length op.functionName))  -- Length prefix for functionName
+           <> functionNameHex
+           <> padLeft32 (intToHex (T.length op.operationData / 2))  -- Length prefix for operationData (byte count)
            <> op.operationData
   in
     keccak256 encoded
 
 -- | Hash metadata to get its Merkle leaf using keccak256
+-- Uses length-prefixed encoding for consistency with hashOpLeafNative
 hashMetadataLeafNative : RootMetadata -> BytesHex
 hashMetadataLeafNative meta =
   let
+    multisigIdHex = asciiToHex meta.multisigId
     encoded = padLeft32 (intToHex meta.chainId)
-           <> asciiToHex meta.multisigId
+           <> padLeft32 (intToHex (T.length meta.multisigId))  -- Length prefix for multisigId
+           <> multisigIdHex
            <> padLeft32 (intToHex meta.preOpCount)
            <> padLeft32 (intToHex meta.postOpCount)
            <> (if meta.overridePreviousRoot then "01" else "00")
@@ -154,22 +165,36 @@ hashMetadataLeafNative meta =
 -- ===========================================================================
 
 -- opId = keccak256(abi.encode(calls, predecessor, salt))
+-- Uses length-prefixed encoding to prevent collision attacks
 hashTimelockOpId : [TimelockCall] -> BytesHex -> BytesHex -> BytesHex
 hashTimelockOpId calls predecessor salt =
   let
-    -- Encode each call
-    encodedCalls = foldl (<>) "" (map encodeTimelockCall calls)
-    -- Combine with predecessor and salt (already BytesHex, no conversion needed)
-    encoded = encodedCalls <> predecessor <> salt
+    -- Length prefix for calls array
+    callsCountPrefix = padLeft32 (intToHex (length calls))
+    -- Encode each call with length prefixes
+    encodedCalls = foldl (<>) "" (map encodeTimelockCallWithLengths calls)
+    -- Length prefix for predecessor (byte count = hex length / 2)
+    predecessorLenPrefix = padLeft32 (intToHex (T.length predecessor / 2))
+    -- Length prefix for salt (byte count = hex length / 2)
+    saltLenPrefix = padLeft32 (intToHex (T.length salt / 2))
+    -- Combine with length prefixes
+    encoded = callsCountPrefix <> encodedCalls <> predecessorLenPrefix <> predecessor <> saltLenPrefix <> salt
   in
     keccak256 encoded
 
--- | Encode a single timelock call for hashing
-encodeTimelockCall : TimelockCall -> BytesHex
-encodeTimelockCall call =
-  asciiToHex call.targetInstanceAddress
-  <> asciiToHex call.functionName
-  <> call.operationData  -- operationData is already BytesHex
+-- | Encode a single timelock call with length prefixes for hashing
+encodeTimelockCallWithLengths : TimelockCall -> BytesHex
+encodeTimelockCallWithLengths call =
+  let
+    targetHex = asciiToHex call.targetInstanceAddress
+    funcHex = asciiToHex call.functionName
+  in
+    padLeft32 (intToHex (T.length call.targetInstanceAddress))  -- Length prefix
+    <> targetHex
+    <> padLeft32 (intToHex (T.length call.functionName))  -- Length prefix
+    <> funcHex
+    <> padLeft32 (intToHex (T.length call.operationData / 2))  -- Length prefix (byte count)
+    <> call.operationData
 
 isValidHex : Text -> Bool
 isValidHex t =
@@ -280,5 +305,5 @@ charToCode c
   | c == "Y" = 89 | c == "Z" = 90
   | c == "_" = 95 | c == "-" = 45 | c == "." = 46 | c == " " = 32
   | c == "@" = 64 | c == ":" = 58
-  | otherwise = 63
+  | otherwise = error ("charToCode: unsupported character: " <> c)
 

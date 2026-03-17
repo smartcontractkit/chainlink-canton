@@ -3,8 +3,10 @@
 module CCIP.LockReleaseTokenPoolCodec
   ( encodeApplyChainUpdatesParams
   , decodeApplyChainUpdatesParams
+  , decodeApplyChainUpdatesParamsWithOffset
   , encodeUpdateRateLimitersParams
   , decodeUpdateRateLimitersParams
+  , decodeUpdateRateLimitersParamsWithOffset
   ) where
 
 import MCMS.Codec
@@ -39,11 +41,18 @@ encodeApplyChainUpdatesParams (remoteChainSelectorsToRemove, chainsToAdd) =
     encodeList remoteChainSelectorsToRemove encodeNumeric0 <>
     encodeList chainsToAdd encodeChainUpdate
 
+-- | Decode ApplyChainUpdates params with final offset
+decodeApplyChainUpdatesParamsWithOffset : BytesHex -> Optional (([Numeric 0], [ChainUpdate]), Int)
+decodeApplyChainUpdatesParamsWithOffset encoded = do
+    (remoteChainSelectorsToRemove, offset) <- decodeList encoded 0 decodeNumeric0At
+    (chainsToAdd, finalOffset) <- decodeList encoded offset decodeChainUpdateAt
+    Some ((remoteChainSelectorsToRemove, chainsToAdd), finalOffset)
+
+-- | Decode ApplyChainUpdates params (discards final offset)
 decodeApplyChainUpdatesParams : BytesHex -> Optional ([Numeric 0], [ChainUpdate])
 decodeApplyChainUpdatesParams encoded = do
-    (remoteChainSelectorsToRemove, offset) <- decodeList encoded 0 decodeNumeric0At
-    (chainsToAdd, _) <- decodeList encoded offset decodeChainUpdateAt
-    Some (remoteChainSelectorsToRemove, chainsToAdd)
+    (result, _) <- decodeApplyChainUpdatesParamsWithOffset encoded
+    Some result
 
 encodeChainUpdate : ChainUpdate -> BytesHex
 encodeChainUpdate chainUpdate =
@@ -76,10 +85,17 @@ encodeUpdateRateLimitersParams : [RateLimiterConfigArgs] -> BytesHex
 encodeUpdateRateLimitersParams rateLimiterConfigArgsList =
     encodeList rateLimiterConfigArgsList encodeRateLimiterConfigArgs
 
+-- | Decode UpdateRateLimiters params with final offset
+decodeUpdateRateLimitersParamsWithOffset : BytesHex -> Optional ([RateLimiterConfigArgs], Int)
+decodeUpdateRateLimitersParamsWithOffset encoded = do
+    (rateLimiterConfigArgsList, finalOffset) <- decodeList encoded 0 decodeRateLimiterConfigArgsAt
+    Some (rateLimiterConfigArgsList, finalOffset)
+
+-- | Decode UpdateRateLimiters params (discards final offset)
 decodeUpdateRateLimitersParams : BytesHex -> Optional [RateLimiterConfigArgs]
 decodeUpdateRateLimitersParams encoded = do
-    (rateLimiterConfigArgsList, _) <- decodeList encoded 0 decodeRateLimiterConfigArgsAt
-    Some rateLimiterConfigArgsList
+    (result, _) <- decodeUpdateRateLimitersParamsWithOffset encoded
+    Some result
 
 encodeRateLimiterConfigArgs : RateLimiterConfigArgs -> BytesHex
 encodeRateLimiterConfigArgs args =

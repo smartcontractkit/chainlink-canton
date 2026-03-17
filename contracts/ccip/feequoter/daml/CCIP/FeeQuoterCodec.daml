@@ -2,8 +2,10 @@
 -- Used by the MCMSReceiver interface implementation to decode operationData
 module CCIP.FeeQuoterCodec
   ( decodeApplyFeeTokenUpdatesParams
+  , decodeApplyFeeTokenUpdatesParamsWithOffset
   , encodeApplyFeeTokenUpdatesParams
   , decodeApplyDestChainConfigUpdatesParams
+  , decodeApplyDestChainConfigUpdatesParamsWithOffset
   , encodeApplyDestChainConfigUpdatesParams
   , encodeFeeTokenArgs
   , decodeFeeTokenArgsAt
@@ -40,22 +42,34 @@ import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChain
 -- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
 -- ===========================================================================
 
--- | Decode ApplyFeeTokenUpdates params
+-- | Decode ApplyFeeTokenUpdates params with final offset
 -- Format: [uint8 numRemove][instrumentId...][uint8 numAdd][feeTokenArgs...]
-decodeApplyFeeTokenUpdatesParams : BytesHex -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs])
-decodeApplyFeeTokenUpdatesParams encoded = do
+decodeApplyFeeTokenUpdatesParamsWithOffset : BytesHex -> Optional (([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs]), Int)
+decodeApplyFeeTokenUpdatesParamsWithOffset encoded = do
   -- Decode list of instrumentIds to remove
   (toRemove, offset1) <- decodeInstrumentIdList encoded 0
   -- Decode list of FeeTokenArgs to add
-  (toAdd, _) <- decodeFeeTokenArgsList encoded offset1
-  Some (toRemove, toAdd)
+  (toAdd, finalOffset) <- decodeFeeTokenArgsList encoded offset1
+  Some ((toRemove, toAdd), finalOffset)
 
--- | Decode ApplyDestChainConfigUpdates params
+-- | Decode ApplyFeeTokenUpdates params (discards final offset)
+decodeApplyFeeTokenUpdatesParams : BytesHex -> Optional ([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs])
+decodeApplyFeeTokenUpdatesParams encoded = do
+  (result, _) <- decodeApplyFeeTokenUpdatesParamsWithOffset encoded
+  Some result
+
+-- | Decode ApplyDestChainConfigUpdates params with final offset
 -- Format: [uint8 numConfigs][destChainConfigArgs...]
+decodeApplyDestChainConfigUpdatesParamsWithOffset : BytesHex -> Optional ([DestChainConfigArgs], Int)
+decodeApplyDestChainConfigUpdatesParamsWithOffset encoded = do
+  (configs, finalOffset) <- decodeDestChainConfigArgsList encoded 0
+  Some (configs, finalOffset)
+
+-- | Decode ApplyDestChainConfigUpdates params (discards final offset)
 decodeApplyDestChainConfigUpdatesParams : BytesHex -> Optional [DestChainConfigArgs]
 decodeApplyDestChainConfigUpdatesParams encoded = do
-  (configs, _) <- decodeDestChainConfigArgsList encoded 0
-  Some configs
+  (result, _) <- decodeApplyDestChainConfigUpdatesParamsWithOffset encoded
+  Some result
 
 -- ===========================================================================
 -- ENCODE FUNCTIONS (for tests and Go integration)
