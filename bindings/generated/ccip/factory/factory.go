@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "316df2864d6426789ae2fbe7042abf1f573b6315d980c90bdbac0145a182731d"
+	PackageID   = "dedbceb41cd2fc10c20a15a37ec46a8422c950ebd1a862d4c598537abd9f3ce3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -741,6 +741,7 @@ type DeployCommitteeVerifierParams struct {
 	Owner                        types.PARTY               `json:"owner"`
 	CcipOwner                    types.PARTY               `json:"ccipOwner"`
 	VersionTag                   types.TEXT                `json:"versionTag"`
+	AllowListAdmin               *types.PARTY              `json:"allowListAdmin" hex:"optional"`
 	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
 	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
 	StorageLocations             []types.TEXT              `json:"storageLocations"`
@@ -759,6 +760,17 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["versionTag"] = string(t.VersionTag)
+
+	if t.AllowListAdmin != nil {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.AllowListAdmin).ToMap(),
+		}
+	} else {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	m["messageSentObservers"] = func() []any {
 		res := make([]any, 0, len(t.MessageSentObservers))
