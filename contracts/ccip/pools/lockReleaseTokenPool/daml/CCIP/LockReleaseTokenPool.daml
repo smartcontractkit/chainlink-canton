@@ -368,7 +368,7 @@ template LockReleaseTokenPool
                         then CCIP.RateLimiter.RateLimitMode_CustomFinality
                         else CCIP.RateLimiter.RateLimitMode_DefaultFinality
                 let expectedRateLimiter = if isFTF
-                        then remoteChainCfg.inboundCustomRateLimiter
+                        then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
                 rateLimiterCid <- CCIP.RateLimiter.lookupInboundRateLimiterCid expectedRateLimitMode extraContext
                 rateLimiter <- fetch rateLimiterCid
@@ -450,14 +450,14 @@ template LockReleaseTokenPool
                         remoteChainSelectorsToRemove
 
                 -- Validate
-                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter} -> do
+                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
                     assertMsg "ApplyChainUpdates: minBlockDepth cannot be negative" (minBlockDepth >= 0)
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     -- Validate rate limiters
-                    assertMsg "ApplyChainUpdates: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && inboundCustomRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
+                    assertMsg "ApplyChainUpdates: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && inboundCustomBlockConfirmationsRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
                     assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
                     -- Validate remote pools
                     assertMsg "ApplyChainUpdates: remotePools cannot contain empty address" ("" `notElem` remotePools)
@@ -465,8 +465,17 @@ template LockReleaseTokenPool
                     assertMsg "ApplyChainUpdates: inbound and outbound CCV lists cannot contain duplicates" (length inboundCCVs == length (dedup inboundCCVs) && length outboundCCVs == length (dedup outboundCCVs))
                 -- Add new chain configs
                 let remoteChainConfigsAdded = foldl
-                        (\configs ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter} ->
-                            Map.insert remoteChainSelector RemoteChainConfig{remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter} configs)
+                        (\configs newConfig ->
+                            Map.insert newConfig.remoteChainSelector RemoteChainConfig with 
+                                    remotePools = newConfig.remotePools
+                                    remoteTokenAddress = newConfig.remoteTokenAddress
+                                    inboundCCVs = newConfig.inboundCCVs
+                                    outboundCCVs = newConfig.outboundCCVs
+                                    minBlockDepth = newConfig.minBlockDepth
+                                    inboundRateLimiter = newConfig.inboundRateLimiter
+                                    inboundCustomBlockConfirmationsRateLimiter = newConfig.inboundCustomBlockConfirmationsRateLimiter
+                                    outboundRateLimiter = newConfig.outboundRateLimiter
+                                configs)
                         remoteChainConfigsRemoved
                         chainsToAdd
                 create this with
@@ -478,19 +487,19 @@ template LockReleaseTokenPool
             controller poolOwner
             do
                 -- Validate
-                forA_ rateLimiterConfigArgs $ \RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter} -> do
+                forA_ rateLimiterConfigArgs $ \RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "UpdateRateLimiters: invalid chain selector" (remoteChainSelector > 0.0)
-                    assertMsg "UpdateRateLimiters: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && inboundCustomRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
+                    assertMsg "UpdateRateLimiters: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && inboundCustomBlockConfirmationsRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
                     assertMsg "UpdateRateLimiters: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
                     assertMsg ("UpdateRateLimiters: unsupported chain selector: " <> show remoteChainSelector) (Map.member remoteChainSelector remoteChainConfigs)
 
                 -- Update
                 let remoteChainConfigsUpdated = foldl
-                        (\configs RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomRateLimiter, outboundRateLimiter} ->
+                        (\configs RateLimiterConfigArgs{remoteChainSelector, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} ->
                             case Map.lookup remoteChainSelector configs of
                                 None -> configs
                                 Some cfg ->
-                                    let updatedCfg = cfg with inboundRateLimiter = inboundRateLimiter, inboundCustomRateLimiter = inboundCustomRateLimiter, outboundRateLimiter = outboundRateLimiter
+                                    let updatedCfg = cfg with inboundRateLimiter = inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter = inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter = outboundRateLimiter
                                     in Map.insert remoteChainSelector updatedCfg configs
                         )
                         remoteChainConfigs

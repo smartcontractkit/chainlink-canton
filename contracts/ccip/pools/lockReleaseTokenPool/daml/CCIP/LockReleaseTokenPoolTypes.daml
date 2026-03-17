@@ -6,27 +6,27 @@ import CCIP.RawInstanceAddress (RawInstanceAddress)
 
 data ChainUpdate = ChainUpdate
     with
-        remoteChainSelector : Numeric 0          -- Chain selector for this config update
-        remotePools : [BytesHex]                 -- Allowed remote pool addresses for this chain
-        remoteTokenAddress : BytesHex            -- The token address on the remote chain
-        inboundCCVs : [RawInstanceAddress]       -- Required CCVs for incoming transfers
-        outboundCCVs : [RawInstanceAddress]      -- Required CCVs for outgoing transfers
-        minBlockDepth : Int                      -- Minimum accepted source-chain depth; 0 means finalized-only
-        inboundRateLimiter : RawInstanceAddress  -- Required rate limiter for incoming transfers
-        inboundCustomRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
-        outboundRateLimiter : RawInstanceAddress -- Required rate limiter for outgoing transfers
+        remoteChainSelector : Numeric 0                                 -- Chain selector for this config update
+        remotePools : [BytesHex]                                        -- Allowed remote pool addresses for this chain
+        remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
+        inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
+        minBlockDepth : Int                                             -- Minimum accepted source-chain depth; 0 means finalized-only
+        inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
+        outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
     deriving (Eq, Show)
 
 data RemoteChainConfig = RemoteChainConfig
     with 
-        remotePools : [BytesHex]                 -- Allowed remote pool addresses for this chain
-        remoteTokenAddress : BytesHex            -- The token address on the remote chain
-        inboundCCVs : [RawInstanceAddress]       -- Required CCVs for incoming transfers
-        outboundCCVs : [RawInstanceAddress]      -- Required CCVs for outgoing transfers
-        minBlockDepth : Int                      -- Minimum accepted source-chain depth; 0 means finalized-only
-        inboundRateLimiter : RawInstanceAddress  -- Required rate limiter for incoming transfers
-        inboundCustomRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
-        outboundRateLimiter : RawInstanceAddress -- Required rate limiter for outgoing transfers
+        remotePools : [BytesHex]                                        -- Allowed remote pool addresses for this chain
+        remoteTokenAddress : BytesHex                                   -- The token address on the remote chain
+        inboundCCVs : [RawInstanceAddress]                              -- Required CCVs for incoming transfers
+        outboundCCVs : [RawInstanceAddress]                             -- Required CCVs for outgoing transfers
+        minBlockDepth : Int                                             -- Minimum accepted source-chain depth; 0 means finalized-only
+        inboundRateLimiter : RawInstanceAddress                         -- Required rate limiter for incoming transfers
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress -- Required rate limiter for FTF incoming transfers
+        outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
     deriving (Eq, Show)
 
 data TokenTransferFeeConfig = TokenTransferFeeConfig
@@ -41,6 +41,6 @@ data RateLimiterConfigArgs = RateLimiterConfigArgs
     with
         remoteChainSelector : Numeric 0
         inboundRateLimiter : RawInstanceAddress
-        inboundCustomRateLimiter : RawInstanceAddress
+        inboundCustomBlockConfirmationsRateLimiter : RawInstanceAddress
         outboundRateLimiter : RawInstanceAddress
     deriving (Eq, Show)

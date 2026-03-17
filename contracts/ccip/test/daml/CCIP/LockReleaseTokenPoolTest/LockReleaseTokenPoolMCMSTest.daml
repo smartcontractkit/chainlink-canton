@@ -64,7 +64,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress "rate-limiter-in-new@owner"
-                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
             ]
 
@@ -106,7 +106,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
             outboundCCVs = [RawInstanceAddress "out1@owner"]
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
-            inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
             outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
 
     -- Create LockReleaseTokenPool with existing remote chain config
@@ -136,7 +136,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
                 outboundCCVs = []
                 minBlockDepth = 12
                 inboundRateLimiter = RawInstanceAddress "rate-limiter-in-new@owner"
-                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
             ,ChainUpdate with
                 remoteChainSelector = 456.0
@@ -146,7 +146,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress "rate-limiter-in-2@owner"
-                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom-2@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-2@owner"
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-2@owner"
             ]
 
@@ -193,7 +193,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
             outboundCCVs = [RawInstanceAddress "out1@owner"]
             minBlockDepth = 0
             inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
-            inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
             outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
 
   -- Create LockReleaseTokenPool with existing config
@@ -218,7 +218,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
             RateLimiterConfigArgs with
                 remoteChainSelector = 123.0
                 inboundRateLimiter = RawInstanceAddress "rate-limiter-in-updated@owner"
-                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom-updated@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-updated@owner"
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
@@ -352,7 +352,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
                 outboundCCVs = []
                 minBlockDepth = 0
                 inboundRateLimiter = RawInstanceAddress "rate-limiter-in-new@owner"
-                inboundCustomRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
             ]
 
