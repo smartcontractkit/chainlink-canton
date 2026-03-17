@@ -270,11 +270,13 @@ template LockReleaseTokenPool
                     None -> abort "pool: unsupported source chain"
                     Some cfg -> pure cfg
 
-                if remoteChainCfg.minBlockDepth == 0
-                    then assertMsg "pool: finalized-only pool rejects FTF messages"
-                        (message.finality == 0)
-                    else assertMsg "pool: message finality below pool minBlockDepth"
-                        (message.finality > 0 && message.finality >= remoteChainCfg.minBlockDepth)
+                if message.finality /= 0
+                    then do
+                        assertMsg "pool: finalized-only pool rejects FTF messages"
+                            (remoteChainCfg.minBlockDepth /= 0)
+                        assertMsg "pool: message finality below pool minBlockDepth"
+                            (message.finality >= remoteChainCfg.minBlockDepth)
+                    else pure ()
 
                 assertMsg "pool: invalid sourcePoolAddress"
                     (tt.sourcePoolAddress `elem` remoteChainCfg.remotePools)

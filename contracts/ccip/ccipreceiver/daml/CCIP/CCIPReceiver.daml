@@ -115,11 +115,13 @@ template CCIPReceiver
                         && isSome em.message.tokenTransfer
                 if isTokenOnlyTransfer
                     then pure ()
-                    else if minBlockDepth == 0
-                        then assertMsg "receiver: finalized-only receiver rejects FTF messages"
-                            (em.message.finality == 0)
-                        else assertMsg "receiver: message finality below receiver minBlockDepth"
-                            (em.message.finality > 0 && em.message.finality >= minBlockDepth)
+                    else if em.message.finality /= 0
+                        then do
+                            assertMsg "receiver: finalized-only receiver rejects FTF messages"
+                                (minBlockDepth /= 0)
+                            assertMsg "receiver: message finality below receiver minBlockDepth"
+                                (em.message.finality >= minBlockDepth)
+                        else pure ()
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->

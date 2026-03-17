@@ -255,11 +255,13 @@ template OffRamp
                         && isSome message.tokenTransfer
                 if isTokenOnlyTransfer
                     then pure ()
-                    else if receiverMinBlockDepth == 0
-                        then assertMsg "offramp: finalized-only receiver rejects FTF messages"
-                            (message.finality == 0)
-                        else assertMsg "offramp: message finality below receiver minBlockDepth"
-                            (message.finality > 0 && message.finality >= receiverMinBlockDepth)
+                    else if message.finality /= 0
+                        then do
+                            assertMsg "offramp: finalized-only receiver rejects FTF messages"
+                                (receiverMinBlockDepth /= 0)
+                            assertMsg "offramp: message finality below receiver minBlockDepth"
+                                (message.finality >= receiverMinBlockDepth)
+                        else pure ()
                 let resolvedReceiverRequiredCCVs = if isTokenOnlyTransfer
                         then []
                         else receiverRequiredCCVs
