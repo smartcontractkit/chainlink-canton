@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "d74e108c6beb73f42171fbd0ea38507a404ab365929bc9b316641e64a17f8def"
+	PackageID   = "cec2e43fa64d53f766dc631dab8584092860b7bdf368feed36bf624920ac0468"
 	SDKVersion  = "3.4.10"
 )
 
@@ -450,11 +450,11 @@ func (t CCIPFactory) SetOwnerToMCMSWithPackageID(contractID string, packageID st
 	}
 }
 
-// Archive exercises the Archive choice on this CCIPFactory contract
+// Archive exercises the Archive choice on this CCIPFactory contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "CCIPFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -464,7 +464,7 @@ func (t CCIPFactory) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CCIPFactory) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "CCIPFactory"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Factory", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -741,7 +741,8 @@ type DeployCommitteeVerifierParams struct {
 	Owner                        types.PARTY               `json:"owner"`
 	CcipOwner                    types.PARTY               `json:"ccipOwner"`
 	VersionTag                   types.TEXT                `json:"versionTag"`
-	MessageSentObserver          types.PARTY               `json:"messageSentObserver"`
+	AllowListAdmin               *types.PARTY              `json:"allowListAdmin" hex:"optional"`
+	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
 	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
 	StorageLocations             []types.TEXT              `json:"storageLocations"`
 	StorageLocationsAdmin        types.PARTY               `json:"storageLocationsAdmin"`
@@ -760,7 +761,24 @@ func (t DeployCommitteeVerifierParams) ToMap() map[string]any {
 
 	m["versionTag"] = string(t.VersionTag)
 
-	m["messageSentObserver"] = t.MessageSentObserver.ToMap()
+	if t.AllowListAdmin != nil {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.AllowListAdmin).ToMap(),
+		}
+	} else {
+		m["allowListAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["messageSentObservers"] = func() []any {
+		res := make([]any, 0, len(t.MessageSentObservers))
+		for _, e := range t.MessageSentObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
 
 	m["rmnRemote"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1022,11 +1040,14 @@ func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
 
 // DeployLockReleaseTokenPoolParams is a Record type
 type DeployLockReleaseTokenPoolParams struct {
-	InstanceId   types.TEXT                               `json:"instanceId"`
-	CcipOwner    types.PARTY                              `json:"ccipOwner"`
-	PoolOwner    types.PARTY                              `json:"poolOwner"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Decimals     types.INT64                              `json:"decimals"`
+	InstanceId         types.TEXT                               `json:"instanceId"`
+	CcipOwner          types.PARTY                              `json:"ccipOwner"`
+	PoolOwner          types.PARTY                              `json:"poolOwner"`
+	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Decimals           types.INT64                              `json:"decimals"`
+	TokenAdminRegistry common.RawInstanceAddress                `json:"tokenAdminRegistry"`
+	FeeQuoter          common.RawInstanceAddress                `json:"feeQuoter"`
+	RmnRemote          common.RawInstanceAddress                `json:"rmnRemote"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
@@ -1048,6 +1069,30 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	}()
 
 	m["decimals"] = int64(t.Decimals)
+
+	m["tokenAdminRegistry"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistry).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistry
+	}()
+
+	m["feeQuoter"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoter).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoter
+	}()
+
+	m["rmnRemote"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.RmnRemote).(mapper); ok {
+			return m.toMap()
+		}
+		return t.RmnRemote
+	}()
 
 	return m
 }

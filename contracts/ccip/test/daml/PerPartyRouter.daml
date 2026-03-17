@@ -376,14 +376,18 @@ testCCIPSendAcceptsPendingFeeTransfer = script do
                 ccvRegistry = ccvRegistryInstanceAddress
 
     executor <- submit ccipOwner do
-        createCmd TestExecutor.TestExecutor with
+        createCmd CCIP.Executor.Executor with
             instanceId = "test-executor-pending-fee"
             owner = ccipOwner
-            minBlockConfirmations = 0
             maxCCVsPerMsg = 10
-            ccvAllowlistEnabled = False
+            dynamicConfig = CCIP.Executor.DynamicConfig with
+                feeAggregator = None
+                minBlockConfirmations = 0
+                ccvAllowlistEnabled = False
             allowedCCVs = []
-            remoteChainFeeUSDCents = Map.fromList [(destChainSelector, 0.0)]
+            remoteChainConfigs = Map.fromList [(destChainSelector, CCIP.Executor.RemoteChainConfig with
+                feeUSDCents = 0.0
+                enabled = True)]
 
     factory <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
