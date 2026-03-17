@@ -196,13 +196,6 @@ encodeTimelockCallWithLengths call =
     <> padLeft32 (intToHex (T.length call.operationData / 2))  -- Length prefix (byte count)
     <> call.operationData
 
--- | Encode a single timelock call for hashing
-encodeTimelockCall : TimelockCall -> BytesHex
-encodeTimelockCall call =
-  asciiToHex call.targetInstanceAddress
-  <> asciiToHex call.functionName
-  <> call.operationData  -- operationData is already BytesHex
-
 isValidHex : Text -> Bool
 isValidHex t =
   (T.length t % 2 == 0) && allHexDigits t
