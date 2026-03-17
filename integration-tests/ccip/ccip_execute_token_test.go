@@ -115,6 +115,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		{Label: "admin", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: registryAdmin}}},
 		{Label: "id", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "Amulet"}}},
 	}}}}
+	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
+	hashedInstrumentIdHex := hex.EncodeToString(crypto.Keccak256(encodedInstrumentId))
 
 	// CCIP Deployment
 	sourceChainSelector := "123"
@@ -170,7 +172,12 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccv-receive"}}},
 						{Label: "versionTag", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: versionTag}}},
 						{Label: "ccipOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "messageSentObserver", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
+						{Label: "allowListAdmin", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{
+							Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}},
+						}}}},
+						{Label: "messageSentObservers", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
+							{Sum: &apiv2.Value_Party{Party: partyCCIP}},
+						}}}}},
 						{Label: "storageLocations", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 							{Sum: &apiv2.Value_Text{Text: "ipfs://test-receive"}},
 						}}}}},
@@ -191,7 +198,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
 						}}}}},
-						{Label: "remoteChainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 					}},
 				}},
 			}},
@@ -394,23 +401,20 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-pool-receive"}}},
 						{Label: "instrumentId", Value: instrumentIdAmt},
 						{Label: "decimals", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 6}}},
-						{Label: "chainPoolConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
+						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
 							Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
 							Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								{Label: "remotePools", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: []*apiv2.Value{
 									{Sum: &apiv2.Value_Text{Text: hex.EncodeToString([]byte(partyTokenPoolOwner))}},
 								}}}}},
+								{Label: "remoteTokenAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hashedInstrumentIdHex}}},
+								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+								{Label: "inboundRateLimiter", Value: rawInstanceAddress("test-pool-receive-inbound-rl@" + partyTokenPoolOwner)},
+								{Label: "outboundRateLimiter", Value: rawInstanceAddress("test-pool-receive-inbound-rl@" + partyTokenPoolOwner)},
 							}}}},
 						}}}}}},
-						{Label: "chainFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-						{Label: "outboundRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
-						{Label: "inboundRateLimiters", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{{
-							Key:   &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}},
-							Value: rawInstanceAddress("test-pool-receive-inbound-rl@" + partyTokenPoolOwner),
-						}}}}}},
-						{Label: "remoteTokens", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
+						{Label: "tokenTransferFeeConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: nil}}}},
 						{Label: "poolReceiveContext", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
 							{Label: "values", Value: &apiv2.Value{Sum: &apiv2.Value_TextMap{TextMap: &apiv2.TextMap{Entries: nil}}}},
 						}}}}},
@@ -419,6 +423,11 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 							Constructor: "RelativeHours",
 							Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 24}},
 						}}}},
+						{Label: "deps", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+							{Label: "tokenAdminRegistry", Value: rawInstanceAddress("test-tar-receive@" + partyCCIP)},
+							{Label: "rmnRemote", Value: rawInstanceAddress("test-rmn-receive@" + partyCCIP)},
+							{Label: "feeQuoter", Value: rawInstanceAddress("placeholder-feequoter@" + partyCCIP)},
+						}}}}},
 					}},
 				}},
 			}},
@@ -515,9 +524,6 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Build Message
 	// Encode instrumentId for destTokenAddress
-	encodedInstrumentId := encodeInstrumentId(registryAdmin, "Amulet")
-	hashedInstrumentIdHex := hex.EncodeToString(crypto.Keccak256(encodedInstrumentId))
-
 	// Build token transfer (5 AMT in Splice Decimal format)
 	tokenAmount := big.NewInt(5)
 	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, partyTokenPoolOwner, hashedInstrumentIdHex, partyReceiver)
