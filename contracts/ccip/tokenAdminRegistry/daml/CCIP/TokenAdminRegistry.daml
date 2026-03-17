@@ -114,8 +114,10 @@ template TokenAdminRegistry
                             Some currentAdmin ->
                                 if currentAdmin /= caller then
                                     abort "TokenAdminRegistry_TransferAdminRole: Caller is not the current admin"
+                                else if currentAdmin == newAdmin then
+                                    abort "TokenAdminRegistry_TransferAdminRole: New admin must differ from current admin"
                                 else do
-                                    let updatedConfig = config with admin = Some newAdmin
+                                    let updatedConfig = config with pendingAdmin = Some newAdmin
                                         updatedMap = Map.insert (CCIP.MessageCodecV1.encodeInstrumentId instrumentId) updatedConfig tokenConfigs
                                     create this with tokenConfigs = updatedMap
 

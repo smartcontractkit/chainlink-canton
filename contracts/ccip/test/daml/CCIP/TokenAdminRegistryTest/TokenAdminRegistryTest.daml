@@ -1,0 +1,98 @@
+module CCIP.TokenAdminRegistryTest.TokenAdminRegistryTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified CCIP.MessageCodecV1
+import CCIP.TokenAdminRegistry
+import CCIP.TokenAdminRegistryTypes (TokenConfig(..))
+
+testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance : Script ()
+testTokenAdminRegistry_TransferAdminRoleRequiresAcceptance = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+  newAdmin <- allocateParty "NewAdmin"
+
+  let instanceId = "tar-transfer-direct-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "WBTC"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+
+  tarCid <- submit owner do
+    createCmd TokenAdminRegistry with
+      instanceId
+      owner
+      tokenConfigs = Map.fromList [
+        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
+        ]
+
+  tarCid <- submit owner do
+    exerciseCmd tarCid TokenAdminRegistry_TransferAdminRole with
+      instrumentId
+      newAdmin
+      caller = owner
+
+  contractsAfterTransfer <- query @TokenAdminRegistry owner
+  case filter (\(_, tar) -> tar.instanceId == instanceId) contractsAfterTransfer of
+    [(_, tar)] ->
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
+        None -> abort "Expected token config after transfer"
+        Some config -> do
+          config.admin === Some owner
+          config.pendingAdmin === Some newAdmin
+    _ -> abort "Expected exactly one TokenAdminRegistry contract after transfer"
+
+  disclosedTar <- fromSome <$> queryDisclosure owner tarCid
+  tarCid <- submit (actAs newAdmin <> disclose disclosedTar) do
+    exerciseCmd tarCid TokenAdminRegistry_AcceptAdminRole with
+      instrumentId
+      caller = newAdmin
+
+  contractsAfterAccept <- query @TokenAdminRegistry owner
+  case filter (\(_, tar) -> tar.instanceId == instanceId) contractsAfterAccept of
+    [(_, tar)] ->
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
+        None -> abort "Expected token config after acceptance"
+        Some config -> do
+          config.admin === Some newAdmin
+          config.pendingAdmin === None
+    _ -> abort "Expected exactly one TokenAdminRegistry contract after acceptance"
+
+  pure ()
+
+testTokenAdminRegistry_TransferAdminRoleRejectsSameAdmin : Script ()
+testTokenAdminRegistry_TransferAdminRoleRejectsSameAdmin = script do
+  owner <- allocateParty "ccip_owner"
+  tokenAdmin <- allocateParty "TokenAdmin"
+
+  let instanceId = "tar-transfer-same-admin-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+      encodedInstrumentId = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+
+  tarCid <- submit owner do
+    createCmd TokenAdminRegistry with
+      instanceId
+      owner
+      tokenConfigs = Map.fromList [
+        (encodedInstrumentId, TokenConfig instrumentId (Some owner) None None)
+        ]
+
+  submitMustFail owner do
+    exerciseCmd tarCid TokenAdminRegistry_TransferAdminRole with
+      instrumentId
+      newAdmin = owner
+      caller = owner
+
+  contracts <- query @TokenAdminRegistry owner
+  case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
+    [(_, tar)] ->
+      case Map.lookup encodedInstrumentId tar.tokenConfigs of
+        None -> abort "Expected token config to remain unchanged"
+        Some config -> do
+          config.admin === Some owner
+          config.pendingAdmin === None
+    _ -> abort "Expected exactly one TokenAdminRegistry contract after rejected transfer"
+
+  pure ()
