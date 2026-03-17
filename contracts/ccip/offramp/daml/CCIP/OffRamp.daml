@@ -3,7 +3,7 @@ module CCIP.OffRamp where
 
 import DA.Foldable qualified as Foldable
 import DA.Crypto.Text (BytesHex, keccak256)
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
 
@@ -83,6 +83,9 @@ template OffRamp
                 globalConfig <- fetch globalConfigCid
                 CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                -- The receiver required CCVs are passed in and cannot contain duplicates
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in receiver required CCVs" (unique receiverRequiredCCVs)
 
                 -- Get lane-mandated CCVs from GlobalConfig
                 sourceConfigOpt <- exercise globalConfigCid
@@ -237,6 +240,9 @@ template OffRamp
                         assertMsg "offramp: invalid source onramp"
                             (message.onRampAddress `elem` c.onRampAddresses)
                         pure c
+
+                -- The receiver required CCVs are passed in and cannot contain duplicates
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in receiver required CCVs" (unique receiverRequiredCCVs)
 
                 -- Get pool's declared CCV requirements from ExecutingMessageV1.
                 -- Pool records these via SetInboundPoolCCVs; None means pool wasn't called.
