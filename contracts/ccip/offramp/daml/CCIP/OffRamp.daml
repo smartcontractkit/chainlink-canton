@@ -3,7 +3,7 @@ module CCIP.OffRamp where
 
 import DA.Foldable qualified as Foldable
 import DA.Crypto.Text (BytesHex, keccak256)
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
 
@@ -84,6 +84,9 @@ template OffRamp
                 CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
+                -- The receiver required CCVs are passed in and cannot contain duplicates
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in receiver required CCVs" (unique receiverRequiredCCVs)
+
                 -- Get lane-mandated CCVs from GlobalConfig
                 sourceConfigOpt <- exercise globalConfigCid
                     CCIP.GlobalConfig.GetSourceChainConfig with
@@ -140,11 +143,9 @@ template OffRamp
                     _ -> pure ()
 
                 -- Validate RMN instance address and check curse
-                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
-                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
-                    caller = ccipOwner
+                rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "prepareExecute: rmn mismatch"
-                    rmnInstanceId rmnOwner deps.rmnRemote
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
                     chainSelector = message.sourceChainSelector
@@ -179,6 +180,7 @@ template OffRamp
             with
                 routerPartyOwner : Party
                 receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverMinBlockDepth : Int
 
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
 
@@ -210,11 +212,9 @@ template OffRamp
                     (execMsg.receiver == routerPartyOwner)
 
                 -- Re-check RMN curse (PrepareExecute may not have been atomic with Execute)
-                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
-                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
-                    caller = ccipOwner
+                rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "offramp: rmn mismatch"
-                    rmnInstanceId rmnOwner execMsg.deps.rmnRemote
+                    rmnRemote.instanceId rmnRemote.rmnOwner execMsg.deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
                     chainSelector = message.sourceChainSelector
@@ -241,6 +241,9 @@ template OffRamp
                             (message.onRampAddress `elem` c.onRampAddresses)
                         pure c
 
+                -- The receiver required CCVs are passed in and cannot contain duplicates
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in receiver required CCVs" (unique receiverRequiredCCVs)
+
                 -- Get pool's declared CCV requirements from ExecutingMessageV1.
                 -- Pool records these via SetInboundPoolCCVs; None means pool wasn't called.
                 poolCCVs <- case execMsg.tokenReceiver of
@@ -256,6 +259,15 @@ template OffRamp
                         message.messageData == ""
                         && message.ccipReceiveGasLimit == 0
                         && isSome message.tokenTransfer
+                if isTokenOnlyTransfer
+                    then pure ()
+                    else if message.finality /= 0
+                        then do
+                            assertMsg "offramp: finalized-only receiver rejects FTF messages"
+                                (receiverMinBlockDepth /= 0)
+                            assertMsg "offramp: message finality below receiver minBlockDepth"
+                                (message.finality >= receiverMinBlockDepth)
+                        else pure ()
                 let resolvedReceiverRequiredCCVs = if isTokenOnlyTransfer
                         then []
                         else receiverRequiredCCVs

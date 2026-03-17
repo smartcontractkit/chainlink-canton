@@ -17,6 +17,7 @@ import MCMS.Codec
   , encodeInt64
   , encodeUint8
   , encodeList
+  , encodeOptional
   )
 import CCIP.Codec
   ( encodeInstrumentId
@@ -27,6 +28,7 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.Factory
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import qualified CCIP.RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 
 -- ===========================================================================
@@ -88,7 +90,8 @@ encodeDeployCommitteeVerifierParams params =
   <> encodeParty params.owner
   <> encodeParty params.ccipOwner
   <> encodeBytesHex params.versionTag
-  <> encodeParty params.messageSentObserver
+  <> encodeOptional params.allowListAdmin encodeParty
+  <> encodePartyList params.messageSentObservers
   <> encodeRawInstanceAddress params.rmnRemote
   <> encodeList params.storageLocations encodeText
   <> encodeParty params.storageLocationsAdmin
@@ -101,6 +104,9 @@ encodeDeployLockReleaseTokenPoolParams params =
   <> encodeParty params.poolOwner
   <> encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
+  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> encodeRawInstanceAddress params.feeQuoter
+  <> encodeRawInstanceAddress params.rmnRemote
 
 encodeRateLimitDirection : RateLimitDirection -> BytesHex
 encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
@@ -132,6 +138,7 @@ encodeDeployCCIPReceiverParams params =
   encodeText params.instanceId
   <> encodeParty params.owner
   <> encodeRawInstanceAddressList params.requiredCCVs
+  <> fromSome (encodeInt64 params.minBlockDepth)
 
 -- ===========================================================================
 -- ROUND-TRIP TESTS
@@ -319,13 +326,16 @@ testDecodeDeployCommitteeVerifierParams = script do
   messageSentObserver <- allocateParty "msg_observer"
   storageAdmin <- allocateParty "storage_admin"
   pendingAdmin <- allocateParty "pending_admin"
+  allowListAdmin <- allocateParty "allow_list_admin"
 
   let params = DeployCommitteeVerifierParams with
         instanceId = "ccv-1"
         owner
         ccipOwner
         versionTag = "01020304"
-        messageSentObserver
+        allowListAdmin = Some allowListAdmin
+        --allowListAdmin = None
+        messageSentObservers = [messageSentObserver]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2", "loc3"]
         storageLocationsAdmin = storageAdmin
@@ -339,7 +349,8 @@ testDecodeDeployCommitteeVerifierParams = script do
       decoded.owner === params.owner
       decoded.ccipOwner === params.ccipOwner
       decoded.versionTag === params.versionTag
-      decoded.messageSentObserver === params.messageSentObserver
+      decoded.allowListAdmin === params.allowListAdmin
+      decoded.messageSentObservers === params.messageSentObservers
       decoded.rmnRemote === params.rmnRemote
       decoded.storageLocations === params.storageLocations
       decoded.storageLocationsAdmin === params.storageLocationsAdmin
@@ -359,7 +370,8 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
         owner
         ccipOwner
         versionTag = ""
-        messageSentObserver
+        allowListAdmin = None
+        messageSentObservers = [messageSentObserver]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = []
         storageLocationsAdmin = storageAdmin
@@ -368,7 +380,9 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
 
   case decodeDeployCommitteeVerifierParams encoded of
     None -> abort "Failed to decode with empty storage locations"
-    Some decoded -> decoded.storageLocations === []
+    Some decoded -> do
+      decoded.storageLocations === []
+      decoded.allowListAdmin === None
 
   pure ()
 
@@ -377,6 +391,8 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
   ccipOwner <- allocateParty "ccip_owner"
   poolOwner <- allocateParty "pool_owner"
   tokenAdmin <- allocateParty "token_admin"
+  feeOwner <- allocateParty "fee_owner"
+  rmnOwner <- allocateParty "rmn_owner"
 
   let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
@@ -384,6 +400,9 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
         poolOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
+        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" rmnOwner
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   case decodeDeployLockReleaseTokenPoolParams encoded of
@@ -393,6 +412,9 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
       decoded.ccipOwner === params.ccipOwner
       decoded.poolOwner === params.poolOwner
       decoded.instrumentId === params.instrumentId
+      decoded.tokenAdminRegistry === params.tokenAdminRegistry
+      decoded.feeQuoter === params.feeQuoter
+      decoded.rmnRemote === params.rmnRemote
       decoded.decimals === params.decimals
 
   pure ()
@@ -478,6 +500,7 @@ testDecodeDeployCCIPReceiverParams = script do
         instanceId = "receiver-1"
         owner
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        minBlockDepth = 42
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
@@ -486,6 +509,7 @@ testDecodeDeployCCIPReceiverParams = script do
       decoded.instanceId === params.instanceId
       decoded.owner === params.owner
       decoded.requiredCCVs === params.requiredCCVs
+      decoded.minBlockDepth === params.minBlockDepth
 
   pure ()
 
@@ -497,11 +521,14 @@ testDecodeDeployCCIPReceiverParams_EmptyRequiredCCVs = script do
         instanceId = "receiver-empty"
         owner
         requiredCCVs = []
+        minBlockDepth = 0
       encoded = encodeDeployCCIPReceiverParams params
 
   case decodeDeployCCIPReceiverParams encoded of
     None -> abort "Failed to decode with empty requiredCCVs"
-    Some decoded -> decoded.requiredCCVs === []
+    Some decoded -> do
+      decoded.requiredCCVs === []
+      decoded.minBlockDepth === params.minBlockDepth
 
   pure ()
 

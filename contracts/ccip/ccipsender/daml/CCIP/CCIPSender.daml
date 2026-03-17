@@ -31,7 +31,6 @@ data CCVSendInput = CCVSendInput
 data CantonExtraArgsV1 = CantonExtraArgsV1
     with
         gasLimit : Int
-        blockConfirmations : Optional Int
         senderRequiredCCVs : [RawInstanceAddress]
         executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
         executorArgs : Optional BytesHex
@@ -103,7 +102,6 @@ template CCIPSender
                     receiver
                     payload
                     ccipReceiveGasLimit = extraArgs.gasLimit
-                    blockConfirmations = extraArgs.blockConfirmations
                     senderRequiredCCVs = extraArgs.senderRequiredCCVs
                     tokenInstrumentId
                     tokenReceiver = extraArgs.tokenReceiver

@@ -118,7 +118,6 @@ removeCustomObservers : [Party] -> [Party] -> [Party]
 removeCustomObservers current removals =
     filter (`notElem` removals) current
 
-
 -- | RMN contract providing curse capability for emergency stops.
 -- Separate rmnOwner party allows independent control from ccipOwner.
 template RMNRemote
@@ -131,6 +130,12 @@ template RMNRemote
     where
         signatory rmnOwner
         observer ccipOwner, customObservers
+
+        nonconsuming choice Get : RMNRemote
+            with
+                caller : Party
+            controller caller
+            do pure this
 
         -- Check if globally cursed (party-as-parameter pattern for open access)
         nonconsuming choice IsCursed : Bool
@@ -149,15 +154,6 @@ template RMNRemote
                 let chainSubject = chainSelectorToSubject chainSelector
                 pure (globalCurseSubject `elem` cursedSubjects
                       || chainSubject `elem` cursedSubjects)
-
-        -- Returns (instanceId, owner) so callers can verify the address.
-        -- TODO: ccip-rmn cannot depend on ccip-common (cycle), so callers
-        -- must do the RawInstanceAddress comparison themselves.
-        nonconsuming choice FetchRawInstanceAddress : (Text, Party)
-            with
-                caller : Party
-            controller caller
-            do pure (instanceId, rmnOwner)
 
         -- Get all cursed subjects
         nonconsuming choice GetCursedSubjects : [BytesHex]

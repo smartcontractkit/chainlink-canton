@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "32f1da6831cdd1d21039f3703718d8e7c41372f463dc11341507f245b0d80b58"
+	PackageID   = "1cb38d11192986248799771dd516536fdc95c5419801d1c78e2e61c19e970974"
 	SDKVersion  = "3.4.10"
 )
 
@@ -641,11 +641,11 @@ func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, p
 	}
 }
 
-// Archive exercises the Archive choice on this FeeQuoter contract
+// Archive exercises the Archive choice on this FeeQuoter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -655,10 +655,31 @@ func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// Get exercises the Get choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) Get(contractID string, args Get) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "Get",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetWithPackageID exercises the Get choice using the provided package ID instead of package name
+func (t FeeQuoter) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "Get",
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -939,6 +960,59 @@ func (t GasPriceUpdate) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GasPriceUpdate from hex string (Canton MCMS format)
 func (t *GasPriceUpdate) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Get is a Record type
+type Get struct {
+	Caller types.PARTY `json:"caller"`
+}
+
+// ToMap converts Get to a map for DAML arguments
+func (t Get) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t Get) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Get) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Get to hex string (Canton MCMS format)
+func (t Get) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Get from hex string (Canton MCMS format)
+func (t *Get) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetMCMSParams is Get without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type GetMCMSParams struct {
+}
+
+// MarshalHex encodes GetMCMSParams to hex string for MCMS operationData.
+func (t GetMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetMCMSParams from hex string.
+func (t *GetMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1498,6 +1572,8 @@ type MCMSEncoder interface {
 	FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
+	Get(args Get) (*bind.EncodedChoice, error)
+	GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error)
 	GetDestChainConfig2(args GetDestChainConfig2) (*bind.EncodedChoice, error)
 	GetDestChainConfig2MCMSParams(args GetDestChainConfig2MCMSParams) (*bind.EncodedChoice, error)
 	GetDestinationChainGasPrice(args GetDestinationChainGasPrice) (*bind.EncodedChoice, error)
@@ -1567,6 +1643,16 @@ func (e *encoder) FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee
 // FeeQuoterGetTokenTransferFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterGetTokenTransferFee choice.
 func (e *encoder) FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("FeeQuoterGetTokenTransferFee", args)
+}
+
+// Get encodes parameters for the Get choice.
+func (e *encoder) Get(args Get) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Get", args)
+}
+
+// GetMCMSParams encodes MCMS parameters (without Caller) for the Get choice.
+func (e *encoder) GetMCMSParams(args GetMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("Get", args)
 }
 
 // GetDestChainConfig2 encodes parameters for the GetDestChainConfig2 choice.

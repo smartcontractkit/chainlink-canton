@@ -291,13 +291,11 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
 							VersionTag:                   types.TEXT(versionTag),
-							MessageSentObserver:          types.PARTY(partyCCIP),
+							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
-							SignerConfigs:                nil,                          // Will be configured later during lane setup
 							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
-							RemoteChainFeeConfigs:        nil,
 						},
 					},
 				},
@@ -433,6 +431,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
 						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
 							remoteSelector: {
+								AllowlistEnabled:   false,
+								FeeUSDCents:        50,
+								GasForVerification: 50_000,
+								PayloadSizeBytes:   6*64 + 2*32,
 								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
 									Signers:   ccvSignerPubKeys,
 									Threshold: 2,
@@ -541,6 +543,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
+						{Label: "minBlockDepth", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}},
 				}},
@@ -552,11 +555,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccipReceiverCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
 
-	// Get disclosures for CCIPReceiver.Execute
+	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
+	// receiver-only; ccip-owned dependencies are only provided via disclosure.
 	disclosedContracts, choiceContext, ccvContractIDs, err := testhelpers.GetCCIPExecuteDisclosures(t.Context(), edsClient, []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)})
 	require.NoError(t, err)
 
-	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one transaction
+	// CCIPReceiver.Execute: PrepareExecute + CCV verification + Execute in one
+	// receiver-authored transaction with disclosures for off-ramp dependencies.
 	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.Must(uuid.NewUUID()).String(),

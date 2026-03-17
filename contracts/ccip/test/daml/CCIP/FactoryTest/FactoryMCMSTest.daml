@@ -9,6 +9,7 @@ import DA.Map qualified as Map
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
 import CCIP.Factory
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import qualified CCIP.RawInstanceAddress
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.FactoryTest.FactoryCodecTest
@@ -517,7 +518,8 @@ testDeployCommitteeVerifier_MCMS = script do
         owner = mcmsParty
         ccipOwner = mcmsParty
         versionTag = "01020304"
-        messageSentObserver = mcmsParty
+        allowListAdmin = None
+        messageSentObservers = [mcmsParty]
         rmnRemote = RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2"]
         storageLocationsAdmin = mcmsParty
@@ -557,6 +559,9 @@ testDeployLockReleaseTokenPool_MCMS = script do
         poolOwner = mcmsParty
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "USDC"
         decimals = 6
+        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" mcmsParty
+        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" mcmsParty
+        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" mcmsParty
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   submit mcmsParty do
@@ -661,6 +666,7 @@ testDeployCCIPReceiver_MCMS = script do
         instanceId = "receiver-1"
         owner = mcmsParty
         requiredCCVs = [RawInstanceAddress "ccv1@owner", RawInstanceAddress "ccv2@owner"]
+        minBlockDepth = 7
       encoded = encodeDeployCCIPReceiverParams params
 
   submit mcmsParty do

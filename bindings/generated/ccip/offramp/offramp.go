@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "c7862178e28b792b32df84a600579ce06f7cbea6a1ea785e3a861f5824425f59"
+	PackageID   = "cf4b7019279b7bfcd6613d056f50207fc1eb3a3e7bf8c808324f1e9217318027"
 	SDKVersion  = "3.4.10"
 )
 
@@ -57,6 +57,7 @@ func argsToMap(args any) map[string]any {
 type ExecuteFromRouter struct {
 	RouterPartyOwner      types.PARTY                 `json:"routerPartyOwner"`
 	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverMinBlockDepth types.INT64                 `json:"receiverMinBlockDepth"`
 	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
 	GlobalConfigCid       types.CONTRACT_ID           `json:"globalConfigCid"`
 	TokenAdminRegistryCid types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
@@ -81,6 +82,8 @@ func (t ExecuteFromRouter) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["receiverMinBlockDepth"] = int64(t.ReceiverMinBlockDepth)
 
 	m["executingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -445,11 +448,11 @@ func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packa
 	}
 }
 
-// Archive exercises the Archive choice on this OffRamp contract
+// Archive exercises the Archive choice on this OffRamp contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -459,7 +462,7 @@ func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

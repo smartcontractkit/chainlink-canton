@@ -38,6 +38,12 @@ template TokenAdminRegistry
     where
         signatory owner
 
+        nonconsuming choice Get : TokenAdminRegistry
+            with
+                caller : Party
+            controller caller
+            do pure this
+
         nonconsuming choice TokenAdminRegistry_GetTokenConfig : Optional TokenConfig
             with
                 instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
@@ -197,7 +203,6 @@ template TokenAdminRegistry
                 caller : Party
             controller caller
             do
-                -- TODO: Replace fetch with nonconsuming getter choice on SendingMessageV1.
                 sm <- fetch sendingMessageCid
                 -- Trust model: TAR is currently a concrete trusted internal
                 -- dependency chosen by `owner`/`ccipOwner`, not an adversarial

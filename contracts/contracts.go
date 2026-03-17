@@ -32,6 +32,7 @@ const (
 	CCIPPoolInterfaces       = Package("ccip-tokenpool-interfaces")
 	CCIPLockReleaseTokenPool = Package("ccip-lockreleasetokenpool")
 	CCIPPerPartyRouter       = Package("ccip-perpartyrouter")
+	CCIPExecutor             = Package("ccip-executor")
 	CCIPFactory              = Package("ccip-factory")
 	CCIPRMN                  = Package("ccip-rmn")
 	CCIPTest                 = Package("ccip-test")
@@ -62,6 +63,7 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPPoolInterfaces:       []string{"0.0.1", CurrentVersion},
 	CCIPLockReleaseTokenPool: []string{"0.0.1", CurrentVersion},
 	CCIPPerPartyRouter:       []string{"0.0.1", CurrentVersion},
+	CCIPExecutor:             []string{"0.0.1", CurrentVersion},
 	CCIPFactory:              []string{"0.0.1", CurrentVersion},
 	CCIPRMN:                  []string{"0.0.1", CurrentVersion},
 	CCIPTest:                 []string{"0.0.1", CurrentVersion},
@@ -98,7 +100,8 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 var OutputDirs = map[Package][]string{
 	Coin: []string{"coin"},
 
-	MCMS: []string{"mcms"},
+	MCMS:     []string{"mcms"},
+	MCMSTest: []string{"mcms", "mcmstest"},
 
 	CCIPReceiver:             []string{"ccip", "ccipreceiver"},
 	CCIPSender:               []string{"ccip", "ccipsender"},
@@ -110,6 +113,7 @@ var OutputDirs = map[Package][]string{
 	CCIPOffRamp:              []string{"ccip", "offramp"},
 	CCIPOnRamp:               []string{"ccip", "onramp"},
 	CCIPPerPartyRouter:       []string{"ccip", "perpartyrouter"},
+	CCIPExecutor:             []string{"ccip", "executor"},
 	CCIPFactory:              []string{"ccip", "factory"},
 	CCIPRMN:                  []string{"ccip", "rmn"},
 	CCIPTokenAdminRegistry:   []string{"ccip", "tokenadminregistry"},

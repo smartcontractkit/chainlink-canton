@@ -14,11 +14,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -144,37 +142,12 @@ var ConfigureChainForLanes = operations.NewSequence(
 
 		// Apply signature configs to CommitteeVerifiers
 		for _, verifierConfig := range input.CommitteeVerifiers {
-			signatureConfigs := make([]ccvs.SignatureConfig, 0, len(verifierConfig.RemoteChains))
-			for remoteSelector, remoteConfig := range verifierConfig.RemoteChains {
-				signerKeys := make([]types.TEXT, len(remoteConfig.SignatureConfig.Signers))
-				for i, signer := range remoteConfig.SignatureConfig.Signers {
-					// Decode and encode signer pubkeys to ensure they're in the correct format
-					signerBytes, err := hex.DecodeString(strings.TrimPrefix(signer, "0x"))
-					if err != nil {
-						return sequences.OnChainOutput{}, fmt.Errorf("failed to decode signer key %d for remote chain %d: %w", i, remoteSelector, err)
-					}
-					signerKeys[i] = types.TEXT(hex.EncodeToString(signerBytes))
-				}
-
-				signatureConfigs = append(signatureConfigs, ccvs.SignatureConfig{
-					SourceChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-					Threshold:           types.INT64(remoteConfig.SignatureConfig.Threshold),
-					SignerKeys:          signerKeys,
-				})
-			}
-			for _, address := range verifierConfig.CommitteeVerifier {
-				_, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, deps, contract.ChoiceInput[ccvs.CommitteeVerifierApplySignatureConfigs]{
-					ChainSelector:   deps.Chain.Selector,
-					InstanceAddress: address,
-					ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-					Args: ccvs.CommitteeVerifierApplySignatureConfigs{
-						SourceChainSelectorsToRemove: nil, // This doesn't support removing chains
-						SignatureConfigs:             signatureConfigs,
-					},
-				})
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to apply signature configs to CommitteeVerifier at address %s: %w", address.Hex(), err)
-				}
+			_, err := operations.ExecuteSequence(b, ConfigureCommitteeVerifierForLanes, deps, ConfigureCommitteeVerifierForLanesInput{
+				ChainSelector:           input.ChainSelector,
+				CommitteeVerifierConfig: verifierConfig,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to configure committee verifier for lanes: %w", err)
 			}
 		}
 

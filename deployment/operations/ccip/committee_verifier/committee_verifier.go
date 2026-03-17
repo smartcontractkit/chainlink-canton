@@ -33,14 +33,19 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 		if template.VersionTag == "" {
 			return errors.New("version tag cannot be empty")
 		}
-		if template.MessageSentObserver == "" {
-			return errors.New("message sent observer cannot be empty")
-		}
 		if template.StorageLocationsAdmin == "" {
 			return errors.New("storage locations admin cannot be empty")
 		}
 		if template.PendingStorageLocationsAdmin != template.StorageLocationsAdmin {
 			return errors.New("pending storage locations admin should not be set, set to the same value as StorageLocationsAdmin use two-step transfer instead")
+		}
+		// These configs must not be set as part of deployment
+		// If required, they should be set after deployment using ApplySignatureConfig, ApplyRemoteChainConfigUpdates, and ApplyAllowListUpdates respectively
+		if len(template.RemoteChainConfigs) != 0 {
+			return errors.New("remote chain configs should not be set during deployment")
+		}
+		if len(template.SignerConfigs) != 0 {
+			return errors.New("signer configs should not be set during deployment")
 		}
 
 		return nil
@@ -112,4 +117,34 @@ var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExercisePara
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
 	Method:       ccvs.CommitteeVerifier{}.CommitteeVerifierAcceptStorageLocationsAdmin,
+})
+
+var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[ccvs.SetDynamicConfig]{
+	Name:         "canton/ccip/committee_verifier/set_dynamic_config",
+	Version:      Version,
+	Description:  "Sets the dynamic config",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.SetDynamicConfig,
+})
+
+var ApplyRemoteChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.ApplyRemoteChainConfigUpdates]{
+	Name:         "canton/ccip/committee_verifier/apply_remote_chain_config_updates",
+	Version:      Version,
+	Description:  "Applies remote chain configs to a CommitteeVerifier instance by adding/removing configs",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.ApplyRemoteChainConfigUpdates,
+})
+
+var ApplyAllowListUpdates = contract.NewExercise(contract.ExerciseParams[ccvs.ApplyAllowListUpdates]{
+	Name:         "canton/ccip/committee_verifier/apply_allow_list_updates",
+	Version:      Version,
+	Description:  "Applies allow lists updates to a Canton CommitteeVerifier instance",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     ccvs.CommitteeVerifier{},
+	Method:       ccvs.CommitteeVerifier{}.ApplyAllowListUpdates,
 })

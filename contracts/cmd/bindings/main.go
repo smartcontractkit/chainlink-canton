@@ -11,9 +11,10 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/go-daml/codegen"
 	"github.com/smartcontractkit/go-daml/codegen/model"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 func main() {
@@ -108,6 +109,7 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("outputFile", outputFile).Msg("Failed to create output subdirectory for package")
 		}
+
 		err = os.WriteFile(outputFile, output, 0o644)
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Str("outputFile", outputFile).Msg("Failed to write generated bindings to file")

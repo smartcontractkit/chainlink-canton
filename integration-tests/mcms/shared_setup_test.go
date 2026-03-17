@@ -19,6 +19,7 @@ import (
 type SharedCantonEnvironment struct {
 	Participant   canton.Participant
 	McmsPkgID     string
+	McmsTestPkgID string
 	McmsEncoder   mcms.MCMSEncoder
 	CcipOwner     string
 	Signers       []*MCMSSigner
@@ -72,24 +73,33 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 			return
 		}
 
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant)
+		// Upload MCMS Test DAR (contains Counter)
+		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
 		if err != nil {
 			errSharedEnv = err
 			return
 		}
 
-		if len(packageIDs) == 0 {
+		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant)
+		if err != nil {
+			errSharedEnv = err
+			return
+		}
+
+		if len(packageIDs) < 2 {
 			errSharedEnv = err
 			return
 		}
 
 		mcmsPkgID := packageIDs[0]
+		mcmsTestPkgID := packageIDs[1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedEnv = &SharedCantonEnvironment{
 			Participant:   participant,
 			McmsPkgID:     mcmsPkgID,
+			McmsTestPkgID: mcmsTestPkgID,
 			McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
 			CcipOwner:     participant.PartyID,
 			Signers:       signers,
@@ -121,18 +131,26 @@ func GetSharedTwoParticipantEnvironment(t *testing.T) *SharedTwoParticipantEnvir
 			return
 		}
 
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar}, participant, userParticipant)
+		// Upload MCMS Test DAR (contains Counter) to both participants
+		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
 		if err != nil {
 			errSharedTwoPartEnv = err
 			return
 		}
 
-		if len(packageIDs) == 0 {
+		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar}, participant, userParticipant)
+		if err != nil {
+			errSharedTwoPartEnv = err
+			return
+		}
+
+		if len(packageIDs) < 2 {
 			errSharedTwoPartEnv = err
 			return
 		}
 
 		mcmsPkgID := packageIDs[0]
+		mcmsTestPkgID := packageIDs[1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
@@ -140,6 +158,7 @@ func GetSharedTwoParticipantEnvironment(t *testing.T) *SharedTwoParticipantEnvir
 			SharedCantonEnvironment: SharedCantonEnvironment{
 				Participant:   participant,
 				McmsPkgID:     mcmsPkgID,
+				McmsTestPkgID: mcmsTestPkgID,
 				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
 				CcipOwner:     participant.PartyID,
 				Signers:       signers,
@@ -173,6 +192,13 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 			return
 		}
 
+		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
+		if err != nil {
+			errSharedTAREnv = err
+
+			return
+		}
+
 		commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
 		if err != nil {
 			errSharedTAREnv = err
@@ -187,20 +213,21 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 			return
 		}
 
-		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, commonDar, tarDar}, participant)
+		packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{mcmsDar, mcmsTestDar, commonDar, tarDar}, participant)
 		if err != nil {
 			errSharedTAREnv = err
 
 			return
 		}
 
-		if len(packageIDs) < 3 {
+		if len(packageIDs) < 4 {
 			errSharedTAREnv = err
 
 			return
 		}
 
 		mcmsPkgID := packageIDs[0]
+		mcmsTestPkgID := packageIDs[1]
 		tarPkgID := packageIDs[len(packageIDs)-1]
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
@@ -209,6 +236,7 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 			SharedCantonEnvironment: SharedCantonEnvironment{
 				Participant:   participant,
 				McmsPkgID:     mcmsPkgID,
+				McmsTestPkgID: mcmsTestPkgID,
 				McmsEncoder:   NewMCMSEncoder(mcmsPkgID),
 				CcipOwner:     participant.PartyID,
 				Signers:       signers,

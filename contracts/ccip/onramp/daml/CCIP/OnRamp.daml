@@ -111,7 +111,6 @@ template OnRamp
                 receiver : BytesHex
                 payload : BytesHex
                 ccipReceiveGasLimit : Int
-                blockConfirmations : Optional Int
                 currentSequenceNumber : Numeric 0
                 senderRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
                 tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
@@ -124,11 +123,9 @@ template OnRamp
                 CCIP.RawInstanceAddress.assertEqual "onramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
-                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
-                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
-                    caller = ccipOwner
+                rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
-                    rmnInstanceId rmnOwner deps.rmnRemote
+                    rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
@@ -175,8 +172,6 @@ template OnRamp
                 let resolvedTokenReceiver = if hasTokenTransfer
                         then validateDestChainAddress (fromOptional receiver tokenReceiver) destConfig.addressBytesLength
                         else ""
-                let resolvedBlockConfirmations = fromOptional 0 blockConfirmations
-
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
@@ -200,7 +195,6 @@ template OnRamp
                     payload = payload
                     executionGasLimit = 0
                     ccipReceiveGasLimit
-                    blockConfirmations = resolvedBlockConfirmations
                     ccvAndExecutorHash = ""
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
@@ -275,11 +269,9 @@ template OnRamp
                     globalConfig.instanceId globalConfig.ccipOwner
                     sendingMsg.deps.globalConfig
 
-                -- TODO: inline check due to ccip-rmn/ccip-common dependency cycle
-                (rmnInstanceId, rmnOwner) <- exercise rmnRemoteCid CCIP.RMNRemote.FetchRawInstanceAddress with
-                    caller = ccipOwner
+                rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "onramp: rmn mismatch"
-                    rmnInstanceId rmnOwner sendingMsg.deps.rmnRemote
+                    rmnRemote.instanceId rmnRemote.rmnOwner sendingMsg.deps.rmnRemote
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 CCIP.RawInstanceAddress.assertEqual "tar mismatch"

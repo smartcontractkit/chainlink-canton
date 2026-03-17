@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms/mcmstest"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 )
 
@@ -26,6 +27,7 @@ func TestMCMS_Timelock(t *testing.T) {
 	sharedEnv := GetSharedEnvironment(t)
 	participant := sharedEnv.Participant
 	mcmsPkgID := sharedEnv.McmsPkgID
+	mcmsTestPkgID := sharedEnv.McmsTestPkgID
 	mcmsEncoder := sharedEnv.McmsEncoder
 	ccipOwner := sharedEnv.CcipOwner
 	cfg := sharedEnv.Config
@@ -41,7 +43,7 @@ func TestMCMS_Timelock(t *testing.T) {
 	// Deploy Counter
 	counterBaseID := "counter-timelock-" + uuid.New().String()[:8]
 	counterInstanceAddr := fmt.Sprintf("%s@%s", counterBaseID, ccipOwner)
-	counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterBaseID)
+	counterCid := createCounter(t, participant, mcmsTestPkgID, ccipOwner, counterBaseID)
 	counterTargetInstanceAddr := counterInstanceAddr
 
 	t.Run("ScheduleAndExecute", func(t *testing.T) {
@@ -89,7 +91,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		mcmsCid = executeScheduledBatch(t, participant, mcmsPkgID, ccipOwner, mcmsCid, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 
 		// 4) Verify counter incremented
-		val := queryCounterValue(t, participant, mcmsPkgID, counterBaseID)
+		val := queryCounterValue(t, participant, mcmsTestPkgID, counterBaseID)
 		require.Equal(t, int64(1), val)
 	})
 
@@ -153,7 +155,7 @@ func TestMCMS_Timelock(t *testing.T) {
 		// Should now be gone; ExecuteScheduledBatch should fail with not found.
 		err = executeScheduledBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid2, opID, calls, ZeroHash, salt, map[string]string{counterTargetInstanceAddr: counterCid})
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "E_OPERATION_NOT_FOUND", "expected E_OPERATION_NOT_FOUND, got: %v", err)
+		require.Contains(t, err.Error(), "mcms: operation not found in timelock", "expected 'mcms: operation not found in timelock', got: %v", err)
 	})
 
 	t.Run("BlockedFunction", func(t *testing.T) {
@@ -197,7 +199,7 @@ func TestMCMS_Timelock(t *testing.T) {
 
 		err = scheduleBatchExpectError(t, participant, mcmsPkgID, ccipOwner, mcmsCid3, proposal.Operations[0], opProof)
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "E_FUNCTION_BLOCKED", "expected E_FUNCTION_BLOCKED, got: %v", err)
+		require.Contains(t, err.Error(), "mcms: function blocked:", "expected 'mcms: function blocked:', got: %v", err)
 	})
 }
 
@@ -214,11 +216,11 @@ func createSigners(t *testing.T) []*MCMSSigner {
 	return signers
 }
 
-func createCounter(t *testing.T, participant canton.Participant, mcmsPkgID, owner, instanceID string) string {
+func createCounter(t *testing.T, participant canton.Participant, mcmsTestPkgID, owner, instanceID string) string {
 	t.Helper()
 
 	// Use bindings to create Counter - provides type safety and tests bindings work correctly
-	counter := mcms.Counter{
+	counter := mcmstest.Counter{
 		Owner:      types.PARTY(owner),
 		InstanceId: types.TEXT(instanceID),
 		Value:      types.INT64(0),
@@ -231,8 +233,8 @@ func createCounter(t *testing.T, participant canton.Participant, mcmsPkgID, owne
 				Command: &apiv2.Command_Create{
 					Create: &apiv2.CreateCommand{
 						TemplateId: &apiv2.Identifier{
-							PackageId:  mcmsPkgID,
-							ModuleName: "MCMS.Counter",
+							PackageId:  mcmsTestPkgID,
+							ModuleName: "MCMS.Mock.Counter",
 							EntityName: "Counter",
 						},
 						CreateArguments: ledger.ConvertToRecord(counter),
@@ -715,11 +717,11 @@ func cancelBatch(
 	return ""
 }
 
-func queryCounterValue(t *testing.T, participant canton.Participant, mcmsPkgID, instanceID string) int64 {
+func queryCounterValue(t *testing.T, participant canton.Participant, mcmsTestPkgID, instanceID string) int64 {
 	t.Helper()
 	counterContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, &apiv2.Identifier{
-		PackageId:  mcmsPkgID,
-		ModuleName: "MCMS.Counter",
+		PackageId:  mcmsTestPkgID,
+		ModuleName: "MCMS.Mock.Counter",
 		EntityName: "Counter",
 	})
 	require.NoError(t, err)
@@ -906,6 +908,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 	sharedEnv := GetSharedEnvironment(t)
 	participant := sharedEnv.Participant
 	mcmsPkgID := sharedEnv.McmsPkgID
+	mcmsTestPkgID := sharedEnv.McmsTestPkgID
 	mcmsEncoder := sharedEnv.McmsEncoder
 	ccipOwner := sharedEnv.CcipOwner
 	cfg := sharedEnv.Config
@@ -1058,7 +1061,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		mcmsCid := createMCMSMultiRole(t, participant, mcmsPkgID, ccipOwner, chainID, base, cfg, 0, nil)
 
 		counterBase := "counter-mixed-" + uuid.New().String()[:8]
-		counterCid := createCounter(t, participant, mcmsPkgID, ccipOwner, counterBase)
+		counterCid := createCounter(t, participant, mcmsTestPkgID, ccipOwner, counterBase)
 		counterTargetInstanceAddr := fmt.Sprintf("%s@%s", counterBase, ccipOwner)
 
 		// Define mixed calls and salt first so we can encode them
@@ -1100,7 +1103,7 @@ func TestMCMS_SelfDispatch(t *testing.T) {
 		delay := queryMinDelay(t, participant, mcmsPkgID, ccipOwner, mcmsCid)
 		require.Equal(t, int64(1_000_000), delay, "minDelay should be 1s after mixed batch")
 
-		val := queryCounterValue(t, participant, mcmsPkgID, counterBase)
+		val := queryCounterValue(t, participant, mcmsTestPkgID, counterBase)
 		require.Equal(t, int64(1), val, "counter should be incremented")
 	})
 }

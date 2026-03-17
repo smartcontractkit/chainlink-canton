@@ -16,6 +16,9 @@ import DA.Text qualified as Text
 newtype RawInstanceAddress = RawInstanceAddress Text
     deriving (Eq, Ord, Show)
 
+empty : RawInstanceAddress
+empty = RawInstanceAddress ""
+
 -- | Create a raw instance address from instanceId and owner.
 -- Validates that instanceId doesn't contain "@" separator.
 make : Text -> Party -> RawInstanceAddress

@@ -29,8 +29,6 @@ type DeployTokenPoolConfig struct {
 	Decimals     int64
 	// Qualifier is optional (e.g. token symbol) for AddressRef and idempotency.
 	Qualifier string
-	// Optional; defaults to empty. ChainPoolConfigs can be set for chain-specific pool config (CCV requirements, remote pools).
-	ChainPoolConfigs types.GENMAP
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
 	PoolReceiveContext common.CCIPContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
@@ -65,10 +63,6 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 
 	cfg := config.Config
-	chainPoolConfigs := cfg.ChainPoolConfigs
-	if chainPoolConfigs == nil {
-		chainPoolConfigs = types.GENMAP{}
-	}
 	poolReceiveContext := cfg.PoolReceiveContext
 	if poolReceiveContext.Values == nil {
 		poolReceiveContext = common.CCIPContext{Values: types.TEXTMAP{}}
@@ -80,14 +74,15 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	}
 
 	template := lockreleasetokenpool.LockReleaseTokenPool{
-		CcipOwner:          types.PARTY(cfg.CcipOwner),
-		PoolOwner:          types.PARTY(cfg.PoolOwner),
-		InstanceId:         "", // set by deploy operation
-		InstrumentId:       cfg.InstrumentId,
-		Decimals:           types.INT64(cfg.Decimals),
-		ChainPoolConfigs:   chainPoolConfigs,
-		PoolReceiveContext: poolReceiveContext,
-		TransferTimeout:    transferTimeout,
+		CcipOwner:               types.PARTY(cfg.CcipOwner),
+		PoolOwner:               types.PARTY(cfg.PoolOwner),
+		InstanceId:              "", // set by deploy operation
+		InstrumentId:            cfg.InstrumentId,
+		Decimals:                types.INT64(cfg.Decimals),
+		RemoteChainConfigs:      types.GENMAP{},
+		TokenTransferFeeConfigs: types.GENMAP{},
+		PoolReceiveContext:      poolReceiveContext,
+		TransferTimeout:         transferTimeout,
 	}
 
 	qualifier := ptr.String(cfg.Qualifier)
