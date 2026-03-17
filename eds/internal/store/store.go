@@ -9,7 +9,6 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/jpillora/backoff"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -152,14 +151,14 @@ func (s *UpdateStore) Run(ctx context.Context) error {
 	for {
 		// Start streaming from s.ledgerEnd (exclusive)
 		s.logger.Debug().Int64("offset", s.ledgerEnd).Msg("Subscribing to update stream")
-		stream, err := s.getUpdateStream(ctx, s.ledgerEnd)
+		stream, err := GetStreamWithRetry(ctx, s.ledgerEnd, s.updateStreamFactory(), DefaultReliableStreamConfig(s.logger, s.maxRetries))
 		if err != nil {
 			return fmt.Errorf("failed to create update stream: %w", err)
 		}
 
 		// Start receiving from stream
 		s.logger.Debug().Int64("offset", s.ledgerEnd).Msg("Update stream created, listening for updates")
-		updateChan, errChan := s.receiveFromStream(ctx, stream)
+		updateChan, errChan := ReceiveFromStream(ctx, stream)
 	reconnect:
 		for {
 			select {
@@ -272,29 +271,10 @@ func (s *UpdateStore) backfill(ctx context.Context, offset int64) (map[contracts
 	}
 }
 
-var backoffStrategyDefault = backoff.Backoff{
-	Min:    100 * time.Millisecond,
-	Max:    3 * time.Second,
-	Factor: 2,
-}
-
-func (s *UpdateStore) getUpdateStream(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
-	backoffStrategy := backoffStrategyDefault.Copy()
-	backoffStrategy.Reset()
-
-	var (
-		stream grpc.ServerStreamingClient[apiv2.GetUpdatesResponse]
-		err    error
-	)
-
-	for numRetries := int(backoffStrategy.Attempt()); ; numRetries++ {
-		if s.maxRetries > 0 {
-			if numRetries > s.maxRetries {
-				return nil, fmt.Errorf("max retries reached: %w", err)
-			}
-		}
-
-		stream, err = s.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
+// updateStreamFactory returns a StreamFactory that creates GetUpdates streams for this store's filters.
+func (s *UpdateStore) updateStreamFactory() StreamFactory[apiv2.GetUpdatesResponse] {
+	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+		return s.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
 			BeginExclusive: offset,
 			EndInclusive:   nil, // not set, stream will not terminate
 			UpdateFormat: &apiv2.UpdateFormat{
@@ -307,47 +287,7 @@ func (s *UpdateStore) getUpdateStream(ctx context.Context, offset int64) (grpc.S
 				},
 			},
 		})
-		if err == nil {
-			return stream, nil
-		}
-
-		wait := backoffStrategy.Duration()
-		s.logger.Warn().Err(err).Str("wait", wait.String()).Int("numRetries", numRetries).Msg("Failed to get update stream, retrying")
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(wait):
-			// continue with next retry
-		}
 	}
-}
-
-func (s *UpdateStore) receiveFromStream(ctx context.Context, stream grpc.ServerStreamingClient[apiv2.GetUpdatesResponse]) (<-chan *apiv2.GetUpdatesResponse, <-chan error) {
-	responseChan := make(chan *apiv2.GetUpdatesResponse)
-	errorChan := make(chan error)
-
-	go func() {
-		defer close(responseChan)
-		defer close(errorChan)
-
-		for {
-			resp, err := stream.Recv()
-			if err != nil {
-				errorChan <- err
-				return
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case responseChan <- resp:
-				// continue receiving from stream
-			}
-		}
-	}()
-
-	return responseChan, errorChan
 }
 
 // getInstanceAddresses returns all possible InstanceAddresses for a given active contract.
