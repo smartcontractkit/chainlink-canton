@@ -8,7 +8,8 @@ import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.TokenAdminRegistryCodec (decodeSetPoolParams, decodeProposeAdminParams, decodeTransferAdminParams, decodeAcceptAdminParams)
+import DA.Crypto.Text (byteCount)
+import CCIP.TokenAdminRegistryCodec (decodeSetPoolParamsWithOffset, decodeProposeAdminParamsWithOffset, decodeTransferAdminParamsWithOffset, decodeAcceptAdminParamsWithOffset)
 import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
 
 import qualified CCIP.ExecutingMessageV1
@@ -322,9 +323,11 @@ template TokenAdminRegistry
 
             case functionName of
               "SetPool" -> do
-                case decodeSetPoolParams operationData of
+                case decodeSetPoolParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: SetPool"
-                  Some (instrumentId, optPool) -> do
+                  Some ((instrumentId, optPool), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetPool" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_SetPool with
                       instrumentId
                       tokenPool = optPool
@@ -332,9 +335,11 @@ template TokenAdminRegistry
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "ProposeAdministrator" -> do
-                case decodeProposeAdminParams operationData of
+                case decodeProposeAdminParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: ProposeAdministrator"
-                  Some (instrumentId, newAdmin) -> do
+                  Some ((instrumentId, newAdmin), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: ProposeAdministrator" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_ProposeAdministrator with
                       instrumentId
                       newAdmin
@@ -342,9 +347,11 @@ template TokenAdminRegistry
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "TransferAdminRole" -> do
-                case decodeTransferAdminParams operationData of
+                case decodeTransferAdminParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: TransferAdminRole"
-                  Some (instrumentId, newAdmin) -> do
+                  Some ((instrumentId, newAdmin), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: TransferAdminRole" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_TransferAdminRole with
                       instrumentId
                       newAdmin
@@ -352,9 +359,11 @@ template TokenAdminRegistry
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "AcceptAdminRole" -> do
-                case decodeAcceptAdminParams operationData of
+                case decodeAcceptAdminParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: AcceptAdminRole"
-                  Some instrumentId -> do
+                  Some (instrumentId, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: AcceptAdminRole" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfTarCid TokenAdminRegistry_AcceptAdminRole with
                       instrumentId
                       caller = owner

@@ -3,6 +3,7 @@ module CCIP.FeeQuoter
   , module CCIP.FeeQuoterTypes
   ) where
 
+import DA.Crypto.Text (byteCount)
 import DA.Foldable qualified as Foldable
 import DA.Map qualified as Map
 import DA.Optional
@@ -15,7 +16,7 @@ import qualified CCIP.Math as Math
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.FeeQuoterCodec (decodeApplyFeeTokenUpdatesParams, decodeApplyDestChainConfigUpdatesParams)
+import CCIP.FeeQuoterCodec (decodeApplyFeeTokenUpdatesParamsWithOffset, decodeApplyDestChainConfigUpdatesParamsWithOffset)
 import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
 
 feeQuoterKey : Text
@@ -232,18 +233,22 @@ template FeeQuoter
 
             case functionName of
               "ApplyFeeTokenUpdates" -> do
-                case decodeApplyFeeTokenUpdatesParams operationData of
+                case decodeApplyFeeTokenUpdatesParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
-                  Some (feeTokensToRemove, feeTokensToAdd) -> do
+                  Some ((feeTokensToRemove, feeTokensToAdd), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: ApplyFeeTokenUpdates" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid ApplyFeeTokenUpdates with
                       feeTokensToRemove
                       feeTokensToAdd
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "ApplyDestChainConfigUpdates" -> do
-                case decodeApplyDestChainConfigUpdatesParams operationData of
+                case decodeApplyDestChainConfigUpdatesParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                  Some destChainConfigArgs -> do
+                  Some (destChainConfigArgs, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid ApplyDestChainConfigUpdates with
                       destChainConfigArgs
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)

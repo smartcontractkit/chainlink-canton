@@ -125,7 +125,8 @@ testCryptoHashOpLeaf = script do
         , functionName = "Increment"
         , operationData = ""
         }
-  let expectedLeaf = "f91f525af385e7112e20ef75cf34dbbb74ed2d2f46cf9b5d6e9457b85e050c22"
+  -- Updated expected value after adding length prefixes for variable-length fields
+  let expectedLeaf = "0d76ff359ffd8496072d57ae1e48d605745f24506f48d859a2d3aa5765c64f8f"
   let actualLeaf = hashOpLeafNative op
 
   assertMsg ("hashOpLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $
@@ -143,7 +144,7 @@ testCryptoHashMetadataLeaf = script do
   -- metadata.preOpCount = 0
   -- metadata.postOpCount = 2
   -- metadata.overridePreviousRoot = false
-  -- metadataLeaf = "29e71e3e2b836397833a36d07ba2aa7c89e9ded57bacb1798f2a6f18b1a4ed27"
+  -- metadataLeaf = "10d135bdbeccde1658604afb11c01192d05452d73ee0c54b0cb447fa6ec679f9" (with length prefix)
   let meta = RootMetadata
         { chainId = 1
         , multisigId = "test-mcms-proposer"
@@ -151,7 +152,7 @@ testCryptoHashMetadataLeaf = script do
         , postOpCount = 2
         , overridePreviousRoot = False
         }
-  let expectedLeaf = "29e71e3e2b836397833a36d07ba2aa7c89e9ded57bacb1798f2a6f18b1a4ed27"
+  let expectedLeaf = "10d135bdbeccde1658604afb11c01192d05452d73ee0c54b0cb447fa6ec679f9"
   let actualLeaf = hashMetadataLeafNative meta
 
   assertMsg ("hashMetadataLeafNative mismatch: expected " <> expectedLeaf <> " got " <> actualLeaf) $

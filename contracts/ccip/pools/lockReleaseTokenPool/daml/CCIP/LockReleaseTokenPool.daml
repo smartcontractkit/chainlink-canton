@@ -10,7 +10,7 @@ module CCIP.LockReleaseTokenPool
   , module CCIP.LockReleaseTokenPoolTypes
   ) where
 
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import qualified DA.Map as Map
@@ -21,7 +21,7 @@ import DA.Time (time, addRelTime, hours)
 import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.LockReleaseTokenPoolCodec (decodeApplyChainUpdatesParams, decodeUpdateRateLimitersParams)
+import CCIP.LockReleaseTokenPoolCodec (decodeApplyChainUpdatesParamsWithOffset, decodeUpdateRateLimitersParamsWithOffset)
 import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), RateLimiterConfigArgs(..))
 
 import qualified Splice.Api.Token.HoldingV1
@@ -631,18 +631,22 @@ template LockReleaseTokenPool
 
             case functionName of
                 "ApplyChainUpdates" -> do
-                    case decodeApplyChainUpdatesParams operationData of
+                    case decodeApplyChainUpdatesParamsWithOffset operationData of
                         None -> abort "E_INVALID_PARAMS: ApplyChainUpdates"
-                        Some (remoteChainSelectorsToRemove, chainsToAdd) -> do
+                        Some ((remoteChainSelectorsToRemove, chainsToAdd), finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: ApplyChainUpdates" $
+                              finalOffset == byteCount operationData
                             newCid <- exercise selfCid ApplyChainUpdates with
                                 remoteChainSelectorsToRemove
                                 chainsToAdd
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
                 "UpdateRateLimiters" -> do
-                  case decodeUpdateRateLimitersParams operationData of
+                  case decodeUpdateRateLimitersParamsWithOffset operationData of
                     None -> abort "E_INVALID_PARAMS: UpdateRateLimiters"
-                    Some rateLimiterConfigArgs -> do
+                    Some (rateLimiterConfigArgs, finalOffset) -> do
+                        assertMsg "E_TRAILING_BYTES: UpdateRateLimiters" $
+                          finalOffset == byteCount operationData
                         newCid <- exercise selfCid UpdateRateLimiters with
                             rateLimiterConfigArgs
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)

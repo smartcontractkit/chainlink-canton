@@ -331,13 +331,22 @@ func TimeToHex(t time.Time) string {
 }
 
 // HashOpLeaf hashes an operation to get its Merkle leaf
-// Matches Canton's hashOpLeafNative
+// Matches Canton's hashOpLeafNative with length-prefixed encoding for variable-length fields
 func HashOpLeaf(op MCMSOp) string {
+	multisigIdHex := AsciiToHex(op.MultisigId)
+	targetAddressHex := AsciiToHex(op.TargetInstanceAddress)
+	functionNameHex := AsciiToHex(op.FunctionName)
+
+	// Length prefixes use character count for text fields, byte count for hex data
 	encoded := PadLeft32(IntToHex(op.ChainId)) +
-		AsciiToHex(op.MultisigId) +
+		PadLeft32(IntToHex(len(op.MultisigId))) + // Length prefix for multisigId
+		multisigIdHex +
 		PadLeft32(IntToHex(op.Nonce)) +
-		AsciiToHex(op.TargetInstanceAddress) +
-		AsciiToHex(op.FunctionName) +
+		PadLeft32(IntToHex(len(op.TargetInstanceAddress))) + // Length prefix for targetInstanceAddress
+		targetAddressHex +
+		PadLeft32(IntToHex(len(op.FunctionName))) + // Length prefix for functionName
+		functionNameHex +
+		PadLeft32(IntToHex(len(op.OperationData)/2)) + // Length prefix for operationData (byte count)
 		op.OperationData
 
 	data, _ := hex.DecodeString(encoded)
@@ -346,15 +355,18 @@ func HashOpLeaf(op MCMSOp) string {
 }
 
 // HashMetadataLeaf hashes metadata to get its Merkle leaf
-// Matches Canton's hashMetadataLeafNative
+// Matches Canton's hashMetadataLeafNative with length-prefixed encoding
 func HashMetadataLeaf(meta MCMSRootMetadata) string {
 	overrideFlag := "00"
 	if meta.OverridePreviousRoot {
 		overrideFlag = "01"
 	}
 
+	multisigIdHex := AsciiToHex(meta.MultisigId)
+
 	encoded := PadLeft32(IntToHex(meta.ChainId)) +
-		AsciiToHex(meta.MultisigId) +
+		PadLeft32(IntToHex(len(meta.MultisigId))) + // Length prefix for multisigId
+		multisigIdHex +
 		PadLeft32(IntToHex(meta.PreOpCount)) +
 		PadLeft32(IntToHex(meta.PostOpCount)) +
 		overrideFlag
@@ -365,19 +377,34 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 }
 
 // HashTimelockOpId computes the operation ID for timelock operations
-// Matches Canton's hashTimelockOpId: keccak256(encodedCalls || predecessor || salt)
+// Matches Canton's hashTimelockOpId with length-prefixed encoding to prevent collision attacks
 // Note: predecessor and salt are BytesHex (already hex-encoded), used directly without conversion.
 func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
-	// Encode calls
 	var sb strings.Builder
+
+	// Length prefix for calls array (32-byte padded)
+	sb.WriteString(PadLeft32(IntToHex(len(calls))))
+
+	// Encode each call with length prefixes
 	for _, call := range calls {
+		// Length prefix for targetInstanceAddress (character count)
+		sb.WriteString(PadLeft32(IntToHex(len(call.TargetInstanceAddress))))
 		sb.WriteString(AsciiToHex(call.TargetInstanceAddress))
+		// Length prefix for functionName (character count)
+		sb.WriteString(PadLeft32(IntToHex(len(call.FunctionName))))
 		sb.WriteString(AsciiToHex(call.FunctionName))
-		sb.WriteString(EncodeOperationDataForHash(call.OperationData))
+		// Length prefix for operationData (byte count = hex length / 2)
+		opData := EncodeOperationDataForHash(call.OperationData)
+		sb.WriteString(PadLeft32(IntToHex(len(opData) / 2)))
+		sb.WriteString(opData)
 	}
 
-	// Combine with predecessor and salt (already BytesHex, no conversion needed)
+	// Length prefix for predecessor (byte count = hex length / 2)
+	sb.WriteString(PadLeft32(IntToHex(len(predecessor) / 2)))
 	sb.WriteString(predecessor)
+
+	// Length prefix for salt (byte count = hex length / 2)
+	sb.WriteString(PadLeft32(IntToHex(len(salt) / 2)))
 	sb.WriteString(salt)
 
 	data, err := hex.DecodeString(sb.String())

@@ -1,7 +1,7 @@
 module CCIP.Factory where
 
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, byteCount)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec
   ( decodeTextAt
@@ -72,79 +72,93 @@ template CCIPFactory
 
             case functionName of
               "SetOwnerToMCMS" -> do
+                -- SetOwnerToMCMS has no operationData, so no validation needed
+                assertMsg "E_TRAILING_BYTES: SetOwnerToMCMS" $ byteCount operationData == 0
                 newCid <- exercise selfCid SetOwnerToMCMS
                 let newAddress = instanceId <> "@" <> partyToText mcmsParty
                 pure (Map.insert newAddress (coerceContractId newCid) (Map.delete selfAddress contractIds))
 
               "DeployGlobalConfig" -> do
-                params <- requireDecoded "DeployGlobalConfig" (decodeDeployGlobalConfigParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployGlobalConfig" (decodeDeployGlobalConfigParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployGlobalConfig" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployGlobalConfig with
                   contract = mkGlobalConfigContract owner params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployFeeQuoter" -> do
-                params <- requireDecoded "DeployFeeQuoter" (decodeDeployFeeQuoterParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployFeeQuoter" (decodeDeployFeeQuoterParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployFeeQuoter" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployFeeQuoter with
                   contract = mkFeeQuoterContract owner params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployTokenAdminRegistry" -> do
-                params <- requireDecoded "DeployTokenAdminRegistry" (decodeDeployTokenAdminRegistryParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployTokenAdminRegistry" (decodeDeployTokenAdminRegistryParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployTokenAdminRegistry" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployTokenAdminRegistry with
                   contract = mkTokenAdminRegistryContract owner params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployOnRamp" -> do
-                params <- requireDecoded "DeployOnRamp" (decodeDeployOnRampParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployOnRamp" (decodeDeployOnRampParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployOnRamp" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployOnRamp with
                   contract = mkOnRampContract owner params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployOffRamp" -> do
-                params <- requireDecoded "DeployOffRamp" (decodeDeployOffRampParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployOffRamp" (decodeDeployOffRampParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployOffRamp" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployOffRamp with
                   contract = mkOffRampContract owner params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployPerPartyRouterFactory" -> do
-                params <- requireDecoded "DeployPerPartyRouterFactory" (decodeDeployPerPartyRouterFactoryParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployPerPartyRouterFactory" (decodeDeployPerPartyRouterFactoryParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployPerPartyRouterFactory" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployPerPartyRouterFactory with
                   contract = mkPerPartyRouterFactoryContract owner params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployRMNRemote" -> do
-                params <- requireDecoded "DeployRMNRemote" (decodeDeployRMNRemoteParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployRMNRemote" (decodeDeployRMNRemoteParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployRMNRemote" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployRMNRemote with
                   contract = mkRMNRemoteContract params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployCommitteeVerifier" -> do
-                params <- requireDecoded "DeployCommitteeVerifier" (decodeDeployCommitteeVerifierParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployCommitteeVerifier" (decodeDeployCommitteeVerifierParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployCommitteeVerifier" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployCommitteeVerifier with
                   contract = mkCommitteeVerifierContract params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployLockReleaseTokenPool" -> do
-                params <- requireDecoded "DeployLockReleaseTokenPool" (decodeDeployLockReleaseTokenPoolParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployLockReleaseTokenPool" (decodeDeployLockReleaseTokenPoolParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployLockReleaseTokenPool" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployLockReleaseTokenPool with
                   contract = mkLockReleaseTokenPoolContract params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployRateLimiter" -> do
-                params <- requireDecoded "DeployRateLimiter" (decodeDeployRateLimiterParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployRateLimiter" (decodeDeployRateLimiterParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployRateLimiter" $ finalOffset == byteCount operationData
                 rateLimiterContract <- mkRateLimiterContract params
                 deployResult <- exercise selfCid DeployRateLimiter with
                   contract = rateLimiterContract
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployCCIPSender" -> do
-                params <- requireDecoded "DeployCCIPSender" (decodeDeployCCIPSenderParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployCCIPSender" (decodeDeployCCIPSenderParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployCCIPSender" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployCCIPSender with
                   contract = mkCCIPSenderContract params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
 
               "DeployCCIPReceiver" -> do
-                params <- requireDecoded "DeployCCIPReceiver" (decodeDeployCCIPReceiverParams operationData)
+                (params, finalOffset) <- requireDecodedWithOffset "DeployCCIPReceiver" (decodeDeployCCIPReceiverParamsWithOffset operationData)
+                assertMsg "E_TRAILING_BYTES: DeployCCIPReceiver" $ finalOffset == byteCount operationData
                 deployResult <- exercise selfCid DeployCCIPReceiver with
                   contract = mkCCIPReceiverContract params
                 pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
@@ -522,6 +536,12 @@ requireDecoded functionName decoded =
         None -> abort ("E_INVALID_PARAMS: " <> functionName)
         Some value -> pure value
 
+requireDecodedWithOffset : Text -> Optional (a, Int) -> Update (a, Int)
+requireDecodedWithOffset functionName decoded =
+    case decoded of
+        None -> abort ("E_INVALID_PARAMS: " <> functionName)
+        Some value -> pure value
+
 mkGlobalConfigContract : Party -> DeployGlobalConfigParams -> CCIP.GlobalConfig.GlobalConfig
 mkGlobalConfigContract ccipOwner params = CCIP.GlobalConfig.GlobalConfig with
     instanceId = params.instanceId
@@ -649,91 +669,101 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     owner = params.owner
     requiredCCVs = params.requiredCCVs
 
+-- WithOffset variants for buffer consumption validation
+
+decodeDeployGlobalConfigParamsWithOffset : BytesHex -> Optional (DeployGlobalConfigParams, Int)
+decodeDeployGlobalConfigParamsWithOffset encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (chainSelector, finalOffset) <- decodeNumeric0At encoded offset1
+    Some ((DeployGlobalConfigParams with instanceId; chainSelector), finalOffset)
+
 decodeDeployGlobalConfigParams : BytesHex -> Optional DeployGlobalConfigParams
 decodeDeployGlobalConfigParams encoded = do
+    (result, _) <- decodeDeployGlobalConfigParamsWithOffset encoded
+    Some result
+
+decodeDeployFeeQuoterParamsWithOffset : BytesHex -> Optional (DeployFeeQuoterParams, Int)
+decodeDeployFeeQuoterParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
-    (chainSelector, _) <- decodeNumeric0At encoded offset1
-    Some DeployGlobalConfigParams with
-        instanceId
-        chainSelector
+    (linkTokenInstrumentId, offset2) <- decodeInstrumentId encoded offset1
+    (maxFeeJuelsPerMsg, finalOffset) <- decodeNumeric0At encoded offset2
+    Some ((DeployFeeQuoterParams with instanceId; linkTokenInstrumentId; maxFeeJuelsPerMsg), finalOffset)
 
 decodeDeployFeeQuoterParams : BytesHex -> Optional DeployFeeQuoterParams
 decodeDeployFeeQuoterParams encoded = do
-    (instanceId, offset1) <- decodeTextAt encoded 0
-    (linkTokenInstrumentId, offset2) <- decodeInstrumentId encoded offset1
-    (maxFeeJuelsPerMsg, _) <- decodeNumeric0At encoded offset2
-    Some DeployFeeQuoterParams with
-        instanceId
-        linkTokenInstrumentId
-        maxFeeJuelsPerMsg
+    (result, _) <- decodeDeployFeeQuoterParamsWithOffset encoded
+    Some result
+
+decodeDeployTokenAdminRegistryParamsWithOffset : BytesHex -> Optional (DeployTokenAdminRegistryParams, Int)
+decodeDeployTokenAdminRegistryParamsWithOffset encoded = do
+    (instanceId, finalOffset) <- decodeTextAt encoded 0
+    Some ((DeployTokenAdminRegistryParams with instanceId), finalOffset)
 
 decodeDeployTokenAdminRegistryParams : BytesHex -> Optional DeployTokenAdminRegistryParams
 decodeDeployTokenAdminRegistryParams encoded = do
-    (instanceId, _) <- decodeTextAt encoded 0
-    Some DeployTokenAdminRegistryParams with instanceId
+    (result, _) <- decodeDeployTokenAdminRegistryParamsWithOffset encoded
+    Some result
 
-decodeDeployOnRampParams : BytesHex -> Optional DeployOnRampParams
-decodeDeployOnRampParams encoded = do
+decodeDeployOnRampParamsWithOffset : BytesHex -> Optional (DeployOnRampParams, Int)
+decodeDeployOnRampParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (globalConfig, offset2) <- decodeRawInstanceAddressAt encoded offset1
     (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
     (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
     (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
-    (ccvRegistry, _) <- decodeRawInstanceAddressAt encoded offset5
-    Some DeployOnRampParams with
-        instanceId
-        globalConfig
-        rmnRemote
-        tokenAdminRegistry
-        feeQuoter
-        ccvRegistry
+    (ccvRegistry, finalOffset) <- decodeRawInstanceAddressAt encoded offset5
+    Some ((DeployOnRampParams with instanceId; globalConfig; rmnRemote; tokenAdminRegistry; feeQuoter; ccvRegistry), finalOffset)
 
-decodeDeployOffRampParams : BytesHex -> Optional DeployOffRampParams
-decodeDeployOffRampParams encoded = do
+decodeDeployOnRampParams : BytesHex -> Optional DeployOnRampParams
+decodeDeployOnRampParams encoded = do
+    (result, _) <- decodeDeployOnRampParamsWithOffset encoded
+    Some result
+
+decodeDeployOffRampParamsWithOffset : BytesHex -> Optional (DeployOffRampParams, Int)
+decodeDeployOffRampParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (globalConfig, offset2) <- decodeRawInstanceAddressAt encoded offset1
     (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
-    (tokenAdminRegistry, _) <- decodeRawInstanceAddressAt encoded offset3
-    Some DeployOffRampParams with
-        instanceId
-        globalConfig
-        rmnRemote
-        tokenAdminRegistry
+    (tokenAdminRegistry, finalOffset) <- decodeRawInstanceAddressAt encoded offset3
+    Some ((DeployOffRampParams with instanceId; globalConfig; rmnRemote; tokenAdminRegistry), finalOffset)
 
-decodeDeployPerPartyRouterFactoryParams : BytesHex -> Optional DeployPerPartyRouterFactoryParams
-decodeDeployPerPartyRouterFactoryParams encoded = do
+decodeDeployOffRampParams : BytesHex -> Optional DeployOffRampParams
+decodeDeployOffRampParams encoded = do
+    (result, _) <- decodeDeployOffRampParamsWithOffset encoded
+    Some result
+
+decodeDeployPerPartyRouterFactoryParamsWithOffset : BytesHex -> Optional (DeployPerPartyRouterFactoryParams, Int)
+decodeDeployPerPartyRouterFactoryParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (onRamp, offset2) <- decodeRawInstanceAddressAt encoded offset1
     (offRamp, offset3) <- decodeRawInstanceAddressAt encoded offset2
     (globalConfig, offset4) <- decodeRawInstanceAddressAt encoded offset3
     (tokenAdminRegistry, offset5) <- decodeRawInstanceAddressAt encoded offset4
     (feeQuoter, offset6) <- decodeRawInstanceAddressAt encoded offset5
-    (rmnRemote, _) <- decodeRawInstanceAddressAt encoded offset6
-    Some DeployPerPartyRouterFactoryParams with
-        instanceId
-        onRamp
-        offRamp
-        globalConfig
-        tokenAdminRegistry
-        feeQuoter
-        rmnRemote
+    (rmnRemote, finalOffset) <- decodeRawInstanceAddressAt encoded offset6
+    Some ((DeployPerPartyRouterFactoryParams with instanceId; onRamp; offRamp; globalConfig; tokenAdminRegistry; feeQuoter; rmnRemote), finalOffset)
 
-decodeDeployRMNRemoteParams : BytesHex -> Optional DeployRMNRemoteParams
-decodeDeployRMNRemoteParams encoded = do
+decodeDeployPerPartyRouterFactoryParams : BytesHex -> Optional DeployPerPartyRouterFactoryParams
+decodeDeployPerPartyRouterFactoryParams encoded = do
+    (result, _) <- decodeDeployPerPartyRouterFactoryParamsWithOffset encoded
+    Some result
+
+decodeDeployRMNRemoteParamsWithOffset : BytesHex -> Optional (DeployRMNRemoteParams, Int)
+decodeDeployRMNRemoteParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (rmnOwner, offset2) <- decodePartyAt encoded offset1
     (ccipOwner, offset3) <- decodePartyAt encoded offset2
     (customObservers, offset4) <- decodePartyList encoded offset3
-    (cursedSubjects, _) <- decodeBytesHexList encoded offset4
-    Some DeployRMNRemoteParams with
-        instanceId
-        rmnOwner
-        ccipOwner
-        customObservers
-        cursedSubjects
+    (cursedSubjects, finalOffset) <- decodeBytesHexList encoded offset4
+    Some ((DeployRMNRemoteParams with instanceId; rmnOwner; ccipOwner; customObservers; cursedSubjects), finalOffset)
 
-decodeDeployCommitteeVerifierParams : BytesHex -> Optional DeployCommitteeVerifierParams
-decodeDeployCommitteeVerifierParams encoded = do
+decodeDeployRMNRemoteParams : BytesHex -> Optional DeployRMNRemoteParams
+decodeDeployRMNRemoteParams encoded = do
+    (result, _) <- decodeDeployRMNRemoteParamsWithOffset encoded
+    Some result
+
+decodeDeployCommitteeVerifierParamsWithOffset : BytesHex -> Optional (DeployCommitteeVerifierParams, Int)
+decodeDeployCommitteeVerifierParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (owner, offset2) <- decodePartyAt encoded offset1
     (ccipOwner, offset3) <- decodePartyAt encoded offset2
@@ -742,20 +772,16 @@ decodeDeployCommitteeVerifierParams encoded = do
     (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
     (storageLocations, offset7) <- decodeList encoded offset6 decodeTextAt
     (storageLocationsAdmin, offset8) <- decodePartyAt encoded offset7
-    (pendingStorageLocationsAdmin, _) <- decodePartyAt encoded offset8
-    Some DeployCommitteeVerifierParams with
-        instanceId
-        owner
-        ccipOwner
-        versionTag
-        messageSentObservers
-        rmnRemote
-        storageLocations
-        storageLocationsAdmin
-        pendingStorageLocationsAdmin
+    (pendingStorageLocationsAdmin, finalOffset) <- decodePartyAt encoded offset8
+    Some ((DeployCommitteeVerifierParams with instanceId; owner; ccipOwner; versionTag; messageSentObservers; rmnRemote; storageLocations; storageLocationsAdmin; pendingStorageLocationsAdmin), finalOffset)
 
-decodeDeployLockReleaseTokenPoolParams : BytesHex -> Optional DeployLockReleaseTokenPoolParams
-decodeDeployLockReleaseTokenPoolParams encoded = do
+decodeDeployCommitteeVerifierParams : BytesHex -> Optional DeployCommitteeVerifierParams
+decodeDeployCommitteeVerifierParams encoded = do
+    (result, _) <- decodeDeployCommitteeVerifierParamsWithOffset encoded
+    Some result
+
+decodeDeployLockReleaseTokenPoolParamsWithOffset : BytesHex -> Optional (DeployLockReleaseTokenPoolParams, Int)
+decodeDeployLockReleaseTokenPoolParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (ccipOwner, offset2) <- decodePartyAt encoded offset1
     (poolOwner, offset3) <- decodePartyAt encoded offset2
@@ -763,16 +789,13 @@ decodeDeployLockReleaseTokenPoolParams encoded = do
     (decimals, offset5) <- decodeInt64At encoded offset4
     (tokenAdminRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
     (feeQuoter, offset7) <- decodeRawInstanceAddressAt encoded offset6
-    (rmnRemote, _) <- decodeRawInstanceAddressAt encoded offset7
-    Some DeployLockReleaseTokenPoolParams with
-        instanceId
-        ccipOwner
-        poolOwner
-        instrumentId
-        decimals
-        tokenAdminRegistry
-        feeQuoter
-        rmnRemote
+    (rmnRemote, finalOffset) <- decodeRawInstanceAddressAt encoded offset7
+    Some ((DeployLockReleaseTokenPoolParams with instanceId; ccipOwner; poolOwner; instrumentId; decimals; tokenAdminRegistry; feeQuoter; rmnRemote), finalOffset)
+
+decodeDeployLockReleaseTokenPoolParams : BytesHex -> Optional DeployLockReleaseTokenPoolParams
+decodeDeployLockReleaseTokenPoolParams encoded = do
+    (result, _) <- decodeDeployLockReleaseTokenPoolParamsWithOffset encoded
+    Some result
 
 decodeRateLimitDirectionAt : BytesHex -> Int -> Optional (CCIP.RateLimiter.RateLimitDirection, Int)
 decodeRateLimitDirectionAt encoded offset = do
@@ -792,8 +815,8 @@ decodeRateLimitModeAt encoded offset = do
         1 -> Some (CCIP.RateLimiter.RateLimitMode_CustomFinality, offset + 1)
         _ -> None
 
-decodeDeployRateLimiterParams : BytesHex -> Optional DeployRateLimiterParams
-decodeDeployRateLimiterParams encoded = do
+decodeDeployRateLimiterParamsWithOffset : BytesHex -> Optional (DeployRateLimiterParams, Int)
+decodeDeployRateLimiterParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (poolInstanceId, offset2) <- decodeTextAt encoded offset1
     (poolOwner, offset3) <- decodePartyAt encoded offset2
@@ -802,35 +825,36 @@ decodeDeployRateLimiterParams encoded = do
     (mode, offset6) <- decodeRateLimitModeAt encoded offset5
     (isEnabled, offset7) <- decodeBoolAt encoded offset6
     (capacity, offset8) <- decodeNumeric0At encoded offset7
-    (rate, _) <- decodeNumeric0At encoded offset8
-    Some DeployRateLimiterParams with
-        instanceId
-        poolInstanceId
-        poolOwner
-        remoteChainSelector
-        direction
-        mode
-        isEnabled
-        capacity
-        rate
+    (rate, finalOffset) <- decodeNumeric0At encoded offset8
+    Some ((DeployRateLimiterParams with instanceId; poolInstanceId; poolOwner; remoteChainSelector; direction; mode; isEnabled; capacity; rate), finalOffset)
+
+decodeDeployRateLimiterParams : BytesHex -> Optional DeployRateLimiterParams
+decodeDeployRateLimiterParams encoded = do
+    (result, _) <- decodeDeployRateLimiterParamsWithOffset encoded
+    Some result
+
+decodeDeployCCIPSenderParamsWithOffset : BytesHex -> Optional (DeployCCIPSenderParams, Int)
+decodeDeployCCIPSenderParamsWithOffset encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (owner, finalOffset) <- decodePartyAt encoded offset1
+    Some ((DeployCCIPSenderParams with instanceId; owner), finalOffset)
 
 decodeDeployCCIPSenderParams : BytesHex -> Optional DeployCCIPSenderParams
 decodeDeployCCIPSenderParams encoded = do
+    (result, _) <- decodeDeployCCIPSenderParamsWithOffset encoded
+    Some result
+
+decodeDeployCCIPReceiverParamsWithOffset : BytesHex -> Optional (DeployCCIPReceiverParams, Int)
+decodeDeployCCIPReceiverParamsWithOffset encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
-    (owner, _) <- decodePartyAt encoded offset1
-    Some DeployCCIPSenderParams with
-        instanceId
-        owner
+    (owner, offset2) <- decodePartyAt encoded offset1
+    (requiredCCVs, finalOffset) <- decodeList encoded offset2 decodeRawInstanceAddressAt
+    Some ((DeployCCIPReceiverParams with instanceId; owner; requiredCCVs), finalOffset)
 
 decodeDeployCCIPReceiverParams : BytesHex -> Optional DeployCCIPReceiverParams
 decodeDeployCCIPReceiverParams encoded = do
-    (instanceId, offset1) <- decodeTextAt encoded 0
-    (owner, offset2) <- decodePartyAt encoded offset1
-    (requiredCCVs, _) <- decodeList encoded offset2 decodeRawInstanceAddressAt
-    Some DeployCCIPReceiverParams with
-        instanceId
-        owner
-        requiredCCVs
+    (result, _) <- decodeDeployCCIPReceiverParamsWithOffset encoded
+    Some result
 
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =

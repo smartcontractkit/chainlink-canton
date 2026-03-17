@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "94b39a0ea210134c7457b747ca40d28a14fc3a70e8171f7192d274876ad77e98"
+	PackageID   = "e34caa351de2386959409653cfa4c8b2f8e43f53fab0f978523ead403e039a18"
 	SDKVersion  = "3.4.10"
 )
 
@@ -741,11 +740,11 @@ func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, ar
 	}
 }
 
-// Archive exercises the Archive choice on this RMNRemote contract via the IMCMSReceiver interface
+// Archive exercises the Archive choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -755,7 +754,7 @@ func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -911,7 +910,7 @@ func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID str
 
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this RMNRemote contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
-func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
@@ -921,7 +920,7 @@ func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSRecei
 }
 
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
@@ -932,7 +931,7 @@ func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 
 // Verify interface implementations for RMNRemote
 
-var _ mcms.IMCMSReceiver = (*RMNRemote)(nil)
+var _ IMCMSReceiver = (*RMNRemote)(nil)
 
 // RemoveCustomObservers is a Record type
 type RemoveCustomObservers struct {

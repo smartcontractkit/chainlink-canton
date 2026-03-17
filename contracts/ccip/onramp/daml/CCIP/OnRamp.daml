@@ -376,9 +376,11 @@ template OnRamp
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
@@ -481,16 +483,22 @@ validateDestChainAddress address addressBytesLength =
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
 -- ===========================================================================
 
--- | Decode SetDeps params (Optional fields)
+-- | Decode SetDeps params with final offset (Optional fields)
 -- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA ccvRegistry]
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
+decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
+decodeSetDepsParamsWithOffset encoded = do
   (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
   (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
   (tokenAdminRegistry, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
   (feeQuoter, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
-  (ccvRegistry, _offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
-  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry)
+  (ccvRegistry, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset4
+  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry, finalOffset)
+
+-- | Decode SetDeps params (discards final offset)
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  Some result
 
 -- | Encode SetDeps params (Optional fields)
 encodeSetDepsParams : SetDepsParams -> BytesHex
