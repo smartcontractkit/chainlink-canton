@@ -41,6 +41,11 @@ func encodeInstrumentId(admin, identifier string) []byte {
 // - Call PerPartyRouter.Execute to process message and get TokenReceiveTicket
 // - Call TokenPool_ReleaseFromTicket to transfer tokens from pool to receiver
 // - Verify receiver received the tokens
+// - Validate FTF/custom-finality path by:
+//   - requiring minBlockDepth=2000 on the destination pool
+//   - enabling a default inbound limiter with lower capacity
+//   - enabling a custom-finality inbound limiter with higher capacity
+//     Success proves ReleaseFromTicket selected the custom inbound limiter.
 func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Parallel()
 
@@ -107,7 +112,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Token Setup
 	// Mint tokens to Token Pool Owner (these will be "locked" in the pool)
-	poolHoldingCid, err := testhelpers.MintAMT(t.Context(), tokenPoolOwnerParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyTokenPoolOwner, "10000000000")
+	poolHoldingCid, err := testhelpers.MintAMT(t.Context(), tokenPoolOwnerParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partyTokenPoolOwner, "100.00")
 	require.NoError(t, err)
 	t.Logf("Minted 100 AMT to Pool Owner, Holding CID: %s", poolHoldingCid)
 
@@ -353,7 +358,9 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Logf("Created PerPartyRouter for receiver: %s", routerCid)
 
 	// Token Pool Setup
-	// Deploy inbound RateLimiter required by ReleaseFromTicket receive flow.
+	// Deploy default inbound RateLimiter required by ReleaseFromTicket receive flow.
+	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
+	// is selected for this FTF transfer instead of the custom-finality limiter.
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -368,10 +375,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
 						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
 						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_DefaultFinality"}}}},
-						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
+						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "1000000"}}},
+						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "1000000"}}},
+						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "1000000"}}},
 						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
 					}},
 				}},
@@ -381,7 +388,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	inboundRateLimiterCid := extractCreatedContractId(res)
-	t.Logf("Deployed inbound RateLimiter: %s", inboundRateLimiterCid)
+	t.Logf("Deployed default inbound RateLimiter: %s", inboundRateLimiterCid)
 	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -396,10 +403,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 						{Label: "remoteChainSelector", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: sourceChainSelector}}},
 						{Label: "direction", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitDirection_Inbound"}}}},
 						{Label: "mode", Value: &apiv2.Value{Sum: &apiv2.Value_Enum{Enum: &apiv2.Enum{Constructor: "RateLimitMode_CustomFinality"}}}},
-						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
+						{Label: "isEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
+						{Label: "capacity", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "10000000"}}},
+						{Label: "rate", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "10000000"}}},
+						{Label: "tokens", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "10000000"}}},
 						{Label: "lastUpdated", Value: &apiv2.Value{Sum: &apiv2.Value_Timestamp{Timestamp: time.Now().UnixMicro()}}},
 					}},
 				}},
@@ -409,7 +416,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 	inboundCustomBlockConfirmationsRateLimiterCid := extractCreatedContractId(res)
-	t.Logf("Deployed inbound custom-finality RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
+	t.Logf("Deployed custom-finality inbound RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
 	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
