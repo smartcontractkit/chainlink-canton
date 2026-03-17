@@ -23,8 +23,8 @@ type CCIPExecuteRequest struct {
 	// As part of the response, the explicit disclosures for all CCVs that this EDS knows about will be returned.
 	Ccvs []string `json:"ccvs"`
 
-	// MessageID The message ID of the CCIP message to be executed.
-	MessageID string `json:"messageID"`
+	// EncodedMessage The encoded CCIP message to be executed, in hex format.
+	EncodedMessage string `json:"encodedMessage"`
 }
 
 // CCIPExecuteResponse defines model for CCIPExecuteResponse.

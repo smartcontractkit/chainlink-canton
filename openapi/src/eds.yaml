@@ -151,12 +151,12 @@ components:
     CCIPExecuteRequest:
         type: object
         required:
-          - messageID
+          - encodedMessage
           - ccvs
         properties:
-          messageID:
+          encodedMessage:
             type: string
-            description: The message ID of the CCIP message to be executed.
+            description: The encoded CCIP message to be executed, in hex format.
           ccvs:
             type: array
             items:

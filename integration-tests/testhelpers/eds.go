@@ -55,8 +55,8 @@ func GetCCIPExecuteDisclosures(ctx context.Context, edsClient *edsv1.ClientWithR
 ) {
 	// Add the requested CCVs to the API request
 	request := edsv1.CCIPExecuteRequest{
-		Ccvs:      make([]string, len(ccvs)),
-		MessageID: "", // not used (yet)
+		Ccvs:           make([]string, len(ccvs)),
+		EncodedMessage: "", // not used (yet)
 	}
 	for i, ccv := range ccvs {
 		request.Ccvs[i] = ccv.String()
