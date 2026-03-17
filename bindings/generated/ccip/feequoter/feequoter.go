@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "60a772f0c925a5d072dc938723e0645d76a582c0d8c41c90f3c96a438bb922e1"
+	PackageID   = "0ba20d91f0960aeba1b45510ba9e1248866bb73e6ca06ddd3724553c11fb8b71"
 	SDKVersion  = "3.4.10"
 )
 
@@ -641,11 +641,11 @@ func (t FeeQuoter) ApplyDestChainConfigUpdatesWithPackageID(contractID string, p
 	}
 }
 
-// Archive exercises the Archive choice on this FeeQuoter contract
+// Archive exercises the Archive choice on this FeeQuoter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -655,7 +655,7 @@ func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

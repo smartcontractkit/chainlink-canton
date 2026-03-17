@@ -160,11 +160,11 @@ func (t CoinHolding) TransferWithPackageID(contractID string, packageID string, 
 	}
 }
 
-// Archive exercises the Archive choice on this CoinHolding contract
+// Archive exercises the Archive choice on this CoinHolding contract via the IHolding interface
 // This method uses the package name in the template ID
 func (t CoinHolding) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Coin.Holding", "CoinHolding"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Coin.Holding", "Holding"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -174,7 +174,7 @@ func (t CoinHolding) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CoinHolding) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Holding", "CoinHolding"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Holding", "Holding"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -295,11 +295,11 @@ func (t *CoinRegistry) UnmarshalHex(data string) error {
 
 // Choice methods for CoinRegistry
 
-// Archive exercises the Archive choice on this CoinRegistry contract
+// Archive exercises the Archive choice on this CoinRegistry contract via the IBurnMintFactory interface
 // This method uses the package name in the template ID
 func (t CoinRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Coin.Registry", "CoinRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Coin.Registry", "BurnMintFactory"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -309,7 +309,7 @@ func (t CoinRegistry) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CoinRegistry) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Registry", "CoinRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Registry", "BurnMintFactory"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -504,11 +504,11 @@ func (t *CoinTransferInstruction) UnmarshalHex(data string) error {
 
 // Choice methods for CoinTransferInstruction
 
-// Archive exercises the Archive choice on this CoinTransferInstruction contract
+// Archive exercises the Archive choice on this CoinTransferInstruction contract via the ITransferInstruction interface
 // This method uses the package name in the template ID
 func (t CoinTransferInstruction) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Coin.Transfer", "CoinTransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -518,7 +518,7 @@ func (t CoinTransferInstruction) Archive(contractID string) *model.ExerciseComma
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CoinTransferInstruction) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Transfer", "CoinTransferInstruction"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Coin.Transfer", "TransferInstruction"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

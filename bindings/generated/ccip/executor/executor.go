@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "05f1ebf5c3ad3b737961acbbf7cf5514b259bb0ed5030e9114f05a40b029555f"
+	PackageID   = "9019a5584395b32d8f48fb0fc46be22f9f0fb7ae131c10cacb5e51506dccefb9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -415,7 +415,7 @@ func (t Executor) ExecutorGetMinBlockConfirmationsWithPackageID(contractID strin
 	}
 }
 
-// Archive exercises the Archive choice on this Executor contract
+// Archive exercises the Archive choice on this Executor contract via the IIExecutor interface
 // This method uses the package name in the template ID
 func (t Executor) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -436,7 +436,7 @@ func (t Executor) ArchiveWithPackageID(contractID string, packageID string) *mod
 	}
 }
 
-// ExecutorCalculateFee exercises the Executor_CalculateFee choice on this Executor contract
+// ExecutorCalculateFee exercises the Executor_CalculateFee choice on this Executor contract via the IIExecutor interface
 // This method uses the package name in the template ID
 func (t Executor) ExecutorCalculateFee(contractID string, args common.ExecutorCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{

@@ -9,7 +9,7 @@ import Daml.Script
 import MCMS.Types
 import MCMS.Main
 import MCMS.MCMSReceiver (MCMSReceiver)
-import MCMS.Counter
+import MCMS.Mock.Counter
 import MCMS.Crypto (RawSignature(..), hashTimelockOpId)
 
 -- ===========================================================================

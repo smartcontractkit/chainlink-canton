@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "7f77aa7e5c53bba520e2066df76c3c6c696a607bc60c8b615592cb23b12e9b62"
+	PackageID   = "a6401bcdcf942878a48e6a080dd8cf11543cb820dd251c36da6597fdc72d29a5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -445,11 +445,11 @@ func (t OffRamp) GetRequiredCCVsForExecuteWithPackageID(contractID string, packa
 	}
 }
 
-// Archive exercises the Archive choice on this OffRamp contract
+// Archive exercises the Archive choice on this OffRamp contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -459,7 +459,7 @@ func (t OffRamp) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t OffRamp) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "OffRamp"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OffRamp", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

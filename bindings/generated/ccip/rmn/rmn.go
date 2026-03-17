@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "c6e87f7c71c45a4da9147092a8c2514e00cfc7558af652cdcdffabb8bf80afac"
+	PackageID   = "94b39a0ea210134c7457b747ca40d28a14fc3a70e8171f7192d274876ad77e98"
 	SDKVersion  = "3.4.10"
 )
 
@@ -741,11 +741,11 @@ func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, ar
 	}
 }
 
-// Archive exercises the Archive choice on this RMNRemote contract
+// Archive exercises the Archive choice on this RMNRemote contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -755,7 +755,7 @@ func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

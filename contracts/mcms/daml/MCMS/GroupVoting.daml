@@ -29,12 +29,12 @@ verifyGroupVoting signerAddrs config = do
   -- Check root group met quorum
   let rootQuorum = config.groupQuorums !! 0
   when (rootQuorum == 0) $
-    Left "E_MISSING_CONFIG: root group has no quorum set"
+    Left "mcms.groupvoting: root group has no quorum configured"
 
   let rootVotes = finalVotes !! 0
   when (rootVotes < rootQuorum) $
-    Left $ "E_INSUFFICIENT_SIGNERS: root group needs " <> show rootQuorum <>
-           " but only got " <> show rootVotes
+    Left $ "mcms.groupvoting: insufficient signers, root group needs " <> show rootQuorum <>
+           " but got " <> show rootVotes
 
 -- ===========================================================================
 -- HELPER FUNCTIONS
@@ -48,7 +48,7 @@ validateSignerOrder [_] = Right ()
 validateSignerOrder addrs = do
   forA_ (zip addrs (drop 1 addrs)) $ \(a, b) ->
     unless (a < b) $
-      Left "E_SIGNERS_NOT_SORTED: signer addresses must be in strictly increasing order"
+      Left "mcms.groupvoting: signer addresses must be in strictly increasing order"
 
 -- | Build a map from address to signer info for O(1) lookup
 buildSignerMap : [SignerInfo] -> Map.Map Text SignerInfo
@@ -74,7 +74,7 @@ processSingleSignature : Map.Map Text SignerInfo -> MultisigConfig -> [Int] -> T
 processSingleSignature signerMap config votes signerAddr = do
   -- Look up signer
   signer <- case Map.lookup signerAddr signerMap of
-    None -> Left $ "E_INVALID_SIGNER: address " <> signerAddr <> " not in config"
+    None -> Left $ "mcms.groupvoting: signer not in config: " <> signerAddr
     Some s -> Right s
 
   -- Add vote to signer's group and propagate if needed
