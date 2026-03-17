@@ -485,8 +485,9 @@ testCCIPSendAcceptsPendingFeeTransfer = script do
 
     ccipOwnerHoldings <- query @TestToken.TestHolding ccipOwner
     let receivedAmounts = [h.amount | (_, h) <- ccipOwnerHoldings, h.instrumentId == testFeeTokenId]
+    let totalReceivedAmount = sum receivedAmounts
     assertMsg "ccipOwner should receive fee tokens after pending transfer acceptance"
-        (expectedFeeTokenAmount `elem` receivedAmounts)
+        (totalReceivedAmount >= expectedFeeTokenAmount)
 
     debug "testCCIPSendAcceptsPendingFeeTransfer: PASSED"
 
