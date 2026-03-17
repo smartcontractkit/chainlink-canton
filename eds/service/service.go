@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
@@ -133,6 +134,14 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		})
 		ccvCids[i] = ccv.InstanceAddress
 	}
+	tokenPoolCids := make([]contracts.InstanceAddress, len(cfg.Contracts.TokenPools))
+	for i, tokenPool := range cfg.Contracts.TokenPools {
+		templates = append(templates, store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}),
+			PartyID:    tokenPool.PartyID,
+		})
+		tokenPoolCids[i] = tokenPool.InstanceAddress
+	}
 
 	updateStore, err := store.NewUpdateStore(ctx, store.UpdateStoreConfig{
 		Logger:        logger,
@@ -167,6 +176,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		RMNRemote:             cfg.Contracts.RMNRemote.InstanceAddress,
 		FeeQuoter:             cfg.Contracts.FeeQuoter.InstanceAddress,
 		CCVs:                  ccvCids,
+		TokenPools:            tokenPoolCids,
 	})
 
 	server := api.NewServer(logger, disclosureSvc)

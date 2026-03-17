@@ -39,6 +39,7 @@ type Contracts struct {
 	RMNRemote             ContractIdentifier   `toml:"rmn_remote" validate:"required"`
 	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
 	CCVs                  []ContractIdentifier `toml:"ccvs"`
+	TokenPools            []ContractIdentifier `toml:"token_pools"`
 }
 
 type ContractIdentifier struct {

@@ -22,6 +22,7 @@ type DisclosureServiceConfig struct {
 	RMNRemote             contracts.InstanceAddress
 	FeeQuoter             contracts.InstanceAddress
 	CCVs                  []contracts.InstanceAddress
+	TokenPools            []contracts.InstanceAddress
 }
 
 // The DisclosureService returns explicit disclosures for CCIP contracts.
@@ -38,6 +39,7 @@ type DisclosureService struct {
 	rmnRemote             contracts.InstanceAddress
 	feeQuoter             contracts.InstanceAddress
 	ccvs                  []contracts.InstanceAddress
+	tokenPools            []contracts.InstanceAddress
 
 	// Contains all configured instance addresses, to allow looking up if a requested disclosure should be returned.
 	allContracts map[contracts.InstanceAddress]struct{}
@@ -45,7 +47,7 @@ type DisclosureService struct {
 
 func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *DisclosureService {
 	// Create a map of all instance addresses
-	allContracts := make(map[contracts.InstanceAddress]struct{}, 7+len(config.CCVs))
+	allContracts := make(map[contracts.InstanceAddress]struct{}, 7+len(config.CCVs)+len(config.TokenPools))
 	allContracts[config.PerPartyRouterFactory] = struct{}{}
 	allContracts[config.OnRamp] = struct{}{}
 	allContracts[config.OffRamp] = struct{}{}
@@ -56,7 +58,9 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 	for _, ccv := range config.CCVs {
 		allContracts[ccv] = struct{}{}
 	}
-
+	for _, tokenPool := range config.TokenPools {
+		allContracts[tokenPool] = struct{}{}
+	}
 	return &DisclosureService{
 		contractStore: config.ContractStore,
 
@@ -68,6 +72,7 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 		rmnRemote:             config.RMNRemote,
 		feeQuoter:             config.FeeQuoter,
 		ccvs:                  config.CCVs,
+		tokenPools:            config.TokenPools,
 
 		allContracts: allContracts,
 	}
