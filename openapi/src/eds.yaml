@@ -169,12 +169,20 @@ components:
       required:
         - choiceContext
         - ccvs
+        - tokenPool
+        - tokenPoolHoldings
       properties:
         choiceContext:
           $ref: '#/components/schemas/ChoiceContext'
         ccvs:
           type: object
           additionalProperties:
+            $ref: '#/components/schemas/OptionalDisclosure'
+        tokenPool:
+          $ref: '#/components/schemas/OptionalDisclosure'
+        tokenPoolHoldings:
+          type: array
+          items:
             $ref: '#/components/schemas/OptionalDisclosure'
 
     CCIPPerPartyRouterFactoryRequest:

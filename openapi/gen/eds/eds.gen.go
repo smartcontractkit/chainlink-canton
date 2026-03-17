@@ -35,6 +35,13 @@ type CCIPExecuteResponse struct {
 	// Used to retrieve additional CCIP contracts which are referred to via their
 	// contract IDs in the 'choiceContextData'.
 	ChoiceContext ChoiceContext `json:"choiceContext"`
+
+	// TokenPool The result of the explicit disclosure lookup for a contract.
+	// Will be used in places where the EDS is not guaranteed to serve the explicit disclosure itself:
+	// - If the EDS can serve an explicit disclosure for the requested contract, then the 'disclosedContract' field will be returned, containing the explicit disclosure for the contract.
+	// - If the contract's owner has registered the contract with the global EDS registry, but the EDS cannot serve an explicit disclosure for the contract itself, then the 'registeredContract' field will be returned, containing the information on where to query the explicit disclosure for the contract, as well as the party ID of the owner of the contract.
+	TokenPool         OptionalDisclosure   `json:"tokenPool"`
+	TokenPoolHoldings []OptionalDisclosure `json:"tokenPoolHoldings"`
 }
 
 // CCIPPerPartyRouterFactoryRequest defines model for CCIPPerPartyRouterFactoryRequest.

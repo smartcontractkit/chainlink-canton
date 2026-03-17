@@ -396,7 +396,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					InstanceAddress: contracts.HexToInstanceAddress(feeQuoter.Address),
 				},
 				CCVs: []config.ContractIdentifier{
-					config.ContractIdentifier{
+					{
 						PartyID:         partyCCIP,
 						InstanceAddress: contracts.HexToInstanceAddress(committeeVerifier.Address),
 					},
