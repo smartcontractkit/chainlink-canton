@@ -9,7 +9,7 @@ module CCIP.CCIPReceiver where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Optional (isSome)
 
 import qualified CCIP.Context
@@ -52,6 +52,8 @@ template CCIPReceiver
         minBlockDepth : Int
     where
         signatory owner
+        -- Ensure that requiredCCVs are unique
+        ensure unique requiredCCVs
 
         -- | Query the receiver's CCV requirements. Off-chain code calls this
         -- to discover which CCVs need verification inputs before calling
@@ -68,7 +70,9 @@ template CCIPReceiver
             with
                 newRequiredCCVs : [RawInstanceAddress]
             controller owner
-            do create this with requiredCCVs = newRequiredCCVs
+            do
+                assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in new required CCVs" (unique newRequiredCCVs)
+                create this with requiredCCVs = newRequiredCCVs
 
 
         -- | Executes an inbound CCIP message end-to-end.
