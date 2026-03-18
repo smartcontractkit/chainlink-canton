@@ -33,16 +33,18 @@ var _ InstrumentHoldingStore = &InstrumentHoldingStoreService{}
 const DefaultReconnectBackoff = 5 * time.Second
 
 type InstrumentHoldingStoreConfig struct {
-	Logger              zerolog.Logger
-	Owner                types.PARTY
-	StateService         apiv2.StateServiceClient
-	UpdateService        apiv2.UpdateServiceClient
-	MaxRetries           int
-	ReconnectBackoff     time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
+	Logger           zerolog.Logger
+	Owner            types.PARTY
+	StateService     apiv2.StateServiceClient
+	UpdateService    apiv2.UpdateServiceClient
+	MaxRetries       int
+	ReconnectBackoff time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
 }
 
 type InstrumentHoldingStoreService struct {
 	logger zerolog.Logger
+
+	filtersByParty map[string]*apiv2.Filters
 
 	// owner is the party that we're tracking the holdings of.
 	owner types.PARTY
@@ -53,6 +55,7 @@ type InstrumentHoldingStoreService struct {
 	// stateService is the service used to get the latest active contracts via interface id,
 	// specifically the #splice-api-token-holding-v1 interface.
 	stateService apiv2.StateServiceClient
+
 	// updateService is the service used to subscribe to updates from the Canton participant,
 	// specifically fetching _new_ holdings.
 	updateService apiv2.UpdateServiceClient
@@ -80,34 +83,33 @@ func NewInstrumentHoldingStore(
 		owner:              config.Owner,
 		holdingDisclosures: make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract),
 
-		stateService:       config.StateService,
-		updateService:      config.UpdateService,
-		maxRetries:         config.MaxRetries,
-		reconnectBackoff:   backoff,
+		stateService:     config.StateService,
+		updateService:    config.UpdateService,
+		maxRetries:       config.MaxRetries,
+		reconnectBackoff: backoff,
+		filtersByParty: map[string]*apiv2.Filters{
+			string(config.Owner): {
+				Cumulative: []*apiv2.CumulativeFilter{
+					{
+						IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
+							InterfaceId: &apiv2.Identifier{
+								PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+								ModuleName: "Splice.Api.Token.HoldingV1",
+								EntityName: "Holding",
+							},
+							IncludeInterfaceView:    true,
+							IncludeCreatedEventBlob: true,
+						}},
+					},
+				},
+			},
+		},
 	}
 }
 
 // updateStreamFactory returns a StreamFactory that creates GetUpdates streams for this store's owner and Holding interface.
 // It mirrors UpdateStore's updateStreamFactory but filters for the Holding interface only.
 func (i *InstrumentHoldingStoreService) updateStreamFactory() StreamFactory[apiv2.GetUpdatesResponse] {
-	filtersByParty := map[string]*apiv2.Filters{
-		string(i.owner): {
-			Cumulative: []*apiv2.CumulativeFilter{
-				{
-					IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
-						InterfaceId: &apiv2.Identifier{
-							PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-							ModuleName: "Splice.Api.Token.HoldingV1",
-							EntityName: "Holding",
-						},
-						IncludeInterfaceView:    true,
-						IncludeCreatedEventBlob: true,
-					}},
-				},
-			},
-		},
-	}
-
 	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 		return i.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
 			BeginExclusive: offset,
@@ -115,7 +117,7 @@ func (i *InstrumentHoldingStoreService) updateStreamFactory() StreamFactory[apiv
 			UpdateFormat: &apiv2.UpdateFormat{
 				IncludeTransactions: &apiv2.TransactionFormat{
 					EventFormat: &apiv2.EventFormat{
-						FiltersByParty: filtersByParty,
+						FiltersByParty: i.filtersByParty,
 						Verbose:        true,
 					},
 					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
@@ -220,6 +222,61 @@ func getHoldingDisclosureAndView(expectedOwner types.PARTY, ac *apiv2.ActiveCont
 	}
 
 	return holdingDisclosure, holdingView, nil
+}
+
+// backfill returns all currently-active contracts for s.filtersByParty at a given offset, indexed by InstanceAddress.
+func (i *InstrumentHoldingStoreService) backfill(ctx context.Context, offset int64) (map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract, error) {
+	holdingDisclosures := make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract)
+
+	activeContractsResponse, err := i.stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: offset,
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: i.filtersByParty,
+			Verbose:        true,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active contracts: %w", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			_ = activeContractsResponse.CloseSend()
+			return holdingDisclosures, ctx.Err()
+		default:
+			resp, err := activeContractsResponse.Recv()
+			if errors.Is(err, io.EOF) {
+				_ = activeContractsResponse.CloseSend()
+				return holdingDisclosures, nil
+			}
+			if err != nil {
+				return nil, fmt.Errorf("failed to receive active contract: %w", err)
+			}
+
+			if ac, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
+				i.logger.Debug().
+					Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).
+					Str("packageName", ac.ActiveContract.GetCreatedEvent().GetPackageName()).
+					Str("packageID", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetPackageId()).
+					Str("moduleName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetModuleName()).
+					Str("entityName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName()).
+					Msg("Backfilling holding")
+
+				holdingDisclosure, holdingView, err := getHoldingDisclosureAndView(i.owner, ac.ActiveContract)
+				if err != nil {
+					i.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get holding disclosure for active contract, skipping")
+					continue
+				}
+				i.logger.Info().
+					Any("holdingView", holdingView).
+					Any("holdingDisclosure", holdingDisclosure).
+					Msg("Recording holding disclosure")
+
+				holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
+			}
+		}
+	}
 }
 
 // GetInstrumentHolding implements [InstrumentHoldingStore].
