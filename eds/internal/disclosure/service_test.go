@@ -182,7 +182,7 @@ func TestDisclosureService_GetCCIPExecuteDisclosures(t *testing.T) {
 		}
 
 		result, err := svc.GetCCIPExecuteDisclosures(ctx, CCIPExecuteRequest{
-			Message: protocol.Message{}, // no token transfer
+			Message: &protocol.Message{}, // no token transfer
 			CCVs:    config.CCVs,
 		})
 		require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestDisclosureService_GetCCIPExecuteDisclosures(t *testing.T) {
 		contractStore.EXPECT().GetContract(ctx, config.OffRamp).Return(nil)
 
 		result, err := svc.GetCCIPExecuteDisclosures(ctx, CCIPExecuteRequest{
-			Message: protocol.Message{},
+			Message: &protocol.Message{},
 			CCVs:    config.CCVs,
 		})
 		require.Error(t, err)

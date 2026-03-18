@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
 type Server struct {
@@ -47,8 +49,24 @@ func (s Server) CcipExecute(c *gin.Context) {
 		ccvs[i] = instanceAddress
 	}
 
+	// Decode the CCIP encoded message
+	var message *protocol.Message
+	if req.EncodedMessage != "" {
+		messageBytes, err := hex.DecodeString(req.EncodedMessage)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid encoded message: %s", err.Error())})
+			return
+		}
+		message, err = protocol.DecodeMessage(messageBytes)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, edsv1.ErrorResponse{Error: fmt.Sprintf("invalid encoded message: %s", err.Error())})
+			return
+		}
+	}
+
 	disclosures, err := s.disclosureSvc.GetCCIPExecuteDisclosures(c.Request.Context(), disclosure.CCIPExecuteRequest{
-		CCVs: ccvs,
+		Message: message,
+		CCVs:    ccvs,
 	})
 	if err != nil {
 		s.logger.Err(err).Msg("failed to get disclosures for CCIP execute")
@@ -92,7 +110,9 @@ func (s Server) CcipExecute(c *gin.Context) {
 			ChoiceContextData:  choiceContextData,
 			DisclosedContracts: disclosedContracts,
 		},
-		Ccvs: make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+		Ccvs:              make(map[string]edsv1.OptionalDisclosure, len(disclosures.CCVs)),
+		TokenPool:         convertOptionalDisclosure(disclosures.TokenPool),
+		TokenPoolHoldings: convertOptionalDisclosure(disclosures.TokenPoolHolding),
 	}
 
 	for address, contract := range disclosures.CCVs {
@@ -246,5 +266,17 @@ func convertDisclosedContract(contract *apiv2.DisclosedContract) edsv1.Disclosed
 		CreatedEventBlob: base64.StdEncoding.EncodeToString(contract.CreatedEventBlob),
 		SynchronizerId:   contract.SynchronizerId,
 		TemplateId:       fmt.Sprintf("%s:%s:%s", contract.GetTemplateId().GetPackageId(), contract.GetTemplateId().GetModuleName(), contract.GetTemplateId().GetEntityName()),
+	}
+}
+
+func convertOptionalDisclosure(contract *apiv2.DisclosedContract) edsv1.OptionalDisclosure {
+	if contract == nil {
+		return edsv1.OptionalDisclosure{}
+	}
+
+	disclosure := convertDisclosedContract(contract)
+	return edsv1.OptionalDisclosure{
+		DisclosedContract:  &disclosure,
+		RegisteredContract: nil,
 	}
 }

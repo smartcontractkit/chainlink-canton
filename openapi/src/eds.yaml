@@ -181,9 +181,7 @@ components:
         tokenPool:
           $ref: '#/components/schemas/OptionalDisclosure'
         tokenPoolHoldings:
-          type: array
-          items:
-            $ref: '#/components/schemas/OptionalDisclosure'
+          $ref: '#/components/schemas/OptionalDisclosure'
 
     CCIPPerPartyRouterFactoryRequest:
       type: object

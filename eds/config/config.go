@@ -40,6 +40,11 @@ type Contracts struct {
 	FeeQuoter             ContractIdentifier   `toml:"fee_quoter" validate:"required"`
 	CCVs                  []ContractIdentifier `toml:"ccvs"`
 	TokenPools            []ContractIdentifier `toml:"token_pools"`
+
+	// PoolOwner is the party that owns the token pools.
+	// The instrument holdings of this owner is what will end up getting tracked by EDS,
+	// and we will serve disclosures for them if needed (i.e. for token transfer executions).
+	PoolOwner string `toml:"pool_owner"`
 }
 
 type ContractIdentifier struct {

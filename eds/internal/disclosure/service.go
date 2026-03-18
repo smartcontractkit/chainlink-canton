@@ -169,7 +169,7 @@ func (s *DisclosureService) GetCCIPSendDisclosures(ctx context.Context, request 
 }
 
 type CCIPExecuteRequest struct {
-	Message protocol.Message
+	Message *protocol.Message
 	CCVs    []contracts.InstanceAddress
 }
 
@@ -228,7 +228,12 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 	}, nil
 }
 
-func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context, message protocol.Message) (tokenPoolDisclosure *apiv2.DisclosedContract, instrumentHoldingDisclosure *apiv2.DisclosedContract, err error) {
+func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context, message *protocol.Message) (tokenPoolDisclosure *apiv2.DisclosedContract, instrumentHoldingDisclosure *apiv2.DisclosedContract, err error) {
+	if message == nil {
+		// Nothing to do, can't provide disclosures for token pool and holdings if we don't have message data
+		return nil, nil, nil
+	}
+
 	// To get the token pool, we need to query the token admin registry for the token pool instance address.
 	if message.TokenTransfer != nil &&
 		len(message.TokenTransfer.DestTokenAddress) > 0 {
