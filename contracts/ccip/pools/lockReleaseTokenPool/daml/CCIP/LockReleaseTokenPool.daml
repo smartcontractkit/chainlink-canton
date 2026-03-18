@@ -131,6 +131,12 @@ assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expec
     assertMsg (prefix <> ": rate limit mode mismatch")
         (limiter.mode == mode)
 
+bpsDenominator : Numeric 0
+bpsDenominator = 10000.0
+
+calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
+calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
+
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
     with
@@ -157,6 +163,8 @@ template LockReleaseTokenPool
         deps : LockReleaseTokenPoolDeps
     where
         signatory poolOwner
+
+        ensure all (\cfg -> cfg.feeBps >= 0.0 && cfg.feeBps < bpsDenominator) (Map.values tokenTransferFeeConfigs)
 
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with
@@ -220,6 +228,13 @@ template LockReleaseTokenPool
                         sendingMessageCid = arg.sendingMessageCid
                         feeQuoterCid = arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
+                        caller = arg.caller
+
+            tokenPool_getTokenFeeQuoteImpl self arg = do
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_GetTokenFeeQuote
+                    with
+                        remoteChainSelector = arg.remoteChainSelector
+                        amount = arg.amount
                         caller = arg.caller
 
         -- Get required CCV raw instance addresses based on chain and direction.
@@ -560,6 +575,25 @@ template LockReleaseTokenPool
                         destBytesOverhead = destBytesOverhead
                         caller = poolOwner
 
+        nonconsuming choice LockReleaseTokenPool_GetTokenFeeQuote
+                : CCIP.Interfaces.TokenPool.TokenFeeQuote
+            with
+                remoteChainSelector : Numeric 0
+                amount : Numeric 0
+                caller : Party
+            controller caller
+            do
+                assertMsg "pool: unsupported remote chain selector"
+                    (Map.member remoteChainSelector remoteChainConfigs)
+                let tokenFeeBps = case Map.lookup remoteChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let tokenFeeAmount = calculateFeeFromBps amount tokenFeeBps
+                pure CCIP.Interfaces.TokenPool.TokenFeeQuote with
+                    tokenFeeBps = tokenFeeBps
+                    tokenFeeAmount = tokenFeeAmount
+                    amountAfterFee = amount - tokenFeeAmount
+
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.
         -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
@@ -642,13 +676,17 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
+                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let amountAfterFeeBps = amount - calculateFeeFromBps amount tokenFeeBps
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSend with
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         instrumentId = instrumentId
-                        amount = amount
+                        amount = amountAfterFeeBps
                         destTokenAddress = destTokenAddr
                         extraData = extraData
                         caller = poolOwner

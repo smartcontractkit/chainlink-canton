@@ -33,6 +33,12 @@ type DeployTokenPoolConfig struct {
 	PoolReceiveContext common.CCIPContext
 	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
 	TransferTimeout lockreleasetokenpool.TransferTimeout
+	// Optional; defaults to empty map.
+	RemoteChainConfigs types.GENMAP
+	// Optional; defaults to empty map.
+	TokenTransferFeeConfigs types.GENMAP
+	// Optional; zero-value deps if not provided.
+	Deps lockreleasetokenpool.LockReleaseTokenPoolDeps
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
 	TokenAdminRegistryInstanceAddress contracts.InstanceAddress
 }
@@ -72,6 +78,14 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		h := types.INT64(24)
 		transferTimeout = lockreleasetokenpool.TransferTimeout{RelativeHours: &h}
 	}
+	remoteChainConfigs := cfg.RemoteChainConfigs
+	if remoteChainConfigs == nil {
+		remoteChainConfigs = types.GENMAP{}
+	}
+	tokenTransferFeeConfigs := cfg.TokenTransferFeeConfigs
+	if tokenTransferFeeConfigs == nil {
+		tokenTransferFeeConfigs = types.GENMAP{}
+	}
 
 	template := lockreleasetokenpool.LockReleaseTokenPool{
 		CcipOwner:               types.PARTY(cfg.CcipOwner),
@@ -79,10 +93,11 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		InstanceId:              "", // set by deploy operation
 		InstrumentId:            cfg.InstrumentId,
 		Decimals:                types.INT64(cfg.Decimals),
-		RemoteChainConfigs:      types.GENMAP{},
-		TokenTransferFeeConfigs: types.GENMAP{},
+		RemoteChainConfigs:      remoteChainConfigs,
+		TokenTransferFeeConfigs: tokenTransferFeeConfigs,
 		PoolReceiveContext:      poolReceiveContext,
 		TransferTimeout:         transferTimeout,
+		Deps:                    cfg.Deps,
 	}
 
 	qualifier := ptr.String(cfg.Qualifier)
@@ -105,19 +120,21 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to save deployed LockReleaseTokenPool contract address: %w", err)
 	}
 
-	regInput := sequences.RegisterTokenPoolInput{
-		TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
-		InstrumentId: splice_api_token_holding_v1.InstrumentId{
-			Admin: cfg.InstrumentId.Admin,
-			Id:    cfg.InstrumentId.Id,
-		},
-		CcipParty:      cfg.CcipOwner,
-		PoolOwnerParty: cfg.PoolOwner,
-		PoolInstanceID: out.Output.Address,
-	}
-	_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
-	if err != nil {
-		return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
+	if cfg.TokenAdminRegistryInstanceAddress != (contracts.InstanceAddress{}) {
+		regInput := sequences.RegisterTokenPoolInput{
+			TokenAdminRegistryInstanceAddress: cfg.TokenAdminRegistryInstanceAddress,
+			InstrumentId: splice_api_token_holding_v1.InstrumentId{
+				Admin: cfg.InstrumentId.Admin,
+				Id:    cfg.InstrumentId.Id,
+			},
+			CcipParty:      cfg.CcipOwner,
+			PoolOwnerParty: cfg.PoolOwner,
+			PoolInstanceID: out.Output.Address,
+		}
+		_, err = cld_ops.ExecuteSequence(e.OperationsBundle, sequences.RegisterTokenPool, deps, regInput)
+		if err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("failed to register token pool with TAR: %w", err)
+		}
 	}
 
 	return cldf.ChangesetOutput{
