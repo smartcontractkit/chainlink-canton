@@ -108,6 +108,17 @@ template CCIPSender
                     tokenArgs = extraArgs.tokenArgs
                     feeToken
 
+                -- Outbound pool CCV verification via TAR happens first for token sends.
+                smCid <- case tokenTransfer of
+                    None -> pure smCid
+                    Some tt -> exercise tt.tokenPoolCid
+                        CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            extraContext = tt.poolExtraContext
+                            sendingMessageCid = smCid
+                            amount = tt.amount
+                            caller = owner
+
                 -- CalculateFee (CCV + pool, USD cents only)
                 smCid <- foldlA (\cid input ->
                     exercise input.ccvCid
@@ -120,20 +131,10 @@ template CCIPSender
                     None -> pure smCid
                     Some tt -> exercise tt.tokenPoolCid
                         CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
                             sendingMessageCid = smCid
                             feeQuoterCid = feeQuoterCid
                             tokenInstrumentId = tt.tokenInstrumentId
-                            caller = owner
-
-                -- Outbound pool CCV verification via TAR
-                smCid <- case tokenTransfer of
-                    None -> pure smCid
-                    Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_VerifyOutboundCCVs with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            extraContext = tt.poolExtraContext
-                            sendingMessageCid = smCid
-                            amount = tt.amount
                             caller = owner
 
                 -- LockOrBurn (stores token data before executor finalization)
@@ -142,6 +143,7 @@ template CCIPSender
                     Some tt -> do
                         lockResult <- exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_LockOrBurn with
+                                tokenAdminRegistryCid = tokenAdminRegistryCid
                                 rmnRemoteCid = rmnRemoteCid
                                 extraContext = tt.poolExtraContext
                                 sendingMessageCid = smCid

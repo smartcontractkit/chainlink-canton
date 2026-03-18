@@ -199,13 +199,15 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  -- Verify admin was transferred
+  -- Verify transfer creates a pending admin and leaves current admin unchanged
   contracts <- query @TokenAdminRegistry owner
   case filter (\(_, tar) -> tar.instanceId == instanceId) contracts of
     [(_, tar)] ->
       case Map.lookup encodedInstrumentId tar.tokenConfigs of
         None -> abort "Expected token config"
-        Some config -> config.admin === Some newAdmin
+        Some config -> do
+          config.admin === Some owner
+          config.pendingAdmin === Some newAdmin
     _ -> abort "Expected exactly one TokenAdminRegistry contract"
 
   pure ()

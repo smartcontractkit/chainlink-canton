@@ -175,6 +175,9 @@ template OnRamp
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
+                let initialState = if hasTokenTransfer
+                        then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
+                        else CCIP.SendingMessageV1.SendingMessageState_Prepared
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -220,7 +223,7 @@ template OnRamp
                     ccvOwners = []
                     tokenSendData = None
                     observingParties = [routerPartyOwner]
-                    state = CCIP.SendingMessageV1.SendingMessageState_Prepared
+                    state = initialState
 
         -- | Validate and finalize a CCIP send.
         -- Reads accumulated data from SendingMessageV1. Fee collection happens

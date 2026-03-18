@@ -231,8 +231,8 @@ func TestCCIPSend(t *testing.T) {
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // random executor
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
-							NetworkFeeUSDCents:      0,
-							DefaultTokenFeeUSDCents: 0,
+							NetworkFeeUSDCents:      25,
+							DefaultTokenFeeUSDCents: 10,
 						},
 						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
 						AddressBytesLength:      20,
@@ -511,10 +511,10 @@ func TestCCIPSend(t *testing.T) {
 
 	t.Logf("partySender=%q", partySender)
 
-	// Mint Amulet tokens to sender so they can pay the fee
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.00")
+	// Mint 100 whole AMT in local 1e8 units so the sender can cover non-zero fees.
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
-	t.Logf("Minted 100 Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
+	t.Logf("Minted 100 whole Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
