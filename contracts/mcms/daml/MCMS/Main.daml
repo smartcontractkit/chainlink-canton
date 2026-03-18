@@ -15,7 +15,7 @@ module MCMS.Main where
 
 import DA.Map qualified as Map
 import DA.List ((!!), dedup)
-import DA.Action (unless, when)
+import DA.Action (unless)
 import DA.Foldable (forA_)
 import DA.Time (RelTime, seconds, addRelTime)
 import DA.Text (parseInt)
@@ -82,9 +82,11 @@ validateMultisigConfig config = do
   let signerCounts = countSignersPerGroup config.signers
   let childCounts = computeChildCounts signerCounts config.groupQuorums config.groupParents
   forA_ (zip3 [0..(numGroups - 1)] config.groupQuorums childCounts) $ \(idx, quorum, children) ->
-    when (quorum > 0) $
-      assertMsg ("mcms: group " <> show idx <> " quorum " <> show quorum <> " exceeds children count " <> show children) $
-        children >= quorum
+    if quorum > 0
+      then assertMsg ("mcms: group " <> show idx <> " quorum " <> show quorum <> " exceeds children count " <> show children) $
+             children >= quorum
+      else assertMsg ("mcms: disabled group " <> show idx <> " has children") $
+             children == 0
   -- Validate signer addresses are unique
   let signerAddrs = map (\s -> s.signerAddress) config.signers
   assertMsg "mcms: duplicate signer addresses" $
