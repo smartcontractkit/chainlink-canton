@@ -1,17 +1,25 @@
 package disclosure
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 type DisclosureServiceConfig struct {
-	ContractStore store.ContractStore
+	ContractStore          store.ContractStore
+	InstrumentHoldingStore store.InstrumentHoldingStore
 
 	// Contracts
 	PerPartyRouterFactory contracts.InstanceAddress
@@ -29,7 +37,8 @@ type DisclosureServiceConfig struct {
 // It uses a store.ContractStore to retrieve active contracts from the ledger and provides explicit disclosures for them.
 // It is configured with a fixed list of InstanceAddresses for all CCIP contracts.
 type DisclosureService struct {
-	contractStore store.ContractStore
+	contractStore          store.ContractStore
+	instrumentHoldingStore store.InstrumentHoldingStore
 
 	perPartyRouterFactory contracts.InstanceAddress
 	onRamp                contracts.InstanceAddress
@@ -62,7 +71,8 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 		allContracts[tokenPool] = struct{}{}
 	}
 	return &DisclosureService{
-		contractStore: config.ContractStore,
+		contractStore:          config.ContractStore,
+		instrumentHoldingStore: config.InstrumentHoldingStore,
 
 		perPartyRouterFactory: config.PerPartyRouterFactory,
 		onRamp:                config.OnRamp,
@@ -159,7 +169,8 @@ func (s *DisclosureService) GetCCIPSendDisclosures(ctx context.Context, request 
 }
 
 type CCIPExecuteRequest struct {
-	CCVs []contracts.InstanceAddress
+	Message protocol.Message
+	CCVs    []contracts.InstanceAddress
 }
 
 type CCIPExecuteDisclosures struct {
@@ -168,6 +179,8 @@ type CCIPExecuteDisclosures struct {
 	TokenAdminRegistry *apiv2.DisclosedContract
 	RMNRemote          *apiv2.DisclosedContract
 	CCVs               map[contracts.InstanceAddress]*apiv2.DisclosedContract
+	TokenPool          *apiv2.DisclosedContract
+	TokenPoolHolding   *apiv2.DisclosedContract
 }
 
 func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, request CCIPExecuteRequest) (CCIPExecuteDisclosures, error) {
@@ -199,13 +212,154 @@ func (s *DisclosureService) GetCCIPExecuteDisclosures(ctx context.Context, reque
 		ccvs[requestedCCV] = ccv
 	}
 
+	tokenPoolDisclosure, instrumentHoldingDisclosure, err := s.getTokenPoolAndHoldingDisclosure(ctx, request.Message)
+	if err != nil {
+		return CCIPExecuteDisclosures{}, fmt.Errorf("can't get token pool and holding disclosure: %w", err)
+	}
+
 	return CCIPExecuteDisclosures{
 		OffRamp:            offRamp,
 		GlobalConfig:       globalConfig,
 		TokenAdminRegistry: tokenAdminRegistry,
 		RMNRemote:          rmnRemote,
 		CCVs:               ccvs,
+		TokenPool:          tokenPoolDisclosure,
+		TokenPoolHolding:   instrumentHoldingDisclosure,
 	}, nil
+}
+
+func (s *DisclosureService) getTokenPoolAndHoldingDisclosure(ctx context.Context, message protocol.Message) (tokenPoolDisclosure *apiv2.DisclosedContract, instrumentHoldingDisclosure *apiv2.DisclosedContract, err error) {
+	// To get the token pool, we need to query the token admin registry for the token pool instance address.
+	if message.TokenTransfer != nil &&
+		len(message.TokenTransfer.DestTokenAddress) > 0 {
+		// get the created event of the token admin registry via the update store.
+		tarActiveContract := s.contractStore.GetContract(ctx, s.tokenAdminRegistry)
+		if tarActiveContract == nil {
+			return nil, nil, fmt.Errorf("can't get tokenAdminRegistry disclosure from update store: %w", err)
+		}
+		tarCreatedEvent, err := bindings.UnmarshalCreatedEvent[tokenadminregistry.TokenAdminRegistry](tarActiveContract.GetCreatedEvent())
+		if err != nil {
+			return nil, nil, fmt.Errorf("can't unmarshal tokenAdminRegistry created event: %w", err)
+		}
+
+		// get the token pool instance address from the created event.
+		// Note that the destTokenAddress is the hashed instrumentId, which is what the mapping
+		// in the TokenAdminRegistry uses as a key.
+		tokenPoolInstanceAddress, instrumentID, err := getTokenPoolAddressAndInstrumentID(tarCreatedEvent, message.TokenTransfer.DestTokenAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("can't get token pool instance address from token admin registry createdEvent: %w", err)
+		}
+
+		tokenPoolDisclosure, err = s.GetDisclosure(ctx, tokenPoolInstanceAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("can't get token pool disclosure: %w", err)
+		}
+
+		// look up the instrument holding disclosure for the instrument id.
+		instrumentHoldingDisclosure, err = s.instrumentHoldingStore.GetInstrumentHolding(ctx, instrumentID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("can't get instrument holding disclosure: %w", err)
+		}
+
+		return tokenPoolDisclosure, instrumentHoldingDisclosure, nil
+	}
+
+	// If a message doesn't have a token transfer there will be no disclosures for either the token pool or the instrument holding.
+	return nil, nil, nil
+}
+
+// TODO: this is really janky, how to properly test this?
+func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.TokenAdminRegistry, destTokenAddress []byte) (contracts.InstanceAddress, splice_api_token_holding_v1.InstrumentId, error) {
+	expectedHashedInstrumentID := contracts.BytesToInstanceAddress(destTokenAddress)
+
+	// -- | Maps keccak256(InstrumentId) to token configuration
+	// tokenConfigs : Map.Map BytesHex TokenConfig
+	for hashedInstrumentID, v := range tarCreatedEvent.TokenConfigs {
+		// check if this instrument ID corresponds to the one we expect.
+		instrumentIDBytes, err := hex.DecodeString(hashedInstrumentID)
+		if err != nil {
+			continue
+		}
+		if !bytes.Equal(instrumentIDBytes, expectedHashedInstrumentID.Bytes()) {
+			continue
+		}
+
+		configMap, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		// Unmarshalled form may wrap fields in "data"
+		m := configMap
+		if data, ok := configMap["data"].(map[string]any); ok {
+			m = data
+		}
+		tokenPoolRaw, ok := m["tokenPool"]
+		if !ok || tokenPoolRaw == nil {
+			continue
+		}
+		// Optional: {"_type": "optional", "value": <PoolRegistration map>}
+		var tokenPoolMap map[string]any
+		if opt, ok := tokenPoolRaw.(map[string]any); ok {
+			if val, has := opt["value"]; has && val != nil {
+				tokenPoolMap, _ = val.(map[string]any)
+			}
+		}
+		if tokenPoolMap == nil {
+			tokenPoolMap, _ = tokenPoolRaw.(map[string]any)
+		}
+		if tokenPoolMap == nil {
+			continue
+		}
+		// poolOwner may be under tokenPool.data when unmarshalled
+		tokenPoolData := tokenPoolMap
+		if data, ok := tokenPoolMap["data"].(map[string]any); ok {
+			tokenPoolData = data
+		}
+		poolOwnerStr := optionalStringFromMap(tokenPoolData, "poolOwner")
+		if poolOwnerStr == "" {
+			continue
+		}
+		poolInstanceIDStr := optionalStringFromMap(tokenPoolData, "poolInstanceId")
+		if poolInstanceIDStr == "" {
+			continue
+		}
+		tokenPoolInstanceAddress := contracts.InstanceID(poolInstanceIDStr).RawInstanceAddress(types.PARTY(poolOwnerStr)).InstanceAddress()
+
+		// get the instrument id from the token config as well.
+		instrumentIDAny, ok := m["instrumentId"]
+		if !ok {
+			// this should never happen, but just in case.
+			continue
+		}
+		instrumentID, ok := instrumentIDAny.(splice_api_token_holding_v1.InstrumentId)
+		if !ok {
+			// this should never happen, but just in case.
+			continue
+		}
+		return tokenPoolInstanceAddress, instrumentID, nil
+	}
+
+	return contracts.InstanceAddress{}, splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf("token pool instance address not found in token admin registry data: %+v", tarCreatedEvent.TokenConfigs)
+}
+
+// optionalStringFromMap gets an optional string from a map: either direct string or {"value": "<string>"}.
+func optionalStringFromMap(m map[string]any, key string) string {
+	raw, ok := m[key]
+	if !ok || raw == nil {
+		return ""
+	}
+	if s, ok := raw.(string); ok {
+		return s
+	}
+	if opt, ok := raw.(map[string]any); ok {
+		if v, ok := opt["value"]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+	}
+
+	return ""
 }
 
 type PerPartyRouterFactoryRequest struct{}
