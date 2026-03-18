@@ -10,10 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/disclosure"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 )
 
 type Server struct {
@@ -275,6 +276,7 @@ func convertOptionalDisclosure(contract *apiv2.DisclosedContract) edsv1.Optional
 	}
 
 	disclosure := convertDisclosedContract(contract)
+
 	return edsv1.OptionalDisclosure{
 		DisclosedContract:  &disclosure,
 		RegisteredContract: nil,

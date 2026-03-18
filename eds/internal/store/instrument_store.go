@@ -11,9 +11,10 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var ErrHoldingDisclosureNotFound = errors.New("holding disclosure not found")
@@ -94,6 +95,7 @@ func (i *InstrumentHoldingStoreService) updateStreamFactory() StreamFactory[apiv
 			},
 		},
 	}
+
 	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 		return i.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
 			BeginExclusive: offset,
@@ -144,6 +146,7 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 			case <-ctx.Done():
 				i.logger.Debug().Msg("Context cancelled, stopping InstrumentHoldingStoreService")
 				_ = stream.CloseSend()
+
 				return ctx.Err()
 			case resp, ok := <-respChan:
 				if !ok {

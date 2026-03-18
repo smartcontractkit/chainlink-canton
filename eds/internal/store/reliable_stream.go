@@ -37,19 +37,19 @@ func DefaultReliableStreamConfig(logger zerolog.Logger, maxRetries int) Reliable
 // GetStreamWithRetry creates a stream by calling createStream, retrying with backoff on failure.
 // The stream starts at the given offset (meaning is defined by the factory, e.g. BeginExclusive or ActiveAtOffset).
 func GetStreamWithRetry[T any](ctx context.Context, offset int64, createStream StreamFactory[T], config ReliableStreamConfig) (grpc.ServerStreamingClient[T], error) {
-	min := config.BackoffMin
-	if min == 0 {
-		min = 100 * time.Millisecond
+	backoffMin := config.BackoffMin
+	if backoffMin == 0 {
+		backoffMin = 100 * time.Millisecond
 	}
-	max := config.BackoffMax
-	if max == 0 {
-		max = 3 * time.Second
+	backoffMax := config.BackoffMax
+	if backoffMax == 0 {
+		backoffMax = 3 * time.Second
 	}
-	factor := config.BackoffFactor
-	if factor == 0 {
-		factor = 2
+	backoffFactor := config.BackoffFactor
+	if backoffFactor == 0 {
+		backoffFactor = 2
 	}
-	b := &backoff.Backoff{Min: min, Max: max, Factor: factor}
+	b := &backoff.Backoff{Min: backoffMin, Max: backoffMax, Factor: backoffFactor}
 	b.Reset()
 
 	var lastErr error

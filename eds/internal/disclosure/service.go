@@ -8,13 +8,14 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
+	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 type DisclosureServiceConfig struct {
@@ -70,6 +71,7 @@ func NewDisclosureService(ctx context.Context, config DisclosureServiceConfig) *
 	for _, tokenPool := range config.TokenPools {
 		allContracts[tokenPool] = struct{}{}
 	}
+
 	return &DisclosureService{
 		contractStore:          config.ContractStore,
 		instrumentHoldingStore: config.InstrumentHoldingStore,
@@ -341,6 +343,7 @@ func getTokenPoolAddressAndInstrumentID(tarCreatedEvent *tokenadminregistry.Toke
 			// this should never happen, but just in case.
 			continue
 		}
+
 		return tokenPoolInstanceAddress, instrumentID, nil
 	}
 

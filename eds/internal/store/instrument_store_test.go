@@ -14,9 +14,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // fakeActiveContractsStream implements grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] for tests.
@@ -32,6 +33,7 @@ func (s *fakeActiveContractsStream) Recv() (*apiv2.GetActiveContractsResponse, e
 	if s.idx < len(s.responses) {
 		resp := s.responses[s.idx]
 		s.idx++
+
 		return resp, nil
 	}
 	if s.err != nil {
@@ -41,6 +43,7 @@ func (s *fakeActiveContractsStream) Recv() (*apiv2.GetActiveContractsResponse, e
 		<-s.ctx.Done()
 		return nil, s.ctx.Err()
 	}
+
 	return nil, io.EOF
 }
 
@@ -60,6 +63,7 @@ func (s *fakeActiveContractsStream) Context() context.Context {
 	if s.ctx != nil {
 		return s.ctx
 	}
+
 	return context.Background()
 }
 
@@ -86,6 +90,7 @@ func (s *fakeUpdatesStream) Recv() (*apiv2.GetUpdatesResponse, error) {
 	if s.idx < len(s.responses) {
 		resp := s.responses[s.idx]
 		s.idx++
+
 		return resp, nil
 	}
 	if s.err != nil {
@@ -95,6 +100,7 @@ func (s *fakeUpdatesStream) Recv() (*apiv2.GetUpdatesResponse, error) {
 		<-s.ctx.Done()
 		return nil, s.ctx.Err()
 	}
+
 	return nil, io.EOF
 }
 
@@ -105,6 +111,7 @@ func (s *fakeUpdatesStream) Context() context.Context {
 	if s.ctx != nil {
 		return s.ctx
 	}
+
 	return context.Background()
 }
 func (s *fakeUpdatesStream) SendMsg(any) error { return nil }
@@ -120,6 +127,7 @@ func holdingCreatedEvent(contractID string, owner types.PARTY, instrumentID spli
 		ModuleName: "Splice.Api.Token.HoldingV1",
 		EntityName: "Holding",
 	}
+
 	return &apiv2.CreatedEvent{
 		ContractId: contractID,
 		TemplateId: templateID,

@@ -7,30 +7,31 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 )
 
 // testInstanceAddress returns a deterministic InstanceAddress for testing.
-func testInstanceAddress(instanceID string, party string) contracts.InstanceAddress {
-	return contracts.InstanceID(instanceID).RawInstanceAddress(types.PARTY(party)).InstanceAddress()
+func testInstanceAddress(instanceID string) contracts.InstanceAddress {
+	return contracts.InstanceID(instanceID).RawInstanceAddress(types.PARTY("party")).InstanceAddress()
 }
 
 func defaultTestConfig(contractStore *mocks.MockContractStore, instrumentStore *mocks.MockInstrumentHoldingStore) DisclosureServiceConfig {
 	return DisclosureServiceConfig{
 		ContractStore:          contractStore,
 		InstrumentHoldingStore: instrumentStore,
-		PerPartyRouterFactory:  testInstanceAddress("router-factory", "party"),
-		OnRamp:                 testInstanceAddress("onramp", "party"),
-		OffRamp:                testInstanceAddress("offramp", "party"),
-		GlobalConfig:           testInstanceAddress("global-config", "party"),
-		TokenAdminRegistry:     testInstanceAddress("token-admin-registry", "party"),
-		RMNRemote:              testInstanceAddress("rmn-remote", "party"),
-		FeeQuoter:              testInstanceAddress("fee-quoter", "party"),
-		CCVs:                   []contracts.InstanceAddress{testInstanceAddress("ccv1", "party")},
-		TokenPools:             []contracts.InstanceAddress{testInstanceAddress("token-pool", "party")},
+		PerPartyRouterFactory:  testInstanceAddress("router-factory"),
+		OnRamp:                 testInstanceAddress("onramp"),
+		OffRamp:                testInstanceAddress("offramp"),
+		GlobalConfig:           testInstanceAddress("global-config"),
+		TokenAdminRegistry:     testInstanceAddress("token-admin-registry"),
+		RMNRemote:              testInstanceAddress("rmn-remote"),
+		FeeQuoter:              testInstanceAddress("fee-quoter"),
+		CCVs:                   []contracts.InstanceAddress{testInstanceAddress("ccv1")},
+		TokenPools:             []contracts.InstanceAddress{testInstanceAddress("token-pool")},
 	}
 }
 
@@ -67,7 +68,7 @@ func TestDisclosureService_GetDisclosure(t *testing.T) {
 		config := defaultTestConfig(contractStore, instrumentStore)
 		svc := NewDisclosureService(ctx, config)
 
-		unknownAddr := testInstanceAddress("unknown-contract", "party")
+		unknownAddr := testInstanceAddress("unknown-contract")
 		disclosure, err := svc.GetDisclosure(ctx, unknownAddr)
 		require.Error(t, err)
 		require.Nil(t, disclosure)
