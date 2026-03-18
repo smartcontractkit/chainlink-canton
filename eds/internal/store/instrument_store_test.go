@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
@@ -20,11 +21,11 @@ import (
 
 // fakeActiveContractsStream implements grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] for tests.
 type fakeActiveContractsStream struct {
-	ctx         context.Context //nolint:containedctx
-	responses   []*apiv2.GetActiveContractsResponse
-	err         error
-	idx         int
-	blockOnEOF  bool // when true, Recv blocks on ctx.Done() instead of returning EOF (for context cancellation tests)
+	ctx        context.Context //nolint:containedctx
+	responses  []*apiv2.GetActiveContractsResponse
+	err        error
+	idx        int
+	blockOnEOF bool // when true, Recv blocks on ctx.Done() instead of returning EOF (for context cancellation tests)
 }
 
 func (s *fakeActiveContractsStream) Recv() (*apiv2.GetActiveContractsResponse, error) {
@@ -72,6 +73,45 @@ func (s *fakeActiveContractsStream) RecvMsg(any) error {
 
 var _ grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse] = (*fakeActiveContractsStream)(nil)
 
+// fakeUpdatesStream implements grpc.ServerStreamingClient[apiv2.GetUpdatesResponse] for tests.
+type fakeUpdatesStream struct {
+	ctx        context.Context //nolint:containedctx
+	responses  []*apiv2.GetUpdatesResponse
+	err        error
+	idx        int
+	blockOnEOF bool
+}
+
+func (s *fakeUpdatesStream) Recv() (*apiv2.GetUpdatesResponse, error) {
+	if s.idx < len(s.responses) {
+		resp := s.responses[s.idx]
+		s.idx++
+		return resp, nil
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.blockOnEOF && s.ctx != nil {
+		<-s.ctx.Done()
+		return nil, s.ctx.Err()
+	}
+	return nil, io.EOF
+}
+
+func (s *fakeUpdatesStream) Header() (metadata.MD, error) { return metadata.MD{}, nil }
+func (s *fakeUpdatesStream) Trailer() metadata.MD         { return metadata.MD{} }
+func (s *fakeUpdatesStream) CloseSend() error             { return nil }
+func (s *fakeUpdatesStream) Context() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return context.Background()
+}
+func (s *fakeUpdatesStream) SendMsg(any) error { return nil }
+func (s *fakeUpdatesStream) RecvMsg(any) error { return nil }
+
+var _ grpc.ServerStreamingClient[apiv2.GetUpdatesResponse] = (*fakeUpdatesStream)(nil)
+
 // holdingCreatedEvent returns a CreatedEvent that UnmarshalCreatedEvent[HoldingView] can parse.
 // owner and instrumentId must match the store's owner and the instrument ID you want to look up.
 func holdingCreatedEvent(contractID string, owner types.PARTY, instrumentID splice_api_token_holding_v1.InstrumentId) *apiv2.CreatedEvent {
@@ -106,9 +146,21 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 	owner := types.PARTY(testOwner)
 	logger := zerolog.Nop()
 
-	t.Run("records holding when stream yields ActiveContract then EOF", func(t *testing.T) {
+	makeConfig := func(stateClient *mocks.MockStateServiceClient, updateClient *mocks.MockUpdateServiceClient, maxRetries int) InstrumentHoldingStoreConfig {
+		return InstrumentHoldingStoreConfig{
+			Logger:        logger,
+			Owner:         owner,
+			StateService:  stateClient,
+			UpdateService: updateClient,
+			MaxRetries:    maxRetries,
+		}
+	}
+
+	t.Run("records holding when stream yields transaction with Created then reconnects on EOF", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		instrumentID := splice_api_token_holding_v1.InstrumentId{Admin: "admin-party", Id: "instrument-1"}
 		contractID := "holding-contract-1"
 		createdEvent := holdingCreatedEvent(contractID, owner, instrumentID)
@@ -116,37 +168,52 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 5}, nil)
-		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.MatchedBy(func(req *apiv2.GetActiveContractsRequest) bool {
-			return req != nil && req.ActiveAtOffset == 5 &&
-				req.EventFormat != nil &&
-				req.EventFormat.FiltersByParty[testOwner] != nil
+
+		tx := &apiv2.Transaction{
+			UpdateId: "test-update-id",
+			Offset:   6,
+			Events: []*apiv2.Event{
+				{Event: &apiv2.Event_Created{Created: createdEvent}},
+			},
+		}
+		updateClient := mocks.NewMockUpdateServiceClient(t)
+		// First call: one transaction then EOF; Run will reconnect. Second call: block until ctx done.
+		updateClient.EXPECT().GetUpdates(mock.Anything, mock.MatchedBy(func(req *apiv2.GetUpdatesRequest) bool {
+			return req != nil && req.BeginExclusive == 5 &&
+				req.UpdateFormat != nil &&
+				req.UpdateFormat.IncludeTransactions != nil &&
+				req.UpdateFormat.IncludeTransactions.EventFormat != nil &&
+				req.UpdateFormat.IncludeTransactions.EventFormat.FiltersByParty[testOwner] != nil
 		}), mock.Anything).
-			Return(&fakeActiveContractsStream{
+			Return(&fakeUpdatesStream{
 				ctx: ctx,
-				responses: []*apiv2.GetActiveContractsResponse{
-					{
-						ContractEntry: &apiv2.GetActiveContractsResponse_ActiveContract{
-							ActiveContract: &apiv2.ActiveContract{
-								CreatedEvent:   createdEvent,
-								SynchronizerId: "sync-1",
-							},
-						},
-					},
+				responses: []*apiv2.GetUpdatesResponse{
+					{Update: &apiv2.GetUpdatesResponse_Transaction{Transaction: tx}},
 				},
 			}, nil)
+		updateClient.EXPECT().GetUpdates(mock.Anything, mock.MatchedBy(func(req *apiv2.GetUpdatesRequest) bool {
+			return req != nil && req.BeginExclusive == 6
+		}), mock.Anything).
+			Return(&fakeUpdatesStream{ctx: ctx, blockOnEOF: true}, nil)
 
-		svc := NewInstrumentHoldingStore(owner, stateClient, logger)
-		err := svc.Run(ctx)
-		require.Error(t, err)
-		require.ErrorIs(t, err, io.EOF)
-		require.Contains(t, err.Error(), "failed to receive active contract")
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
+		done := make(chan error, 1)
+		go func() { done <- svc.Run(ctx) }()
 
-		// Run processes one contract then exits on EOF; disclosure should be recorded
+		// Wait for disclosure to be recorded (from first stream)
+		require.Eventually(t, func() bool {
+			_, err := svc.GetInstrumentHolding(ctx, instrumentID)
+			return err == nil
+		}, 2*time.Second, 10*time.Millisecond)
+
 		disclosure, err := svc.GetInstrumentHolding(ctx, instrumentID)
 		require.NoError(t, err)
 		require.NotNil(t, disclosure)
 		require.Equal(t, contractID, disclosure.ContractId)
 		require.Equal(t, createdEvent.TemplateId, disclosure.TemplateId)
+
+		cancel()
+		require.ErrorIs(t, <-done, context.Canceled)
 	})
 
 	t.Run("surfaces GetLedgerEnd error", func(t *testing.T) {
@@ -156,48 +223,52 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return((*apiv2.GetLedgerEndResponse)(nil), expectedErr)
+		updateClient := mocks.NewMockUpdateServiceClient(t)
 
-		svc := NewInstrumentHoldingStore(owner, stateClient, logger)
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
 		err := svc.Run(ctx)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to get ledger end")
 		require.ErrorIs(t, err, expectedErr)
 	})
 
-	t.Run("surfaces GetActiveContracts error", func(t *testing.T) {
+	t.Run("surfaces GetUpdates error", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
-		expectedErr := errors.New("get active contracts failed")
+		expectedErr := errors.New("get updates failed")
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
-		// GetStreamWithRetry retries; with MaxRetries=1 we get 2 attempts total
-		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
-			Return((grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse])(nil), expectedErr).Times(2)
+		updateClient := mocks.NewMockUpdateServiceClient(t)
+		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
+			Return((grpc.ServerStreamingClient[apiv2.GetUpdatesResponse])(nil), expectedErr).Times(2)
 
-		svc := NewInstrumentHoldingStore(owner, stateClient, logger)
-		svc.MaxRetries = 1
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1))
 		err := svc.Run(ctx)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to get active contracts")
+		require.ErrorContains(t, err, "failed to create update stream")
 		require.ErrorIs(t, err, expectedErr)
 	})
 
-	t.Run("surfaces stream Recv error", func(t *testing.T) {
+	t.Run("reconnects on stream Recv error", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
-		recvErr := errors.New("recv failed")
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
-		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
-			Return(&fakeActiveContractsStream{ctx: ctx, err: recvErr}, nil)
+		updateClient := mocks.NewMockUpdateServiceClient(t)
+		// First stream returns recvErr; Run reconnects. Second stream blocks until ctx done.
+		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeUpdatesStream{ctx: ctx, err: errors.New("recv failed")}, nil)
+		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeUpdatesStream{ctx: ctx, blockOnEOF: true}, nil)
 
-		svc := NewInstrumentHoldingStore(owner, stateClient, logger)
-		err := svc.Run(ctx)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "failed to receive active contract")
-		require.ErrorIs(t, err, recvErr)
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 0))
+		done := make(chan error, 1)
+		go func() { done <- svc.Run(ctx) }()
+		cancel()
+		require.ErrorIs(t, <-done, context.Canceled)
 	})
 
 	t.Run("returns context error when context is cancelled", func(t *testing.T) {
@@ -206,12 +277,11 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 		stateClient := mocks.NewMockStateServiceClient(t)
 		stateClient.EXPECT().GetLedgerEnd(mock.Anything, mock.Anything).
 			Return(&apiv2.GetLedgerEndResponse{Offset: 0}, nil)
-		// Stream blocks on Recv until ctx is done, then returns context.Canceled
-		stateClient.EXPECT().GetActiveContracts(mock.Anything, mock.Anything, mock.Anything).
-			Return(&fakeActiveContractsStream{ctx: ctx, blockOnEOF: true}, nil)
+		updateClient := mocks.NewMockUpdateServiceClient(t)
+		updateClient.EXPECT().GetUpdates(mock.Anything, mock.Anything, mock.Anything).
+			Return(&fakeUpdatesStream{ctx: ctx, blockOnEOF: true}, nil)
 
-		svc := NewInstrumentHoldingStore(owner, stateClient, logger)
-		svc.MaxRetries = 1 // no retries so we connect once and then block on Recv
+		svc := NewInstrumentHoldingStore(makeConfig(stateClient, updateClient, 1))
 		cancel()
 		err := svc.Run(ctx)
 		require.Error(t, err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -26,6 +27,14 @@ type InstrumentHoldingStore interface {
 
 var _ InstrumentHoldingStore = &InstrumentHoldingStoreService{}
 
+type InstrumentHoldingStoreConfig struct {
+	Logger        zerolog.Logger
+	Owner         types.PARTY
+	StateService  apiv2.StateServiceClient
+	UpdateService apiv2.UpdateServiceClient
+	MaxRetries    int
+}
+
 type InstrumentHoldingStoreService struct {
 	logger zerolog.Logger
 
@@ -38,55 +47,65 @@ type InstrumentHoldingStoreService struct {
 	// stateService is the service used to get the latest active contracts via interface id,
 	// specifically the #splice-api-token-holding-v1 interface.
 	stateService apiv2.StateServiceClient
+	// updateService is the service used to subscribe to updates from the Canton participant,
+	// specifically fetching _new_ holdings.
+	updateService apiv2.UpdateServiceClient
 
-	// MaxRetries is the maximum number of retries when creating the active contracts stream (0 = unlimited).
-	MaxRetries int
+	// maxRetries is the maximum number of retries when creating the active contracts stream (0 = unlimited).
+	maxRetries int
 
 	// mux is to protect the holdings map.
 	mux sync.RWMutex
 }
 
 func NewInstrumentHoldingStore(
-	owner types.PARTY,
-	stateService apiv2.StateServiceClient,
-	logger zerolog.Logger,
+	config InstrumentHoldingStoreConfig,
 ) *InstrumentHoldingStoreService {
 	return &InstrumentHoldingStoreService{
-		logger: logger.With().Str("component", "InstrumentHoldingStoreService").Logger(),
+		logger: config.Logger.With().Str("component", "InstrumentHoldingStoreService").Logger(),
 
-		owner:              owner,
+		owner:              config.Owner,
 		holdingDisclosures: make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract),
 
-		stateService: stateService,
+		stateService:  config.StateService,
+		updateService: config.UpdateService,
 
-		mux: sync.RWMutex{},
+		maxRetries: config.MaxRetries,
 	}
 }
 
-// activeContractsStreamFactory returns a StreamFactory that creates GetActiveContracts streams for this store's owner and Holding interface.
-func (i *InstrumentHoldingStoreService) activeContractsStreamFactory() StreamFactory[apiv2.GetActiveContractsResponse] {
-	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetActiveContractsResponse], error) {
-		return i.stateService.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
-			ActiveAtOffset: offset,
-			EventFormat: &apiv2.EventFormat{
-				FiltersByParty: map[string]*apiv2.Filters{
-					string(i.owner): {
-						Cumulative: []*apiv2.CumulativeFilter{
-							{
-								IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
-									InterfaceId: &apiv2.Identifier{
-										PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
-										ModuleName: "Splice.Api.Token.HoldingV1",
-										EntityName: "Holding",
-									},
-									IncludeInterfaceView:    true,
-									IncludeCreatedEventBlob: true,
-								}},
-							},
+// updateStreamFactory returns a StreamFactory that creates GetUpdates streams for this store's owner and Holding interface.
+// It mirrors UpdateStore's updateStreamFactory but filters for the Holding interface only.
+func (i *InstrumentHoldingStoreService) updateStreamFactory() StreamFactory[apiv2.GetUpdatesResponse] {
+	filtersByParty := map[string]*apiv2.Filters{
+		string(i.owner): {
+			Cumulative: []*apiv2.CumulativeFilter{
+				{
+					IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
+						InterfaceId: &apiv2.Identifier{
+							PackageId:  fmt.Sprintf("#%s", splice_api_token_holding_v1.PackageName),
+							ModuleName: "Splice.Api.Token.HoldingV1",
+							EntityName: "Holding",
 						},
-					},
+						IncludeInterfaceView:    true,
+						IncludeCreatedEventBlob: true,
+					}},
 				},
-				Verbose: true,
+			},
+		},
+	}
+	return func(ctx context.Context, offset int64) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+		return i.updateService.GetUpdates(ctx, &apiv2.GetUpdatesRequest{
+			BeginExclusive: offset,
+			EndInclusive:   nil, // not set, stream will not terminate
+			UpdateFormat: &apiv2.UpdateFormat{
+				IncludeTransactions: &apiv2.TransactionFormat{
+					EventFormat: &apiv2.EventFormat{
+						FiltersByParty: filtersByParty,
+						Verbose:        true,
+					},
+					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_ACS_DELTA,
+				},
 			},
 		})
 	}
@@ -100,53 +119,60 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 	}
 	offset := ledgerEndResponse.Offset
 
-	stream, err := GetStreamWithRetry(ctx, offset, i.activeContractsStreamFactory(), DefaultReliableStreamConfig(i.logger, i.MaxRetries))
-	if err != nil {
-		return fmt.Errorf("failed to get active contracts: %w", err)
-	}
-	defer stream.CloseSend()
-
-	respChan, errChan := ReceiveFromStream(ctx, stream)
+	// Subscribe to updates; reconnect on stream error (including EOF)
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-errChan:
-			if err != nil {
-				return fmt.Errorf("failed to receive active contract: %w", err)
-			}
-		case resp, ok := <-respChan:
-			if !ok {
-				// respChan closed; error was already sent on errChan
-				err := <-errChan
-				if err != nil {
-					return fmt.Errorf("failed to receive active contract: %w", err)
+		i.logger.Debug().Int64("offset", offset).Msg("Subscribing to update stream")
+		stream, err := GetStreamWithRetry(ctx, offset, i.updateStreamFactory(), DefaultReliableStreamConfig(i.logger, i.maxRetries))
+		if err != nil {
+			return fmt.Errorf("failed to create update stream: %w", err)
+		}
+
+		i.logger.Debug().Int64("offset", offset).Msg("Update stream created, listening for updates")
+		respChan, errChan := ReceiveFromStream(ctx, stream)
+	reconnect:
+		for {
+			select {
+			case err := <-errChan:
+				if errors.Is(err, io.EOF) {
+					i.logger.Debug().Msg("Update stream closed by server, reconnecting")
+					break reconnect
 				}
-				return nil
-			}
-			if ac, ok := resp.GetContractEntry().(*apiv2.GetActiveContractsResponse_ActiveContract); ok {
-				i.logger.Debug().
-					Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).
-					Str("packageName", ac.ActiveContract.GetCreatedEvent().GetPackageName()).
-					Str("packageID", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetPackageId()).
-					Str("moduleName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetModuleName()).
-					Str("entityName", ac.ActiveContract.GetCreatedEvent().GetTemplateId().GetEntityName()).
-					Msg("Received active contract")
-
-				holdingDisclosure, holdingView, err := getHoldingDisclosureAndView(i.owner, ac.ActiveContract)
 				if err != nil {
-					i.logger.Debug().Err(err).Str("contractID", ac.ActiveContract.GetCreatedEvent().GetContractId()).Msg("Failed to get holding disclosure for active contract, skipping")
-					continue
+					i.logger.Warn().Err(err).Msg("Update stream closed by server, reconnecting")
+					break reconnect
 				}
-
-				i.logger.Info().
-					Any("holdingView", holdingView).
-					Any("holdingDisclosure", holdingDisclosure).
-					Msg("Recording holding disclosure")
-
-				i.mux.Lock()
-				i.holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
-				i.mux.Unlock()
+			case <-ctx.Done():
+				i.logger.Debug().Msg("Context cancelled, stopping InstrumentHoldingStoreService")
+				_ = stream.CloseSend()
+				return ctx.Err()
+			case resp, ok := <-respChan:
+				if !ok {
+					// respChan closed; err was already sent on errChan, inner loop will handle it
+					break reconnect
+				}
+				if tx, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
+					for _, event := range tx.Transaction.GetEvents() {
+						if createdEvent, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+							ac := &apiv2.ActiveContract{
+								CreatedEvent:   createdEvent.Created,
+								SynchronizerId: tx.Transaction.GetSynchronizerId(),
+							}
+							holdingDisclosure, holdingView, err := getHoldingDisclosureAndView(i.owner, ac)
+							if err != nil {
+								i.logger.Debug().Err(err).Str("contractID", createdEvent.Created.GetContractId()).Msg("Failed to get holding disclosure for created event, skipping")
+								continue
+							}
+							i.logger.Info().
+								Any("holdingView", holdingView).
+								Any("holdingDisclosure", holdingDisclosure).
+								Msg("Recording holding disclosure")
+							i.mux.Lock()
+							i.holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
+							i.mux.Unlock()
+						}
+					}
+					offset = tx.Transaction.GetOffset()
+				}
 			}
 		}
 	}
