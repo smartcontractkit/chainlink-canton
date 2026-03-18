@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "fa900eb5fa382f3e99e8072b67b8eb26b977d61583b8b280cf506f27decb1d73"
+	PackageID   = "71c823bfbc88f7947a97f93eced8c0fda8a62866b735f98763b27b80acefe242"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2564,6 +2564,7 @@ func (t *FinalizeExecuteResult) UnmarshalHex(data string) error {
 type FinalizeFee struct {
 	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
 	PremiumMultiplier types.NUMERIC `json:"premiumMultiplier"`
+	UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas"`
 }
 
 // ToMap converts FinalizeFee to a map for DAML arguments
@@ -2573,6 +2574,8 @@ func (t FinalizeFee) ToMap() map[string]any {
 	m["feeTokenPrice"] = t.FeeTokenPrice
 
 	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	m["usdPerUnitGas"] = t.UsdPerUnitGas
 
 	return m
 }
@@ -4897,7 +4900,6 @@ func (t *SourceChainConfigArgs) UnmarshalHex(data string) error {
 type TokenReceiveTicket struct {
 	CcipOwner                    types.PARTY                              `json:"ccipOwner"`
 	CcvOwners                    []types.PARTY                            `json:"ccvOwners"`
-	VerifiedCCVs                 []RawInstanceAddress                     `json:"verifiedCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
 	PoolOwner                    types.PARTY                              `json:"poolOwner"`
 	Receiver                     types.PARTY                              `json:"receiver"`
@@ -4932,20 +4934,6 @@ func (t TokenReceiveTicket) CreateCommand() *model.CreateCommand {
 		res := make([]any, 0, len(t.CcvOwners))
 		for _, e := range t.CcvOwners {
 			res = append(res, e.ToMap())
-		}
-		return res
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["verifiedCCVs"] = func() []any {
-		res := make([]any, 0, len(t.VerifiedCCVs))
-		for _, e := range t.VerifiedCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
 		}
 		return res
 	}()
@@ -5006,20 +4994,6 @@ func (t TokenReceiveTicket) CreateCommandWithPackageID(packageID string) *model.
 		res := make([]any, 0, len(t.CcvOwners))
 		for _, e := range t.CcvOwners {
 			res = append(res, e.ToMap())
-		}
-		return res
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["verifiedCCVs"] = func() []any {
-		res := make([]any, 0, len(t.VerifiedCCVs))
-		for _, e := range t.VerifiedCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
 		}
 		return res
 	}()

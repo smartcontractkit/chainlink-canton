@@ -31,6 +31,7 @@ module CCIP.Math
   ( integerAmountWithinCap
   , normalizedFeeWithinCap
   , mulDivDown
+  , mulDivUp
   , maxDecimalIntegerValue
   , canFitInDecimal
   , numeric0ToDecimalChecked
@@ -91,6 +92,20 @@ mulDivDown a b c =
             denominator = toLimbs "mulDivDown c" c
             (quotient, _) = divModLimbs numerator denominator
         in fromLimbs "mulDivDown result" quotient
+
+-- | Exact ceil(a * b / c) over integer-valued Numeric 0 inputs.
+mulDivUp : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
+mulDivUp a b c =
+    if c <= 0.0 then error "mulDivUp: denominator must be positive"
+    else if a < 0.0 || b < 0.0 then error "mulDivUp: negative input"
+    else if a == 0.0 || b == 0.0 then 0.0
+    else
+        let numerator = mulLimbs (toLimbs "mulDivUp a" a) (toLimbs "mulDivUp b" b)
+            denominator = toLimbs "mulDivUp c" c
+            (quotient, remainder) = divModLimbs numerator denominator
+            needsRoundUp = not (isZeroLimbs remainder)
+            rounded = if needsRoundUp then addLimbs quotient [1] else quotient
+        in fromLimbs "mulDivUp result" rounded
 
 convertTokenAmountLocal : Numeric 0 -> Numeric 0 -> Numeric 0 -> Numeric 0
 convertTokenAmountLocal amount fromPrice toPrice = mulDivDown amount fromPrice toPrice

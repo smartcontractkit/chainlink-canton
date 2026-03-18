@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -326,6 +327,14 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		Id:    types.TEXT("link-token"),
 	}
 	usdPerToken := "100000000"
+	// FeeQuoter uses usdPerUnitGas as USD-8 (8-decimal USD per gas unit).
+	// For Canton -> EVM pricing, derive from EVM gas price and native token USD price:
+	//   evmGasPrice = 0.152 gwei => evmGasPriceWei = 0.152 * 1e9 = 152,000,000
+	//   ethUsd = 2500
+	//   usdPerUnitGas(USD-8) = (evmGasPriceWei * ethUsd) / 1e10
+	//                        = (152,000,000 * 2500) / 10,000,000,000
+	//                        = 38
+	destUsdPerUnitGas := "38"
 	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.UpdatePrices, ccipDeps, contractops.ChoiceInput[feequoter.UpdatePrices]{
 		ChainSelector:   env.Chain.ChainSelector(),
 		InstanceAddress: feeQuoterInstanceAddress,
@@ -342,13 +351,18 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 						UsdPerToken:  types.NUMERIC("1500000000"),
 					},
 				},
-				GasPriceUpdates: []feequoter.GasPriceUpdate{},
+				GasPriceUpdates: []feequoter.GasPriceUpdate{
+					{
+						DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+						UsdPerUnitGas:     types.NUMERIC(destUsdPerUnitGas),
+					},
+				},
 			},
 			Caller: types.PARTY(partyCCIP),
 		},
 	})
 	require.NoError(t, err, "failed to update prices")
-	t.Logf("Updated FeeToken price to $%s per token", usdPerToken)
+	t.Logf("Updated prices: FeeToken=$%s, LINK=$%s, destUsdPerUnitGas=%s", usdPerToken, "1500000000", destUsdPerUnitGas)
 
 	// Setup token pool for outbound token transfer in Send.
 	tokenAdminRegistryRawAddr, err := contracts.RawInstanceAddressFromString(tokenAdminRegistry.Labels.List()[0])
@@ -387,6 +401,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
+	const poolDestGasOverhead = int64(25_000)
 	out, err = changesets.DeployTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   1,
@@ -412,7 +427,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TokenTransferFeeConfigs: types.GENMAP{
 				strconv.FormatUint(remoteSelector, 10): map[string]any{
 					"isEnabled":         true,
-					"destGasOverhead":   int64(0),
+					"destGasOverhead":   poolDestGasOverhead,
 					"destBytesOverhead": int64(0),
 					"feeUSDCents":       types.NUMERIC("10"),
 					"feeBps":            types.NUMERIC("500"),
@@ -821,8 +836,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	//   2) pool flat token fee (feeUSDCents = 10)
 	//   3) CCV fee (FeeUSDCents = 7)
 	//   4) executor fee (feeUSDCents = 9)
+	// - Execution gas accounting (receipt metadata):
+	//   5) pool destGasOverhead = 25,000 is carried in pool receipt destGasLimit
 	// - Token amount cut:
-	//   5) pool proportional fee (feeBps = 500 = 5%) at LockOrBurn
+	//   6) pool proportional fee (feeBps = 500 = 5%) at LockOrBurn
 	// Total fees here are in different units:
 	// - Fee quote side: $0.36 (USD-denominated; paid in fee token after conversion)
 	// - Token cut side: 5% of 10,000 = 500 Amulet deducted from transfer amount
@@ -914,6 +931,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Extract messageId from CCIPMessageSent to verify success
 	var returnedMessageId string
 	var returnedEncodedMessage string
+	var poolReceiptDestGasLimit int64 = -1
 	for _, event := range res.GetTransaction().GetEvents() {
 		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
 			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
@@ -922,11 +940,44 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					// fields[4] is the "event" field (CCIPMessageSentEvent)
 					// (ccipOwner, ccvOwners, sender, observers, event)
 					eventField := fields[4].GetValue().GetRecord()
-					if eventField != nil && len(eventField.Fields) >= 4 {
-						// eventField.Fields[2] is messageId, eventField.Fields[3] is encodedMessage
-						returnedMessageId = eventField.Fields[2].GetValue().GetText()
-						if len(eventField.Fields) >= 4 {
-							returnedEncodedMessage = eventField.Fields[3].GetValue().GetText()
+					if eventField != nil {
+						for _, field := range eventField.Fields {
+							switch field.GetLabel() {
+							case "messageId":
+								returnedMessageId = field.GetValue().GetText()
+							case "encodedMessage":
+								returnedEncodedMessage = field.GetValue().GetText()
+							case "receipts":
+								receipts := field.GetValue().GetList().GetElements()
+								for _, receipt := range receipts {
+									rec := receipt.GetRecord()
+									if rec == nil {
+										continue
+									}
+									var issuerType string
+									var destGasLimit int64
+									for _, rf := range rec.Fields {
+										switch rf.GetLabel() {
+										case "issuerType":
+											if e := rf.GetValue().GetEnum(); e != nil {
+												issuerType = e.GetConstructor()
+											} else if v := rf.GetValue().GetVariant(); v != nil {
+												issuerType = v.GetConstructor()
+											} else {
+												issuerType = rf.GetValue().GetText()
+											}
+										case "destGasLimit":
+											destGasLimit = rf.GetValue().GetInt64()
+										}
+									}
+									// Be tolerant to constructor naming differences in ledger API payloads
+									// (e.g. "IssuerType_Pool" vs fully-qualified variants ending in "Pool").
+									if issuerType == "IssuerType_Pool" || strings.HasSuffix(issuerType, "Pool") {
+										poolReceiptDestGasLimit = destGasLimit
+										break
+									}
+								}
+							}
 						}
 					}
 				}
@@ -937,6 +988,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+	require.Equal(t, poolDestGasOverhead, poolReceiptDestGasLimit, "pool receipt must carry configured destGasOverhead in destGasLimit")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)

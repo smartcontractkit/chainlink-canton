@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
@@ -104,13 +105,29 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 var defaultNetworkOnce = &sync.Once{}
 
 func LoadChainWithCTF(t *testing.T, numberOfValidators int) (*canton.Chain, error) {
-	bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
-		NumberOfValidators: numberOfValidators,
-		Once:               defaultNetworkOnce,
-	}).Initialize(t.Context())
-	require.NoError(t, err, "Failed to initialize CTF chain provider")
+	const (
+		maxAttempts = 3
+		retryDelay  = 5 * time.Second
+	)
 
-	return bc.(*canton.Chain), nil
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
+			NumberOfValidators: numberOfValidators,
+			Once:               defaultNetworkOnce,
+		}).Initialize(t.Context())
+		if err == nil {
+			return bc.(*canton.Chain), nil
+		}
+
+		lastErr = err
+		t.Logf("CTF chain provider initialization failed (attempt %d/%d): %v", attempt, maxAttempts, err)
+		if attempt < maxAttempts {
+			time.Sleep(retryDelay)
+		}
+	}
+
+	return nil, fmt.Errorf("failed to initialize CTF chain provider after %d attempts: %w", maxAttempts, lastErr)
 }
 
 type TestConfig struct {
