@@ -69,29 +69,30 @@ timelockScheduleMetadata = RootMetadata
   }
 
 timelockScheduleRoot : Text
-timelockScheduleRoot = "9e7a0e251412ac60fd357f33a18fc1650e0eaaf1554f2a9f7adddf5e7dd40dc9"
+timelockScheduleRoot = "4d87914a7232c3fded68910072f5fbfe429114710d45df7462c40d32c89851ce"
 
 timelockScheduleMetadataProof : [Text]
 timelockScheduleMetadataProof =
-  [ "bf251061b8c4c0f0ac95029356047986fce8432f7941977d8f34c88f01af8412"
+  [ "094f0a965cd950fa210e69110793dc892cf180b0975e9ed518e9437b25c68d3b"
   ]
 
 timelockScheduleOpProof : [Text]
 timelockScheduleOpProof =
-  [ "0a1c782dfb71499f99ede0c2fd8b57302deb3225d41832158af0e03171c71ffc"
+  [ "9f4f78512e46c0e493724a735afdff2c6d3f5209c69956ff5ac5784f9fa57ab1"
   ]
 
+-- Updated with domain separators
 timelockScheduleSignatures : [RawSignature]
 timelockScheduleSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "a8e506c5b53ee8517e1a7e3059ff45995dd4930942ec35afe734490a541fa1fc"
-      , s = "19731ddc0bf927dcca89bb7020847a87efb90ac998a493e0f3083411d7030326"
+      , r = "e52717cf5bc0f6bdada07e74cddbaf756141641b725dcdac0e49daea38b45c17"
+      , s = "05c5e2b22cc4c44a8efb6fa08635d45fb160ee9799227eb1546de7088f786cca"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "5eb155448831341b780bfcfad20413d4db6dc9682a86d3dd7c3c666e3bc266ad"
-      , s = "72588d1db3e9637a5a583b4ce47a488345f8ce47484fc849d66f5a41dd5961db"
+      , r = "dc6d62e6137ad1b92f6954db8a4a9650a5cee70a34e6782f49860e08d07d8fe0"
+      , s = "339ea964b1e9a1c2ab5d4274c4cb400384219dc0877e47438a36ed7c5dd6613c"
       }
   ]
 
@@ -116,29 +117,30 @@ timelockBypasserMetadata = RootMetadata
   }
 
 timelockBypasserRoot : Text
-timelockBypasserRoot = "ac97d1b940489af3367708135c0c3c3916cd7a38cb4d823994c2c794dcadf59c"
+timelockBypasserRoot = "b30ded0b1200bbd826df57d49166a051d1bc62d4f1bde501189a1932be9e1a0a"
 
 timelockBypasserMetadataProof : [Text]
 timelockBypasserMetadataProof =
-  [ "b857bf77243c276d0fb36da39a493e28447f14c934b531644c776e8609eaef82"
+  [ "6742aee030a2a1bc78654c4e82eccc258950733c2dedd5e224d520e135db5bcc"
   ]
 
 timelockBypasserOpProof : [Text]
 timelockBypasserOpProof =
-  [ "66b94efb8d25d22230621e135eb2a7aac11336162aaf2d9643d09f5eafa3d7be"
+  [ "b058861759da490d5ebdca109f8a72079fdda167f282e4b2dc8f39e571df0c6d"
   ]
 
+-- Updated with domain separators
 timelockBypasserSignatures : [RawSignature]
 timelockBypasserSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "dc1f8363c43a6022accc983af04dca8fd7d70a15559912125a553fbeb35b78c2"
-      , s = "7ef933939ffc4a6076d2928b12dc27a944585ffbe2a09803d18f1c28853887d8"
+      , r = "a9212dd30011e0a1ed3be0f1fbe828085bbcf62de72add60f23f4e0bf78e7a48"
+      , s = "0b0aad9811b252b4207d0efd3b03152f919a733f61def6d3f7a13b383498cb06"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "0a88a3b34fd292223dc80e5333954def27a16729e1ff9308a3384dbbe3fea77d"
-      , s = "1721c4c40a7f0ac26528505c63c0fb0e86102f5984f374bfee5077341c859e08"
+      , r = "4afbb539a3891ad3a845a65bef6e1a4b6143945c9dd29e8e4cf7c3795581cc08"
+      , s = "69d2deb1cdb2739f8efec23079dbbb57bb6dfa7e4c3f127ae819ce5f0fbd3cef"
       }
   ]
 

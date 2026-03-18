@@ -82,6 +82,19 @@ type TimelockCall struct {
 // ZeroHash represents "no predecessor" in timelock operations
 const ZeroHash = "0000000000000000000000000000000000000000000000000000000000000000"
 
+var (
+	// opLeafDomainSeparator = keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
+	opLeafDomainSeparator = func() string {
+		data := []byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
+		return hex.EncodeToString(crypto.Keccak256(data))
+	}()
+	// metadataLeafDomainSeparator = keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
+	metadataLeafDomainSeparator = func() string {
+		data := []byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
+		return hex.EncodeToString(crypto.Keccak256(data))
+	}()
+)
+
 // ===========================================================================
 // TYPE CONVERSION HELPERS (local <-> generated mcms bindings)
 // ===========================================================================
@@ -331,14 +344,15 @@ func TimeToHex(t time.Time) string {
 }
 
 // HashOpLeaf hashes an operation to get its Merkle leaf
-// Matches Canton's hashOpLeafNative with length-prefixed encoding for variable-length fields
+// Matches Canton's hashOpLeafNative with domain separator and length-prefixed encoding for variable-length fields
 func HashOpLeaf(op MCMSOp) string {
 	multisigIdHex := AsciiToHex(op.MultisigId)
 	targetAddressHex := AsciiToHex(op.TargetInstanceAddress)
 	functionNameHex := AsciiToHex(op.FunctionName)
 
-	// Length prefixes use character count for text fields, byte count for hex data
-	encoded := PadLeft32(IntToHex(op.ChainId)) +
+	// Domain separator followed by length prefixes (character count for text, byte count for hex)
+	encoded := opLeafDomainSeparator +
+		PadLeft32(IntToHex(op.ChainId)) +
 		PadLeft32(IntToHex(len(op.MultisigId))) + // Length prefix for multisigId
 		multisigIdHex +
 		PadLeft32(IntToHex(op.Nonce)) +
@@ -355,7 +369,7 @@ func HashOpLeaf(op MCMSOp) string {
 }
 
 // HashMetadataLeaf hashes metadata to get its Merkle leaf
-// Matches Canton's hashMetadataLeafNative with length-prefixed encoding
+// Matches Canton's hashMetadataLeafNative with domain separator and length-prefixed encoding
 func HashMetadataLeaf(meta MCMSRootMetadata) string {
 	overrideFlag := "00"
 	if meta.OverridePreviousRoot {
@@ -364,7 +378,9 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 
 	multisigIdHex := AsciiToHex(meta.MultisigId)
 
-	encoded := PadLeft32(IntToHex(meta.ChainId)) +
+	// Domain separator followed by length prefixes
+	encoded := metadataLeafDomainSeparator +
+		PadLeft32(IntToHex(meta.ChainId)) +
 		PadLeft32(IntToHex(len(meta.MultisigId))) + // Length prefix for multisigId
 		multisigIdHex +
 		PadLeft32(IntToHex(meta.PreOpCount)) +

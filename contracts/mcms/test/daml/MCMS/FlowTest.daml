@@ -69,31 +69,32 @@ realTestMetadata = RootMetadata
   }
 
 realTestRoot : Text
-realTestRoot = "b0c24fb52e41bd7c57349d687756d479dddb29f08f5d6926ab12ad51a88b6345"
+realTestRoot = "e5aeef059e7037a3b83c98b67797721c3e93c9ed1c91c2629d2302939177817f"
 
 realTestMetadataProof : [Text]
 realTestMetadataProof =
-  [ "fde5f82373423a46a09dcbafe6f5a253226a22ba0f623731b49347f28fc067ad"
+  [ "bb4702995a3369c0097d47c32fa34af84f0b0b3d1c611f08245d70fae767ff53"
   ]
 
 realTestOpProof : [Text]
 realTestOpProof =
-  [ "0a1c782dfb71499f99ede0c2fd8b57302deb3225d41832158af0e03171c71ffc"
+  [ "9f4f78512e46c0e493724a735afdff2c6d3f5209c69956ff5ac5784f9fa57ab1"
   ]
 
 -- Real ECDSA secp256k1 signatures (ValidUntil: 2030-01-01T00:00:00Z)
 -- Signatures are from the first 2 signers (sorted by address)
+-- Updated with domain separators
 realTestSignatures : [RawSignature]
 realTestSignatures =
   [ RawSignature
       { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-      , r = "62053ea4227be80f8addbe603860a01fb4cbff3d909a7584e5306ceaeeb49bc5"
-      , s = "362dbb73e126a9f2f3cc6b921f2ad8a1526cca0f27c5459baec39c2b4b29448c"
+      , r = "60b529deda554194437e6669cba94aafcfa514b466354bbea7e97e1f5b90a9e4"
+      , s = "4b92c07facc9a8d2c4b8dbbcd522cb15523716654b6391b2b3dc6f8e3488efd4"
       }
   , RawSignature
       { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-      , r = "50d9449c84ca5f372841b68a2b16ca076a5cf5e84461242ddc9b8b738ec0ff4d"
-      , s = "02f92d1233043f0890b44d0e0581276e283d9a93c3a2bb07fe63d1252ff7b83c"
+      , r = "36894955c0e69c2a39c887490552b5a5584c34e04d92e22b0cbd6fe7fc0f23ae"
+      , s = "33a696648eb53fc9ce5f30ff9f4301e55f73047f4d45f1b1b2cc1bce24f49a75"
       }
   ]
 
@@ -361,7 +362,7 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         , functionName = "BypasserExecuteBatch"
         , operationData = "011b636f756e74657240636369705f6f776e65722d396365666539346409496e6372656d656e740000"
         }
-  let externalBypasserRoot = "a7457c6333efe2b0a43ac802b44ddd48e2eac8546a2f38eb618919baf72c1fcf"
+  let externalBypasserRoot = "7d70e8ba5c202e505d587e0e8a84580ed6aee6e1fa2e5bc2de64ca24994cf7e5"
   let externalBypasserMetadata = RootMetadata
         { chainId = 1
         , multisigId = "mcms-daml-test@ccip_owner-9cefe94d-bypasser"
@@ -369,18 +370,18 @@ testNonStakeholderCanExecuteWithDisclosures = script do
         , postOpCount = 1
         , overridePreviousRoot = False
         }
-  let externalBypasserMetadataProof = ["4b3ccda2feecd6d800d30e85da902b0bc01c57d49c52d1106ce937aeb315159a"]
-  let externalBypasserOpProof = ["66b94efb8d25d22230621e135eb2a7aac11336162aaf2d9643d09f5eafa3d7be"]
+  let externalBypasserMetadataProof = ["3acdb8db6932b3d8de890d5c7a3ff15359970bfb9e5bd37c2fe915d9e2c2561a"]
+  let externalBypasserOpProof = ["b058861759da490d5ebdca109f8a72079fdda167f282e4b2dc8f39e571df0c6d"]
   let externalBypasserSignatures =
         [ RawSignature
             { publicKey = "04c170cfd2dfedf29d6dc68f57205d5b2a182dfbf0ae5fc4f6d9cb3382e6ab194e5e236469efad820ecceb3c474be2657747ea6d947fd79cb73f1834b45911cc2e"
-            , r = "48e2ce205c50d6aa60aad325feeff55b397e5d8416d621e388ae7316748f71ff"
-            , s = "0195474bb1dcffaf2a85a3725c26b29e1b6a3861d2a10c9a822714aa326e9fee"
+            , r = "1b96af6ddd5de09296fb305c515855827f79e0b1f11c508b94e06cb7ea4cf6d1"
+            , s = "4c227c8797d1b12ce284e394fba5582fb1d00825411bf0fb6efc3139c63e006d"
             }
         , RawSignature
             { publicKey = "04be6d6382ad269cab52671739bb27d4b3ac087c46c7956324810dee6fa311ef8eb1065e376017fe4a8d3d5ee0e86f837f9bb69f22331c1828e5521765f2cdee31"
-            , r = "aa30172bf05fac994d350b3e4ecae513cfb3c8eae3fd835d6fd91c7f0b79891d"
-            , s = "279c483361a1b5ccb6727962592d236dde0d4021c4787c3a7190ef3d7b7ebcd7"
+            , r = "18094c55a20fcae498d938c34c60a6eed7962be5d3ffd299958388c35f01b0b0"
+            , s = "14985e766e11fecba66b21c3bac0569d46b3ae05a61cf303cc791af9dbbae385"
             }
         ]
 
@@ -708,7 +709,6 @@ runFlowTests () = script do
   testReplayProtection
   testNonceOrdering
   testRootExpiry
-  -- Disclosure test (signatory checks are in ExternalTargetTest.daml)
   testNonStakeholderCanExecuteWithDisclosures
   -- Codec tests
   testCodecRoundtrip

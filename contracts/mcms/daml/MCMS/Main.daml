@@ -14,8 +14,8 @@
 module MCMS.Main where
 
 import DA.Map qualified as Map
-import DA.List ((!!))
-import DA.Action (unless)
+import DA.List ((!!), dedup)
+import DA.Action (unless, when)
 import DA.Foldable (forA_)
 import DA.Time (RelTime, seconds, addRelTime)
 import DA.Text (parseInt)
@@ -54,6 +54,8 @@ validateMultisigConfig : MultisigConfig -> Update ()
 validateMultisigConfig config = do
   assertMsg "mcms: signer count exceeds maximum allowed" $
     length config.signers <= maxNumSigners
+  assertMsg "mcms: must have at least one signer" $
+    not (null config.signers)
   assertMsg "mcms: group quorums array must have 32 entries" $
     length config.groupQuorums == numGroups
   assertMsg "mcms: group parents array must have 32 entries" $
@@ -64,12 +66,29 @@ validateMultisigConfig config = do
   forA_ config.signers $ \signer ->
     assertMsg ("mcms: signerGroup out of bounds [0,31]: " <> show signer.signerGroup) $
       signer.signerGroup >= 0 && signer.signerGroup < numGroups
+  -- Disabled group children check (signers cannot be in disabled groups)
+  forA_ config.signers $ \signer -> do
+    let groupQuorum = config.groupQuorums !! signer.signerGroup
+    assertMsg ("mcms: signer in disabled group " <> show signer.signerGroup) $
+      groupQuorum > 0
   -- Validate groupParents bounds and DAG structure (parent index < self index for non-root)
   forA_ (zip [0..(numGroups - 1)] config.groupParents) $ \(idx, parentIdx) ->
     if idx == 0
       then assertMsg "mcms: root group must be its own parent" $ parentIdx == 0
       else assertMsg ("mcms: group " <> show idx <> " parent must be < " <> show idx <> " (DAG constraint), got " <> show parentIdx) $
         parentIdx >= 0 && parentIdx < idx
+  -- Quorum reachability validation
+  -- Count children per group (signers + enabled child groups)
+  let signerCounts = countSignersPerGroup config.signers
+  let childCounts = computeChildCounts signerCounts config.groupQuorums config.groupParents
+  forA_ (zip3 [0..(numGroups - 1)] config.groupQuorums childCounts) $ \(idx, quorum, children) ->
+    when (quorum > 0) $
+      assertMsg ("mcms: group " <> show idx <> " quorum " <> show quorum <> " exceeds children count " <> show children) $
+        children >= quorum
+  -- Validate signer addresses are unique
+  let signerAddrs = map (\s -> s.signerAddress) config.signers
+  assertMsg "mcms: duplicate signer addresses" $
+    length (dedup signerAddrs) == length signerAddrs
 
 template MCMS
   with
@@ -476,6 +495,28 @@ setRoleState Proposer rs m = m with proposer = rs
 setRoleState Canceller rs m = m with canceller = rs
 setRoleState Bypasser rs m = m with bypasser = rs
 
+-- | Helper: Count signers per group
+countSignersPerGroup : [SignerInfo] -> [Int]
+countSignersPerGroup signers =
+  let counts = replicate numGroups 0
+  in foldl (\acc s -> MCMS.GroupVoting.incrementAt s.signerGroup acc) counts signers
+
+-- | Helper: Compute total children counts (signers + enabled child groups)
+-- Process groups from highest index to lowest (children before parents)
+computeChildCounts : [Int] -> [Int] -> [Int] -> [Int]
+computeChildCounts signerCounts groupQuorums groupParents =
+  let initial = signerCounts
+  in foldr (propagateChildCount groupQuorums groupParents) initial (reverse [1..(numGroups - 1)])
+
+-- | Helper: Propagate enabled child group to parent's count
+propagateChildCount : [Int] -> [Int] -> Int -> [Int] -> [Int]
+propagateChildCount groupQuorums groupParents idx counts =
+  let quorum = groupQuorums !! idx
+      parentIdx = groupParents !! idx
+  in if quorum > 0  -- enabled group propagates to parent
+     then MCMS.GroupVoting.incrementAt parentIdx counts
+     else counts
+
 -- | Execute a self-dispatch call (admin operations routed through timelock)
 -- This function does NOT perform role checks. This is intentional and safe because:
 -- This function is only reachable via two validated paths:
@@ -498,7 +539,9 @@ executeSelfDispatch mcms call =
     "UpdateMinDelay" ->
       case parseInt call.operationData of
         None -> abort "mcms: delay must be integer seconds"
-        Some secs -> pure $ mcms with minDelay = seconds secs
+        Some secs -> do
+          assertMsg "mcms: delay must be positive" $ secs > 0
+          pure $ mcms with minDelay = seconds secs
 
     "BlockFunction" ->
       case decodeBlockedFunctionWithOffset call.operationData of
