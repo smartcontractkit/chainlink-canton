@@ -834,15 +834,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// - Fee token (Amulet) payment:
 	//   1) lane token-network fee (DefaultTokenFeeUSDCents = 10)
 	//   2) pool flat token fee (feeUSDCents = 10)
-	//   3) CCV fee (FeeUSDCents = 7)
-	//   4) executor fee (feeUSDCents = 9)
-	// - Execution gas accounting (receipt metadata):
-	//   5) pool destGasOverhead = 25,000 is carried in pool receipt destGasLimit
+	//   3) pool destGasOverhead fee priced via FeeQuoter gas price:
+	//      ceil(25,000 * 38 / 1,000,000) = 1 US cent
+	//   4) CCV fee (FeeUSDCents = 7)
+	//   5) executor fee (feeUSDCents = 9)
 	// - Token amount cut:
 	//   6) pool proportional fee (feeBps = 500 = 5%) at LockOrBurn
 	// Total fees here are in different units:
-	// - Fee quote side: $0.36 (USD-denominated; paid in fee token after conversion)
-	// - Token cut side: 5% of 10,000 = 500 Amulet deducted from transfer amount
+	// 	Fee-token payment side: $0.37 total
+	//     ($0.10 lane token-network + $0.10 pool flat + $0.01 destGasOverhead + $0.07 CCV + $0.09 executor)
+	//   - Token amount cut side: 500 Amulet
+	//     (5% of 10,000), so bridged amount is 9,500.
 	sendArgs := ccipsender.Send{
 		Context:           sendContext,
 		RouterCid:         types.CONTRACT_ID(routerCid),
