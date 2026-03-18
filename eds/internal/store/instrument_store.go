@@ -66,6 +66,8 @@ type InstrumentHoldingStoreService struct {
 	// reconnectBackoff is the delay before reconnecting after the stream closes (avoids log thrashing on misconfiguration).
 	reconnectBackoff time.Duration
 
+	ledgerEnd int64
+
 	// mux is to protect the holdings map.
 	mux sync.RWMutex
 }
@@ -135,15 +137,27 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 	}
 	offset := ledgerEndResponse.Offset
 
+	// backfill
+	i.logger.Debug().Int64("offset", offset).Msg("Starting backfill")
+	holdingDisclosures, err := i.backfill(ctx, offset)
+	if err != nil {
+		return fmt.Errorf("backfill failed: %w", err)
+	}
+	i.mux.Lock()
+	i.ledgerEnd = offset
+	i.holdingDisclosures = holdingDisclosures
+	i.mux.Unlock()
+	i.logger.Debug().Int("holdingDisclosures", len(holdingDisclosures)).Int64("ledgerEnd", offset).Msg("Backfill complete")
+
 	// Subscribe to updates; reconnect on stream error (including EOF)
 	for {
-		i.logger.Debug().Int64("offset", offset).Msg("Subscribing to update stream")
-		stream, err := GetStreamWithRetry(ctx, offset, i.updateStreamFactory(), DefaultReliableStreamConfig(i.logger, i.maxRetries))
+		i.logger.Debug().Int64("offset", i.ledgerEnd).Msg("Subscribing to update stream")
+		stream, err := GetStreamWithRetry(ctx, i.ledgerEnd, i.updateStreamFactory(), DefaultReliableStreamConfig(i.logger, i.maxRetries))
 		if err != nil {
 			return fmt.Errorf("failed to create update stream: %w", err)
 		}
 
-		i.logger.Debug().Int64("offset", offset).Msg("Update stream created, listening for updates")
+		i.logger.Debug().Int64("offset", i.ledgerEnd).Msg("Update stream created, listening for updates")
 		respChan, errChan := ReceiveFromStream(ctx, stream)
 	reconnect:
 		for {
@@ -184,11 +198,11 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 								Any("holdingDisclosure", holdingDisclosure).
 								Msg("Recording holding disclosure")
 							i.mux.Lock()
+							i.ledgerEnd = tx.Transaction.GetOffset()
 							i.holdingDisclosures[holdingView.InstrumentId] = holdingDisclosure
 							i.mux.Unlock()
 						}
 					}
-					offset = tx.Transaction.GetOffset()
 				}
 			}
 		}
