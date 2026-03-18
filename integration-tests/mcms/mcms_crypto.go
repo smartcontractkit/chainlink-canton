@@ -346,19 +346,19 @@ func TimeToHex(t time.Time) string {
 // HashOpLeaf hashes an operation to get its Merkle leaf
 // Matches Canton's hashOpLeafNative with domain separator and length-prefixed encoding for variable-length fields
 func HashOpLeaf(op MCMSOp) string {
-	multisigIdHex := AsciiToHex(op.MultisigId)
-	targetAddressHex := AsciiToHex(op.TargetInstanceAddress)
-	functionNameHex := AsciiToHex(op.FunctionName)
+	multisigIdHex := TextToHex(op.MultisigId)
+	targetAddressHex := TextToHex(op.TargetInstanceAddress)
+	functionNameHex := TextToHex(op.FunctionName)
 
-	// Domain separator followed by length prefixes (character count for text, byte count for hex)
+	// Domain separator followed by length prefixes (byte count for all fields)
 	encoded := opLeafDomainSeparator +
 		PadLeft32(IntToHex(op.ChainId)) +
-		PadLeft32(IntToHex(len(op.MultisigId))) + // Length prefix for multisigId
+		PadLeft32(IntToHex(len(op.MultisigId))) + // Length prefix for multisigId (UTF-8 byte count)
 		multisigIdHex +
 		PadLeft32(IntToHex(op.Nonce)) +
-		PadLeft32(IntToHex(len(op.TargetInstanceAddress))) + // Length prefix for targetInstanceAddress
+		PadLeft32(IntToHex(len(op.TargetInstanceAddress))) + // Length prefix for targetInstanceAddress (UTF-8 byte count)
 		targetAddressHex +
-		PadLeft32(IntToHex(len(op.FunctionName))) + // Length prefix for functionName
+		PadLeft32(IntToHex(len(op.FunctionName))) + // Length prefix for functionName (UTF-8 byte count)
 		functionNameHex +
 		PadLeft32(IntToHex(len(op.OperationData)/2)) + // Length prefix for operationData (byte count)
 		op.OperationData
@@ -376,12 +376,12 @@ func HashMetadataLeaf(meta MCMSRootMetadata) string {
 		overrideFlag = "01"
 	}
 
-	multisigIdHex := AsciiToHex(meta.MultisigId)
+	multisigIdHex := TextToHex(meta.MultisigId)
 
-	// Domain separator followed by length prefixes
+	// Domain separator followed by length prefixes (byte count for all fields)
 	encoded := metadataLeafDomainSeparator +
 		PadLeft32(IntToHex(meta.ChainId)) +
-		PadLeft32(IntToHex(len(meta.MultisigId))) + // Length prefix for multisigId
+		PadLeft32(IntToHex(len(meta.MultisigId))) + // Length prefix for multisigId (UTF-8 byte count)
 		multisigIdHex +
 		PadLeft32(IntToHex(meta.PreOpCount)) +
 		PadLeft32(IntToHex(meta.PostOpCount)) +
@@ -403,12 +403,12 @@ func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 
 	// Encode each call with length prefixes
 	for _, call := range calls {
-		// Length prefix for targetInstanceAddress (character count)
+		// Length prefix for targetInstanceAddress (UTF-8 byte count)
 		sb.WriteString(PadLeft32(IntToHex(len(call.TargetInstanceAddress))))
-		sb.WriteString(AsciiToHex(call.TargetInstanceAddress))
-		// Length prefix for functionName (character count)
+		sb.WriteString(TextToHex(call.TargetInstanceAddress))
+		// Length prefix for functionName (UTF-8 byte count)
 		sb.WriteString(PadLeft32(IntToHex(len(call.FunctionName))))
-		sb.WriteString(AsciiToHex(call.FunctionName))
+		sb.WriteString(TextToHex(call.FunctionName))
 		// Length prefix for operationData (byte count = hex length / 2)
 		opData := EncodeOperationDataForHash(call.OperationData)
 		sb.WriteString(PadLeft32(IntToHex(len(opData) / 2)))
@@ -433,13 +433,13 @@ func HashTimelockOpId(calls []TimelockCall, predecessor, salt string) string {
 
 // EncodeOperationDataForHash matches the on-chain MCMS.Crypto.encodeOperationData:
 // - If operationData is valid hex (even length, hex digits only), treat it as raw bytes (already hex)
-// - Otherwise, treat it as ASCII and hex-encode it
+// - Otherwise, treat it as text and hex-encode it (UTF-8)
 func EncodeOperationDataForHash(operationData string) string {
 	if isValidHex(operationData) {
 		return operationData
 	}
 
-	return AsciiToHex(operationData)
+	return TextToHex(operationData)
 }
 
 func isValidHex(s string) bool {
@@ -628,8 +628,9 @@ func IntToHex(n int) string {
 	return fmt.Sprintf("%x", n)
 }
 
-// AsciiToHex converts ASCII string to hex
-func AsciiToHex(s string) string {
+// TextToHex converts a string to hex via UTF-8 encoding.
+// Matches Daml's DA.Crypto.Text.toHex function.
+func TextToHex(s string) string {
 	return hex.EncodeToString([]byte(s))
 }
 

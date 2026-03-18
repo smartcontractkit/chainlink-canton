@@ -1626,9 +1626,9 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	}
 	scheduleParams := mcms.ScheduleBatchParams{
 		Calls:       scheduleInnerCalls,
-		Predecessor: types.TEXT(ZeroHash),                      // no predecessor
-		Salt:        types.TEXT(AsciiToHex("schedule-salt-1")), // Human-readable salt hex-encoded
-		DelaySecs:   types.INT64(0),                            // use minimum delay
+		Predecessor: types.TEXT(ZeroHash),                     // no predecessor
+		Salt:        types.TEXT(TextToHex("schedule-salt-1")), // Human-readable salt hex-encoded
+		DelaySecs:   types.INT64(0),                           // use minimum delay
 	}
 	scheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, scheduleParams)
 
@@ -2003,7 +2003,7 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	externalScheduleParams := mcms.ScheduleBatchParams{
 		Calls:       externalScheduleCalls,
 		Predecessor: types.TEXT(ZeroHash),
-		Salt:        types.TEXT(AsciiToHex("external-salt-1")), // Human-readable salt hex-encoded
+		Salt:        types.TEXT(TextToHex("external-salt-1")), // Human-readable salt hex-encoded
 		DelaySecs:   types.INT64(0),
 	}
 	externalScheduleChoice := MustEncodeScheduleBatch(t, mcmsEncoder, externalScheduleParams)
