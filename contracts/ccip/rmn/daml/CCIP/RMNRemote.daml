@@ -3,6 +3,7 @@
 module CCIP.RMNRemote where
 
 import DA.Crypto.Text (BytesHex)
+import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as Text
@@ -221,6 +222,10 @@ template RMNRemote
                 subjects : [BytesHex]
             controller rmnOwner
             do
+                assertMsg "rmn: duplicate subjects in curse request"
+                    (length subjects == length (dedup subjects))
+                Foldable.forA_ subjects (\subject ->
+                    assertMsg "rmn: subject already cursed" (subject `notElem` cursedSubjects))
                 create this with cursedSubjects = subjects ++ cursedSubjects
 
         -- Uncurse multiple subjects atomically
