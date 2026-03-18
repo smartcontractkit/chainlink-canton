@@ -27,6 +27,9 @@ type DeployTokenPoolConfig struct {
 	PoolOwner    string
 	InstrumentId splice_api_token_holding_v1.InstrumentId
 	Decimals     int64
+	// Optional explicit instance ID for the pool.
+	// If empty, deploy operation generates one.
+	InstanceID string
 	// Qualifier is optional (e.g. token symbol) for AddressRef and idempotency.
 	Qualifier string
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
@@ -52,7 +55,7 @@ func (d DeployTokenPool) VerifyPreconditions(e cldf.Environment, config CantonCS
 	if !ok {
 		return fmt.Errorf("canton chain %v not found", config.ChainSelector)
 	}
-	if len(chain.Participants) < config.Participant {
+	if config.Participant < 0 || config.Participant >= len(chain.Participants) {
 		return fmt.Errorf("participant index %d out of range for canton chain %d with %d participants", config.Participant, config.ChainSelector, len(chain.Participants))
 	}
 
@@ -65,7 +68,8 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 
 	deps := dependencies.CantonDeps{
-		Chain: chain,
+		Chain:       chain,
+		Participant: config.Participant,
 	}
 
 	cfg := config.Config
@@ -90,7 +94,7 @@ func (d DeployTokenPool) Apply(e cldf.Environment, config CantonCSDeps[DeployTok
 	template := lockreleasetokenpool.LockReleaseTokenPool{
 		CcipOwner:               types.PARTY(cfg.CcipOwner),
 		PoolOwner:               types.PARTY(cfg.PoolOwner),
-		InstanceId:              "", // set by deploy operation
+		InstanceId:              types.TEXT(cfg.InstanceID),
 		InstrumentId:            cfg.InstrumentId,
 		Decimals:                types.INT64(cfg.Decimals),
 		RemoteChainConfigs:      remoteChainConfigs,

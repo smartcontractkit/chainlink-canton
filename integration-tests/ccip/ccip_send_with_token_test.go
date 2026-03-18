@@ -395,6 +395,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			PoolOwner:    partySender,
 			InstrumentId: feeTokenInstrumentId,
 			Decimals:     6,
+			InstanceID:   poolInstanceID,
 			Qualifier:    "test-pool-send",
 			RemoteChainConfigs: types.GENMAP{
 				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
@@ -438,42 +439,82 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to parse lock release token pool raw address")
 	poolInstanceID = tokenPoolRawAddr.InstanceID()
 
-	tokenAdminRegistryInstanceAddress := contracts.HexToInstanceAddress(tokenAdminRegistry.Address)
-	_, err = cld_ops.ExecuteOperation(bundle, token_admin_registry.ProposeAdministrator, ccipDeps, contractops.ChoiceInput[tokenadminregistry.TokenAdminRegistryProposeAdministrator]{
-		ChainSelector:   env.Chain.ChainSelector(),
-		InstanceAddress: tokenAdminRegistryInstanceAddress,
-		ActAs:           []string{partyCCIP},
-		Args: tokenadminregistry.TokenAdminRegistryProposeAdministrator{
-			InstrumentId: feeTokenInstrumentId,
-			NewAdmin:     types.PARTY(partySender),
-			Caller:       types.PARTY(partyCCIP),
+	disclosedTarForPoolSetup, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
+	})
+	require.NoError(t, err)
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
+					ContractId: disclosedTarForPoolSetup.ContractId,
+					Choice:     "TokenAdminRegistry_ProposeAdministrator",
+					ChoiceArgument: ledger.MapToValue(tokenadminregistry.TokenAdminRegistryProposeAdministrator{
+						InstrumentId: feeTokenInstrumentId,
+						NewAdmin:     types.PARTY(partySender),
+						Caller:       types.PARTY(partyCCIP),
+					}),
+				}},
+			}},
+			ActAs:              []string{partyCCIP},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTarForPoolSetup},
 		},
 	})
-	require.NoError(t, err, "failed to propose token admin role via operation")
-	_, err = cld_ops.ExecuteOperation(bundle, token_admin_registry.AcceptAdminRole, senderDeps, contractops.ChoiceInput[tokenadminregistry.TokenAdminRegistryAcceptAdminRole]{
-		ChainSelector:   env.Chain.ChainSelector(),
-		InstanceAddress: tokenAdminRegistryInstanceAddress,
-		ActAs:           []string{partySender},
-		Args: tokenadminregistry.TokenAdminRegistryAcceptAdminRole{
-			InstrumentId: feeTokenInstrumentId,
-			Caller:       types.PARTY(partySender),
+	require.NoError(t, err)
+
+	disclosedTarForPoolSetup, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
+	})
+	require.NoError(t, err)
+	_, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
+					ContractId: disclosedTarForPoolSetup.ContractId,
+					Choice:     "TokenAdminRegistry_AcceptAdminRole",
+					ChoiceArgument: ledger.MapToValue(tokenadminregistry.TokenAdminRegistryAcceptAdminRole{
+						InstrumentId: feeTokenInstrumentId,
+						Caller:       types.PARTY(partySender),
+					}),
+				}},
+			}},
+			ActAs:              []string{partySender},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTarForPoolSetup},
 		},
 	})
-	require.NoError(t, err, "failed to accept token admin role via operation")
-	_, err = cld_ops.ExecuteOperation(bundle, token_admin_registry.SetPool, senderDeps, contractops.ChoiceInput[tokenadminregistry.TokenAdminRegistrySetPool]{
-		ChainSelector:   env.Chain.ChainSelector(),
-		InstanceAddress: tokenAdminRegistryInstanceAddress,
-		ActAs:           []string{partySender},
-		Args: tokenadminregistry.TokenAdminRegistrySetPool{
-			InstrumentId: feeTokenInstrumentId,
-			TokenPool: &tokenadminregistry.PoolRegistration{
-				PoolOwner:      types.PARTY(partySender),
-				PoolInstanceId: types.TEXT(poolInstanceID),
-			},
-			Caller: types.PARTY(partySender),
+	require.NoError(t, err)
+
+	disclosedTarForPoolSetup, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry",
+	})
+	require.NoError(t, err)
+	_, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-tokenadminregistry", ModuleName: "CCIP.TokenAdminRegistry", EntityName: "TokenAdminRegistry"},
+					ContractId: disclosedTarForPoolSetup.ContractId,
+					Choice:     "TokenAdminRegistry_SetPool",
+					ChoiceArgument: ledger.MapToValue(tokenadminregistry.TokenAdminRegistrySetPool{
+						InstrumentId: feeTokenInstrumentId,
+						TokenPool: &tokenadminregistry.PoolRegistration{
+							PoolOwner:      types.PARTY(partySender),
+							PoolInstanceId: types.TEXT(poolInstanceID),
+						},
+						Caller: types.PARTY(partySender),
+					}),
+				}},
+			}},
+			ActAs:              []string{partySender},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedTarForPoolSetup},
 		},
 	})
-	require.NoError(t, err, "failed to set token pool via operation")
+	require.NoError(t, err)
 
 	// Create PerPartyRouter for sender
 	var res *apiv2.SubmitAndWaitForTransactionResponse
@@ -916,5 +957,6 @@ func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedC
 		seen[c.ContractId] = struct{}{}
 		out = append(out, c)
 	}
+
 	return out
 }
