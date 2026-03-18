@@ -173,6 +173,8 @@ template OnRamp
                         ++ destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
+                assertMsg "onramp: sequence number exceeds uint64"
+                    (newSequenceNumber <= 18446744073709551615.0)
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 let resolvedTokenReceiver = if hasTokenTransfer
