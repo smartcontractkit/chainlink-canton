@@ -150,6 +150,12 @@ template OnRamp
                         assertMsg "onramp: destination chain disabled" c.isEnabled
                         pure c
 
+                case Map.lookup destChainSelector feeQuoter.destChainConfigs of
+                    Some feeDestConfig ->
+                        assertMsg "onramp: payload exceeds destination maxDataBytes"
+                            (byteCount payload <= feeDestConfig.maxDataBytes)
+                    None -> pure ()
+
                 _ <- exercise feeQuoterCid CCIP.FeeQuoter.GetTokenPrice with
                     instrumentId = feeToken
                     caller = ccipOwner
