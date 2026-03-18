@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
@@ -28,12 +29,16 @@ type InstrumentHoldingStore interface {
 
 var _ InstrumentHoldingStore = &InstrumentHoldingStoreService{}
 
+// DefaultReconnectBackoff is the delay before reconnecting after the update stream closes (e.g. server closed or error).
+const DefaultReconnectBackoff = 5 * time.Second
+
 type InstrumentHoldingStoreConfig struct {
-	Logger        zerolog.Logger
-	Owner         types.PARTY
-	StateService  apiv2.StateServiceClient
-	UpdateService apiv2.UpdateServiceClient
-	MaxRetries    int
+	Logger              zerolog.Logger
+	Owner                types.PARTY
+	StateService         apiv2.StateServiceClient
+	UpdateService        apiv2.UpdateServiceClient
+	MaxRetries           int
+	ReconnectBackoff     time.Duration // delay before reconnecting after stream close; 0 uses DefaultReconnectBackoff
 }
 
 type InstrumentHoldingStoreService struct {
@@ -55,6 +60,9 @@ type InstrumentHoldingStoreService struct {
 	// maxRetries is the maximum number of retries when creating the active contracts stream (0 = unlimited).
 	maxRetries int
 
+	// reconnectBackoff is the delay before reconnecting after the stream closes (avoids log thrashing on misconfiguration).
+	reconnectBackoff time.Duration
+
 	// mux is to protect the holdings map.
 	mux sync.RWMutex
 }
@@ -62,16 +70,20 @@ type InstrumentHoldingStoreService struct {
 func NewInstrumentHoldingStore(
 	config InstrumentHoldingStoreConfig,
 ) *InstrumentHoldingStoreService {
+	backoff := config.ReconnectBackoff
+	if backoff == 0 {
+		backoff = DefaultReconnectBackoff
+	}
 	return &InstrumentHoldingStoreService{
 		logger: config.Logger.With().Str("component", "InstrumentHoldingStoreService").Logger(),
 
 		owner:              config.Owner,
 		holdingDisclosures: make(map[splice_api_token_holding_v1.InstrumentId]*apiv2.DisclosedContract),
 
-		stateService:  config.StateService,
-		updateService: config.UpdateService,
-
-		maxRetries: config.MaxRetries,
+		stateService:       config.StateService,
+		updateService:      config.UpdateService,
+		maxRetries:         config.MaxRetries,
+		reconnectBackoff:   backoff,
 	}
 }
 
@@ -177,6 +189,14 @@ func (i *InstrumentHoldingStoreService) Run(ctx context.Context) error {
 					offset = tx.Transaction.GetOffset()
 				}
 			}
+		}
+
+		// Backoff before reconnecting to avoid thrashing logs (e.g. on misconfiguration).
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(i.reconnectBackoff):
+			i.logger.Debug().Str("backoff", i.reconnectBackoff.String()).Msg("Reconnect backoff elapsed, reconnecting")
 		}
 	}
 }

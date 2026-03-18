@@ -156,11 +156,12 @@ func TestInstrumentHoldingStoreService_Run(t *testing.T) {
 
 	makeConfig := func(stateClient *mocks.MockStateServiceClient, updateClient *mocks.MockUpdateServiceClient, maxRetries int) InstrumentHoldingStoreConfig {
 		return InstrumentHoldingStoreConfig{
-			Logger:        logger,
-			Owner:         owner,
-			StateService:  stateClient,
-			UpdateService: updateClient,
-			MaxRetries:    maxRetries,
+			Logger:            logger,
+			Owner:             owner,
+			StateService:      stateClient,
+			UpdateService:     updateClient,
+			MaxRetries:        maxRetries,
+			ReconnectBackoff: time.Millisecond, // short backoff in tests so reconnect tests don't wait
 		}
 	}
 
