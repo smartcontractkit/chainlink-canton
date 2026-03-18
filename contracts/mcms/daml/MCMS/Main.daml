@@ -14,7 +14,7 @@
 module MCMS.Main where
 
 import DA.Map qualified as Map
-import DA.List ((!!))
+import DA.List ((!!), dedup)
 import DA.Action (unless, when)
 import DA.Foldable (forA_)
 import DA.Time (RelTime, seconds, addRelTime)
@@ -85,6 +85,10 @@ validateMultisigConfig config = do
     when (quorum > 0) $
       assertMsg ("mcms: group " <> show idx <> " quorum " <> show quorum <> " exceeds children count " <> show children) $
         children >= quorum
+  -- Validate signer addresses are unique
+  let signerAddrs = map (\s -> s.signerAddress) config.signers
+  assertMsg "mcms: duplicate signer addresses" $
+    length (dedup signerAddrs) == length signerAddrs
 
 template MCMS
   with
@@ -535,7 +539,9 @@ executeSelfDispatch mcms call =
     "UpdateMinDelay" ->
       case parseInt call.operationData of
         None -> abort "mcms: delay must be integer seconds"
-        Some secs -> pure $ mcms with minDelay = seconds secs
+        Some secs -> do
+          assertMsg "mcms: delay must be positive" $ secs > 0
+          pure $ mcms with minDelay = seconds secs
 
     "BlockFunction" ->
       case decodeBlockedFunctionWithOffset call.operationData of

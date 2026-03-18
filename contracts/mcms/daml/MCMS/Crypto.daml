@@ -124,6 +124,12 @@ computeSignedHashNative root validUntil =
   in
     keccak256 prefixedData
 
+opLeafDomainSeparator : BytesHex
+opLeafDomainSeparator = keccak256 (asciiToHex "MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
+
+metadataLeafDomainSeparator : BytesHex
+metadataLeafDomainSeparator = keccak256 (asciiToHex "MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
+
 -- | Hash an operation to get its Merkle leaf using keccak256
 -- Uses length-prefixed encoding for variable-length fields to prevent preimage collisions
 hashOpLeafNative : Op -> BytesHex
@@ -132,7 +138,8 @@ hashOpLeafNative op =
     multisigIdHex = asciiToHex op.multisigId
     targetAddressHex = asciiToHex op.targetInstanceAddress
     functionNameHex = asciiToHex op.functionName
-    encoded = padLeft32 (intToHex op.chainId)
+    encoded = opLeafDomainSeparator
+           <> padLeft32 (intToHex op.chainId)
            <> padLeft32 (intToHex (T.length op.multisigId))  -- Length prefix for multisigId
            <> multisigIdHex
            <> padLeft32 (intToHex op.nonce)
@@ -151,7 +158,8 @@ hashMetadataLeafNative : RootMetadata -> BytesHex
 hashMetadataLeafNative meta =
   let
     multisigIdHex = asciiToHex meta.multisigId
-    encoded = padLeft32 (intToHex meta.chainId)
+    encoded = metadataLeafDomainSeparator
+           <> padLeft32 (intToHex meta.chainId)
            <> padLeft32 (intToHex (T.length meta.multisigId))  -- Length prefix for multisigId
            <> multisigIdHex
            <> padLeft32 (intToHex meta.preOpCount)

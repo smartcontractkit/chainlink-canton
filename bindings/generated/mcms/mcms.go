@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "f48a8f1b2415bd9fb50d95158dd207c9ef2d62aeb4a9e0f037e0a884e2372a7d"
+	PackageID   = "025ebc41c6dea87d005b36517228d3ed75ead93af4bb7afee49bb194ead322a0"
 	SDKVersion  = "3.4.10"
 )
 
