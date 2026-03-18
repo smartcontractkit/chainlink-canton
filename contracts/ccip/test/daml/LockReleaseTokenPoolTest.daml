@@ -408,6 +408,7 @@ testReleaseFromTicket = script do
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
             ccvOwners = []
+            verifiedCCVs = []
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -468,6 +469,151 @@ testReleaseFromTicket = script do
     poolC.owner === poolOwner
 
     debug "testReleaseFromTicket: PASSED"
+
+-- | Test ReleaseFromTicket requires the exact configured inbound CCV instance,
+-- even when another CCV instance shares the same owner party.
+testReleaseFromTicketRejectsWrongCCVInstance : Script ()
+testReleaseFromTicketRejectsWrongCCVInstance = script do
+    ccipOwner <- allocateParty "ccip-owner-instance"
+    rmnOwner <- allocateParty "rmn-owner-instance"
+    poolOwner <- allocateParty "pool-owner-instance"
+    receiver <- allocateParty "receiver-instance"
+    ccvOwner <- allocateParty "ccv-owner-instance"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let tokenAdminRegistryInstanceId = "test-tar-release-instance"
+    let requiredCcv = RawInstanceAddress.make "required-ccv" ccvOwner
+    let otherCcv = RawInstanceAddress.make "other-ccv" ccvOwner
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    poolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            owner = poolOwner
+            admin = ccipOwner
+            instrumentId = testInstrumentId
+            amount = 10000000.0
+
+    receiverPreapproval <- submit (actAs receiver <> actAs ccipOwner) do
+        createCmd TestToken.TestTransferPreapproval with
+            admin = ccipOwner
+            receiver = receiver
+
+    transferFactory <- submit ccipOwner do
+        createCmd TestToken.TestTransferFactory with
+            admin = ccipOwner
+            preapprovalCid = Some receiverPreapproval
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            instanceId = tokenAdminRegistryInstanceId
+            tokenConfigs = Map.empty
+
+    tokenAdminRegistry <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+            instrumentId = testInstrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+
+    disclosedTar1 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar1) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+            instrumentId = testInstrumentId
+            caller = poolOwner
+
+    disclosedTar2 <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar2) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+            instrumentId = testInstrumentId
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = "test-lock-release-pool-instance"
+            caller = poolOwner
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = "test-rmn-release-instance"
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        "test-lock-release-pool-instance"
+        sourceChainSelector
+        RateLimiter.RateLimitDirection_Inbound
+        10000000.0
+        1000.0
+
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = [requiredCcv]
+            outboundCCVs = []
+            minBlockDepth = 0
+            inboundRateLimiter = inboundRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = ccipOwner
+            poolOwner = poolOwner
+            instanceId = "test-lock-release-pool-instance"
+            instrumentId = testInstrumentId
+            decimals = 6
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, existingConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release-instance" "test-feequoter-release-instance" ccipOwner rmnOwner
+
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs ccvOwner) do
+        createCmd Tickets.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            ccvOwners = [ccvOwner]
+            verifiedCCVs = [otherCcv]
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = 3000000.0
+            sourcePoolData = ""
+            messageHash = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            sourceChainSelector = sourceChainSelector
+            finality = 0
+
+    let tokenInput = ITokenPool.TokenInput with
+            transferFactory = toInterfaceContractId transferFactory
+            extraArgs = MetadataV1.ExtraArgs with
+                context = MetadataV1.emptyChoiceContext
+                meta = MetadataV1.emptyMetadata
+            tokenPoolHoldings = [toInterfaceContractId poolHolding]
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
+
+    submitMustFail (actAs receiver
+                    <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
+                    <> disclose disclosedPreapproval <> disclose disclosedRmn
+                    <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = rmnRemote
+            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            tokenInput = tokenInput
+            caller = receiver
 
 -- | Test ReleaseFromTicket converts source decimals to local decimals.
 testReleaseFromTicketDecimalConversion : Script ()
@@ -573,6 +719,7 @@ testReleaseFromTicketDecimalConversion = script do
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
             ccvOwners = []
+            verifiedCCVs = []
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver
@@ -722,6 +869,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
             ccvOwners = [ccvOwner]
+            verifiedCCVs = []
             poolOwner = poolOwner
             receiver = receiver
             tokenReceiver = receiver

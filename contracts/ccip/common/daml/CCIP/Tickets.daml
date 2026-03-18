@@ -4,6 +4,7 @@ module CCIP.Tickets where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
+import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified Splice.Api.Token.HoldingV1
 
 
@@ -37,6 +38,9 @@ template TokenReceiveTicket
         -- CCV owner parties accumulated from ExecutingMessageV1's finalize choice.
         -- Mirrors the widened signatory set for deterministic pool-side validation.
         ccvOwners : [Party]
+        -- Exact CCV instances that verified the message on the inbound path.
+        -- Pools use these to preserve instance-level trust checks.
+        verifiedCCVs : [RawInstanceAddress]
         tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
         poolOwner : Party           -- Observer - pool that should release
         receiver : Party            -- Message receiver (observer)
