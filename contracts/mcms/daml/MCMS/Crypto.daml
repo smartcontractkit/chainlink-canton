@@ -1,6 +1,6 @@
 module MCMS.Crypto where
 
-import DA.Crypto.Text (BytesHex, keccak256, secp256k1WithEcdsaOnly)
+import DA.Crypto.Text (BytesHex, keccak256, secp256k1WithEcdsaOnly, toHex, byteCount)
 import DA.Text qualified as T
 import DA.Time (subTime, convertRelTimeToMicroseconds, time)
 import DA.Date (Month(..), date)
@@ -125,29 +125,29 @@ computeSignedHashNative root validUntil =
     keccak256 prefixedData
 
 opLeafDomainSeparator : BytesHex
-opLeafDomainSeparator = keccak256 (asciiToHex "MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
+opLeafDomainSeparator = keccak256 (toHex "MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_CANTON")
 
 metadataLeafDomainSeparator : BytesHex
-metadataLeafDomainSeparator = keccak256 (asciiToHex "MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
+metadataLeafDomainSeparator = keccak256 (toHex "MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_CANTON")
 
 -- | Hash an operation to get its Merkle leaf using keccak256
 -- Uses length-prefixed encoding for variable-length fields to prevent preimage collisions
 hashOpLeafNative : Op -> BytesHex
 hashOpLeafNative op =
   let
-    multisigIdHex = asciiToHex op.multisigId
-    targetAddressHex = asciiToHex op.targetInstanceAddress
-    functionNameHex = asciiToHex op.functionName
+    multisigIdHex = toHex op.multisigId
+    targetAddressHex = toHex op.targetInstanceAddress
+    functionNameHex = toHex op.functionName
     encoded = opLeafDomainSeparator
            <> padLeft32 (intToHex op.chainId)
-           <> padLeft32 (intToHex (T.length op.multisigId))  -- Length prefix for multisigId
+           <> padLeft32 (intToHex (byteCount multisigIdHex))  -- Length prefix for multisigId (byte count)
            <> multisigIdHex
            <> padLeft32 (intToHex op.nonce)
-           <> padLeft32 (intToHex (T.length op.targetInstanceAddress))  -- Length prefix for targetInstanceAddress
+           <> padLeft32 (intToHex (byteCount targetAddressHex))  -- Length prefix for targetInstanceAddress (byte count)
            <> targetAddressHex
-           <> padLeft32 (intToHex (T.length op.functionName))  -- Length prefix for functionName
+           <> padLeft32 (intToHex (byteCount functionNameHex))  -- Length prefix for functionName (byte count)
            <> functionNameHex
-           <> padLeft32 (intToHex (T.length op.operationData / 2))  -- Length prefix for operationData (byte count)
+           <> padLeft32 (intToHex (byteCount op.operationData))  -- Length prefix for operationData (byte count)
            <> op.operationData
   in
     keccak256 encoded
@@ -157,10 +157,10 @@ hashOpLeafNative op =
 hashMetadataLeafNative : RootMetadata -> BytesHex
 hashMetadataLeafNative meta =
   let
-    multisigIdHex = asciiToHex meta.multisigId
+    multisigIdHex = toHex meta.multisigId
     encoded = metadataLeafDomainSeparator
            <> padLeft32 (intToHex meta.chainId)
-           <> padLeft32 (intToHex (T.length meta.multisigId))  -- Length prefix for multisigId
+           <> padLeft32 (intToHex (byteCount multisigIdHex))  -- Length prefix for multisigId (byte count)
            <> multisigIdHex
            <> padLeft32 (intToHex meta.preOpCount)
            <> padLeft32 (intToHex meta.postOpCount)
@@ -181,10 +181,10 @@ hashTimelockOpId calls predecessor salt =
     callsCountPrefix = padLeft32 (intToHex (length calls))
     -- Encode each call with length prefixes
     encodedCalls = foldl (<>) "" (map encodeTimelockCallWithLengths calls)
-    -- Length prefix for predecessor (byte count = hex length / 2)
-    predecessorLenPrefix = padLeft32 (intToHex (T.length predecessor / 2))
-    -- Length prefix for salt (byte count = hex length / 2)
-    saltLenPrefix = padLeft32 (intToHex (T.length salt / 2))
+    -- Length prefix for predecessor (byte count)
+    predecessorLenPrefix = padLeft32 (intToHex (byteCount predecessor))
+    -- Length prefix for salt (byte count)
+    saltLenPrefix = padLeft32 (intToHex (byteCount salt))
     -- Combine with length prefixes
     encoded = callsCountPrefix <> encodedCalls <> predecessorLenPrefix <> predecessor <> saltLenPrefix <> salt
   in
@@ -194,14 +194,14 @@ hashTimelockOpId calls predecessor salt =
 encodeTimelockCallWithLengths : TimelockCall -> BytesHex
 encodeTimelockCallWithLengths call =
   let
-    targetHex = asciiToHex call.targetInstanceAddress
-    funcHex = asciiToHex call.functionName
+    targetHex = toHex call.targetInstanceAddress
+    funcHex = toHex call.functionName
   in
-    padLeft32 (intToHex (T.length call.targetInstanceAddress))  -- Length prefix
+    padLeft32 (intToHex (byteCount targetHex))  -- Length prefix (byte count)
     <> targetHex
-    <> padLeft32 (intToHex (T.length call.functionName))  -- Length prefix
+    <> padLeft32 (intToHex (byteCount funcHex))  -- Length prefix (byte count)
     <> funcHex
-    <> padLeft32 (intToHex (T.length call.operationData / 2))  -- Length prefix (byte count)
+    <> padLeft32 (intToHex (byteCount call.operationData))  -- Length prefix (byte count)
     <> call.operationData
 
 isValidHex : Text -> Bool
@@ -278,40 +278,4 @@ timeToUnixSeconds t = convertRelTimeToMicroseconds (subTime t epoch) / 1_000_000
 -- | Convert Time to 32-byte hex (matching ABI encoding of uint32)
 timeToHex : Time -> BytesHex
 timeToHex t = padLeft32 (intToHex (timeToUnixSeconds t))
-
-asciiToHex : Text -> BytesHex
-asciiToHex t = asciiToHexHelperTop t ""
-
-asciiToHexHelperTop : Text -> BytesHex -> BytesHex
-asciiToHexHelperTop txt acc =
-  if T.length txt == 0
-    then acc
-    else
-      let c = T.take 1 txt
-          rest = T.drop 1 txt
-          code = charToCode c
-      in asciiToHexHelperTop rest (acc <> byteToHex code)
-
-charToCode : Text -> Int
-charToCode c
-  | c == "0" = 48 | c == "1" = 49 | c == "2" = 50 | c == "3" = 51
-  | c == "4" = 52 | c == "5" = 53 | c == "6" = 54 | c == "7" = 55
-  | c == "8" = 56 | c == "9" = 57
-  | c == "a" = 97 | c == "b" = 98 | c == "c" = 99 | c == "d" = 100
-  | c == "e" = 101 | c == "f" = 102 | c == "g" = 103 | c == "h" = 104
-  | c == "i" = 105 | c == "j" = 106 | c == "k" = 107 | c == "l" = 108
-  | c == "m" = 109 | c == "n" = 110 | c == "o" = 111 | c == "p" = 112
-  | c == "q" = 113 | c == "r" = 114 | c == "s" = 115 | c == "t" = 116
-  | c == "u" = 117 | c == "v" = 118 | c == "w" = 119 | c == "x" = 120
-  | c == "y" = 121 | c == "z" = 122
-  | c == "A" = 65 | c == "B" = 66 | c == "C" = 67 | c == "D" = 68
-  | c == "E" = 69 | c == "F" = 70 | c == "G" = 71 | c == "H" = 72
-  | c == "I" = 73 | c == "J" = 74 | c == "K" = 75 | c == "L" = 76
-  | c == "M" = 77 | c == "N" = 78 | c == "O" = 79 | c == "P" = 80
-  | c == "Q" = 81 | c == "R" = 82 | c == "S" = 83 | c == "T" = 84
-  | c == "U" = 85 | c == "V" = 86 | c == "W" = 87 | c == "X" = 88
-  | c == "Y" = 89 | c == "Z" = 90
-  | c == "_" = 95 | c == "-" = 45 | c == "." = 46 | c == " " = 32
-  | c == "@" = 64 | c == ":" = 58
-  | otherwise = error ("charToCode: unsupported character: " <> c)
 
