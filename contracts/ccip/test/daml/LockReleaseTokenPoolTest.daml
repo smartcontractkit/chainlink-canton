@@ -457,7 +457,7 @@ testLockOrBurnDeductsFeeBps = script do
             ccvOwners = []
             tokenSendData = None
             observingParties = [sender]
-            state = SendingMessageV1.SendingMessageState_PoolVerified
+            state = SendingMessageV1.SendingMessageState_Prepared
 
     let tokenInput = ITokenPool.TokenInput with
             transferFactory = toInterfaceContractId transferFactory
@@ -480,6 +480,7 @@ testLockOrBurnDeductsFeeBps = script do
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter
                       <> disclose disclosedSm) do
         exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+            tokenAdminRegistryCid = tokenAdminRegistry
             sendingMessageCid = sendingMessageCid
             tokenInput = tokenInput
             senderInputCids = [toInterfaceContractId senderHolding]
