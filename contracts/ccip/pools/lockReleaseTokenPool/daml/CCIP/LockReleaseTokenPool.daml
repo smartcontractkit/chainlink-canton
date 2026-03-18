@@ -230,13 +230,6 @@ template LockReleaseTokenPool
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
-            tokenPool_getTokenFeeQuoteImpl self arg = do
-                exercise (fromInterfaceContractId @LockReleaseTokenPool self) LockReleaseTokenPool_GetTokenFeeQuote
-                    with
-                        remoteChainSelector = arg.remoteChainSelector
-                        amount = arg.amount
-                        caller = arg.caller
-
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice LockReleaseTokenPool_GetRequiredCCVs : [RawInstanceAddress]
             with
@@ -574,25 +567,6 @@ template LockReleaseTokenPool
                         destGasOverhead = destGasOverhead
                         destBytesOverhead = destBytesOverhead
                         caller = poolOwner
-
-        nonconsuming choice LockReleaseTokenPool_GetTokenFeeQuote
-                : CCIP.Interfaces.TokenPool.TokenFeeQuote
-            with
-                remoteChainSelector : Numeric 0
-                amount : Numeric 0
-                caller : Party
-            controller caller
-            do
-                assertMsg "pool: unsupported remote chain selector"
-                    (Map.member remoteChainSelector remoteChainConfigs)
-                let tokenFeeBps = case Map.lookup remoteChainSelector tokenTransferFeeConfigs of
-                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
-                        _ -> 0.0
-                let tokenFeeAmount = calculateFeeFromBps amount tokenFeeBps
-                pure CCIP.Interfaces.TokenPool.TokenFeeQuote with
-                    tokenFeeBps = tokenFeeBps
-                    tokenFeeAmount = tokenFeeAmount
-                    amountAfterFee = amount - tokenFeeAmount
 
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.

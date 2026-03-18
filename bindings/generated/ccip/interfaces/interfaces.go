@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "feacaa87360ef3b5054ea73ca3cd22836213850541d0cb5263486fcec31d3b86"
+	PackageID   = "cab9e796b80599374201ba1c631d66e29c5e3ca1628205f54a4410851605919a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -58,9 +58,6 @@ type IITokenPool interface {
 
 	// TokenPoolCalculateFee executes the TokenPool_CalculateFee choice
 	TokenPoolCalculateFee(contractID string, args TokenPoolCalculateFee) *model.ExerciseCommand
-
-	// TokenPoolGetTokenFeeQuote executes the TokenPool_GetTokenFeeQuote choice
-	TokenPoolGetTokenFeeQuote(contractID string, args TokenPoolGetTokenFeeQuote) *model.ExerciseCommand
 }
 
 func argsToMap(args any) map[string]any {
@@ -337,48 +334,6 @@ func (t *ReleaseOrMintResultPending) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenFeeQuote is a Record type
-type TokenFeeQuote struct {
-	TokenFeeBps    types.NUMERIC `json:"tokenFeeBps"`
-	TokenFeeAmount types.NUMERIC `json:"tokenFeeAmount"`
-	AmountAfterFee types.NUMERIC `json:"amountAfterFee"`
-}
-
-// ToMap converts TokenFeeQuote to a map for DAML arguments
-func (t TokenFeeQuote) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["tokenFeeBps"] = t.TokenFeeBps
-
-	m["tokenFeeAmount"] = t.TokenFeeAmount
-
-	m["amountAfterFee"] = t.AmountAfterFee
-
-	return m
-}
-
-func (t TokenFeeQuote) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *TokenFeeQuote) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes TokenFeeQuote to hex string (Canton MCMS format)
-func (t TokenFeeQuote) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenFeeQuote from hex string (Canton MCMS format)
-func (t *TokenFeeQuote) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // TokenInput is a Record type
 type TokenInput struct {
 	TransferFactory   types.CONTRACT_ID                      `json:"transferFactory"`
@@ -612,48 +567,6 @@ func (t TokenPoolGetRequiredCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes TokenPoolGetRequiredCCVs from hex string (Canton MCMS format)
 func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// TokenPoolGetTokenFeeQuote is a Record type
-type TokenPoolGetTokenFeeQuote struct {
-	RemoteChainSelector types.NUMERIC `json:"remoteChainSelector"`
-	Amount              types.NUMERIC `json:"amount"`
-	Caller              types.PARTY   `json:"caller"`
-}
-
-// ToMap converts TokenPoolGetTokenFeeQuote to a map for DAML arguments
-func (t TokenPoolGetTokenFeeQuote) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["remoteChainSelector"] = t.RemoteChainSelector
-
-	m["amount"] = t.Amount
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t TokenPoolGetTokenFeeQuote) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *TokenPoolGetTokenFeeQuote) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes TokenPoolGetTokenFeeQuote to hex string (Canton MCMS format)
-func (t TokenPoolGetTokenFeeQuote) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes TokenPoolGetTokenFeeQuote from hex string (Canton MCMS format)
-func (t *TokenPoolGetTokenFeeQuote) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

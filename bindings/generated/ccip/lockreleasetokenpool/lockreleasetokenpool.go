@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "2b15b77e29525366c071884879763c559613f3e9a56dbdb0e62845bece264113"
+	PackageID   = "c4054874fd5205a6ebc6d79baf19b8d8c3778366bf73fdeffea3e99cd2cccdd8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -497,27 +497,6 @@ func (t LockReleaseTokenPool) UpdateRateLimitersWithPackageID(contractID string,
 	}
 }
 
-// LockReleaseTokenPoolGetTokenFeeQuote exercises the LockReleaseTokenPool_GetTokenFeeQuote choice on this LockReleaseTokenPool contract
-// This method uses the package name in the template ID
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetTokenFeeQuote(contractID string, args LockReleaseTokenPoolGetTokenFeeQuote) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetTokenFeeQuote",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// LockReleaseTokenPoolGetTokenFeeQuoteWithPackageID exercises the LockReleaseTokenPool_GetTokenFeeQuote choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) LockReleaseTokenPoolGetTokenFeeQuoteWithPackageID(contractID string, packageID string, args LockReleaseTokenPoolGetTokenFeeQuote) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
-		ContractID: contractID,
-		Choice:     "LockReleaseTokenPool_GetTokenFeeQuote",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // LockReleaseTokenPoolVerifyInboundMessage exercises the LockReleaseTokenPool_VerifyInboundMessage choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) LockReleaseTokenPoolVerifyInboundMessage(contractID string, args LockReleaseTokenPoolVerifyInboundMessage) *model.ExerciseCommand {
@@ -770,27 +749,6 @@ func (t LockReleaseTokenPool) TokenPoolCalculateFeeWithPackageID(contractID stri
 	}
 }
 
-// TokenPoolGetTokenFeeQuote exercises the TokenPool_GetTokenFeeQuote choice on this LockReleaseTokenPool contract via the IITokenPool interface
-// This method uses the package name in the template ID
-func (t LockReleaseTokenPool) TokenPoolGetTokenFeeQuote(contractID string, args interfaces.TokenPoolGetTokenFeeQuote) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "ITokenPool"),
-		ContractID: contractID,
-		Choice:     "TokenPool_GetTokenFeeQuote",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// TokenPoolGetTokenFeeQuoteWithPackageID exercises the TokenPool_GetTokenFeeQuote choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) TokenPoolGetTokenFeeQuoteWithPackageID(contractID string, packageID string, args interfaces.TokenPoolGetTokenFeeQuote) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "ITokenPool"),
-		ContractID: contractID,
-		Choice:     "TokenPool_GetTokenFeeQuote",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // Verify interface implementations for LockReleaseTokenPool
 
 var _ mcms.IMCMSReceiver = (*LockReleaseTokenPool)(nil)
@@ -1025,67 +983,6 @@ func (t LockReleaseTokenPoolGetRequiredCCVsMCMSParams) MarshalHex() (string, err
 
 // UnmarshalHex decodes LockReleaseTokenPoolGetRequiredCCVsMCMSParams from hex string.
 func (t *LockReleaseTokenPoolGetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolGetTokenFeeQuote is a Record type
-type LockReleaseTokenPoolGetTokenFeeQuote struct {
-	RemoteChainSelector types.NUMERIC `json:"remoteChainSelector"`
-	Amount              types.NUMERIC `json:"amount"`
-	Caller              types.PARTY   `json:"caller"`
-}
-
-// ToMap converts LockReleaseTokenPoolGetTokenFeeQuote to a map for DAML arguments
-func (t LockReleaseTokenPoolGetTokenFeeQuote) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["remoteChainSelector"] = t.RemoteChainSelector
-
-	m["amount"] = t.Amount
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t LockReleaseTokenPoolGetTokenFeeQuote) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LockReleaseTokenPoolGetTokenFeeQuote) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LockReleaseTokenPoolGetTokenFeeQuote to hex string (Canton MCMS format)
-func (t LockReleaseTokenPoolGetTokenFeeQuote) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolGetTokenFeeQuote from hex string (Canton MCMS format)
-func (t *LockReleaseTokenPoolGetTokenFeeQuote) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams is LockReleaseTokenPoolGetTokenFeeQuote without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams struct {
-	RemoteChainSelector types.NUMERIC `json:"remoteChainSelector"`
-	Amount              types.NUMERIC `json:"amount"`
-}
-
-// MarshalHex encodes LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams to hex string for MCMS operationData.
-func (t LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams from hex string.
-func (t *LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1809,8 +1706,6 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolGetTokenFeeQuote(args LockReleaseTokenPoolGetTokenFeeQuote) (*bind.EncodedChoice, error)
-	LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams(args LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolLockOrBurn(args LockReleaseTokenPoolLockOrBurn) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolLockOrBurnMCMSParams(args LockReleaseTokenPoolLockOrBurnMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolReleaseFromTicket(args LockReleaseTokenPoolReleaseFromTicket) (*bind.EncodedChoice, error)
@@ -1872,16 +1767,6 @@ func (e *encoder) LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolG
 // LockReleaseTokenPoolGetRequiredCCVsMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetRequiredCCVs choice.
 func (e *encoder) LockReleaseTokenPoolGetRequiredCCVsMCMSParams(args LockReleaseTokenPoolGetRequiredCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetRequiredCCVs", args)
-}
-
-// LockReleaseTokenPoolGetTokenFeeQuote encodes parameters for the LockReleaseTokenPoolGetTokenFeeQuote choice.
-func (e *encoder) LockReleaseTokenPoolGetTokenFeeQuote(args LockReleaseTokenPoolGetTokenFeeQuote) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetTokenFeeQuote", args)
-}
-
-// LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams encodes MCMS parameters (without Caller) for the LockReleaseTokenPoolGetTokenFeeQuote choice.
-func (e *encoder) LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams(args LockReleaseTokenPoolGetTokenFeeQuoteMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("LockReleaseTokenPoolGetTokenFeeQuote", args)
 }
 
 // LockReleaseTokenPoolLockOrBurn encodes parameters for the LockReleaseTokenPoolLockOrBurn choice.
