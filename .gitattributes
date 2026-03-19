@@ -5,5 +5,8 @@
 # Mark generated bindings as generated code
 bindings/** linguist-generated
 
+# Mark Dar artifacts as generated code
+contracts/dars/** linguist-generated
+
 # Mark vendored Dars as vendored code
 contracts/dependencies/** linguist-vendored
