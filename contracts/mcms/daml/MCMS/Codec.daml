@@ -56,8 +56,7 @@ module MCMS.Codec
   , encodeDecimal
   , decodeDecimalAt
   , parseDecimal
-  , parseDecimalUnsafe
-  , parseIntUnsafe
+  , parseIntSafe
   , parseDigitsUnsafe
   , charToDigitInt
   , pow10
@@ -652,31 +651,54 @@ decodeDecimalAt encoded offset = do
 
 -- | Parse decimal from text (handles "123.456" format)
 parseDecimal : Text -> Optional Decimal
-parseDecimal text = Some (parseDecimalUnsafe text)
+parseDecimal text =
+  if Text.length text == 0 then None
+  else
+    let parts = Text.splitOn "." text
+    in case parts of
+      [intPart] -> do
+        intVal <- parseIntSafe intPart
+        Some (intToDecimal intVal)
+      [intPart, fracPart] -> do
+        intVal <- parseIntSafe intPart
+        if Text.length fracPart == 0 || not (allDigits fracPart)
+          then None
+          else
+            let fracLen = Text.length fracPart
+                fracVal = parseDigitsUnsafe fracPart 0
+                divisor = pow10 fracLen
+            in Some (intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor))
+      _ -> None
 
-parseDecimalUnsafe : Text -> Decimal
-parseDecimalUnsafe text =
-  let parts = Text.splitOn "." text
-  in case parts of
-    [intPart] -> intToDecimal (parseIntUnsafe intPart)
-    [intPart, fracPart] ->
-      let intVal = parseIntUnsafe intPart
-          fracLen = Text.length fracPart
-          fracVal = parseIntUnsafe fracPart
-          divisor = pow10 fracLen
-      in intToDecimal intVal + (intToDecimal fracVal / intToDecimal divisor)
-    _ -> error ("Invalid decimal format: " <> text)
-
-parseIntUnsafe : Text -> Int
-parseIntUnsafe text =
-  if Text.length text == 0 then 0
+-- | Safe integer parsing - returns None on invalid input
+parseIntSafe : Text -> Optional Int
+parseIntSafe text =
+  if Text.length text == 0 then Some 0
   else
     let (negative, digits) =
           if Text.take 1 text == "-"
           then (True, Text.drop 1 text)
           else (False, text)
-        value = parseDigitsUnsafe digits 0
-    in if negative then negate value else value
+    in if Text.length digits == 0 || not (allDigits digits)
+       then None
+       else
+         let value = parseDigitsUnsafe digits 0
+         in Some (if negative then negate value else value)
+
+-- | Check if all characters in text are digits
+allDigits : Text -> Bool
+allDigits text =
+  if Text.length text == 0 then True
+  else
+    let c = Text.take 1 text
+        rest = Text.drop 1 text
+    in isDigitChar c && allDigits rest
+
+-- | Check if a single character is a digit
+isDigitChar : Text -> Bool
+isDigitChar c =
+  c == "0" || c == "1" || c == "2" || c == "3" || c == "4" ||
+  c == "5" || c == "6" || c == "7" || c == "8" || c == "9"
 
 parseDigitsUnsafe : Text -> Int -> Int
 parseDigitsUnsafe text acc =

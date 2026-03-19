@@ -248,8 +248,10 @@ hashPair a b =
 padLeft32 : BytesHex -> BytesHex
 padLeft32 hex =
   let len = T.length hex
-  in if len >= 64
-     then T.take 64 hex
+  in if len > 64
+     then error ("padLeft32: input exceeds 32 bytes: " <> show len <> " hex chars")
+     else if len == 64
+     then hex
      else replicateText (64 - len) "0" <> hex
 
 replicateText : Int -> Text -> Text

@@ -5,7 +5,7 @@ import DA.Crypto.Text (BytesHex, PublicKeyHex, byteCount, keccak256, secp256k1Wi
 import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
-import DA.Optional (fromSomeNote)
+import DA.Optional (fromOptional, fromSomeNote)
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
@@ -16,6 +16,11 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
 
 import qualified CCIP.Crypto.DerEncoding
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Codec (extractBytes, decodeUint8, decodeUint16, decodeNumeric0At, decodeInt64At, decodeBoolAt)
+import CCIP.Codec (decodeOptionalRawInstanceAddressAt)
+import DA.Crypto.Text (fromHex)
 
 versionTagV1_7_0 : BytesHex = "49ff34ed"
 
@@ -65,6 +70,12 @@ data SignatureConfig = SignatureConfig
 data CommitteeVerifierDeps = CommitteeVerifierDeps
     with
         rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+-- | Parameters for SetDeps - optional fields for selective updates
+data SetDepsParams = SetDepsParams
+    with
+        rmnRemote : Optional CCIP.RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 template CommitteeVerifier
@@ -219,6 +230,16 @@ template CommitteeVerifier
                     (all isValidSignatureConfig signatureConfigs)
                 let newSignerConfigs = foldr (\config acc -> Map.insert config.sourceChainSelector config acc) signerConfigsAfterRemoval signatureConfigs
                 create this with signerConfigs = newSignerConfigs
+
+        -- | Update dependencies selectively (None = keep existing)
+        choice SetDeps : ContractId CommitteeVerifier
+            with
+                newDeps : SetDepsParams
+            controller owner
+            do
+                let mergedDeps = CommitteeVerifierDeps with
+                        rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
+                create this with deps = mergedDeps
 
         -- ==========================================
         -- |           Storage Locations            |
@@ -377,6 +398,61 @@ template CommitteeVerifier
                     messageSentObservers = messageSentObservers
                     caller = owner
 
+        -- ==========================================
+        -- |         MCMSReceiver Interface         |
+        -- ==========================================
+
+        interface instance MCMSReceiver for CommitteeVerifier where
+          view = MCMSReceiverView with
+            mcmsController = owner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let instAddr = instanceId <> "@" <> partyToText owner
+            selfCid <- case Map.lookup instAddr contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+              Some cid -> pure (coerceContractId cid : ContractId CommitteeVerifier)
+
+            case functionName of
+              "ApplySignatureConfigs" -> do
+                case decodeApplySignatureConfigsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplySignatureConfigs"
+                  Some (selectorsToRemove, configTuples) -> do
+                    -- Convert tuples to SignatureConfig records
+                    let configs = map (\(sel, thresh, keys) -> SignatureConfig sel thresh keys) configTuples
+                    newCid <- exercise selfCid CommitteeVerifier_ApplySignatureConfigs with
+                      sourceChainSelectorsToRemove = selectorsToRemove
+                      signatureConfigs = configs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "SetDynamicConfig" -> do
+                case decodeSetDynamicConfigParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
+                  Some (admin, observers) -> do
+                    let config = DynamicConfig with allowListAdmin = admin, messageSentObservers = observers
+                    newCid <- exercise selfCid SetDynamicConfig with dynamicConfig = config
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "ApplyRemoteChainConfigUpdates" -> do
+                case decodeApplyRemoteChainConfigUpdatesParams operationData of
+                  None -> abort "E_INVALID_PARAMS: ApplyRemoteChainConfigUpdates"
+                  Some configTuples -> do
+                    -- Convert tuples to RemoteChainConfigArgs records
+                    let configs = map (\(sel, fee, gas, payload, allow) ->
+                          RemoteChainConfigArgs sel fee gas payload allow) configTuples
+                    newCid <- exercise selfCid ApplyRemoteChainConfigUpdates with remoteChainConfigArgs = configs
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "SetDeps" -> do
+                case decodeSetDepsParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetDeps"
+                  Some rmnRemoteOpt -> do
+                    let newDeps = SetDepsParams with rmnRemote = rmnRemoteOpt
+                    newCid <- exercise selfCid SetDeps with newDeps
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
 
 parseSignatures : BytesHex -> [(BytesHex, BytesHex)]
 parseSignatures signatureData =
@@ -418,3 +494,118 @@ isValidSignatureConfig config =
     config.threshold > 0
         && length config.signerKeys >= config.threshold
         && length config.signerKeys == length (dedup config.signerKeys)
+
+-- ==========================================================================
+-- CODEC: MCMS parameter decoding
+-- ===========================================================================
+
+decodeApplySignatureConfigsParams : BytesHex -> Optional ([Numeric 0], [(Numeric 0, Int, [BytesHex])])
+decodeApplySignatureConfigsParams encoded = do
+  (toRemove, offset1) <- decodeNumeric0List encoded 0
+  (configs, finalOffset) <- decodeSignatureConfigList encoded offset1
+  assertOffset finalOffset (byteCount encoded)
+  Some (toRemove, configs)
+
+decodeSetDynamicConfigParams : BytesHex -> Optional (Optional Party, [Party])
+decodeSetDynamicConfigParams encoded = do
+  hasAdminHex <- extractBytes encoded 0 1
+  hasAdmin <- decodeUint8 hasAdminHex
+  (admin, offset1) <- if hasAdmin == 1
+    then do
+      (p, off) <- decodePartyAt encoded 1
+      Some (Some p, off)
+    else Some (None, 1)
+  (observers, finalOffset) <- decodePartyList encoded offset1
+  assertOffset finalOffset (byteCount encoded)
+  Some (admin, observers)
+
+decodeApplyRemoteChainConfigUpdatesParams : BytesHex -> Optional [(Numeric 0, Numeric 0, Int, Int, Bool)]
+decodeApplyRemoteChainConfigUpdatesParams encoded = do
+  countHex <- extractBytes encoded 0 1
+  count <- decodeUint8 countHex
+  (configs, finalOffset) <- decodeRemoteChainConfigList encoded 1 count []
+  assertOffset finalOffset (byteCount encoded)
+  Some configs
+
+decodeSetDepsParams : BytesHex -> Optional (Optional CCIP.RawInstanceAddress.RawInstanceAddress)
+decodeSetDepsParams encoded = do
+  (rmnRemote, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded 0
+  assertOffset finalOffset (byteCount encoded)
+  Some rmnRemote
+
+-- Codec helpers
+
+assertOffset : Int -> Int -> Optional ()
+assertOffset actual expected = if actual == expected then Some () else None
+
+decodeNumeric0List : BytesHex -> Int -> Optional ([Numeric 0], Int)
+decodeNumeric0List encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeNumeric0ListHelper encoded (offset + 1) count []
+
+decodeNumeric0ListHelper : BytesHex -> Int -> Int -> [Numeric 0] -> Optional ([Numeric 0], Int)
+decodeNumeric0ListHelper _ offset 0 acc = Some (reverse acc, offset)
+decodeNumeric0ListHelper encoded offset remaining acc = do
+  (n, newOffset) <- decodeNumeric0At encoded offset
+  decodeNumeric0ListHelper encoded newOffset (remaining - 1) (n :: acc)
+
+decodeSignatureConfigList : BytesHex -> Int -> Optional ([(Numeric 0, Int, [BytesHex])], Int)
+decodeSignatureConfigList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeSignatureConfigListHelper encoded (offset + 1) count []
+
+decodeSignatureConfigListHelper : BytesHex -> Int -> Int -> [(Numeric 0, Int, [BytesHex])] -> Optional ([(Numeric 0, Int, [BytesHex])], Int)
+decodeSignatureConfigListHelper _ offset 0 acc = Some (reverse acc, offset)
+decodeSignatureConfigListHelper encoded offset remaining acc = do
+  (selector, o1) <- decodeNumeric0At encoded offset
+  thresholdHex <- extractBytes encoded o1 2
+  threshold <- decodeUint16 thresholdHex
+  (keys, o2) <- decodeBytesHexList encoded (o1 + 2)
+  decodeSignatureConfigListHelper encoded o2 (remaining - 1) ((selector, threshold, keys) :: acc)
+
+decodeRemoteChainConfigList : BytesHex -> Int -> Int -> [(Numeric 0, Numeric 0, Int, Int, Bool)] -> Optional ([(Numeric 0, Numeric 0, Int, Int, Bool)], Int)
+decodeRemoteChainConfigList _ offset 0 acc = Some (reverse acc, offset)
+decodeRemoteChainConfigList encoded offset remaining acc = do
+  (selector, o1) <- decodeNumeric0At encoded offset
+  (fee, o2) <- decodeNumeric0At encoded o1
+  (gas, o3) <- decodeInt64At encoded o2
+  (payload, o4) <- decodeInt64At encoded o3
+  (allowList, o5) <- decodeBoolAt encoded o4
+  decodeRemoteChainConfigList encoded o5 (remaining - 1) ((selector, fee, gas, payload, allowList) :: acc)
+
+decodeBytesHexList : BytesHex -> Int -> Optional ([BytesHex], Int)
+decodeBytesHexList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodeBytesHexListHelper encoded (offset + 1) count []
+
+decodeBytesHexListHelper : BytesHex -> Int -> Int -> [BytesHex] -> Optional ([BytesHex], Int)
+decodeBytesHexListHelper _ offset 0 acc = Some (reverse acc, offset)
+decodeBytesHexListHelper encoded offset remaining acc = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  bh <- extractBytes encoded (offset + 1) len
+  decodeBytesHexListHelper encoded (offset + 1 + len) (remaining - 1) (bh :: acc)
+
+decodePartyAt : BytesHex -> Int -> Optional (Party, Int)
+decodePartyAt encoded offset = do
+  lenHex <- extractBytes encoded offset 1
+  len <- decodeUint8 lenHex
+  partyHex <- extractBytes encoded (offset + 1) len
+  partyText <- fromHex partyHex
+  party <- partyFromText partyText
+  Some (party, offset + 1 + len)
+
+decodePartyList : BytesHex -> Int -> Optional ([Party], Int)
+decodePartyList encoded offset = do
+  countHex <- extractBytes encoded offset 1
+  count <- decodeUint8 countHex
+  decodePartyListHelper encoded (offset + 1) count []
+
+decodePartyListHelper : BytesHex -> Int -> Int -> [Party] -> Optional ([Party], Int)
+decodePartyListHelper _ offset 0 acc = Some (reverse acc, offset)
+decodePartyListHelper encoded offset remaining acc = do
+  (party, newOffset) <- decodePartyAt encoded offset
+  decodePartyListHelper encoded newOffset (remaining - 1) (party :: acc)

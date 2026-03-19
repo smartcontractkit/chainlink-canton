@@ -156,7 +156,7 @@ template MCMS
           not $ Map.member signedHash rs.seenHashes
 
         -- 3. Validate timestamps
-        assertMsg "mcms: root has expired" $ now < validUntil
+        assertMsg "mcms: root has expired" $ now <= validUntil
 
         -- 4. Validate metadata matches this role
         assertMsg ("mcms: chain ID mismatch, expected " <> show chainId) $
