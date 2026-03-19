@@ -1,21 +1,23 @@
 # CCIP Canton Contracts
 
-This document describes the Daml smart contract architecture for Chainlink CCIP (Cross-Chain Interoperability Protocol) on Canton.
+This document describes the Daml smart contract architecture for Chainlink CCIP (Cross-Chain Interoperability Protocol)
+on Canton.
 
 ## Overview
 
-CCIP Canton enables cross-chain messaging between Canton and other blockchain networks (EVM, Solana, Aptos, SUI, TVM). Unlike EVM-based CCIP which supports arbitrary execution via `ccipReceive()` callbacks, Canton CCIP provides **arbitrary messaging** - users receive verified message data and decide how to process it.
+CCIP Canton enables cross-chain messaging between Canton and other blockchain networks (EVM, Solana, Aptos, SUI, TVM).
+Unlike EVM-based CCIP which supports arbitrary execution via `ccipReceive()` callbacks, Canton CCIP provides **arbitrary
+messaging** - users receive verified message data and decide how to process it.
 
 ### Key Differences from EVM CCIP
 
-| Aspect | EVM CCIP | Canton CCIP |
-|--------|----------|-------------|
-| Execution model | Arbitrary execution via callbacks | Arbitrary messaging (user processes data) |
-| Receiver | Contract address | PartyId encoded as bytes |
-| Message retrieval | Automatic callback | User fetches from off-chain storage |
-| State model | Global shared state | Per-party isolated state |
-| Contract visibility | Public | Explicit disclosure required |
-
+| Aspect              | EVM CCIP                          | Canton CCIP                               |
+|---------------------|-----------------------------------|-------------------------------------------|
+| Execution model     | Arbitrary execution via callbacks | Arbitrary messaging (user processes data) |
+| Receiver            | Contract address                  | PartyId encoded as bytes                  |
+| Message retrieval   | Automatic callback                | User fetches from off-chain storage       |
+| State model         | Global shared state               | Per-party isolated state                  |
+| Contract visibility | Public                            | Explicit disclosure required              |
 
 ## Architecture
 
@@ -96,7 +98,8 @@ contracts/ccip/
 
 ### PerPartyRouter
 
-Per-party routing/state contract used by sender/receiver flows. Each party gets their own router to avoid state contention.
+Per-party routing/state contract used by sender/receiver flows. Each party gets their own router to avoid state
+contention.
 
 ```daml
 template PerPartyRouter
@@ -110,6 +113,7 @@ template PerPartyRouter
 ```
 
 **Key choices:**
+
 - `CCIPSend` - Send a cross-chain message
 - `Execute` - Execute an inbound message
 - `GetRequiredCCVsForSend` - Query required CCVs for sending
@@ -127,6 +131,7 @@ template OnRamp
 ```
 
 **Key choice:**
+
 - `CCIPSendFromRouter` - Validates tickets, encodes message, returns encoded result
 
 ### OffRamp
@@ -141,6 +146,7 @@ template OffRamp
 ```
 
 **Key choice:**
+
 - `ExecuteFromRouter` - Decodes message, validates CCVs, issues TokenReceiveTicket
 
 ### GlobalConfig
@@ -191,6 +197,7 @@ data TokenConfig = TokenConfig
 ```
 
 **Key choices:**
+
 - `TokenAdminRegistry_IssueSendTicket` - Called by pool after locking tokens
 - `TokenAdminRegistry_IssueReceiveTicket` - Called by OffRamp after verification
 - `TokenAdminRegistry_ConsumeReceiveTicket` - Called by pool to release tokens
@@ -211,7 +218,8 @@ template CommitteeVerifier
 
 ## Ticket Pattern
 
-Canton's privacy model means CCIP infrastructure cannot directly call user contracts. The **ticket pattern** solves this:
+Canton's privacy model means CCIP infrastructure cannot directly call user contracts. The **ticket pattern** solves
+this:
 
 1. User calls their contract (e.g., TokenPool) to perform an action
 2. Contract issues a ticket proving the action occurred
@@ -220,16 +228,17 @@ Canton's privacy model means CCIP infrastructure cannot directly call user contr
 
 ### Ticket Types
 
-| Ticket | Issued By | Consumed By | Purpose |
-|--------|-----------|-------------|---------|
-| `TokenSendTicket` | TokenPool via TokenAdminRegistry | OnRamp | Proves tokens were locked |
-| `VerifierData` | CCV (`ForwardToVerifier`) | OnRamp / message pipeline | Attestation data attached to outbound message |
-| `CCVVerification` | CCV (`VerifyMessage`) | OffRamp / execution pipeline | Proves inbound message verification |
-| `TokenReceiveTicket` | OffRamp via TokenAdminRegistry | TokenPool | Authorizes token release |
+| Ticket               | Issued By                        | Consumed By                  | Purpose                                       |
+|----------------------|----------------------------------|------------------------------|-----------------------------------------------|
+| `TokenSendTicket`    | TokenPool via TokenAdminRegistry | OnRamp                       | Proves tokens were locked                     |
+| `VerifierData`       | CCV (`ForwardToVerifier`)        | OnRamp / message pipeline    | Attestation data attached to outbound message |
+| `CCVVerification`    | CCV (`VerifyMessage`)            | OffRamp / execution pipeline | Proves inbound message verification           |
+| `TokenReceiveTicket` | OffRamp via TokenAdminRegistry   | TokenPool                    | Authorizes token release                      |
 
 ## CCV Identification
 
 Cross-Chain Verifiers are identified by a `CCVId` combining:
+
 - **Version tag** (4 bytes hex): Identifies the CCV type/version
 - **Party**: Identifies the CCV operator
 
@@ -238,7 +247,8 @@ CCVId = "<versionTag>@<partyId>"
 Example: "49ff34ed@participant1::ccv-owner"
 ```
 
-The version tag is embedded in the first 4 bytes of `verifierBlob`/`ccvData`, preventing CCVs from lying about their type.
+The version tag is embedded in the first 4 bytes of `verifierBlob`/`ccvData`, preventing CCVs from lying about their
+type.
 
 ## Message Encoding
 
@@ -273,7 +283,8 @@ data MessageV1 = MessageV1
 
 ## Explicit Disclosure
 
-Canton participants maintain private contract stores. Users need **explicit disclosure** to access shared contracts they're not stakeholders of.
+Canton participants maintain private contract stores. Users need **explicit disclosure** to access shared contracts
+they're not stakeholders of.
 
 ### How It Works
 
@@ -285,6 +296,7 @@ Canton participants maintain private contract stores. Users need **explicit disc
 ### Contracts Needed by Operation
 
 **CCIPSend:**
+
 - `PerPartyRouter` (stakeholder)
 - `OnRamp` (disclosed)
 - `GlobalConfig` (disclosed)
@@ -292,6 +304,7 @@ Canton participants maintain private contract stores. Users need **explicit disc
 - User's tickets (stakeholder)
 
 **Execute:**
+
 - `PerPartyRouter` (stakeholder)
 - `OffRamp` (disclosed)
 - `GlobalConfig` (disclosed)
@@ -304,87 +317,88 @@ Canton participants maintain private contract stores. Users need **explicit disc
 
 Sending a cross-chain message from Canton to another chain.
 
-Note: some legacy diagrams below still use `CCVTicket` naming. Current verifier integration is direct via verifier interface choices.
+Note: some legacy diagrams below still use `CCVTicket` naming. Current verifier integration is direct via verifier
+interface choices.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              SEND FLOW                                       │
+│                              SEND FLOW                                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  1. PREPARE TOKENS (if token transfer)                                       │
-│  ═══════════════════════════════════════                                     │
-│                                                                              │
-│     User ──► TokenPool.Lock()                                                │
-│                   │                                                          │
-│                   ▼                                                          │
-│              TokenAdminRegistry_IssueSendTicket                              │
-│                   │                                                          │
-│                   ▼                                                          │
-│              TokenSendTicket (created)                                       │
-│                                                                              │
-│  2. GET CCV ATTESTATION                                                      │
-│  ══════════════════════                                                      │
-│                                                                              │
-│     User ──► CommitteeVerifier_ForwardToVerifier                             │
-│                   │                                                          │
-│                   ▼                                                          │
-│              VerifierData appended to SendingMessageV1                       │
-│                                                                              │
-│  3. SEND MESSAGE                                                             │
-│  ═══════════════                                                             │
-│                                                                              │
-│     User ──► CCIPSender.Send(                                                │
-│                  context,                                                    │
-│                  routerCid,                                                  │
-│                  destChainSelector,                                          │
-│                  receiver,                                                   │
-│                  payload,                                                    │
-│                  tokenTransfer,                                              │
-│                  ccvSendInputs                                               │
-│              )                                                               │
-│                   │                                                          │
-│                   ▼                                                          │
+│                                                                             │
+│  1. PREPARE TOKENS (if token transfer)                                      │
+│  ═══════════════════════════════════════                                    │
+│                                                                             │
+│     User ──► TokenPool.Lock()                                               │
+│                   │                                                         │
+│                   ▼                                                         │
+│              TokenAdminRegistry_IssueSendTicket                             │
+│                   │                                                         │
+│                   ▼                                                         │
+│              TokenSendTicket (created)                                      │
+│                                                                             │
+│  2. GET CCV ATTESTATION                                                     │
+│  ══════════════════════                                                     │
+│                                                                             │
+│     User ──► CommitteeVerifier_ForwardToVerifier                            │
+│                   │                                                         │
+│                   ▼                                                         │
+│              VerifierData appended to SendingMessageV1                      │
+│                                                                             │
+│  3. SEND MESSAGE                                                            │
+│  ═══════════════                                                            │
+│                                                                             │
+│     User ──► CCIPSender.Send(                                               │
+│                  context,                                                   │
+│                  routerCid,                                                 │
+│                  destChainSelector,                                         │
+│                  receiver,                                                  │
+│                  payload,                                                   │
+│                  tokenTransfer,                                             │
+│                  ccvSendInputs                                              │
+│              )                                                              │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ CCIPSender                                                   │         │
-│     │   1. Prepare send via PerPartyRouter                         │         │
-│     │   2. Calculate/finalize fee                                  │         │
-│     │   3. Forward to verifier interfaces                          │         │
+│     │ CCIPSender                                                  │         │
+│     │   1. Prepare send via PerPartyRouter                        │         │
+│     │   2. Calculate/finalize fee                                 │         │
+│     │   3. Forward to verifier interfaces                         │         │
 │     │   4. Finalize send via PerPartyRouter.CCIPSend              │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                   │                                                          │
-│                   ▼                                                          │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ OnRamp.CCIPSendFromRouter                                    │         │
-│     │   1. Validate router environment matches                     │         │
-│     │   2. Validate GlobalConfig                                   │         │
-│     │   3. Get dest chain config                                   │         │
+│     │ OnRamp.CCIPSendFromRouter                                   │         │
+│     │   1. Validate router environment matches                    │         │
+│     │   2. Validate GlobalConfig                                  │         │
+│     │   3. Get dest chain config                                  │         │
 │     │   4. Process TokenSendTicket → TokenTransferV1              │         │
 │     │   5. Get required CCVs (lane + pool + defaults)             │         │
-│     │   6. Validate required CCV inputs                            │         │
-│     │   7. Build final message                                     │         │
-│     │   8. Build MessageV1                                         │         │
-│     │   9. Encode message                                          │         │
+│     │   6. Validate required CCV inputs                           │         │
+│     │   7. Build final message                                    │         │
+│     │   8. Build MessageV1                                        │         │
+│     │   9. Encode message                                         │         │
 │     │  10. Compute messageId = keccak256(encodedMessage)          │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                   │                                                          │
-│                   ▼                                                          │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ PerPartyRouter (continued)                                   │         │
+│     │ PerPartyRouter (continued)                                  │         │
 │     │   4. Update outboundSequenceNumbers                         │         │
 │     │   5. Create CCIPMessageSent event contract                  │         │
 │     │   6. Return CCIPSendResult                                  │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                                                                              │
-│  4. OUTPUT                                                                   │
-│  ═════════                                                                   │
-│                                                                              │
-│     CCIPMessageSent contract contains:                                       │
-│       - destChainSelector                                                    │
-│       - sequenceNumber                                                       │
-│       - messageId                                                            │
-│       - encodedMessage                                                       │
+│                                                                             │
+│  4. OUTPUT                                                                  │
+│  ═════════                                                                  │
+│                                                                             │
+│     CCIPMessageSent contract contains:                                      │
+│       - destChainSelector                                                   │
+│       - sequenceNumber                                                      │
+│       - messageId                                                           │
+│       - encodedMessage                                                      │
 │       - verifierBlobs (for off-chain DON to pick up)                        │
-│                                                                              │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -419,95 +433,95 @@ Executing an inbound cross-chain message on Canton.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                             RECEIVE FLOW                                     │
+│                             RECEIVE FLOW                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  1. FETCH MESSAGE (off-chain)                                                │
-│  ════════════════════════════                                                │
-│                                                                              │
-│     User fetches from off-chain storage:                                     │
-│       - encodedMessage                                                       │
+│                                                                             │
+│  1. FETCH MESSAGE (off-chain)                                               │
+│  ════════════════════════════                                               │
+│                                                                             │
+│     User fetches from off-chain storage:                                    │
+│       - encodedMessage                                                      │
 │       - verifierBlobs (ccvData with signatures)                             │
-│                                                                              │
-│  2. VERIFY MESSAGE WITH CCVs                                                 │
-│  ═══════════════════════════                                                 │
-│                                                                              │
-│     User provides ccvInputs to CCIPReceiver.Execute                          │
-│     (receiver calls CrossChainVerifier_VerifyMessage internally)             │
-│                                                                              │
-│     CrossChainVerifier_VerifyMessage(                                        │
-│                  executingMessageCid,                                        │
-│                  verifierResults,                                            │
-│                  caller                                                      │
-│              )                                                               │
-│                   │                                                          │
-│                   ▼                                                          │
+│                                                                             │
+│  2. VERIFY MESSAGE WITH CCVs                                                │
+│  ═══════════════════════════                                                │
+│                                                                             │
+│     User provides ccvInputs to CCIPReceiver.Execute                         │
+│     (receiver calls CrossChainVerifier_VerifyMessage internally)            │
+│                                                                             │
+│     CrossChainVerifier_VerifyMessage(                                       │
+│                  executingMessageCid,                                       │
+│                  verifierResults,                                           │
+│                  caller                                                     │
+│              )                                                              │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ CommitteeVerifier                                            │         │
-│     │   1. Verify version tag matches                              │         │
-│     │   2. Parse signatures from ccvData                           │         │
+│     │ CommitteeVerifier                                           │         │
+│     │   1. Verify version tag matches                             │         │
+│     │   2. Parse signatures from ccvData                          │         │
 │     │   3. Compute signedHash = keccak256(versionTag || encoded)  │         │
-│     │   4. Verify >= threshold valid signatures                    │         │
+│     │   4. Verify >= threshold valid signatures                   │         │
 │     │   5. Append verification to ExecutingMessageV1              │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                   │                                                          │
-│                   ▼                                                          │
-│              ExecutingMessageV1 updated                                      │
-│                                                                              │
-│  3. EXECUTE MESSAGE                                                          │
-│  ══════════════════                                                          │
-│                                                                              │
-│     User ──► CCIPReceiver.Execute(                                           │
-│                  context,                                                    │
-│                  routerCid,                                                  │
-│                  encodedMessage,                                             │
-│                  tokenTransfer,                                              │
-│                  ccvInputs,                                                  │
-│                  additionalRequiredCCVs                                      │
-│              )                                                               │
-│                   │                                                          │
-│                   ▼                                                          │
+│                   │                                                         │
+│                   ▼                                                         │
+│              ExecutingMessageV1 updated                                     │
+│                                                                             │
+│  3. EXECUTE MESSAGE                                                         │
+│  ══════════════════                                                         │
+│                                                                             │
+│     User ──► CCIPReceiver.Execute(                                          │
+│                  context,                                                   │
+│                  routerCid,                                                 │
+│                  encodedMessage,                                            │
+│                  tokenTransfer,                                             │
+│                  ccvInputs,                                                 │
+│              )                                                              │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ PerPartyRouter                                               │         │
+│     │ PerPartyRouter                                              │         │
 │     │   1. Validate OffRamp (ccipOwner, environmentId)            │         │
 │     │   2. Compute messageHash = keccak256(encodedMessage)        │         │
-│     │   3. Check execution state (replay prevention)               │         │
+│     │   3. Check execution state (replay prevention)              │         │
 │     │   4. Delegate to OffRamp.ExecuteFromRouter                  │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                   │                                                          │
-│                   ▼                                                          │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ OffRamp.ExecuteFromRouter                                    │         │
-│     │   1. Validate router environment matches                     │         │
+│     │ OffRamp.ExecuteFromRouter                                   │         │
+│     │   1. Validate router environment matches                    │         │
 │     │   2. Decode MessageV1 from encodedMessage                   │         │
-│     │   3. Verify receiver matches router party                    │         │
-│     │   4. Validate GlobalConfig                                   │         │
-│     │   5. Get source chain config                                 │         │
+│     │   3. Verify receiver matches router party                   │         │
+│     │   4. Validate GlobalConfig                                  │         │
+│     │   5. Get source chain config                                │         │
 │     │   6. Get required CCVs (lane + receiver + pool + defaults)  │         │
-│     │   7. Validate required CCV verifications                     │         │
-│     │   8. Validate all required CCVs                              │         │
-│     │   9. Issue TokenReceiveTicket via TokenAdminRegistry        │         │
+│     │   7. Validate CCV verifications                             │         │
+│     │   8. Validate all required CCVs                             │         │
+│     │   8. Validate all optional CCVs meet optional threshold     │         │
+│     │  10. Issue TokenReceiveTicket via TokenAdminRegistry        │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                   │                                                          │
-│                   ▼                                                          │
+│                   │                                                         │
+│                   ▼                                                         │
 │     ┌─────────────────────────────────────────────────────────────┐         │
-│     │ PerPartyRouter (continued)                                   │         │
+│     │ PerPartyRouter (continued)                                  │         │
 │     │   5. Update executionStates[messageHash] = SUCCESS          │         │
 │     │   6. Create ExecutionStateChanged event contract            │         │
 │     │   7. Return ExecuteResult with TokenReceiveTicket           │         │
 │     └─────────────────────────────────────────────────────────────┘         │
-│                                                                              │
-│  4. RELEASE TOKENS (if token transfer)                                       │
-│  ═════════════════════════════════════                                       │
-│                                                                              │
-│     User ──► TokenPool.ReleaseFromTicket(tokenReceiveTicket)                 │
-│                   │                                                          │
-│                   ▼                                                          │
-│              TokenAdminRegistry_ConsumeReceiveTicket                         │
-│                   │                                                          │
-│                   ▼                                                          │
-│              Tokens released to receiver                                     │
-│                                                                              │
+│                                                                             │
+│  4. RELEASE TOKENS (if token transfer)                                      │
+│  ═════════════════════════════════════                                      │
+│                                                                             │
+│     User ──► TokenPool.ReleaseFromTicket(tokenReceiveTicket)                │
+│                   │                                                         │
+│                   ▼                                                         │
+│              TokenAdminRegistry_ConsumeReceiveTicket                        │
+│                   │                                                         │
+│                   ▼                                                         │
+│              Tokens released to receiver                                    │
+│                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -523,7 +537,6 @@ result <- exercise receiverCid Execute with
     routerCid = routerCid
     encodedMessage = encodedMessage
     ccvInputs = ccvInputs
-    additionalRequiredCCVs = []
     ...
 
 -- Step 4: Release tokens (if message had token transfer)
@@ -575,19 +588,19 @@ Required CCVs = lane-mandated + receiver + pool + defaults
 Security is enforced through mutual validation:
 
 ```
-┌──────────────────┐                    ┌──────────────────┐
-│ PerPartyRouter   │                    │ OnRamp/OffRamp   │
-│                  │                    │                  │
-│ 1. Fetch ramp    │───────────────────►│                  │
-│ 2. Validate:     │                    │                  │
-│    - ccipOwner   │                    │                  │
-│    - environmentId                    │                  │
-│                  │                    │                  │
-│ 3. Exercise      │───────────────────►│ 4. Validate:     │
-│    choice        │                    │    - environmentId│
-│                  │◄───────────────────│ 5. Return result │
-│ 6. Update state  │                    │                  │
-└──────────────────┘                    └──────────────────┘
+┌───────────────────┐                    ┌───────────────────┐
+│ PerPartyRouter    │                    │ OnRamp/OffRamp    │
+│                   │                    │                   │
+│ 1. Fetch ramp     │───────────────────►│                   │
+│ 2. Validate:      │                    │                   │
+│    - ccipOwner    │                    │                   │
+│    - environmentId│                    │                   │
+│                   │                    │                   │
+│ 3. Exercise       │───────────────────►│ 4. Validate:      │
+│    choice         │                    │    - environmentId│
+│                   │◄───────────────────│ 5. Return result  │
+│ 6. Update state   │                    │                   │
+└───────────────────┘                    └───────────────────┘
 ```
 
 ---
@@ -604,8 +617,9 @@ Created after successful send. Observed by sender and DON nodes.
 template CCIPMessageSent
     with
         ccipOwner : Party
+        ccvOwners : [Party]          -- CCV operators that this message has been forwarded to
         sender : Party
-        observers : [Party]          -- Includes DON nodes from CCV
+        observers : [Party]          -- Includes (optional) additional observers that CCVs have specified
         event : CCIPMessageSentEvent
 
 data CCIPMessageSentEvent = CCIPMessageSentEvent
@@ -615,6 +629,7 @@ data CCIPMessageSentEvent = CCIPMessageSentEvent
         messageId : BytesHex
         encodedMessage : BytesHex
         verifierBlobs : [BytesHex]   -- DON picks these up
+        receipts : [CCIP.Tickets.Receipt]
 ```
 
 ### ExecutionStateChanged
@@ -625,6 +640,7 @@ Created after successful execute. Observed by receiver.
 template ExecutionStateChanged
     with
         ccipOwner : Party
+        ccvOwners : [Party]          -- CCV operators that this message has been verified by
         receiver : Party
         event : ExecutionStateChangedEvent
 
