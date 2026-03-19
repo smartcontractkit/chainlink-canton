@@ -39,6 +39,30 @@ jobs:
         with:
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
           fetch-depth: 0
+          token: ${{ steps.setup-github-token.outputs.access-token }}
+      - name: Remove previous autofix commits
+        run: |
+          branch="${{ github.event.client_payload.pull_request.head.ref }}"
+          reset_target="HEAD"
+
+          while true; do
+            subject="$(git log -1 --format=%s "$reset_target")"
+            if [[ ! "$subject" =~ ^\[autofix\]\  ]]; then
+              break
+            fi
+
+            if ! git rev-parse "${reset_target}^" >/dev/null 2>&1; then
+              echo "Branch history is entirely autofix commits; refusing to reset past the root commit."
+              exit 1
+            fi
+
+            reset_target="${reset_target}^"
+          done
+
+          if [[ "$reset_target" != "HEAD" ]]; then
+            git reset --hard "$reset_target"
+            git push --force-with-lease origin "HEAD:${branch}"
+          fi
       - name: Install Go
         uses: actions/setup-go@v6
         with:
