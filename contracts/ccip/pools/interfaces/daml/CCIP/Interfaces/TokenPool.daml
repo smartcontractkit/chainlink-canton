@@ -106,7 +106,6 @@ interface ITokenPool where
         controller caller
         do tokenPool_calculateFeeImpl this self arg
 
-
 -- View of the TokenPool
 data TokenPoolView = TokenPoolView
     with

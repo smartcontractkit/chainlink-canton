@@ -147,10 +147,14 @@ template FeeQuoter
                 let premiumMultiplier = fromSomeNote
                         ("Fee token not configured: " <> sm.feeToken.id)
                         (Map.lookup sm.feeToken feeTokens)
+                let usdPerUnitGas = case Map.lookup sm.destChainSelector usdPerUnitGasByDestChainSelector of
+                        Some gasPrice -> gasPrice.price
+                        None -> 0.0
                 finalizedCid <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.FinalizeFee with
                         feeTokenPrice = tokenPrice.price
                         premiumMultiplier
+                        usdPerUnitGas
                 finalizedFeeTokenAmount <- exercise finalizedCid
                     CCIP.SendingMessageV1.FeeTokenAmount with
                         caller

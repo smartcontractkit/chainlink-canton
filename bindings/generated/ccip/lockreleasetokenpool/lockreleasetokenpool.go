@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "7d3898b22c61ae1e79985cf942ae89e0c79c425429ce731b4b0e65a3dfd2dd62"
+	PackageID   = "05d9a73969c9eb18ba8d3652eebe499a2c263bacec7821c4e24f657ec6a0afc8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1549,6 +1549,7 @@ type TokenTransferFeeConfig2 struct {
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
 	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	FeeBps            types.NUMERIC `json:"feeBps"`
 }
 
 // ToMap converts TokenTransferFeeConfig2 to a map for DAML arguments
@@ -1562,6 +1563,8 @@ func (t TokenTransferFeeConfig2) ToMap() map[string]any {
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
 
 	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["feeBps"] = t.FeeBps
 
 	return m
 }

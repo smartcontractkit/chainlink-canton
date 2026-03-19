@@ -131,6 +131,12 @@ assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expec
     assertMsg (prefix <> ": rate limit mode mismatch")
         (limiter.mode == mode)
 
+bpsDenominator : Numeric 0
+bpsDenominator = 10000.0
+
+calculateFeeFromBps : Numeric 0 -> Numeric 0 -> Numeric 0
+calculateFeeFromBps amount feeBps = CCIP.Math.mulDivDown amount feeBps bpsDenominator
+
 -- | Lock/release token pool with dynamic CCV requirements per chain.
 template LockReleaseTokenPool
     with
@@ -157,6 +163,8 @@ template LockReleaseTokenPool
         deps : LockReleaseTokenPoolDeps
     where
         signatory poolOwner
+
+        ensure all (\cfg -> cfg.feeBps >= 0.0 && cfg.feeBps < bpsDenominator) (Map.values tokenTransferFeeConfigs)
 
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with
@@ -642,13 +650,17 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
+                let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
+                        Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
+                        _ -> 0.0
+                let amountAfterFeeBps = amount - calculateFeeFromBps amount tokenFeeBps
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
                     CCIP.TokenAdminRegistry.TokenAdminRegistry_AddTokenSend with
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         instrumentId = instrumentId
-                        amount = amount
+                        amount = amountAfterFeeBps
                         destTokenAddress = destTokenAddr
                         extraData = extraData
                         caller = poolOwner

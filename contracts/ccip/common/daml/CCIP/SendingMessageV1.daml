@@ -398,6 +398,8 @@ template SendingMessageV1
             with
                 feeTokenPrice : Numeric 0
                 premiumMultiplier : Numeric 0
+                -- 8-decimal USD price per destination gas unit from FeeQuoter.
+                usdPerUnitGas : Numeric 0
             controller ccipOwner
             do
                 assertMsg "sendingMessage: FinalizeFee only allowed after executor finalization"
@@ -418,12 +420,16 @@ template SendingMessageV1
                 let convertDirect feeUSDCents =
                         let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
                         in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
+                let gasCostUsdCents gasUnits =
+                        CCIP.Math.mulDivUp (intToNumeric gasUnits) usdPerUnitGas usd8PerUsdCent
 
                 let ccvAmounts = map
                         (\fee -> convertWithPremium fee.feeUSDCents) ccvFees
                 let poolAmount = case tokenSendFee of
                         None -> 0.0
-                        Some fee -> convertWithPremium fee.feeUSDCents
+                        Some fee ->
+                            let poolFeeUSDCents = fee.feeUSDCents + gasCostUsdCents fee.destGasOverhead
+                            in convertWithPremium poolFeeUSDCents
                 let executorAmount = case executorFee of
                         None -> 0.0
                         Some fee -> convertDirect fee.feeUSDCents

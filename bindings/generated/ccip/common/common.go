@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "fa900eb5fa382f3e99e8072b67b8eb26b977d61583b8b280cf506f27decb1d73"
+	PackageID   = "84e8c26c1520e795c9ed5ccc63e27ac69496318b0ca2b3ca2edd9f0385816300"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2564,6 +2564,7 @@ func (t *FinalizeExecuteResult) UnmarshalHex(data string) error {
 type FinalizeFee struct {
 	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
 	PremiumMultiplier types.NUMERIC `json:"premiumMultiplier"`
+	UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas"`
 }
 
 // ToMap converts FinalizeFee to a map for DAML arguments
@@ -2573,6 +2574,8 @@ func (t FinalizeFee) ToMap() map[string]any {
 	m["feeTokenPrice"] = t.FeeTokenPrice
 
 	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	m["usdPerUnitGas"] = t.UsdPerUnitGas
 
 	return m
 }
