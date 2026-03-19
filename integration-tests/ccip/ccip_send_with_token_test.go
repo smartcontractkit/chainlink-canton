@@ -1036,7 +1036,7 @@ func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant c
 		amountStr := fields[2].GetValue().GetNumeric()
 		intPart, fracPart, hasFrac := strings.Cut(amountStr, ".")
 		if hasFrac {
-			require.Equalf(t, strings.Trim(fracPart, "0") == "", "expected integer Numeric 0, got %q", amountStr)
+			require.Truef(t, strings.Trim(fracPart, "0") == "", "expected integer Numeric 0, got %q", amountStr)
 		}
 		amt, err := strconv.ParseInt(intPart, 10, 64)
 		require.NoErrorf(t, err, "failed to parse Numeric %q", amountStr)

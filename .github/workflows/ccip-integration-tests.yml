@@ -51,7 +51,7 @@ jobs:
       - name: Run Go tests
         run: |
           cd integration-tests/ccip
-          go test -v -count 1 -timeout 20m -run TestCCIPSend ./...
+          go test -v -count 1 -timeout 20m -run '^TestCCIPSend$' ./...
 
   test-ccip-send-with-token:
     name: TestCCIPSendWithToken
@@ -66,4 +66,4 @@ jobs:
       - name: Run Go tests
         run: |  
           cd integration-tests/ccip
-          go test -v -count 1 -timeout 20m -run TestCCIPSendWithToken ./...
+          go test -v -count 1 -timeout 20m -run '^TestCCIPSendWithTokenTransferFeeBps$' ./...
