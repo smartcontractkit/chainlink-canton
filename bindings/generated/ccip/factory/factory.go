@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "ceaef214c35e84eebe51621a6a42cdfeeef5c1e8885abf7b24c4aacd518b0173"
+	PackageID   = "704ffcb073551c556550cdc6cc78e9be39dc9a9261c72fd61897b65ddf84c76f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -561,10 +561,12 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId    types.TEXT                  `json:"instanceId"`
-	Owner         types.PARTY                 `json:"owner"`
-	RequiredCCVs  []common.RawInstanceAddress `json:"requiredCCVs"`
-	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
+	InstanceId            types.TEXT                  `json:"instanceId"`
+	Owner                 types.PARTY                 `json:"owner"`
+	RequiredCCVs          []common.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs          []common.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold     types.INT64                 `json:"optionalThreshold"`
+	MinBlockConfirmations types.INT64                 `json:"minBlockConfirmations"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -588,7 +590,22 @@ func (t DeployCCIPReceiverParams) ToMap() map[string]any {
 		return res
 	}()
 
-	m["minBlockDepth"] = int64(t.MinBlockDepth)
+	m["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["optionalThreshold"] = int64(t.OptionalThreshold)
+
+	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
 
 	return m
 }
