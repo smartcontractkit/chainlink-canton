@@ -24,6 +24,7 @@ import CCIP.Codec
   , decodeOptionalRawInstanceAddressAt
   )
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Crypto (assertValidHex, isValidHex)
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -159,6 +160,13 @@ template OnRamp
                 _ <- exercise feeQuoterCid CCIP.FeeQuoter.GetTokenPrice with
                     instrumentId = feeToken
                     caller = ccipOwner
+
+                assertValidHex "receiver" receiver
+                assertValidHex "payload" payload
+                assertValidHex "tokenArgs" tokenArgs
+                case tokenReceiver of
+                    Some tr -> assertValidHex "tokenReceiver" tr
+                    None -> pure ()
 
                 let hasTokenTransfer = isSome tokenInstrumentId
                 let isTokenOnlyTransfer = hasTokenTransfer
@@ -477,14 +485,16 @@ findFeeWithAmount (f :: fs) (a :: as) pred =
     if pred f then (f, a)
     else findFeeWithAmount fs as pred
 
--- | Validates a destination-chain address against the chain's expected address length.
+-- | Validates a destination-chain address against the chain's expected address length and hex validity.
 -- The message receiver, tokenReceiver, and destTokenAddress are all validated using this function since they're all remote chain addresses.
 validateDestChainAddress : BytesHex -> Int -> BytesHex
 validateDestChainAddress address addressBytesLength =
-    let actualLength = byteCount address
-    in if actualLength == addressBytesLength
-        then address
-        else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
+    if not (isValidHex address)
+    then error ("InvalidDestChainAddress: not valid hex: " <> show address)
+    else let actualLength = byteCount address
+         in if actualLength == addressBytesLength
+            then address
+            else error ("InvalidDestChainAddress: address length (" <> show actualLength <> ") does not match expected length (" <> show addressBytesLength <> ") for the destination chain: " <> show address)
 
 -- ===========================================================================
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint

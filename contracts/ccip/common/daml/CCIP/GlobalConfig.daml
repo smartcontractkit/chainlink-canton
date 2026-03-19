@@ -11,6 +11,7 @@ import DA.Foldable (forA_)
 
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Crypto (assertValidHex)
 import CCIP.GlobalConfigTypes (DestChainConfig(..), DestChainConfigArgs(..), SourceChainConfig(..), SourceChainConfigArgs(..), validateDefaultAndMandatedCCVs)
 import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParamsWithOffset, decodeApplySourceChainConfigUpdatesParamsWithOffset)
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
@@ -92,6 +93,7 @@ template GlobalConfig
                 assertMsg "InvalidChainSelector: destination chain selector must be greater than zero" (destChainSelector > 0.0)
                 assertMsg "InvalidChainSelector: destination chain selector must not be the same as the local chain selector" (destChainSelector /= chainSelector)
                 assertMsg "InvalidAddressByteLength: address byte length must be greater than zero" (addressBytesLength > 0)
+                assertValidHex "offRampAddress" offRampAddress
                 assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
@@ -112,8 +114,7 @@ template GlobalConfig
               forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
                 assertMsg "InvalidChainSelector: source chain selector must be greater than zero" (sourceChainSelector > 0.0)
                 assertMsg "InvalidChainSelector: source chain selector must not be the same as the local chain selector" (sourceChainSelector /= chainSelector)
-                -- Allow for empty onRampAddresses
-                -- This list could be empty, which would mean no onRamps are allowed and the lane is disabled, even for existing messages
+                forA_ onRampAddresses $ \addr -> assertValidHex "onRampAddress" addr
                 validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
               -- Update

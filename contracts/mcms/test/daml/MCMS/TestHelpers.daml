@@ -14,9 +14,9 @@ import MCMS.Crypto (RawSignature(..), replicateText)
 make2of3Config : MultisigConfig
 make2of3Config = MultisigConfig
   { signers =
-      [ SignerInfo "0x1111111111111111111111111111111111111111" 0 0
-      , SignerInfo "0x2222222222222222222222222222222222222222" 1 0
-      , SignerInfo "0x3333333333333333333333333333333333333333" 2 0
+      [ SignerInfo "1111111111111111111111111111111111111111" 0 0
+      , SignerInfo "2222222222222222222222222222222222222222" 1 0
+      , SignerInfo "3333333333333333333333333333333333333333" 2 0
       ]
   , groupQuorums = [2] <> replicate 31 0  -- Root group needs 2
   , groupParents = replicate 32 0          -- All point to root
