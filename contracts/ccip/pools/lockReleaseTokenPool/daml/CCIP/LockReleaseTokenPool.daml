@@ -309,6 +309,8 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
+                assertMsg "pool: amount must be positive" (amount > 0.0)
+
                 sm <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
@@ -583,6 +585,8 @@ template LockReleaseTokenPool
                 caller : Party
             controller caller
             do
+                assertMsg "pool: amount must be positive" (amount > 0.0)
+
                 sendingMsg <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"

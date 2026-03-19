@@ -273,6 +273,38 @@ testLockOrBurn = script do
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
     disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
 
+    -- Test that LockOrBurn with 0 amount fails.
+    submitMustFail (actAs sender
+                      <> disclose disclosedPool <> disclose disclosedTar
+                      <> disclose disclosedFactory <> disclose disclosedPreapproval
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter
+                      <> disclose disclosedSm) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            sendingMessageCid = sendingMessageCid
+            tokenInput = tokenInput
+            senderInputCids = [toInterfaceContractId senderHolding]
+            amount = 0.0 
+            rmnRemoteCid = rmnRemote
+            extraContext = mkRateLimiterContext outboundRateLimiter
+            caller = sender
+
+    -- Test that LockOrBurn with a negative amount fails.
+    submitMustFail (actAs sender
+                      <> disclose disclosedPool <> disclose disclosedTar
+                      <> disclose disclosedFactory <> disclose disclosedPreapproval
+                      <> disclose disclosedRmn <> disclose disclosedRateLimiter
+                      <> disclose disclosedSm) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_LockOrBurn with
+            tokenAdminRegistryCid = tokenAdminRegistry
+            sendingMessageCid = sendingMessageCid
+            tokenInput = tokenInput
+            senderInputCids = [toInterfaceContractId senderHolding]
+            amount = -5000000.0
+            rmnRemoteCid = rmnRemote
+            extraContext = mkRateLimiterContext outboundRateLimiter
+            caller = sender
+
     -- LockOrBurn stores token data via AddTokenSend
     result <- submit (actAs sender
                       <> disclose disclosedPool <> disclose disclosedTar
