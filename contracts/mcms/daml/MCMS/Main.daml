@@ -306,6 +306,8 @@ template MCMS
               Some (params, finalOffset) -> do
                 assertMsg "mcms: trailing bytes in BypasserExecuteBatch operationData" $
                   finalOffset == byteCount op.operationData
+                -- Validate targetCids size to prevent DoS via inflated maps
+                validateTargetCidsSize instanceAddress params.calls targetCids
                 bypasserExecuteBatchInternal owner this rs params.calls targetCids
 
           "CancelBatch" -> do
@@ -370,10 +372,14 @@ template MCMS
                 Some predTime ->
                   assertMsg "mcms: predecessor operation not complete" $ predTime == doneTimestamp
 
-            -- 6. Process all calls (self-dispatch inline, external via MCMSReceiver)
+            -- 6. Validate targetCids size to prevent DoS via inflated maps
+            let mcmsInstanceAddress = makeInstanceAddress instanceId owner
+            validateTargetCidsSize mcmsInstanceAddress calls targetCids
+
+            -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
             (_, finalMcms) <- processCallsLoop owner targetCids this calls
 
-            -- 7. Mark as done (set to doneTimestamp)
+            -- 8. Mark as done (set to doneTimestamp)
             create (finalMcms with
               timelockTimestamps = Map.insert opId doneTimestamp finalMcms.timelockTimestamps)
 
@@ -548,6 +554,23 @@ propagateChildCount groupQuorums groupParents idx counts =
      then MCMS.GroupVoting.incrementAt parentIdx counts
      else counts
 
+-- | Count distinct external target addresses in a list of calls
+-- External = any call where targetInstanceAddress != mcmsInstanceAddress
+countDistinctExternalTargets : Text -> [TimelockCall] -> Int
+countDistinctExternalTargets mcmsInstanceAddress calls =
+  let externalTargets = [c.targetInstanceAddress | c <- calls, c.targetInstanceAddress /= mcmsInstanceAddress]
+  in length (dedup externalTargets)
+
+-- | Validate targetCids map size against distinct external targets
+-- Prevents DoS by inflating map with irrelevant entries
+validateTargetCidsSize : Text -> [TimelockCall] -> Map.Map Text (ContractId MCMSReceiver) -> Update ()
+validateTargetCidsSize mcmsInstanceAddress calls targetCids = do
+  let distinctTargets = countDistinctExternalTargets mcmsInstanceAddress calls
+  let mapSize = Map.size targetCids
+  assertMsg ("mcms: targetCids size " <> show mapSize <>
+             " exceeds distinct external targets " <> show distinctTargets) $
+    mapSize <= distinctTargets
+
 -- | Execute a self-dispatch call (admin operations routed through timelock)
 -- This function does NOT perform role checks. This is intentional and safe because:
 -- This function is only reachable via two validated paths:
@@ -713,21 +736,36 @@ cancelBatchInternal mcms rs opIdToCancel = do
 -- | Process timelock calls: self-dispatch inline, external via MCMSReceiver
 -- Uses a map keyed by instanceAddress to support multiple calls to the same contract.
 -- After each external call, the map is updated with the new CID returned from MCMSReceiver_Entrypoint.
+--
+-- Converts typed→untyped map once at start, carries untyped through loop,
+-- Converts untyped→typed once at end. This avoids O(k*n) map conversions where k = external calls.
 processCallsLoop : Party -> Map.Map Text (ContractId MCMSReceiver) -> MCMS -> [TimelockCall] -> Update (Map.Map Text (ContractId MCMSReceiver), MCMS)
-processCallsLoop _ cidMap mcms [] = pure (cidMap, mcms)
-processCallsLoop ownerParty cidMap mcms (call :: rest) = do
+processCallsLoop ownerParty typedCidMap mcms calls = do
+  -- Convert typed→untyped once at start
+  let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList typedCidMap]
+  -- Process all calls with untyped map
+  (finalUntypedMap, finalMcms) <- processCallsLoopInternal ownerParty untypedCidMap mcms calls
+  -- Convert untyped→typed once at end
+  let finalTypedMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList finalUntypedMap]
+  pure (finalTypedMap, finalMcms)
+
+-- | Internal loop that operates on untyped ContractId maps to avoid per-iteration conversions
+processCallsLoopInternal : Party -> Map.Map Text (ContractId ()) -> MCMS -> [TimelockCall] -> Update (Map.Map Text (ContractId ()), MCMS)
+processCallsLoopInternal _ cidMap mcms [] = pure (cidMap, mcms)
+processCallsLoopInternal ownerParty cidMap mcms (call :: rest) = do
   -- Calculate MCMS's own instanceAddress for comparison
   let mcmsInstanceAddress = makeInstanceAddress mcms.instanceId mcms.owner
 
   if call.targetInstanceAddress == mcmsInstanceAddress then do
     -- Self-dispatch: execute internal function (no CID lookup needed)
     newMcms <- executeSelfDispatch mcms call
-    processCallsLoop ownerParty cidMap newMcms rest
+    processCallsLoopInternal ownerParty cidMap newMcms rest
   else do
     -- External call: lookup CID from map and validate
-    targetCid <- case Map.lookup call.targetInstanceAddress cidMap of
+    -- Coerce untyped CID to typed for fetch/exercise
+    targetCid : ContractId MCMSReceiver <- case Map.lookup call.targetInstanceAddress cidMap of
       None -> abort $ "mcms: no contract ID for instance: " <> call.targetInstanceAddress
-      Some cid -> pure cid
+      Some cid -> pure (coerceContractId cid)
 
     -- Parse instanceId from the call's targetInstanceAddress (from merkle leaf)
     expectedInstanceId <- case parseInstanceIdText call.targetInstanceAddress of
@@ -755,20 +793,14 @@ processCallsLoop ownerParty cidMap mcms (call :: rest) = do
           partyToText singleSig == expectedPartyText
       _ -> abort "mcms: target must have exactly one signatory"
 
-    -- Convert typed map to untyped for interface
-    let untypedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList cidMap]
-
     -- Execute call and get updated map from entrypoint
     -- The entrypoint returns a Map with all updated CIDs (including self and any delegated calls)
     returnedCidMap <- exercise targetCid MCMSReceiver_Entrypoint with
       functionName = call.functionName
       operationData = call.operationData
-      contractIds = untypedCidMap
+      contractIds = cidMap
 
-    -- Convert returned map back to typed for next iteration
+    -- Continue with updated map (already untyped from entrypoint)
     -- Note: We trust the returned map because the receiver is a signatory of the owner,
     -- and delegated calls (e.g., OffRamp -> CCIP) need to update multiple CIDs
-    let updatedCidMap = Map.fromList [(k, coerceContractId v) | (k, v) <- Map.toList returnedCidMap]
-
-    -- Continue with updated map
-    processCallsLoop ownerParty updatedCidMap mcms rest
+    processCallsLoopInternal ownerParty returnedCidMap mcms rest
