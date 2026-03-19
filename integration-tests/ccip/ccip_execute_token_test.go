@@ -12,19 +12,17 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-
-	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/scanProxy"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
