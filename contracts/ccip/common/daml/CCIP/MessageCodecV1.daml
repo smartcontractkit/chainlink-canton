@@ -756,7 +756,9 @@ decodeMessageV1 encoded =
                 -- Extract message data
                 msgDataHex <- extractBytes encoded (msgDataLenOffset + 2) msgDataLen
 
-                return MessageV1
+                let finalOffset = msgDataLenOffset + 2 + msgDataLen
+                if finalOffset /= byteCount encoded then None
+                else return MessageV1
                     { sourceChainSelector = sourceChain
                     , destChainSelector = destChain
                     , sequenceNumber = seqNum
