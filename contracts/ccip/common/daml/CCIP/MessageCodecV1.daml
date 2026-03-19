@@ -822,9 +822,12 @@ decodeTokenTransfer encoded =
                 extraDataLen <- decodeUint16 extraDataLenHex
 
                 -- Extract extraData
-                extraDataHex <- extractBytes encoded (39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) extraDataLen
+                let extraDataOffset = 39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen
+                extraDataHex <- extractBytes encoded extraDataOffset extraDataLen
 
-                return TokenTransferV1
+                let finalOffset = extraDataOffset + extraDataLen
+                if finalOffset /= byteCount encoded then None
+                else return TokenTransferV1
                     { amount = amount
                     , sourcePoolAddress = sourcePoolHex
                     , sourceTokenAddress = sourceTokenHex
