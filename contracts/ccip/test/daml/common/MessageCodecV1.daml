@@ -187,11 +187,13 @@ setup = script do
     let test256_0 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000000"
     let test256_1 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000001"
     let test256_max64 = MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
+    let test256_tooLargeForNumeric0 = MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     let test256_invalid = MessageCodecV1.decodeUint256 "0000000000000000" -- wrong length
 
     test256_0 === Some 0.0
     test256_1 === Some 1.0
     test256_max64 === Some 18446744073709551615.0
+    test256_tooLargeForNumeric0 === None
     test256_invalid === None
     debug("uint256 decoding tests passed")
 
