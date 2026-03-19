@@ -168,6 +168,9 @@ template OnRamp
                     Some tr -> assertValidHex "tokenReceiver" tr
                     None -> pure ()
 
+                assertMsg "onramp: sender required CCVs cannot contain duplicates"
+                    (length senderRequiredCCVs == length (dedup senderRequiredCCVs))
+
                 let hasTokenTransfer = isSome tokenInstrumentId
                 let isTokenOnlyTransfer = hasTokenTransfer
                         && payload == ""
