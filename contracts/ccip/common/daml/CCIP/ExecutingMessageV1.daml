@@ -11,6 +11,7 @@ import qualified CCIP.Events
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.RawInstanceAddress
 import qualified CCIP.Tickets
 import qualified Splice.Api.Token.HoldingV1
 
@@ -147,6 +148,9 @@ template ExecutingMessageV1
                         ticketCid <- create CCIP.Tickets.TokenReceiveTicket with
                             ccipOwner = ccipOwner
                             ccvOwners = ccvOwners
+                            verifiedCCVs = dedup (map
+                                (\verification -> CCIP.RawInstanceAddress.make verification.ccvInstanceId verification.ccvOwner)
+                                ccvVerifications)
                             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
                             poolOwner = poolOwner
                             receiver = ticketReceiver

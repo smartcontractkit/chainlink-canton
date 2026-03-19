@@ -652,3 +652,265 @@ testPrepareSendExtraArgs = script do
             feeToken = feeTokenId
 
     pure ()
+
+testPrepareSendRejectsOversizedPayload = script do
+    ccipOwner <- allocateParty "ccip-owner-payload"
+    rmnOwner <- allocateParty "rmn-owner-payload"
+    user <- allocateParty "user-payload"
+
+    let globalConfigInstanceId = "test-globalconfig-payload"
+    let onRampInstanceId = "test-onramp-payload"
+    let rmnInstanceId = "test-rmn-payload"
+    let factoryInstanceId = "test-factory-payload"
+    let tokenAdminRegistryInstanceId = "test-tar-payload"
+    let ccvRegistryInstanceId = "test-ccvregistry-payload"
+    let feeQuoterInstanceId = "test-feequoter-payload"
+    let sourceChainSelector : Numeric 0 = 1111111111.0
+    let destChainSelector : Numeric 0 = 2222222222.0
+
+    let testFeeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = sourceChainSelector
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                isEnabled = True
+                addressBytesLength = 20
+                offRampAddress = "0000000000000000000000000000000000000003"
+                laneMandatedCCVs = []
+                defaultCCVs = []
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
+            sourceChainConfigs = Map.empty
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    feeQuoter <- submit ccipOwner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            instanceId = feeQuoterInstanceId
+            owner = ccipOwner
+            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 4
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "45564d"
+                defaultTxGasLimit = 1
+                networkFeeUSD = 0.0
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(testFeeTokenId,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 100000000.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = testFeeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = []
+
+    onRamp <- submit ccipOwner do
+        createCmd CCIP.OnRamp.OnRamp with
+            instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.OnRamp.OnRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                ccvRegistry = ccvRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouterFactory with
+            instanceId = factoryInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make "unused-offramp-payload" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createRouterResult <- submit (actAs user <> disclose disclosedFactory) do
+        exerciseCmd factory CCIP.PerPartyRouter.CreateRouter with
+            partyOwner = user
+            instanceId = "router-payload"
+    let router = createRouterResult.router
+
+    disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            destChainSelector = destChainSelector
+            receiver = "0000000000000000000000000000000000000001"
+            payload = "0011223344"
+            ccipReceiveGasLimit = 100000
+            senderRequiredCCVs = []
+            tokenInstrumentId = None
+            tokenReceiver = None
+            tokenArgs = ""
+            feeToken = testFeeTokenId
+
+    pure ()
+
+testPrepareSendRejectsSequenceNumberOverflow = script do
+    ccipOwner <- allocateParty "ccip-owner-seq"
+    rmnOwner <- allocateParty "rmn-owner-seq"
+    user <- allocateParty "user-seq"
+
+    let globalConfigInstanceId = "test-globalconfig-seq"
+    let onRampInstanceId = "test-onramp-seq"
+    let rmnInstanceId = "test-rmn-seq"
+    let tokenAdminRegistryInstanceId = "test-tar-seq"
+    let ccvRegistryInstanceId = "test-ccvregistry-seq"
+    let feeQuoterInstanceId = "test-feequoter-seq"
+    let sourceChainSelector : Numeric 0 = 1111111111.0
+    let destChainSelector : Numeric 0 = 2222222222.0
+    let maxUint64 : Numeric 0 = 18446744073709551615.0
+
+    let testFeeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FeeToken"
+
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let feeQuoterInstanceAddress = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+    let onRampInstanceAddress = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = sourceChainSelector
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                isEnabled = True
+                addressBytesLength = 20
+                offRampAddress = "0000000000000000000000000000000000000003"
+                laneMandatedCCVs = []
+                defaultCCVs = []
+                messageNetworkFeeUSDCents = cents 0.0
+                tokenNetworkFeeUSDCents = cents 0.0)]
+            sourceChainConfigs = Map.empty
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    feeQuoter <- submit ccipOwner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            instanceId = feeQuoterInstanceId
+            owner = ccipOwner
+            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.fromList [(testFeeTokenId,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 100000000.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
+            linkTokenInstrumentId = testFeeTokenId
+            maxFeeJuelsPerMsg = 1000000000000000000000000.0
+            priceUpdaters = []
+
+    onRamp <- submit ccipOwner do
+        createCmd CCIP.OnRamp.OnRamp with
+            instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.OnRamp.OnRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = feeQuoterInstanceAddress
+                ccvRegistry = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+
+    router <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = "router-seq"
+            ccipOwner = ccipOwner
+            partyOwner = user
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = onRampInstanceAddress
+                offRamp = CCIP.RawInstanceAddress.make "unused-offramp-seq" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = feeQuoterInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+            outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
+            executionStates = Map.empty
+
+    disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFeeQuoter <- fromSome <$> queryDisclosure ccipOwner feeQuoter
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
+                    ]
+            destChainSelector = destChainSelector
+            receiver = "0000000000000000000000000000000000000001"
+            payload = "abcd"
+            ccipReceiveGasLimit = 100000
+            senderRequiredCCVs = []
+            tokenInstrumentId = None
+            tokenReceiver = None
+            tokenArgs = ""
+            feeToken = testFeeTokenId
+
+    pure ()

@@ -67,7 +67,8 @@ jobs:
           fi
       - name: Push signed commits
         if: steps.commit.outputs.has_changes == 'true'
-        uses: asana/push-signed-commits@d615ca88d8e1a946734c24970d1e7a6c56f34897 # v1
+        # use forked push-signed-commits so that commits can be generated when there are DARs
+        uses: cfal/push-signed-commits@557a29703a381c8401e55eaf9359fc3751c347c0 # v1
         with:
           github-token: ${{ steps.setup-github-token.outputs.access-token }}
           local_branch_name: ${{ github.event.client_payload.pull_request.head.ref }}
