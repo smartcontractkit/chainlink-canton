@@ -10,6 +10,7 @@ import DA.Optional
 import qualified DA.TextMap as TextMap
 
 import qualified CCIP.Context
+import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
@@ -296,6 +297,7 @@ testCCIPSend = script do
 testCCIPExecute = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
+    ccvOwner <- allocateParty "ccv-owner"
     receiver <- allocateParty "receiver"
 
     let globalConfigInstanceId = "test-globalconfig"
@@ -303,6 +305,7 @@ testCCIPExecute = script do
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
+    let ccvInstanceId = "test-ccv"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -310,6 +313,7 @@ testCCIPExecute = script do
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccvOwner
 
     -- Deploy GlobalConfig
     globalConfig <- submit ccipOwner do
@@ -322,7 +326,7 @@ testCCIPExecute = script do
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000001"]
                 laneMandatedCCVs = []
-                defaultCCVs = [])]
+                defaultCCVs = [ccvInstanceAddress])]
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -409,6 +413,13 @@ testCCIPExecute = script do
             tokenReceiverParty = None
             caller = receiver
 
+    -- Add CCV verification
+    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ""
+            caller = ccvOwner
+
     -- Execute
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.Execute with
@@ -419,7 +430,9 @@ testCCIPExecute = script do
                  (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 2000
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     executeResult.state === CCIP.Internal.SUCCESS
 

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "cf4b7019279b7bfcd6613d056f50207fc1eb3a3e7bf8c808324f1e9217318027"
+	PackageID   = "424aae9101c1c1ad58f3146d1826da5c123126ba2abf99c12ff78c8e78b70d3c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -55,13 +55,15 @@ func argsToMap(args any) map[string]any {
 
 // ExecuteFromRouter is a Record type
 type ExecuteFromRouter struct {
-	RouterPartyOwner      types.PARTY                 `json:"routerPartyOwner"`
-	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverMinBlockDepth types.INT64                 `json:"receiverMinBlockDepth"`
-	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
-	GlobalConfigCid       types.CONTRACT_ID           `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid          types.CONTRACT_ID           `json:"rmnRemoteCid"`
+	RouterPartyOwner              types.PARTY                 `json:"routerPartyOwner"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	ExecutingMessageCid           types.CONTRACT_ID           `json:"executingMessageCid"`
+	GlobalConfigCid               types.CONTRACT_ID           `json:"globalConfigCid"`
+	TokenAdminRegistryCid         types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid                  types.CONTRACT_ID           `json:"rmnRemoteCid"`
 }
 
 // ToMap converts ExecuteFromRouter to a map for DAML arguments
@@ -83,7 +85,22 @@ func (t ExecuteFromRouter) ToMap() map[string]any {
 		return res
 	}()
 
-	m["receiverMinBlockDepth"] = int64(t.ReceiverMinBlockDepth)
+	m["receiverOptionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
+		for _, e := range t.ReceiverOptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
+
+	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	m["executingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }

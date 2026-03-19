@@ -516,7 +516,9 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
         instanceId : Text
         owner : Party
         requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-        minBlockDepth : Int
+        optionalCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        optionalThreshold : Int
+        minBlockConfirmations : Int
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -652,7 +654,9 @@ mkCCIPReceiverContract params = CCIP.CCIPReceiver.CCIPReceiver with
     instanceId = params.instanceId
     owner = params.owner
     requiredCCVs = params.requiredCCVs
-    minBlockDepth = params.minBlockDepth
+    optionalCCVs = params.optionalCCVs
+    optionalThreshold = params.optionalThreshold
+    minBlockConfirmations = params.minBlockConfirmations
 
 decodeDeployGlobalConfigParams : BytesHex -> Optional DeployGlobalConfigParams
 decodeDeployGlobalConfigParams encoded = do
@@ -834,12 +838,16 @@ decodeDeployCCIPReceiverParams encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
     (owner, offset2) <- decodePartyAt encoded offset1
     (requiredCCVs, offset3) <- decodeList encoded offset2 decodeRawInstanceAddressAt
-    (minBlockDepth, _) <- decodeInt64At encoded offset3
+    (optionalCCVs, offset4) <- decodeList encoded offset3 decodeRawInstanceAddressAt
+    (optionalThreshold, offset5) <- decodeInt64At encoded offset4
+    (minBlockConfirmations, _) <- decodeInt64At encoded offset5
     Some DeployCCIPReceiverParams with
         instanceId
         owner
         requiredCCVs
-        minBlockDepth
+        optionalCCVs
+        optionalThreshold
+        minBlockConfirmations
 
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =

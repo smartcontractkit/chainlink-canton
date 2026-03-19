@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "3065f52e18c6ed15c818f122ce7bd4df47c20d62a81ea79948e9db958a1b7a88"
+	PackageID   = "2c590b04c35927cb78f170a5264c91c539041640e47d64a54dd67824ba9907ff"
 	SDKVersion  = "3.4.10"
 )
 
@@ -279,10 +279,12 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context               common.CCIPContext          `json:"context"`
-	ExecutingMessageCid   types.CONTRACT_ID           `json:"executingMessageCid"`
-	ReceiverRequiredCCVs  []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverMinBlockDepth types.INT64                 `json:"receiverMinBlockDepth"`
+	Context                       common.CCIPContext          `json:"context"`
+	ExecutingMessageCid           types.CONTRACT_ID           `json:"executingMessageCid"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -318,7 +320,22 @@ func (t Execute) ToMap() map[string]any {
 		return res
 	}()
 
-	m["receiverMinBlockDepth"] = int64(t.ReceiverMinBlockDepth)
+	m["receiverOptionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
+		for _, e := range t.ReceiverOptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
+
+	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	return m
 }

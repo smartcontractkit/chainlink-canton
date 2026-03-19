@@ -94,20 +94,24 @@ createRateLimiter poolOwner poolInstanceId remoteChainSelector direction capacit
 
 
 -- | Test LockOrBurn transfers tokens from sender to pool.
+testLockOrBurn : Script ()
 testLockOrBurn = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
+    ccvOwner <- allocateParty "ccv-owner"
     poolOwner <- allocateParty "pool-owner"
     sender <- allocateParty "sender"
 
     let destChainSelector : Numeric 0 = 456.0
     let sourceChainSelector : Numeric 0 = 123.0
     let rmnInstanceId = "test-rmn"
+    let ccvInstanceId = "test-ccv"
     let tokenAdminRegistryInstanceId = "test-tar"
 
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "TestToken"
+    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -265,7 +269,7 @@ testLockOrBurn = script do
     disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
 
     -- LockOrBurn stores token data via AddTokenSend
-    result <- submit (actAs sender <> actAs poolOwner
+    result <- submit (actAs sender
                       <> disclose disclosedPool <> disclose disclosedTar
                       <> disclose disclosedFactory <> disclose disclosedPreapproval
                       <> disclose disclosedRmn <> disclose disclosedRateLimiter

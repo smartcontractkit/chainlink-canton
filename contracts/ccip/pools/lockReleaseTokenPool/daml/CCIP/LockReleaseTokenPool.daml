@@ -561,7 +561,7 @@ template LockReleaseTokenPool
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Numeric 0
                 caller : Party
-            controller caller, poolOwner
+            controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
