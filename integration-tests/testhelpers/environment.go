@@ -1,6 +1,7 @@
 package testhelpers
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -106,16 +107,25 @@ var defaultNetworkOnce = &sync.Once{}
 
 func LoadChainWithCTF(t *testing.T, numberOfValidators int) (*canton.Chain, error) {
 	const (
-		maxAttempts = 3
-		retryDelay  = 5 * time.Second
+		maxAttempts       = 3
+		retryDelay        = 5 * time.Second
+		perAttemptTimeout = 6 * time.Minute
 	)
 
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		once := defaultNetworkOnce
+		if attempt > 1 {
+			// First attempt may leave a partially initialized/default network behind.
+			// Use a fresh sync.Once on retries so CTF can rebuild network state.
+			once = &sync.Once{}
+		}
+		attemptCtx, cancel := context.WithTimeout(t.Context(), perAttemptTimeout)
 		bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
 			NumberOfValidators: numberOfValidators,
-			Once:               defaultNetworkOnce,
-		}).Initialize(t.Context())
+			Once:               once,
+		}).Initialize(attemptCtx)
+		cancel()
 		if err == nil {
 			return bc.(*canton.Chain), nil
 		}

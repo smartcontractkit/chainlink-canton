@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -690,6 +691,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
+	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -882,7 +884,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)
-	sendDisclosures := dedupeDisclosedContracts(slices.Concat(
+	sendDisclosures := (slices.Concat(
 		[]*apiv2.DisclosedContract{
 			disclosedCCIPSender,
 			disclosedRouter,
@@ -991,6 +993,21 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
 	require.Equal(t, poolDestGasOverhead, poolReceiptDestGasLimit, "pool receipt must carry configured destGasOverhead in destGasLimit")
+	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	senderDelta := senderBalanceBefore - senderBalanceAfter
+	t.Logf(
+		"Sender balance (local units): before=%d after=%d deducted=%d",
+		senderBalanceBefore,
+		senderBalanceAfter,
+		senderDelta,
+	)
+	assertSenderBalanceDeductions(
+		t,
+		senderBalanceBefore,
+		senderBalanceAfter,
+		37*1_000_000, // $0.37 fee-token payment at $1/token and 1e8 local units
+		0,            // sender == poolOwner in this test, so transfer leg is net-zero on sender balance
+	)
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
@@ -998,19 +1015,45 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	t.Logf("  Encoded message: %s", returnedEncodedMessage)
 }
 
-func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
-	seen := make(map[string]struct{}, len(in))
-	out := make([]*apiv2.DisclosedContract, 0, len(in))
-	for _, c := range in {
-		if c == nil {
-			continue
-		}
-		if _, ok := seen[c.ContractId]; ok {
-			continue
-		}
-		seen[c.ContractId] = struct{}{}
-		out = append(out, c)
-	}
+func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant canton.Participant) int64 {
+	t.Helper()
 
-	return out
+	holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, participant, &apiv2.Identifier{
+		PackageId: "#splice-api-token-holding-v1", ModuleName: "Splice.Api.Token.HoldingV1", EntityName: "Holding",
+	})
+	require.NoError(t, err)
+
+	var total int64
+	for _, h := range holdings {
+		views := h.GetCreatedEvent().GetInterfaceViews()
+		if len(views) == 0 {
+			continue
+		}
+		fields := views[0].GetViewValue().GetFields()
+		if len(fields) < 3 {
+			continue
+		}
+		amountStr := fields[2].GetValue().GetNumeric()
+		intPart, fracPart, hasFrac := strings.Cut(amountStr, ".")
+		if hasFrac {
+			require.Truef(t, strings.Trim(fracPart, "0") == "", "expected integer Numeric 0, got %q", amountStr)
+		}
+		amt, err := strconv.ParseInt(intPart, 10, 64)
+		require.NoErrorf(t, err, "failed to parse Numeric %q", amountStr)
+		total += amt
+	}
+	return total
+}
+
+func assertSenderBalanceDeductions(t *testing.T, before, after, expectedFeeTokenDeduction, expectedTransferDeduction int64) {
+	t.Helper()
+
+	delta := before - after
+	expectedTotal := expectedFeeTokenDeduction + expectedTransferDeduction
+	require.Equal(
+		t,
+		expectedTotal,
+		delta,
+		"sender balance deduction should equal fee-token payment + transfer amount",
+	)
 }
