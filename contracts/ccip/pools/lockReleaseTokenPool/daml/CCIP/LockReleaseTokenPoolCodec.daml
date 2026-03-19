@@ -61,7 +61,7 @@ encodeChainUpdate chainUpdate =
     encodeBytesHex chainUpdate.remoteTokenAddress <>
     encodeRawInstanceAddressList chainUpdate.inboundCCVs <>
     encodeRawInstanceAddressList chainUpdate.outboundCCVs <>
-    fromSome (encodeInt64 chainUpdate.minBlockDepth) <>
+    fromSome (encodeInt64 chainUpdate.minBlockConfirmations) <>
     encodeRawInstanceAddress chainUpdate.inboundRateLimiter <>
     encodeRawInstanceAddress chainUpdate.inboundCustomBlockConfirmationsRateLimiter <>
     encodeRawInstanceAddress chainUpdate.outboundRateLimiter
@@ -73,11 +73,11 @@ decodeChainUpdateAt encoded offset = do
     (remoteTokenAddress, offset) <- decodeBytesHexAt encoded offset
     (inboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (outboundCCVs, offset) <- decodeRawInstanceAddressList encoded offset
-    (minBlockDepth, offset) <- decodeInt64At encoded offset
+    (minBlockConfirmations, offset) <- decodeInt64At encoded offset
     (inboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (inboundCustomBlockConfirmationsRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
     (outboundRateLimiter, offset) <- decodeRawInstanceAddressAt encoded offset
-    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)
+    Some (ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockConfirmations, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter}, offset)
 
 -- UpdateRateLimiters
 

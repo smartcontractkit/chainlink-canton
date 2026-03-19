@@ -33,6 +33,7 @@ import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
 -- valid signatures for runtime party IDs.
 --
 -- CommitteeVerifier signature verification is tested separately in CommitteeVerifier/Test.daml.
+testExecuteWithCCVVerification : Script ()
 testExecuteWithCCVVerification = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -173,7 +174,9 @@ testExecuteWithCCVVerification = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 2000
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     -- Verify SUCCESS
     executeResult.state === Internal.SUCCESS
@@ -182,11 +185,13 @@ testExecuteWithCCVVerification = script do
 
     pure ()
 
+testExecuteTokenOnlyIgnoresReceiverCCVs : Script ()
 testExecuteTokenOnlyIgnoresReceiverCCVs = script do
     ccipOwner <- allocateParty "ccip-owner-token-only"
     rmnOwner <- allocateParty "rmn-owner-token-only"
     receiver <- allocateParty "receiver-token-only"
     poolOwner <- allocateParty "pool-owner-token-only"
+    defaultCCVOwner <- allocateParty "ccv-owner-token-only"
     receiverCCVOwner <- allocateParty "receiver-ccv-owner-token-only"
 
     let sourceChainSelector : Numeric 0 = 123.0
@@ -195,9 +200,11 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
     let rmnInstanceId = "test-rmn-token-only"
     let tokenAdminRegistryInstanceId = "test-tar-token-only"
     let offRampInstanceId = "test-offramp-token-only"
+    let defaultCCVInstanceId = "test-default-ccv-token-only"
     let feeToken = HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "TEST"
+    let defaultCCV = CCIP.RawInstanceAddress.make defaultCCVInstanceId defaultCCVOwner
     let receiverCCV = CCIP.RawInstanceAddress.make "receiver-ccv-token-only" receiverCCVOwner
 
     globalConfig <- submit ccipOwner do
@@ -210,7 +217,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
                 isEnabled = True
                 onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                 laneMandatedCCVs = []
-                defaultCCVs = [])]
+                defaultCCVs = [defaultCCV])]
 
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
@@ -318,6 +325,13 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
                 tokenAdminRegistry = tokenAdminRegistryAddr
             state = ExecutingMessageV1.ExecutingMessageState_PoolVerified
 
+    -- Add CCV verification
+    executingMessageCid <- submit (actAs defaultCCVOwner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = defaultCCVInstanceId
+            versionTag = ""
+            caller = defaultCCVOwner
+
     disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
     disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
@@ -333,16 +347,593 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
                     , (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
                     ]
             executingMessageCid = executingMessageCid
-            receiverRequiredCCVs = [receiverCCV]
-            receiverMinBlockDepth = 2000
+            receiverRequiredCCVs = [receiverCCV] -- No verification added for this CCV, but should be ignored since it's token-only execute
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     assertMsg "token-only execute should produce a ticket" (isSome result.tokenReceiveTicket)
     debug "testExecuteTokenOnlyIgnoresReceiverCCVs: PASSED"
+
+-- Test that the receiver specifying empty CCVs causes the default lane CCVs to be used.
+testExecuteWithDefaultCCVs_EmptyReceiverCCVs : Script ()
+testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+    ccv1Owner <- allocateParty "ccv1-owner"
+    ccv2Owner <- allocateParty "ccv2-owner"
+    ccv3Owner <- allocateParty "ccv3-owner"
+    receiver <- allocateParty "receiver"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+
+    let globalConfigInstanceId = "test-globalconfig"
+    let rmnInstanceId = "test-rmn"
+    let tokenAdminRegistryInstanceId = "test-tar"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
+    -- Build CCV raw instance addresses
+    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvInstanceId = "test-ccv-committee"
+    let ccv1RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv1Owner
+    let ccv2RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv2Owner
+    let ccv3RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv3Owner
+
+    -- Deploy GlobalConfig with default CCV requirement
+    globalConfig <- submit ccipOwner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [ccv1RawAddress, ccv2RawAddress])]
+
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    -- Deploy TokenAdminRegistry
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    -- Deploy OffRamp
+    offRamp <- submit ccipOwner do
+        createCmd OffRamp.OffRamp with
+            instanceId = "test-offramp"
+            ccipOwner = ccipOwner
+            deps = OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    -- Deploy PerPartyRouterFactory and create router for receiver
+    factory <- submit ccipOwner do
+        createCmd PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "test-factory"
+            ccipOwner = ccipOwner
+            deps = PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make "test-offramp" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs receiver <> disclose disclosedFactory) do
+        exerciseCmd factory PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = "test-router-receiver"
+    let router = createResult.router
+
+    -- Build test message with correct receiver (using party address hash)
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make "test-offramp" ccipOwner)
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = MessageCodecV1.encodeMessageV1 message
+
+    -- Disclose contracts to receiver
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    -- PrepareExecute to create ExecutingMessageV1
+    executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+    -- Add CCV1 verification
+    -- Exercise AddCCVVerification directly on ExecutingMessageV1
+    -- (In production, CommitteeVerifier does this after signature verification)
+    executingMessageCid <- submit (actAs ccv1Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv1Owner
+    debug ("CCV1 verification added to ExecutingMessageV1")
+
+    -- Execute via PerPartyRouter - must fail due to missing CCV2
+    submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [] -- Specify no required CCVs - should default to lane-default CCVs
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+
+    -- Add CCV2 verification
+    -- Exercise AddCCVVerification directly on ExecutingMessageV1
+    -- (In production, CommitteeVerifier does this after signature verification)
+    executingMessageCid <- submit (actAs ccv2Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv2Owner
+    debug ("CCV2 verification added to ExecutingMessageV1")
+
+    -- Execute again, now that CCV2 is added it should succeed
+    executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [] -- Specify no required CCVs - should default to lane-default CCVs
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+
+    -- Verify SUCCESS
+    executeResult.state === Internal.SUCCESS
+    debug ("Execute with CCV verification: SUCCESS")
+    debug ("Message ID: " <> show executeResult.messageId)
+    let router = executeResult.router
+
+    pure ()
+
+-- Test that the receiver specifying the sentinel useDefaultCCVs causes the default lane CCVs to be used + any additional CCVs
+testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs : Script ()
+testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+    ccv1Owner <- allocateParty "ccv1-owner"
+    ccv2Owner <- allocateParty "ccv2-owner"
+    ccv3Owner <- allocateParty "ccv3-owner"
+    receiver <- allocateParty "receiver"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+
+    let globalConfigInstanceId = "test-globalconfig"
+    let rmnInstanceId = "test-rmn"
+    let tokenAdminRegistryInstanceId = "test-tar"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
+    -- Build CCV raw instance addresses
+    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvInstanceId = "test-ccv-committee"
+    let ccv1RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv1Owner
+    let ccv2RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv2Owner
+    let ccv3RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv3Owner
+
+    -- Deploy GlobalConfig with default CCV requirement
+    globalConfig <- submit ccipOwner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [ccv1RawAddress, ccv2RawAddress])]
+
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    -- Deploy TokenAdminRegistry
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    -- Deploy OffRamp
+    offRamp <- submit ccipOwner do
+        createCmd OffRamp.OffRamp with
+            instanceId = "test-offramp"
+            ccipOwner = ccipOwner
+            deps = OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    -- Deploy PerPartyRouterFactory and create router for receiver
+    factory <- submit ccipOwner do
+        createCmd PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "test-factory"
+            ccipOwner = ccipOwner
+            deps = PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make "test-offramp" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs receiver <> disclose disclosedFactory) do
+        exerciseCmd factory PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = "test-router-receiver"
+    let router = createResult.router
+
+    -- Build test message with correct receiver (using party address hash)
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make "test-offramp" ccipOwner)
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = MessageCodecV1.encodeMessageV1 message
+
+    -- Disclose contracts to receiver
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    -- PrepareExecute to create ExecutingMessageV1
+    executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+    -- Add CCV1 verification
+    executingMessageCid <- submit (actAs ccv1Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv1Owner
+    debug ("CCV1 verification added to ExecutingMessageV1")
+    -- Add CCV3 verification
+    executingMessageCid <- submit (actAs ccv3Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv3Owner
+    debug ("CCV3 verification added to ExecutingMessageV1")
+
+    -- Execute via PerPartyRouter - must fail due to missing CCV2 which is part of the lane default CCVs
+    submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [ccv1RawAddress, GlobalConfig.useDefaultCCVs, ccv3RawAddress] -- Specify both CCV1 and CCV3 + the sentinel useDefaultCCVs which should cause the lane default CCVs (CCV1 and CCV2) to be used, resulting in all three CCVs being required
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+
+    -- Add CCV2 verification
+    executingMessageCid <- submit (actAs ccv2Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv2Owner
+    debug ("CCV2 verification added to ExecutingMessageV1")
+
+    -- Execute again, now that CCV2 is added it should succeed
+    executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [ccv1RawAddress, GlobalConfig.useDefaultCCVs, ccv3RawAddress] -- Specify both CCV1 and CCV3 + the sentinel useDefaultCCVs which should cause the lane default CCVs (CCV1 and CCV2) to be used, resulting in all three CCVs being required
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+
+    -- Verify SUCCESS
+    executeResult.state === Internal.SUCCESS
+    debug ("Execute with CCV verification: SUCCESS")
+    debug ("Message ID: " <> show executeResult.messageId)
+    let router = executeResult.router
+
+    pure ()
+
+-- Test that the receiver specifying optional CCVs will be validated
+testExecuteWithDefaultCCVs_OptionalReceiverCCVs : Script ()
+testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
+    ccipOwner <- allocateParty "ccip-owner"
+    rmnOwner <- allocateParty "rmn-owner"
+    ccv1Owner <- allocateParty "ccv1-owner"
+    ccv2Owner <- allocateParty "ccv2-owner"
+    ccv3Owner <- allocateParty "ccv3-owner"
+    ccv4Owner <- allocateParty "ccv4-owner"
+    receiver <- allocateParty "receiver"
+
+    let sourceChainSelector : Numeric 0 = 123.0
+    let destChainSelector : Numeric 0 = 456.0
+
+    let globalConfigInstanceId = "test-globalconfig"
+    let rmnInstanceId = "test-rmn"
+    let tokenAdminRegistryInstanceId = "test-tar"
+
+    -- Compute instance addresses
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+
+    -- Build CCV raw instance addresses
+    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvInstanceId = "test-ccv-committee"
+    let ccv1RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv1Owner
+    let ccv2RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv2Owner
+    let ccv3RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv3Owner
+    let ccv4RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv4Owner
+
+    -- Deploy GlobalConfig with default CCV requirement
+    globalConfig <- submit ccipOwner do
+        createCmd GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [ccv1RawAddress])]
+
+    -- Deploy RMNRemote
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    -- Deploy TokenAdminRegistry
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    -- Deploy OffRamp
+    offRamp <- submit ccipOwner do
+        createCmd OffRamp.OffRamp with
+            instanceId = "test-offramp"
+            ccipOwner = ccipOwner
+            deps = OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    -- Deploy PerPartyRouterFactory and create router for receiver
+    factory <- submit ccipOwner do
+        createCmd PerPartyRouter.PerPartyRouterFactory with
+            instanceId = "test-factory"
+            ccipOwner = ccipOwner
+            deps = PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make "test-offramp" ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    createResult <- submit (actAs receiver <> disclose disclosedFactory) do
+        exerciseCmd factory PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = "test-router-receiver"
+    let router = createResult.router
+
+    -- Build test message with correct receiver (using party address hash)
+    let message = MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make "test-offramp" ccipOwner)
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "48656c6c6f20576f726c64"
+    let encodedMessage = MessageCodecV1.encodeMessageV1 message
+
+    -- Disclose contracts to receiver
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    -- PrepareExecute to create ExecutingMessageV1
+    executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            caller = receiver
+
+    -- Add CCV1 verification
+    executingMessageCid <- submit (actAs ccv1Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv1Owner
+
+    -- Execute via PerPartyRouter - must fail due to invalid optional threshold
+    submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [] -- Specify no required CCVs - should default to lane-default CCVs
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 1 -- Optional threshold higher than the number of optional CCVs, should revert
+            receiverMinBlockConfirmations = 2000
+
+    -- Add CCV2 verification
+    executingMessageCid <- submit (actAs ccv2Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv2Owner
+
+    -- Execute via PerPartyRouter - must fail due to optional threshold not being met
+    submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [] -- Specify no required CCVs - should default to lane-default CCVs
+            receiverOptionalCCVs = [ccv2RawAddress, ccv3RawAddress, ccv4RawAddress] -- Specify 3 optional CCVs
+            receiverOptionalThreshold = 2
+            receiverMinBlockConfirmations = 2000
+
+    -- Add CCV3 verification
+    executingMessageCid <- submit (actAs ccv3Owner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ccvVersionTag
+            caller = ccv3Owner
+
+    -- Execute via PerPartyRouter - must fail due to optional threshold not being met
+    submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [] -- Specify no required CCVs - should default to lane-default CCVs
+            receiverOptionalCCVs = [ccv2RawAddress, ccv3RawAddress, ccv4RawAddress] -- Specify 3 optional CCVs
+            receiverOptionalThreshold = 3 -- Optional threshold not met since only 2 of the optional CCVs have verified, should revert
+            receiverMinBlockConfirmations = 2000
+
+    -- Execute again, now that optional threshold is met it should succeed
+    executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
+            executingMessageCid = executingMessageCid
+            receiverRequiredCCVs = [] -- Specify no required CCVs - should default to lane-default CCVs
+            receiverOptionalCCVs = [ccv2RawAddress, ccv3RawAddress, ccv4RawAddress] -- Specify 3 optional CCVs
+            receiverOptionalThreshold = 2
+            receiverMinBlockConfirmations = 2000
+
+    -- Verify SUCCESS
+    executeResult.state === Internal.SUCCESS
+    debug ("Execute with CCV verification: SUCCESS")
+    debug ("Message ID: " <> show executeResult.messageId)
+    let router = executeResult.router
+
+    pure ()
 
 
 -- M-3 positive control: message-only (non-token-only) execute with receiver CCVs
 -- must fail when those CCVs are not verified. This complements the token-only test
 -- above which verifies receiver CCVs are skipped for token-only messages.
+testExecuteMessageOnlyRequiresReceiverCCVs : Script ()
 testExecuteMessageOnlyRequiresReceiverCCVs = script do
     ccipOwner <- allocateParty "ccip-owner-m3"
     rmnOwner <- allocateParty "rmn-owner-m3"
@@ -460,13 +1051,16 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = [receiverCCV]
-            receiverMinBlockDepth = 2000
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     debug "testExecuteMessageOnlyRequiresReceiverCCVs: PASSED"
 
 
 -- | Test that execute fails when required CCV is missing.
 -- Verifies that lane-mandated CCVs must be provided.
+testExecuteFailsMissingCCV : Script ()
 testExecuteFailsMissingCCV = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -593,7 +1187,9 @@ testExecuteFailsMissingCCV = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 2000
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     debug ("Execute fails with missing CCV: PASSED")
     pure ()
@@ -601,6 +1197,7 @@ testExecuteFailsMissingCCV = script do
 
 -- | Test that message for wrong receiver fails.
 -- Verifies receiver validation in OffRamp.
+testExecuteWrongReceiver : Script ()
 testExecuteWrongReceiver = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -717,9 +1314,11 @@ testExecuteWrongReceiver = script do
 
 
 -- | Test that execute accepts a message from any configured source onramp.
+testExecuteAllowsMultipleOnRamps : Script ()
 testExecuteAllowsMultipleOnRamps = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
+    ccvOwner <- allocateParty "ccv-owner"
     receiver <- allocateParty "receiver"
 
     let sourceChainSelector : Numeric 0 = 123.0
@@ -730,10 +1329,12 @@ testExecuteAllowsMultipleOnRamps = script do
     let globalConfigInstanceId = "test-globalconfig-multionramp"
     let rmnInstanceId = "test-rmn-multionramp"
     let tokenAdminRegistryInstanceId = "test-tar-multionramp"
+    let ccvInstanceId = "test-ccv-multionramp"
 
     let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccvOwner
 
     globalConfig <- submit ccipOwner do
         createCmd GlobalConfig.GlobalConfig with
@@ -745,7 +1346,7 @@ testExecuteAllowsMultipleOnRamps = script do
                 isEnabled = True
                 onRampAddresses = [primaryOnRamp, rotatedOnRamp]
                 laneMandatedCCVs = []
-                defaultCCVs = [])]
+                defaultCCVs = [ccvInstanceAddress])]
 
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
@@ -822,6 +1423,14 @@ testExecuteAllowsMultipleOnRamps = script do
             tokenReceiverParty = None
             caller = receiver
 
+
+    -- Add CCV verification
+    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ""
+            caller = ccvOwner
+
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = CCIP.Context.CCIPContext with
@@ -831,7 +1440,9 @@ testExecuteAllowsMultipleOnRamps = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 2000
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     executeResult.state === Internal.SUCCESS
     debug ("Execute succeeds with alternate configured onramp: PASSED")
@@ -839,6 +1450,7 @@ testExecuteAllowsMultipleOnRamps = script do
 
 
 -- | Test that execute rejects a message from an unconfigured source onramp.
+testExecuteRejectsUnconfiguredOnRamp : Script ()
 testExecuteRejectsUnconfiguredOnRamp = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -953,7 +1565,9 @@ testExecuteRejectsUnconfiguredOnRamp = script do
                  (OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
             receiverRequiredCCVs = []
-            receiverMinBlockDepth = 2000
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
 
     debug ("Execute fails with unconfigured onramp: PASSED")
     pure ()

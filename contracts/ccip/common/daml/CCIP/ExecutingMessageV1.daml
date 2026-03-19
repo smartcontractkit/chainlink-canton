@@ -5,7 +5,8 @@
 module CCIP.ExecutingMessageV1 where
 
 import DA.Crypto.Text (BytesHex)
-import DA.List (dedup)
+import DA.List (dedup, unique)
+import DA.Optional (isNone, isSome)
 
 import qualified CCIP.Events
 import qualified CCIP.Internal
@@ -111,8 +112,9 @@ template ExecutingMessageV1
                 assertMsg "executingMessage: SetInboundPoolCCVs only allowed in Prepared"
                     (state == ExecutingMessageState_Prepared)
                 assertMsg "executingMessage: inbound pool verification only valid for token transfers"
-                    (tokenReceiver /= None)
-                assertMsg "setInboundPoolCCVs: already set" (inboundPoolCCVs == None)
+                    (isSome tokenReceiver)
+                assertMsg "SetInboundPoolCCVs: already set" (isNone inboundPoolCCVs)
+                assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
                 create this with
                     inboundPoolCCVs = Some poolCCVs
                     state = ExecutingMessageState_PoolVerified
@@ -131,7 +133,7 @@ template ExecutingMessageV1
                 returnData : BytesHex
             controller ccipOwner
             do
-                let isTokenTransfer = tokenReceiver /= None
+                let isTokenTransfer = isSome tokenReceiver
                 assertMsg "executingMessage: invalid state for FinalizeExecute"
                     (if isTokenTransfer
                         then state == ExecutingMessageState_PoolVerified

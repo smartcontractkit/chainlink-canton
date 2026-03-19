@@ -193,7 +193,7 @@ func main() {
 	}
 
 	if failedTests > 0 {
-		log.Println(color.RedString("Failed Tests:", failedTests))
+		log.Println(color.RedString("Failed Tests: %v", failedTests))
 	} else {
 		log.Println(color.GreenString("All tests passed."))
 	}

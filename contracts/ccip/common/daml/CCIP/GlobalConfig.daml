@@ -2,6 +2,7 @@
 module CCIP.GlobalConfig
   ( module CCIP.GlobalConfig
   , module CCIP.GlobalConfigTypes
+  , useDefaultCCVs
   ) where
 
 import DA.Map qualified as Map
@@ -12,6 +13,10 @@ import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import CCIP.GlobalConfigTypes (DestChainConfig(..), DestChainConfigArgs(..), SourceChainConfig(..), SourceChainConfigArgs(..), validateDefaultAndMandatedCCVs)
 import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParamsWithOffset, decodeApplySourceChainConfigUpdatesParamsWithOffset)
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
+useDefaultCCVs : RawInstanceAddress
+useDefaultCCVs = RawInstanceAddress "default-ccvs"
 
 template GlobalConfig
     with

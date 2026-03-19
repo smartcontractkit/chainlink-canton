@@ -415,12 +415,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			Qualifier:    "test-pool-send",
 			RemoteChainConfigs: types.GENMAP{
 				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
-					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
-					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-					InboundCCVs:        []common.RawInstanceAddress{},
-					OutboundCCVs:       []common.RawInstanceAddress{},
-					MinBlockDepth:      types.INT64(0),
-					InboundRateLimiter: outboundRateLimiterAddr.Binding(),
+					RemotePools:           []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
+					RemoteTokenAddress:    types.TEXT(hex.EncodeToString(remoteTokenAddress)),
+					InboundCCVs:           []common.RawInstanceAddress{},
+					OutboundCCVs:          []common.RawInstanceAddress{},
+					MinBlockConfirmations: types.INT64(0),
+					InboundRateLimiter:    outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
 					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),
 				},

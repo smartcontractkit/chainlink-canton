@@ -9,7 +9,7 @@ module CCIP.CCIPReceiver where
 
 import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
-import DA.List (dedup, unique)
+import DA.List (unique)
 import DA.Optional (isSome)
 
 import qualified CCIP.Context
@@ -47,9 +47,11 @@ template CCIPReceiver
         -- IAny2EVMMessageReceiverV2.getCCVs() in the EVM implementation.
         -- Passed to PerPartyRouter.Execute as receiverRequiredCCVs.
         requiredCCVs : [RawInstanceAddress]
-        -- Minimum source-chain block depth this receiver will accept for FTF messages.
+        optionalCCVs : [RawInstanceAddress]
+        optionalThreshold : Int
+        -- Minimum source-chain block confirmations this receiver will accept for FTF messages.
         -- A value of 0 means finalized-only and rejects FTF.
-        minBlockDepth : Int
+        minBlockConfirmations : Int
     where
         signatory owner
         -- Ensure that requiredCCVs are unique
@@ -58,7 +60,6 @@ template CCIPReceiver
         -- | Query the receiver's CCV requirements. Off-chain code calls this
         -- to discover which CCVs need verification inputs before calling
         -- Execute. Analogous to IAny2EVMMessageReceiverV2.getCCVs().
-        -- TODO: consider combining all CCV requirements
         nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
             with
                 caller : Party
@@ -94,10 +95,6 @@ template CCIPReceiver
                 -- One entry per CCV that should verify this message.
                 -- Accepts any ICrossChainVerifier implementation.
                 ccvInputs : [CCVInput]
-
-                -- Per-execute receiver CCV requirements, combined with the template's
-                -- requiredCCVs.
-                additionalRequiredCCVs : [RawInstanceAddress]
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
@@ -122,9 +119,9 @@ template CCIPReceiver
                     else if em.message.finality /= 0
                         then do
                             assertMsg "receiver: finalized-only receiver rejects FTF messages"
-                                (minBlockDepth /= 0)
-                            assertMsg "receiver: message finality below receiver minBlockDepth"
-                                (em.message.finality >= minBlockDepth)
+                                (minBlockConfirmations /= 0)
+                            assertMsg "receiver: message finality below receiver minBlockConfirmations"
+                                (em.message.finality >= minBlockConfirmations)
                         else pure ()
 
                 -- CCV verification: thread executingMessageCid through each CCV
@@ -149,13 +146,13 @@ template CCIPReceiver
                             caller = owner
 
                 -- Execute with the final executingMessageCid
-                let allRequiredCCVs = dedup (requiredCCVs ++ additionalRequiredCCVs)
-
                 result <- exercise routerCid CCIP.PerPartyRouter.Execute with
                     context = context
                     executingMessageCid = emCid
-                    receiverRequiredCCVs = allRequiredCCVs
-                    receiverMinBlockDepth = minBlockDepth
+                    receiverRequiredCCVs = requiredCCVs
+                    receiverOptionalCCVs = optionalCCVs
+                    receiverOptionalThreshold = optionalThreshold
+                    receiverMinBlockConfirmations = minBlockConfirmations
 
                 -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of

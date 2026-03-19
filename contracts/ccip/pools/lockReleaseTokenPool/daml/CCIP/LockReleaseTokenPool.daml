@@ -283,9 +283,9 @@ template LockReleaseTokenPool
                 if message.finality /= 0
                     then do
                         assertMsg "pool: finalized-only pool rejects FTF messages"
-                            (remoteChainCfg.minBlockDepth /= 0)
-                        assertMsg "pool: message finality below pool minBlockDepth"
-                            (message.finality >= remoteChainCfg.minBlockDepth)
+                            (remoteChainCfg.minBlockConfirmations /= 0)
+                        assertMsg "pool: message finality below pool minBlockConfirmations"
+                            (message.finality >= remoteChainCfg.minBlockConfirmations)
                     else pure ()
 
                 assertMsg "pool: invalid sourcePoolAddress"
@@ -461,10 +461,10 @@ template LockReleaseTokenPool
                         remoteChainSelectorsToRemove
 
                 -- Validate
-                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockDepth, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
+                forA_ chainsToAdd $ \ChainUpdate{remoteChainSelector, remotePools, remoteTokenAddress, inboundCCVs, outboundCCVs, minBlockConfirmations, inboundRateLimiter, inboundCustomBlockConfirmationsRateLimiter, outboundRateLimiter} -> do
                     assertMsg "ApplyChainUpdates: invalid chain selector" (remoteChainSelector > 0.0)
                     assertMsg "ApplyChainUpdates: remote token address cannot be empty" (remoteTokenAddress /= "")
-                    assertMsg "ApplyChainUpdates: minBlockDepth cannot be negative" (minBlockDepth >= 0)
+                    assertMsg "ApplyChainUpdates: minBlockConfirmations cannot be negative" (minBlockConfirmations >= 0)
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     -- Validate rate limiters
@@ -482,7 +482,7 @@ template LockReleaseTokenPool
                                     remoteTokenAddress = newConfig.remoteTokenAddress
                                     inboundCCVs = newConfig.inboundCCVs
                                     outboundCCVs = newConfig.outboundCCVs
-                                    minBlockDepth = newConfig.minBlockDepth
+                                    minBlockConfirmations = newConfig.minBlockConfirmations
                                     inboundRateLimiter = newConfig.inboundRateLimiter
                                     inboundCustomBlockConfirmationsRateLimiter = newConfig.inboundCustomBlockConfirmationsRateLimiter
                                     outboundRateLimiter = newConfig.outboundRateLimiter
@@ -581,7 +581,7 @@ template LockReleaseTokenPool
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Numeric 0
                 caller : Party
-            controller caller, poolOwner
+            controller caller
             do
                 sendingMsg <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
