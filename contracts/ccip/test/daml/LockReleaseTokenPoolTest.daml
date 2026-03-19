@@ -201,7 +201,7 @@ testLockOrBurn = script do
                 feeUSDCents = cents 0.0
                 feeBps = 750.0
                 destGasOverhead = 0
-                destBytesOverhead = 0)]
+                destBytesOverhead = 32)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter" ccipOwner rmnOwner
@@ -442,7 +442,7 @@ testLockOrBurnDeductsFeeBps = script do
                 feeUSDCents = cents 0.0
                 feeBps = 500.0
                 destGasOverhead = 0
-                destBytesOverhead = 0)]
+                destBytesOverhead = 32)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-bps" ccipOwner rmnOwner
@@ -2905,10 +2905,47 @@ testPoolTokenTransferFeeConfigRejectsInvalidFeeBps = script do
                 feeUSDCents = cents 0.0
                 feeBps = 10000.0
                 destGasOverhead = 0
-                destBytesOverhead = 0)]
+                destBytesOverhead = 32)]
             poolReceiveContext = CCIP.Context.emptyCCIPContext
             transferTimeout = LockReleaseTokenPool.Indefinite
             deps = mkPoolDeps "test-tar-invalid-fee-bps" "test-rmn-invalid-fee-bps" "test-fq-invalid-fee-bps" owner owner
+
+    pure ()
+
+testPoolTokenTransferFeeConfigRejectsSmallDestBytesOverhead : Script ()
+testPoolTokenTransferFeeConfigRejectsSmallDestBytesOverhead = script do
+    owner <- allocateParty "owner-invalid-dest-bytes-overhead"
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = owner
+            id = "TestToken"
+    let existingConfig = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["000000000000000000000000aaaaaaaaaaaaaaaa"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockConfirmations = 0
+            inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl@owner"
+            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom@owner"
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl@owner"
+
+    submitMustFail owner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            ccipOwner = owner
+            poolOwner = owner
+            instanceId = "test-lock-release-invalid-dest-bytes-overhead"
+            instrumentId = testInstrumentId
+            decimals = 6
+            remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
+            tokenTransferFeeConfigs = Map.fromList [(123.0, LockReleaseTokenPool.TokenTransferFeeConfig with
+                isEnabled = True
+                feeUSDCents = cents 0.0
+                feeBps = 0.0
+                destGasOverhead = 0
+                destBytesOverhead = 31)]
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps "test-tar-invalid-dest-bytes-overhead" "test-rmn-invalid-dest-bytes-overhead" "test-fq-invalid-dest-bytes-overhead" owner owner
 
     pure ()
 
