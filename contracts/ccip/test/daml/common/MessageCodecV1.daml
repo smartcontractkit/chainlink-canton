@@ -84,6 +84,14 @@ setup = script do
     let instanceAddr = MessageCodecV1.encodeInstanceAddress "test-instance" party
     Text.length instanceAddr === 64  -- 32 bytes = 64 hex chars
 
+    let ccvAddr1 = "1111111111111111111111111111111111111111111111111111111111111111"
+    let ccvAddr2 = "2222222222222222222222222222222222222222222222222222222222222222"
+    let executorAddr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    let hashForward = MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] executorAddr
+    let hashReverse = MessageCodecV1.computeCCVAndExecutorHash [ccvAddr2, ccvAddr1] executorAddr
+    hashForward === hashReverse
+    debug("ccvAndExecutorHash canonical ordering test passed")
+
     -- Test InstrumentId round-trip with new id@party format
     let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = party

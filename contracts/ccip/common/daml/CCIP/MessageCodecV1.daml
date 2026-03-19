@@ -24,6 +24,7 @@ module CCIP.MessageCodecV1
   ) where
 
 import DA.Crypto.Text
+import DA.List (sort)
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 
@@ -260,7 +261,7 @@ computeCCVAndExecutorHash ccvInstanceAddresses executorInstanceAddress =
             if byteCount addr /= 32
             then error ("computeCCVAndExecutorHash: CCV address must be 32 bytes, got " <> show (byteCount addr))
             else addr
-        validCCVs = map validateAddr ccvInstanceAddresses
+        validCCVs = sort (map validateAddr ccvInstanceAddresses)
 
         -- Encode: 1 byte length prefix (32) + all CCVs + executor
         lengthPrefix = fromSome (encodeUint8 32)
