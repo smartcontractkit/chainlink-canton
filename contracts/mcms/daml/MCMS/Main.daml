@@ -140,8 +140,9 @@ template MCMS
               config = newConfig
               expiringRoot = newExpiringRoot
               rootMetadata = newRootMetadata
+        let newTimelockTimestamps = if clearRoot then Map.empty else timelockTimestamps
 
-        create (setRoleState targetRole newRs this)
+        create (setRoleState targetRole newRs (this with timelockTimestamps = newTimelockTimestamps))
 
     -- | Set new merkle root with on-chain signature verification
     -- All verification happens on-chain using native keccak256 and secp256k1

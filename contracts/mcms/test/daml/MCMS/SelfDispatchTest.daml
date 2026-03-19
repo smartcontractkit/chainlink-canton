@@ -583,7 +583,7 @@ testClearRootResetsMetadata = script do
       bypasser = emptyRoleState
       minDelay = seconds 0
       blockedFunctions = []
-      timelockTimestamps = Map.empty
+      timelockTimestamps = Map.fromList [("pending-op", selfDispatchTestValidUntil)]
 
   -- Verify initial state: opCount=1, postOpCount=3, hasActiveRoot=True
   stateBefore <- submit ccipOwner do
@@ -616,6 +616,9 @@ testClearRootResetsMetadata = script do
   assertMsg "After: opCount should equal postOpCount (no pending ops)" $
     stateAfter.opCount == stateAfter.postOpCount
   assertMsg "After: root should be cleared" $ not stateAfter.hasActiveRoot
+  mcmsAfter <- queryContractId ccipOwner mcmsCid
+  assertMsg "After: timelock schedule should be cleared" $
+    maybe False (Map.null . timelockTimestamps) mcmsAfter
 
   debug "testClearRootResetsMetadata PASSED!"
   pure ()
