@@ -665,111 +665,115 @@ decodeMessageV1 encoded =
             versionHex <- extractBytes encoded 0 1
             version <- decodeUint8 versionHex
 
-            -- Extract source chain selector (8 bytes, offset 1)
-            sourceChainHex <- extractBytes encoded 1 8
-            sourceChain <- decodeUint64 sourceChainHex
+            if version /= 1 then None else do
 
-            -- Extract dest chain selector (8 bytes, offset 9)
-            destChainHex <- extractBytes encoded 9 8
-            destChain <- decodeUint64 destChainHex
+                -- Extract source chain selector (8 bytes, offset 1)
+                sourceChainHex <- extractBytes encoded 1 8
+                sourceChain <- decodeUint64 sourceChainHex
 
-            -- Extract sequence number (8 bytes, offset 17)
-            seqNumHex <- extractBytes encoded 17 8
-            seqNum <- decodeUint64 seqNumHex
+                -- Extract dest chain selector (8 bytes, offset 9)
+                destChainHex <- extractBytes encoded 9 8
+                destChain <- decodeUint64 destChainHex
 
-            -- Extract executionGasLimit (4 bytes, offset 25)
-            execGasLimitHex <- extractBytes encoded 25 4
-            execGasLimit <- decodeUint32 execGasLimitHex
+                -- Extract sequence number (8 bytes, offset 17)
+                seqNumHex <- extractBytes encoded 17 8
+                seqNum <- decodeUint64 seqNumHex
 
-            -- Extract ccipReceiveGasLimit (4 bytes, offset 29)
-            ccipReceiveGasLimitHex <- extractBytes encoded 29 4
-            ccipRecvGasLimit <- decodeUint32 ccipReceiveGasLimitHex
+                -- Extract executionGasLimit (4 bytes, offset 25)
+                execGasLimitHex <- extractBytes encoded 25 4
+                execGasLimit <- decodeUint32 execGasLimitHex
 
-            -- Extract finality (2 bytes, offset 33)
-            finalityHex <- extractBytes encoded 33 2
-            finality <- decodeUint16 finalityHex
+                -- Extract ccipReceiveGasLimit (4 bytes, offset 29)
+                ccipReceiveGasLimitHex <- extractBytes encoded 29 4
+                ccipRecvGasLimit <- decodeUint32 ccipReceiveGasLimitHex
 
-            -- Extract ccvAndExecutorHash (32 bytes, offset 35)
-            ccvHashHex <- extractBytes encoded 35 32
+                -- Extract finality (2 bytes, offset 33)
+                finalityHex <- extractBytes encoded 33 2
+                finality <- decodeUint16 finalityHex
 
-            -- === VARIABLE LENGTH SECTION (starts at offset 67) ===
+                -- Extract ccvAndExecutorHash (32 bytes, offset 35)
+                ccvHashHex <- extractBytes encoded 35 32
 
-            -- Extract onRamp address length (1 byte, offset 67)
-            onRampLenHex <- extractBytes encoded 67 1
-            onRampLen <- decodeUint8 onRampLenHex
+                -- === VARIABLE LENGTH SECTION (starts at offset 67) ===
 
-            -- Extract onRamp address
-            onRampHex <- extractBytes encoded 68 onRampLen
+                -- Extract onRamp address length (1 byte, offset 67)
+                onRampLenHex <- extractBytes encoded 67 1
+                onRampLen <- decodeUint8 onRampLenHex
 
-            -- Extract offRamp address length (1 byte)
-            let offRampLenOffset = 68 + onRampLen
-            offRampLenHex <- extractBytes encoded offRampLenOffset 1
-            offRampLen <- decodeUint8 offRampLenHex
+                -- Extract onRamp address
+                onRampHex <- extractBytes encoded 68 onRampLen
 
-            -- Extract offRamp address
-            offRampHex <- extractBytes encoded (offRampLenOffset + 1) offRampLen
+                -- Extract offRamp address length (1 byte)
+                let offRampLenOffset = 68 + onRampLen
+                offRampLenHex <- extractBytes encoded offRampLenOffset 1
+                offRampLen <- decodeUint8 offRampLenHex
 
-            -- Extract sender length (1 byte)
-            let senderLenOffset = offRampLenOffset + 1 + offRampLen
-            senderLenHex <- extractBytes encoded senderLenOffset 1
-            senderLen <- decodeUint8 senderLenHex
+                -- Extract offRamp address
+                offRampHex <- extractBytes encoded (offRampLenOffset + 1) offRampLen
 
-            -- Extract sender
-            senderHex <- extractBytes encoded (senderLenOffset + 1) senderLen
+                -- Extract sender length (1 byte)
+                let senderLenOffset = offRampLenOffset + 1 + offRampLen
+                senderLenHex <- extractBytes encoded senderLenOffset 1
+                senderLen <- decodeUint8 senderLenHex
 
-            -- Extract receiver length (1 byte)
-            let receiverLenOffset = senderLenOffset + 1 + senderLen
-            receiverLenHex <- extractBytes encoded receiverLenOffset 1
-            receiverLen <- decodeUint8 receiverLenHex
+                -- Extract sender
+                senderHex <- extractBytes encoded (senderLenOffset + 1) senderLen
 
-            -- Extract receiver
-            receiverHex <- extractBytes encoded (receiverLenOffset + 1) receiverLen
+                -- Extract receiver length (1 byte)
+                let receiverLenOffset = senderLenOffset + 1 + senderLen
+                receiverLenHex <- extractBytes encoded receiverLenOffset 1
+                receiverLen <- decodeUint8 receiverLenHex
 
-            -- Extract destBlob length (2 bytes)
-            let destBlobLenOffset = receiverLenOffset + 1 + receiverLen
-            destBlobLenHex <- extractBytes encoded destBlobLenOffset 2
-            destBlobLen <- decodeUint16 destBlobLenHex
+                -- Extract receiver
+                receiverHex <- extractBytes encoded (receiverLenOffset + 1) receiverLen
 
-            -- Extract destBlob
-            destBlobHex <- extractBytes encoded (destBlobLenOffset + 2) destBlobLen
+                -- Extract destBlob length (2 bytes)
+                let destBlobLenOffset = receiverLenOffset + 1 + receiverLen
+                destBlobLenHex <- extractBytes encoded destBlobLenOffset 2
+                destBlobLen <- decodeUint16 destBlobLenHex
 
-            -- Extract token transfer length (2 bytes)
-            let tokenLenOffset = destBlobLenOffset + 2 + destBlobLen
-            tokenLenHex <- extractBytes encoded tokenLenOffset 2
-            tokenLen <- decodeUint16 tokenLenHex
+                -- Extract destBlob
+                destBlobHex <- extractBytes encoded (destBlobLenOffset + 2) destBlobLen
 
-            -- Extract and decode token transfer (0 or 1)
-            tokenTransfer <-
-                if tokenLen == 0 then Some None
-                else do
-                    tokenHex <- extractBytes encoded (tokenLenOffset + 2) tokenLen
-                    tt <- decodeTokenTransfer tokenHex
-                    Some (Some tt)
+                -- Extract token transfer length (2 bytes)
+                let tokenLenOffset = destBlobLenOffset + 2 + destBlobLen
+                tokenLenHex <- extractBytes encoded tokenLenOffset 2
+                tokenLen <- decodeUint16 tokenLenHex
 
-            -- Extract message data length (2 bytes)
-            let msgDataLenOffset = tokenLenOffset + 2 + tokenLen
-            msgDataLenHex <- extractBytes encoded msgDataLenOffset 2
-            msgDataLen <- decodeUint16 msgDataLenHex
+                -- Extract and decode token transfer (0 or 1)
+                tokenTransfer <-
+                    if tokenLen == 0 then Some None
+                    else do
+                        tokenHex <- extractBytes encoded (tokenLenOffset + 2) tokenLen
+                        tt <- decodeTokenTransfer tokenHex
+                        Some (Some tt)
 
-            -- Extract message data
-            msgDataHex <- extractBytes encoded (msgDataLenOffset + 2) msgDataLen
+                -- Extract message data length (2 bytes)
+                let msgDataLenOffset = tokenLenOffset + 2 + tokenLen
+                msgDataLenHex <- extractBytes encoded msgDataLenOffset 2
+                msgDataLen <- decodeUint16 msgDataLenHex
 
-            return MessageV1
-                { sourceChainSelector = sourceChain
-                , destChainSelector = destChain
-                , sequenceNumber = seqNum
-                , executionGasLimit = execGasLimit
-                , ccipReceiveGasLimit = ccipRecvGasLimit
-                , finality = finality
-                , ccvAndExecutorHash = ccvHashHex
-                , onRampAddress = onRampHex
-                , offRampAddress = offRampHex
-                , sender = senderHex
-                , receiver = receiverHex
-                , destBlob = destBlobHex
-                , tokenTransfer = tokenTransfer
-                , messageData = msgDataHex
-                }
+                -- Extract message data
+                msgDataHex <- extractBytes encoded (msgDataLenOffset + 2) msgDataLen
+
+                let finalOffset = msgDataLenOffset + 2 + msgDataLen
+                if finalOffset /= byteCount encoded then None
+                else return MessageV1
+                    { sourceChainSelector = sourceChain
+                    , destChainSelector = destChain
+                    , sequenceNumber = seqNum
+                    , executionGasLimit = execGasLimit
+                    , ccipReceiveGasLimit = ccipRecvGasLimit
+                    , finality = finality
+                    , ccvAndExecutorHash = ccvHashHex
+                    , onRampAddress = onRampHex
+                    , offRampAddress = offRampHex
+                    , sender = senderHex
+                    , receiver = receiverHex
+                    , destBlob = destBlobHex
+                    , tokenTransfer = tokenTransfer
+                    , messageData = msgDataHex
+                    }
 
 -- | Decode TokenTransferV1 from bytes
 decodeTokenTransfer : BytesHex -> Optional TokenTransferV1
@@ -779,53 +783,58 @@ decodeTokenTransfer encoded =
             versionHex <- extractBytes encoded 0 1
             version <- decodeUint8 versionHex
 
-            -- Extract amount (32 bytes)
-            amountHex <- extractBytes encoded 1 32
-            amount <- decodeUint256 amountHex
+            if version /= 1 then None else do
 
-            -- Extract sourcePool length (1 byte)
-            sourcePoolLenHex <- extractBytes encoded 33 1
-            sourcePoolLen <- decodeUint8 sourcePoolLenHex
+                -- Extract amount (32 bytes)
+                amountHex <- extractBytes encoded 1 32
+                amount <- decodeUint256 amountHex
 
-            -- Extract sourcePool
-            sourcePoolHex <- extractBytes encoded 34 sourcePoolLen
+                -- Extract sourcePool length (1 byte)
+                sourcePoolLenHex <- extractBytes encoded 33 1
+                sourcePoolLen <- decodeUint8 sourcePoolLenHex
 
-            -- Extract sourceToken length (1 byte)
-            sourceTokenLenHex <- extractBytes encoded (34 + sourcePoolLen) 1
-            sourceTokenLen <- decodeUint8 sourceTokenLenHex
+                -- Extract sourcePool
+                sourcePoolHex <- extractBytes encoded 34 sourcePoolLen
 
-            -- Extract sourceToken
-            sourceTokenHex <- extractBytes encoded (35 + sourcePoolLen) sourceTokenLen
+                -- Extract sourceToken length (1 byte)
+                sourceTokenLenHex <- extractBytes encoded (34 + sourcePoolLen) 1
+                sourceTokenLen <- decodeUint8 sourceTokenLenHex
 
-            -- Extract destToken length (1 byte)
-            destTokenLenHex <- extractBytes encoded (35 + sourcePoolLen + sourceTokenLen) 1
-            destTokenLen <- decodeUint8 destTokenLenHex
+                -- Extract sourceToken
+                sourceTokenHex <- extractBytes encoded (35 + sourcePoolLen) sourceTokenLen
 
-            -- Extract destToken
-            destTokenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen) destTokenLen
+                -- Extract destToken length (1 byte)
+                destTokenLenHex <- extractBytes encoded (35 + sourcePoolLen + sourceTokenLen) 1
+                destTokenLen <- decodeUint8 destTokenLenHex
 
-            -- Extract tokenReceiver length (1 byte)
-            tokenReceiverLenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen + destTokenLen) 1
-            tokenReceiverLen <- decodeUint8 tokenReceiverLenHex
+                -- Extract destToken
+                destTokenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen) destTokenLen
 
-            -- Extract tokenReceiver
-            tokenReceiverHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen) tokenReceiverLen
+                -- Extract tokenReceiver length (1 byte)
+                tokenReceiverLenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen + destTokenLen) 1
+                tokenReceiverLen <- decodeUint8 tokenReceiverLenHex
 
-            -- Extract extraData length (2 bytes)
-            extraDataLenHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) 2
-            extraDataLen <- decodeUint16 extraDataLenHex
+                -- Extract tokenReceiver
+                tokenReceiverHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen) tokenReceiverLen
 
-            -- Extract extraData
-            extraDataHex <- extractBytes encoded (39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) extraDataLen
+                -- Extract extraData length (2 bytes)
+                extraDataLenHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) 2
+                extraDataLen <- decodeUint16 extraDataLenHex
 
-            return TokenTransferV1
-                { amount = amount
-                , sourcePoolAddress = sourcePoolHex
-                , sourceTokenAddress = sourceTokenHex
-                , destTokenAddress = destTokenHex
-                , tokenReceiver = tokenReceiverHex
-                , extraData = extraDataHex
-                }
+                -- Extract extraData
+                let extraDataOffset = 39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen
+                extraDataHex <- extractBytes encoded extraDataOffset extraDataLen
+
+                let finalOffset = extraDataOffset + extraDataLen
+                if finalOffset /= byteCount encoded then None
+                else return TokenTransferV1
+                    { amount = amount
+                    , sourcePoolAddress = sourcePoolHex
+                    , sourceTokenAddress = sourceTokenHex
+                    , destTokenAddress = destTokenHex
+                    , tokenReceiver = tokenReceiverHex
+                    , extraData = extraDataHex
+                    }
 
 messageId : MessageV1 -> BytesHex
 messageId message =
