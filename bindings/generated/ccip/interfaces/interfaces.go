@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "92639619f6fc9dc901f5c551ea33634c749d9df9aa97d5f0b627eb0edfd0e330"
+	PackageID   = "08fb8fff6cbbefa37d3612081bceab155d024a7f032d1fd1b273a2355fc46557"
 	SDKVersion  = "3.4.10"
 )
 
