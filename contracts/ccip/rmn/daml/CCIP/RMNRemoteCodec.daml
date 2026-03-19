@@ -2,20 +2,28 @@
 -- Used by the MCMSReceiver interface implementation to decode operationData
 module CCIP.RMNRemoteCodec
   ( decodeCurseParams
+  , decodeCurseParamsWithOffset
   , encodeCurseParams
   , decodeUncurseParams
+  , decodeUncurseParamsWithOffset
   , encodeUncurseParams
   , decodeCurseChainParams
+  , decodeCurseChainParamsWithOffset
   , encodeCurseChainParams
   , decodeUncurseChainParams
+  , decodeUncurseChainParamsWithOffset
   , encodeUncurseChainParams
   , decodeCurseMultipleParams
+  , decodeCurseMultipleParamsWithOffset
   , encodeCurseMultipleParams
   , decodeUncurseMultipleParams
+  , decodeUncurseMultipleParamsWithOffset
   , encodeUncurseMultipleParams
   , decodeAddCustomObserversParams
+  , decodeAddCustomObserversParamsWithOffset
   , encodeAddCustomObserversParams
   , decodeRemoveCustomObserversParams
+  , decodeRemoveCustomObserversParamsWithOffset
   , encodeRemoveCustomObserversParams
   ) where
 
@@ -34,47 +42,87 @@ import DA.Optional (fromSome)
 -- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
 -- ===========================================================================
 
--- | Decode Curse params (single subject)
+-- | Decode Curse params with final offset (single subject)
 -- Format: [uint8 len][bytesHex subject]
+decodeCurseParamsWithOffset : BytesHex -> Optional (BytesHex, Int)
+decodeCurseParamsWithOffset encoded = do
+  (subject, finalOffset) <- decodeBytesHexAt encoded 0
+  Some (subject, finalOffset)
+
+-- | Decode Curse params (discards final offset)
 decodeCurseParams : BytesHex -> Optional BytesHex
 decodeCurseParams encoded = do
-  (subject, _) <- decodeBytesHexAt encoded 0
-  Some subject
+  (result, _) <- decodeCurseParamsWithOffset encoded
+  Some result
 
--- | Decode Uncurse params (same as Curse)
+-- | Decode Uncurse params with final offset (same as Curse)
+decodeUncurseParamsWithOffset : BytesHex -> Optional (BytesHex, Int)
+decodeUncurseParamsWithOffset = decodeCurseParamsWithOffset
+
+-- | Decode Uncurse params (discards final offset)
 decodeUncurseParams : BytesHex -> Optional BytesHex
 decodeUncurseParams = decodeCurseParams
 
--- | Decode CurseChain params (chain selector)
+-- | Decode CurseChain params with final offset (chain selector)
 -- Format: [8 bytes Numeric 0]
+decodeCurseChainParamsWithOffset : BytesHex -> Optional (Numeric 0, Int)
+decodeCurseChainParamsWithOffset encoded = do
+  (chainSelector, finalOffset) <- decodeNumeric0At encoded 0
+  Some (chainSelector, finalOffset)
+
+-- | Decode CurseChain params (discards final offset)
 decodeCurseChainParams : BytesHex -> Optional (Numeric 0)
 decodeCurseChainParams encoded = do
-  (chainSelector, _) <- decodeNumeric0At encoded 0
-  Some chainSelector
+  (result, _) <- decodeCurseChainParamsWithOffset encoded
+  Some result
 
--- | Decode UncurseChain params (same as CurseChain)
+-- | Decode UncurseChain params with final offset (same as CurseChain)
+decodeUncurseChainParamsWithOffset : BytesHex -> Optional (Numeric 0, Int)
+decodeUncurseChainParamsWithOffset = decodeCurseChainParamsWithOffset
+
+-- | Decode UncurseChain params (discards final offset)
 decodeUncurseChainParams : BytesHex -> Optional (Numeric 0)
 decodeUncurseChainParams = decodeCurseChainParams
 
--- | Decode CurseMultiple params (list of subjects)
+-- | Decode CurseMultiple params with final offset (list of subjects)
 -- Format: [uint8 count][bytesHex...]
+decodeCurseMultipleParamsWithOffset : BytesHex -> Optional ([BytesHex], Int)
+decodeCurseMultipleParamsWithOffset encoded = do
+  (subjects, finalOffset) <- decodeBytesHexList encoded 0
+  Some (subjects, finalOffset)
+
+-- | Decode CurseMultiple params (discards final offset)
 decodeCurseMultipleParams : BytesHex -> Optional [BytesHex]
 decodeCurseMultipleParams encoded = do
-  (subjects, _) <- decodeBytesHexList encoded 0
-  Some subjects
+  (result, _) <- decodeCurseMultipleParamsWithOffset encoded
+  Some result
 
--- | Decode UncurseMultiple params (same as CurseMultiple)
+-- | Decode UncurseMultiple params with final offset (same as CurseMultiple)
+decodeUncurseMultipleParamsWithOffset : BytesHex -> Optional ([BytesHex], Int)
+decodeUncurseMultipleParamsWithOffset = decodeCurseMultipleParamsWithOffset
+
+-- | Decode UncurseMultiple params (discards final offset)
 decodeUncurseMultipleParams : BytesHex -> Optional [BytesHex]
 decodeUncurseMultipleParams = decodeCurseMultipleParams
 
--- | Decode AddCustomObservers params (list of parties)
+-- | Decode AddCustomObservers params with final offset (list of parties)
 -- Format: [uint8 count][party...]
+decodeAddCustomObserversParamsWithOffset : BytesHex -> Optional ([Party], Int)
+decodeAddCustomObserversParamsWithOffset encoded = do
+  (parties, finalOffset) <- decodePartyList encoded 0
+  Some (parties, finalOffset)
+
+-- | Decode AddCustomObservers params (discards final offset)
 decodeAddCustomObserversParams : BytesHex -> Optional [Party]
 decodeAddCustomObserversParams encoded = do
-  (parties, _) <- decodePartyList encoded 0
-  Some parties
+  (result, _) <- decodeAddCustomObserversParamsWithOffset encoded
+  Some result
 
--- | Decode RemoveCustomObservers params (same as AddCustomObservers)
+-- | Decode RemoveCustomObservers params with final offset (same as AddCustomObservers)
+decodeRemoveCustomObserversParamsWithOffset : BytesHex -> Optional ([Party], Int)
+decodeRemoveCustomObserversParamsWithOffset = decodeAddCustomObserversParamsWithOffset
+
+-- | Decode RemoveCustomObservers params (discards final offset)
 decodeRemoveCustomObserversParams : BytesHex -> Optional [Party]
 decodeRemoveCustomObserversParams = decodeAddCustomObserversParams
 

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "7726be2cc60c537d9a02b40f407b0a6ef4feaf7d6536866f7b7d04cad4f5b334"
+	PackageID   = "8bcba277b5969716bb27ad737d69e9be5f125b66725467795fb4998baea7ae21"
 	SDKVersion  = "3.4.10"
 )
 
@@ -209,12 +209,10 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId            types.TEXT                  `json:"instanceId"`
-	Owner                 types.PARTY                 `json:"owner"`
-	RequiredCCVs          []common.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []common.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64                 `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64                 `json:"minBlockConfirmations"`
+	InstanceId    types.TEXT                  `json:"instanceId"`
+	Owner         types.PARTY                 `json:"owner"`
+	RequiredCCVs  []common.RawInstanceAddress `json:"requiredCCVs"`
+	MinBlockDepth types.INT64                 `json:"minBlockDepth"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -252,24 +250,7 @@ func (t CCIPReceiver) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["optionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.OptionalCCVs))
-		for _, e := range t.OptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["optionalThreshold"] = int64(t.OptionalThreshold)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	args["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -302,24 +283,7 @@ func (t CCIPReceiver) CreateCommandWithPackageID(packageID string) *model.Create
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["optionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.OptionalCCVs))
-		for _, e := range t.OptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["optionalThreshold"] = int64(t.OptionalThreshold)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
+	args["minBlockDepth"] = int64(t.MinBlockDepth)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -491,11 +455,12 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context        common.CCIPContext  `json:"context"`
-	RouterCid      types.CONTRACT_ID   `json:"routerCid"`
-	EncodedMessage types.TEXT          `json:"encodedMessage"`
-	TokenTransfer  *TokenTransferInput `json:"tokenTransfer" hex:"optional"`
-	CcvInputs      []CCVInput          `json:"ccvInputs"`
+	Context                common.CCIPContext          `json:"context"`
+	RouterCid              types.CONTRACT_ID           `json:"routerCid"`
+	EncodedMessage         types.TEXT                  `json:"encodedMessage"`
+	TokenTransfer          *TokenTransferInput         `json:"tokenTransfer" hex:"optional"`
+	CcvInputs              []CCVInput                  `json:"ccvInputs"`
+	AdditionalRequiredCCVs []common.RawInstanceAddress `json:"additionalRequiredCCVs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -534,6 +499,19 @@ func (t Execute2) ToMap() map[string]any {
 	m["ccvInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvInputs))
 		for _, e := range t.CcvInputs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["additionalRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.AdditionalRequiredCCVs))
+		for _, e := range t.AdditionalRequiredCCVs {
 			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(e).(mapper); ok {
 				res = append(res, m.toMap())

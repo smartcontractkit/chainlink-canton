@@ -12,7 +12,7 @@ import DA.Foldable (forA_)
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import CCIP.GlobalConfigTypes (DestChainConfig(..), DestChainConfigArgs(..), SourceChainConfig(..), SourceChainConfigArgs(..), validateDefaultAndMandatedCCVs)
-import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
+import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParamsWithOffset, decodeApplySourceChainConfigUpdatesParamsWithOffset)
 import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
 useDefaultCCVs : RawInstanceAddress
@@ -47,17 +47,21 @@ template GlobalConfig
 
             case functionName of
               "ApplyDestChainConfigUpdates" -> do
-                case decodeApplyDestChainConfigUpdatesParams operationData of
+                case decodeApplyDestChainConfigUpdatesParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                  Some destChainConfigUpdates -> do
+                  Some (destChainConfigUpdates, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid ApplyDestChainConfigUpdates with
                       destChainConfigUpdates
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               "ApplySourceChainConfigUpdates" -> do
-                case decodeApplySourceChainConfigUpdatesParams operationData of
+                case decodeApplySourceChainConfigUpdatesParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: ApplySourceChainConfigUpdates"
-                  Some sourceChainConfigUpdates -> do
+                  Some (sourceChainConfigUpdates, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: ApplySourceChainConfigUpdates" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid ApplySourceChainConfigUpdates with
                       sourceChainConfigUpdates
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)

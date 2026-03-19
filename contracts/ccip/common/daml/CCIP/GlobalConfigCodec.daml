@@ -2,8 +2,10 @@
 -- Used by the MCMSReceiver interface implementation to decode operationData
 module CCIP.GlobalConfigCodec
   ( decodeApplyDestChainConfigUpdatesParams
+  , decodeApplyDestChainConfigUpdatesParamsWithOffset
   , encodeApplyDestChainConfigUpdatesParams
   , decodeApplySourceChainConfigUpdatesParams
+  , decodeApplySourceChainConfigUpdatesParamsWithOffset
   , encodeApplySourceChainConfigUpdatesParams
   ) where
 
@@ -35,19 +37,31 @@ import CCIP.GlobalConfigTypes (DestChainConfigArgs(..), SourceChainConfigArgs(..
 -- DECODE FUNCTIONS (for MCMSReceiver entrypoint)
 -- ===========================================================================
 
--- | Decode ApplyDestChainConfigUpdates params
+-- | Decode ApplyDestChainConfigUpdates params with final offset
 -- Format: [DestChainConfigArgs]
+decodeApplyDestChainConfigUpdatesParamsWithOffset : BytesHex -> Optional ([DestChainConfigArgs], Int)
+decodeApplyDestChainConfigUpdatesParamsWithOffset encoded = do
+  (destChainConfigArgs, finalOffset) <- decodeList encoded 0 decodeDestChainConfigArgsAt
+  Some (destChainConfigArgs, finalOffset)
+
+-- | Decode ApplyDestChainConfigUpdates params (discards final offset)
 decodeApplyDestChainConfigUpdatesParams : BytesHex -> Optional [DestChainConfigArgs]
 decodeApplyDestChainConfigUpdatesParams encoded = do
-  (destChainConfigArgs, _) <- decodeList encoded 0 decodeDestChainConfigArgsAt
-  Some destChainConfigArgs
+  (result, _) <- decodeApplyDestChainConfigUpdatesParamsWithOffset encoded
+  Some result
 
--- | Decode ApplySourceChainConfigUpdates params
+-- | Decode ApplySourceChainConfigUpdates params with final offset
 -- Format: [SourceChainConfigArgs]
+decodeApplySourceChainConfigUpdatesParamsWithOffset : BytesHex -> Optional ([SourceChainConfigArgs], Int)
+decodeApplySourceChainConfigUpdatesParamsWithOffset encoded = do
+  (sourceChainConfigArgs, finalOffset) <- decodeList encoded 0 decodeSourceChainConfigArgsAt
+  Some (sourceChainConfigArgs, finalOffset)
+
+-- | Decode ApplySourceChainConfigUpdates params (discards final offset)
 decodeApplySourceChainConfigUpdatesParams : BytesHex -> Optional [SourceChainConfigArgs]
 decodeApplySourceChainConfigUpdatesParams encoded = do
-  (sourceChainConfigArgs, _) <- decodeList encoded 0 decodeSourceChainConfigArgsAt
-  Some sourceChainConfigArgs
+  (result, _) <- decodeApplySourceChainConfigUpdatesParamsWithOffset encoded
+  Some result
 
 -- ===========================================================================
 -- ENCODE FUNCTIONS (for tests and Go integration)

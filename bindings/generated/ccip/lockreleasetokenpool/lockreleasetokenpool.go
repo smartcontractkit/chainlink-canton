@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "43af3d82a0bb47468643fbd9a1a444dd7a4abd7f148856e5b6b8cade1c2e2cc9"
+	PackageID   = "2430318ffb67238c1d58711dc08ca8ff478afee77403a5a08235b0d6616bae84"
 	SDKVersion  = "3.4.10"
 )
 
@@ -817,15 +817,24 @@ func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
 
 // LockReleaseTokenPoolCalculateFee is a Record type
 type LockReleaseTokenPoolCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller            types.PARTY                              `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller                types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolCalculateFee to a map for DAML arguments
 func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
 
 	m["sendingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -881,9 +890,10 @@ func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
 // LockReleaseTokenPoolCalculateFeeMCMSParams is LockReleaseTokenPoolCalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolCalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -979,18 +989,27 @@ func (t *LockReleaseTokenPoolGetRequiredCCVsMCMSParams) UnmarshalHex(data string
 
 // LockReleaseTokenPoolLockOrBurn is a Record type
 type LockReleaseTokenPoolLockOrBurn struct {
-	RmnRemoteCid      types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext      common.CCIPContext    `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput        interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount            types.NUMERIC         `json:"amount"`
-	Caller            types.PARTY           `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
+	Amount                types.NUMERIC         `json:"amount"`
+	Caller                types.PARTY           `json:"caller"`
 }
 
 // ToMap converts LockReleaseTokenPoolLockOrBurn to a map for DAML arguments
 func (t LockReleaseTokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1064,12 +1083,13 @@ func (t *LockReleaseTokenPoolLockOrBurn) UnmarshalHex(data string) error {
 // LockReleaseTokenPoolLockOrBurnMCMSParams is LockReleaseTokenPoolLockOrBurn without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolLockOrBurnMCMSParams struct {
-	RmnRemoteCid      types.CONTRACT_ID     `json:"rmnRemoteCid"`
-	ExtraContext      common.CCIPContext    `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID     `json:"sendingMessageCid"`
-	TokenInput        interfaces.TokenInput `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID   `json:"senderInputCids"`
-	Amount            types.NUMERIC         `json:"amount"`
+	TokenAdminRegistryCid types.CONTRACT_ID     `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID     `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext    `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID     `json:"sendingMessageCid"`
+	TokenInput            interfaces.TokenInput `json:"tokenInput"`
+	SenderInputCids       []types.CONTRACT_ID   `json:"senderInputCids"`
+	Amount                types.NUMERIC         `json:"amount"`
 }
 
 // MarshalHex encodes LockReleaseTokenPoolLockOrBurnMCMSParams to hex string for MCMS operationData.
@@ -1529,6 +1549,7 @@ type TokenTransferFeeConfig2 struct {
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
 	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	FeeBps            types.NUMERIC `json:"feeBps"`
 }
 
 // ToMap converts TokenTransferFeeConfig2 to a map for DAML arguments
@@ -1542,6 +1563,8 @@ func (t TokenTransferFeeConfig2) ToMap() map[string]any {
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
 
 	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["feeBps"] = t.FeeBps
 
 	return m
 }

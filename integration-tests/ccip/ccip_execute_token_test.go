@@ -43,8 +43,8 @@ func encodeInstrumentId(admin, identifier string) []byte {
 // - Verify receiver received the tokens
 // - Validate FTF/custom-finality path by:
 //   - requiring minBlockDepth=2000 on the destination pool
-//   - disabling the default inbound limiter
-//   - enabling a custom-finality inbound limiter
+//   - enabling a default inbound limiter with lower capacity
+//   - enabling a custom-finality inbound limiter with higher capacity
 //     Success proves ReleaseFromTicket selected the custom inbound limiter.
 func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	t.Parallel()
@@ -359,8 +359,8 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 
 	// Token Pool Setup
 	// Deploy default inbound RateLimiter required by ReleaseFromTicket receive flow.
-	// Keep it enabled but undersized so the test fails if the default-finality limiter
-	// is selected for this FTF transfer.
+	// Keep it enabled but lower-capacity so the test fails if the default-finality limiter
+	// is selected for this FTF transfer instead of the custom-finality limiter.
 	inboundRateLimiterInstanceID := "test-pool-receive-inbound-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -389,7 +389,6 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	inboundRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed default inbound RateLimiter: %s", inboundRateLimiterCid)
-
 	inboundCustomBlockConfirmationsRateLimiterInstanceID := "test-pool-receive-inbound-custom-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -418,7 +417,6 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	inboundCustomBlockConfirmationsRateLimiterCid := extractCreatedContractId(res)
 	t.Logf("Deployed custom-finality inbound RateLimiter: %s", inboundCustomBlockConfirmationsRateLimiterCid)
-
 	outboundRateLimiterInstanceID := "test-pool-receive-outbound-rl"
 	res, err = tokenPoolOwnerParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
@@ -596,6 +594,10 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	tokenAmount := big.NewInt(5)
 	encodedTokenTransfer := buildTokenTransferV1(tokenAmount, remotePoolAddress, remoteTokenAddress, hashedInstrumentId, partyReceiver)
 
+	localOffRampRawAddress, err := contracts.RawInstanceAddressFromString("test-offramp-receive@" + partyCCIP)
+	require.NoError(t, err)
+	localOffRampAddress := localOffRampRawAddress.InstanceAddress().Bytes()
+
 	// Build message
 	msg := &MessageV1{
 		SourceChainSelector: 123,
@@ -606,7 +608,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 		Finality:            2000,
 		CCVAndExecutorHash:  [32]byte{},
 		OnRampAddress:       hexToBytes("0000000000000000000000000000000000000001"),
-		OffRampAddress:      hexToBytes("0000000000000000000000000000000000000002"),
+		OffRampAddress:      localOffRampAddress,
 		Sender:              hexToBytes("0000000000000000000000000000000000000003"),
 		Receiver:            EncodePartyID(partyReceiver),
 		DestBlob:            []byte{},
@@ -739,7 +741,19 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	executeDisclosures := slices.Concat(
-		[]*apiv2.DisclosedContract{disclosedCCIPReceiver, disclosedRouter, disclosedOffRamp, disclosedGlobalConfig, disclosedTar, disclosedRmnRemote, disclosedCCV, disclosedPool, disclosedInboundRateLimiter, disclosedInboundCustomBlockConfirmationsRateLimiter, disclosedOutboundRateLimiter},
+		[]*apiv2.DisclosedContract{
+			disclosedCCIPReceiver,
+			disclosedRouter,
+			disclosedOffRamp,
+			disclosedGlobalConfig,
+			disclosedTar,
+			disclosedRmnRemote,
+			disclosedCCV,
+			disclosedPool,
+			disclosedInboundRateLimiter,
+			disclosedInboundCustomBlockConfirmationsRateLimiter,
+			disclosedOutboundRateLimiter,
+		},
 		transferFactoryDisclosures,
 		poolHoldingDisclosures,
 	)
@@ -769,7 +783,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 	require.NoError(t, err)
 	poolExtraContext, err := testhelpers.ChoiceContextFromData(map[string]any{
 		"values": map[string]any{
-			"inbound-rate-limiter": map[string]any{
+			"rate-limiter": map[string]any{
 				"tag":   "AV_ContractId",
 				"value": disclosedInboundRateLimiter.ContractId,
 			},

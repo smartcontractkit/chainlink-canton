@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "c6d66938b3a020e9e3326a8a0d1c022781b368c6292a01e1aeeb6e4d246e73a6"
+	PackageID   = "86afe95ff5e88f029db93a0b22a24cf0191593e6aa7e2d25b517f9e9da3800bd"
 	SDKVersion  = "3.4.10"
 )
 
@@ -459,44 +460,23 @@ func (t CommitteeVerifier) CommitteeVerifierVerifyMessageWithPackageID(contractI
 	}
 }
 
-// SetDynamicConfig exercises the SetDynamicConfig choice on this CommitteeVerifier contract
+// CommitteeVerifierApplySignatureConfigs exercises the CommitteeVerifier_ApplySignatureConfigs choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
+func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigs(contractID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
+		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
-func (t CommitteeVerifier) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
+// CommitteeVerifierApplySignatureConfigsWithPackageID exercises the CommitteeVerifier_ApplySignatureConfigs choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigsWithPackageID(contractID string, packageID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "SetDynamicConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyAllowListUpdates exercises the ApplyAllowListUpdates choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "ApplyAllowListUpdates",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ApplyAllowListUpdatesWithPackageID exercises the ApplyAllowListUpdates choice using the provided package ID instead of package name
-func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "ApplyAllowListUpdates",
+		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -522,44 +502,23 @@ func (t CommitteeVerifier) ApplyRemoteChainConfigUpdatesWithPackageID(contractID
 	}
 }
 
-// CommitteeVerifierApplySignatureConfigs exercises the CommitteeVerifier_ApplySignatureConfigs choice on this CommitteeVerifier contract
+// ApplyAllowListUpdates exercises the ApplyAllowListUpdates choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigs(contractID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
+func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
+		Choice:     "ApplyAllowListUpdates",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierApplySignatureConfigsWithPackageID exercises the CommitteeVerifier_ApplySignatureConfigs choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigsWithPackageID(contractID string, packageID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
+// ApplyAllowListUpdatesWithPackageID exercises the ApplyAllowListUpdates choice using the provided package ID instead of package name
+func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CommitteeVerifierTransferStorageLocationsAdmin exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdmin(contractID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CommitteeVerifierTransferStorageLocationsAdminWithPackageID exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdminWithPackageID(contractID string, packageID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Choice:     "ApplyAllowListUpdates",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -585,27 +544,6 @@ func (t CommitteeVerifier) CommitteeVerifierAcceptStorageLocationsAdminWithPacka
 	}
 }
 
-// CommitteeVerifierUpdateStorageLocations exercises the CommitteeVerifier_UpdateStorageLocations choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocations(contractID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CommitteeVerifier_UpdateStorageLocations",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CommitteeVerifierUpdateStorageLocationsWithPackageID exercises the CommitteeVerifier_UpdateStorageLocations choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocationsWithPackageID(contractID string, packageID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CommitteeVerifier_UpdateStorageLocations",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // CommitteeVerifierCalculateFee exercises the CommitteeVerifier_CalculateFee choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CommitteeVerifierCalculateFee(contractID string, args CommitteeVerifierCalculateFee) *model.ExerciseCommand {
@@ -623,6 +561,27 @@ func (t CommitteeVerifier) CommitteeVerifierCalculateFeeWithPackageID(contractID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CommitteeVerifier_CalculateFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierForwardToVerifier exercises the CommitteeVerifier_ForwardToVerifier choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierForwardToVerifier(contractID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_ForwardToVerifier",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierForwardToVerifierWithPackageID exercises the CommitteeVerifier_ForwardToVerifier choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierForwardToVerifierWithPackageID(contractID string, packageID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_ForwardToVerifier",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -648,23 +607,107 @@ func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID str
 	}
 }
 
-// CommitteeVerifierForwardToVerifier exercises the CommitteeVerifier_ForwardToVerifier choice on this CommitteeVerifier contract
+// SetDynamicConfig exercises the SetDynamicConfig choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierForwardToVerifier(contractID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
+func (t CommitteeVerifier) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ForwardToVerifier",
+		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierForwardToVerifierWithPackageID exercises the CommitteeVerifier_ForwardToVerifier choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierForwardToVerifierWithPackageID(contractID string, packageID string, args CommitteeVerifierForwardToVerifier) *model.ExerciseCommand {
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t CommitteeVerifier) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ForwardToVerifier",
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDeps exercises the SetDeps choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
+func (t CommitteeVerifier) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "SetDeps",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierTransferStorageLocationsAdmin exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdmin(contractID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierTransferStorageLocationsAdminWithPackageID exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdminWithPackageID(contractID string, packageID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierUpdateStorageLocations exercises the CommitteeVerifier_UpdateStorageLocations choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocations(contractID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_UpdateStorageLocations",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CommitteeVerifierUpdateStorageLocationsWithPackageID exercises the CommitteeVerifier_UpdateStorageLocations choice using the provided package ID instead of package name
+func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocationsWithPackageID(contractID string, packageID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "CommitteeVerifier_UpdateStorageLocations",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this CommitteeVerifier contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t CommitteeVerifier) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -733,6 +776,8 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(cont
 }
 
 // Verify interface implementations for CommitteeVerifier
+
+var _ mcms.IMCMSReceiver = (*CommitteeVerifier)(nil)
 
 var _ common.IICrossChainVerifier = (*CommitteeVerifier)(nil)
 
@@ -1337,6 +1382,93 @@ func (t *RemoteChainConfigArgs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDeps is a Record type
+type SetDeps struct {
+	NewDeps SetDepsParams `json:"newDeps"`
+}
+
+// ToMap converts SetDeps to a map for DAML arguments
+func (t SetDeps) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newDeps"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.NewDeps).(mapper); ok {
+			return m.toMap()
+		}
+		return t.NewDeps
+	}()
+
+	return m
+}
+
+func (t SetDeps) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDeps) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDeps to hex string (Canton MCMS format)
+func (t SetDeps) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDeps from hex string (Canton MCMS format)
+func (t *SetDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetDepsParams is a Record type
+type SetDepsParams struct {
+	RmnRemote *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+}
+
+// ToMap converts SetDepsParams to a map for DAML arguments
+func (t SetDepsParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.RmnRemote != nil {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+			"value": *t.RmnRemote,
+		}
+	} else {
+		m["rmnRemote"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetDepsParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDepsParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDepsParams to hex string (Canton MCMS format)
+func (t SetDepsParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDepsParams from hex string (Canton MCMS format)
+func (t *SetDepsParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetDynamicConfig is a Record type
 type SetDynamicConfig struct {
 	DynamicConfig DynamicConfig `json:"dynamicConfig"`
@@ -1443,6 +1575,8 @@ type MCMSEncoder interface {
 	CommitteeVerifierUpdateStorageLocations(args CommitteeVerifierUpdateStorageLocations) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error)
+	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
+	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 }
 
@@ -1536,6 +1670,16 @@ func (e *encoder) CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMes
 // CommitteeVerifierVerifyMessageMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierVerifyMessage choice.
 func (e *encoder) CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierVerifyMessage", args)
+}
+
+// SetDeps encodes parameters for the SetDeps choice.
+func (e *encoder) SetDeps(args SetDeps) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
+}
+
+// SetDepsParams encodes parameters for the SetDeps choice.
+func (e *encoder) SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDeps", args)
 }
 
 // SetDynamicConfig encodes parameters for the SetDynamicConfig choice.

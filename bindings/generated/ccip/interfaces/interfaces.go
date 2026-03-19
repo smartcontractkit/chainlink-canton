@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "14a163ee49e10697363a126078909fbcc76858a84d9ff2db0fcd041b85ea482f"
+	PackageID   = "08fb8fff6cbbefa37d3612081bceab155d024a7f032d1fd1b273a2355fc46557"
 	SDKVersion  = "3.4.10"
 )
 
@@ -444,15 +444,24 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller            types.PARTY                              `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
+	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
+	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	Caller                types.PARTY                              `json:"caller"`
 }
 
 // ToMap converts TokenPoolCalculateFee to a map for DAML arguments
 func (t TokenPoolCalculateFee) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
 
 	m["sendingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -564,18 +573,27 @@ func (t *TokenPoolGetRequiredCCVs) UnmarshalHex(data string) error {
 
 // TokenPoolLockOrBurn is a Record type
 type TokenPoolLockOrBurn struct {
-	RmnRemoteCid      types.CONTRACT_ID   `json:"rmnRemoteCid"`
-	ExtraContext      common.CCIPContext  `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID   `json:"sendingMessageCid"`
-	TokenInput        TokenInput          `json:"tokenInput"`
-	SenderInputCids   []types.CONTRACT_ID `json:"senderInputCids"`
-	Amount            types.NUMERIC       `json:"amount"`
-	Caller            types.PARTY         `json:"caller"`
+	TokenAdminRegistryCid types.CONTRACT_ID   `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID   `json:"rmnRemoteCid"`
+	ExtraContext          common.CCIPContext  `json:"extraContext"`
+	SendingMessageCid     types.CONTRACT_ID   `json:"sendingMessageCid"`
+	TokenInput            TokenInput          `json:"tokenInput"`
+	SenderInputCids       []types.CONTRACT_ID `json:"senderInputCids"`
+	Amount                types.NUMERIC       `json:"amount"`
+	Caller                types.PARTY         `json:"caller"`
 }
 
 // ToMap converts TokenPoolLockOrBurn to a map for DAML arguments
 func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }

@@ -2,7 +2,7 @@
 module CCIP.PerPartyRouter where
 
 import DA.Map qualified as Map
-import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Optional (fromOptional)
 import DA.Time (addRelTime, hours)
 
@@ -128,9 +128,11 @@ template PerPartyRouterFactory
 
             case functionName of
               "FactorySetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: FactorySetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: FactorySetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid FactorySetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
@@ -302,6 +304,17 @@ template PerPartyRouter
                         case feeResult.output of
                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
                                 pure feeResult.senderChangeCids
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
+                                acceptResult <- exercise transferInstructionCid
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                        extraArgs = feeTokenInput.extraArgs
+                                case acceptResult.output of
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                        pure feeResult.senderChangeCids
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                                        abort "fee transfer instruction failed"
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
+                                        abort "fee transfer instruction is still pending"
                             _ -> abort "fee transfer did not complete"
                     else pure []
 
@@ -514,9 +527,11 @@ template PerPartyRouter
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
@@ -545,17 +560,23 @@ data ExecuteResult = ExecuteResult
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
 -- ===========================================================================
 
--- | Decode SetDeps params (Optional fields)
+-- | Decode SetDeps params with final offset (Optional fields)
 -- Format: [OptRIA onRamp][OptRIA offRamp][OptRIA globalConfig][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA rmnRemote]
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
+decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
+decodeSetDepsParamsWithOffset encoded = do
   (onRamp, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
   (offRamp, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
   (globalConfig, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
   (tokenAdminRegistry, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
   (feeQuoter, offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
-  (rmnRemote, _offset6) <- decodeOptionalRawInstanceAddressAt encoded offset5
-  Some (SetDepsParams onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote)
+  (rmnRemote, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset5
+  Some (SetDepsParams onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, finalOffset)
+
+-- | Decode SetDeps params (discards final offset)
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  Some result
 
 -- | Encode SetDeps params (Optional fields)
 encodeSetDepsParams : SetDepsParams -> BytesHex

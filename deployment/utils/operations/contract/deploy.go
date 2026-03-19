@@ -47,24 +47,32 @@ type DeployParams[ARGS any] struct {
 //
 // InstanceId:
 // The template *must* have an InstanceId field of type types.TEXT.
-// The instance ID is generated using the provided prefix and a random suffix, it should not be set by the caller.
+// If InstanceId is empty, it is generated using the provided prefix and a random suffix.
+// If InstanceId is set by the caller, that value is preserved.
 func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operation[DeployInput[TT], datastore.AddressRef, dependencies.CantonDeps] {
 	return operations.NewOperation(
 		params.Name,
 		&params.TypeAndVersion.Version,
 		params.Description,
 		func(b operations.Bundle, deps dependencies.CantonDeps, input DeployInput[TT]) (datastore.AddressRef, error) {
-			// Generate InstanceID
-			instanceID, err := contracts.NewInstanceID(params.Prefix)
+			instanceID, err := getInstanceID(input.Template)
 			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to create instance ID: %w", err)
+				return datastore.AddressRef{}, fmt.Errorf("failed to read InstanceID from template: %w", err)
+			}
+			templWithID := common.Template(input.Template)
+			if instanceID == "" {
+				// Generate InstanceID
+				instanceID, err = contracts.NewInstanceID(params.Prefix)
+				if err != nil {
+					return datastore.AddressRef{}, fmt.Errorf("failed to create instance ID: %w", err)
+				}
+				// Set InstanceID in the template
+				templWithID, err = setInstanceID(input.Template, instanceID)
+				if err != nil {
+					return datastore.AddressRef{}, fmt.Errorf("failed to set InstanceID in template: %w", err)
+				}
 			}
 			rawInstanceAddress := instanceID.RawInstanceAddress(input.OwnerParty)
-			// Set InstanceID in the template
-			templWithID, err := setInstanceID(input.Template, instanceID)
-			if err != nil {
-				return datastore.AddressRef{}, fmt.Errorf("failed to set InstanceID in template: %w", err)
-			}
 
 			// Validate
 			if params.Validate != nil {
@@ -161,6 +169,29 @@ func setInstanceID(template common.Template, instanceID contracts.InstanceID) (c
 	}
 
 	return template, nil
+}
+
+// getInstanceID reads the InstanceId field from the given template.
+func getInstanceID(template common.Template) (contracts.InstanceID, error) {
+	t := reflect.TypeOf(template)
+	v := reflect.ValueOf(template)
+
+	if t.Kind() != reflect.Pointer {
+		t = reflect.PointerTo(t)
+		v = reflect.New(t.Elem())
+		v.Elem().Set(reflect.ValueOf(template))
+	}
+
+	if _, ok := t.Elem().FieldByName("InstanceId"); !ok {
+		return "", fmt.Errorf("no InstanceId field found in template")
+	}
+
+	field := v.Elem().FieldByName("InstanceId")
+	if !field.Type().AssignableTo(reflect.TypeFor[types.TEXT]()) {
+		return "", fmt.Errorf("cannot read InstanceId field of type %v", field.Type())
+	}
+
+	return contracts.InstanceID(field.Interface().(types.TEXT)), nil
 }
 
 // TODO: packageName add package name to bindings instead

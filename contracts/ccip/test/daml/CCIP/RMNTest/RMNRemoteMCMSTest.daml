@@ -449,6 +449,49 @@ testRMNRemoteMCMSEntrypoint_MissingSelfCid = script do
 
   pure ()
 
+testRMNRemote_CurseMultipleRejectsDuplicateSubjects : Script ()
+testRMNRemote_CurseMultipleRejectsDuplicateSubjects = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-duplicate-subjects-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  let duplicatedSubject = "01000000000000000000000000000001"
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid CurseMultiple with
+      subjects = [duplicatedSubject, duplicatedSubject]
+
+  pure ()
+
+testRMNRemote_CurseMultipleRejectsAlreadyCursedSubject : Script ()
+testRMNRemote_CurseMultipleRejectsAlreadyCursedSubject = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let existingSubject = "01000000000000000000000000000001"
+      newSubject = "00000000000000000000000000000089"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-already-cursed-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [existingSubject]
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid CurseMultiple with
+      subjects = [existingSubject, newSubject]
+
+  pure ()
+
 -- Helper to convert ContractId to AnyContractId for the map
 toAnyContractId : ContractId a -> ContractId ()
 toAnyContractId = coerceContractId

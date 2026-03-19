@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "e11aa1bc604db153d8177fa8c443fbd69304fb37f94d1d14373f822951ec6879"
+	PackageID   = "0a70f1878367bdbd8085072c07426aae15ae6db3f2a14d4f1c696302e4d8e021"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1181,48 +1181,6 @@ func (t *MCMS) UnmarshalHex(data string) error {
 
 // Choice methods for MCMS
 
-// SetConfig exercises the SetConfig choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
-func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetRoot exercises the SetRoot choice on this MCMS contract
-// This method uses the package name in the template ID
-func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetRoot",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetRootWithPackageID exercises the SetRoot choice using the provided package ID instead of package name
-func (t MCMS) SetRootWithPackageID(contractID string, packageID string, args SetRoot) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
-		ContractID: contractID,
-		Choice:     "SetRoot",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // ExecuteOp exercises the ExecuteOp choice on this MCMS contract
 // This method uses the package name in the template ID
 func (t MCMS) ExecuteOp(contractID string, args ExecuteOp) *model.ExerciseCommand {
@@ -1261,6 +1219,48 @@ func (t MCMS) ExecuteScheduledBatchWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
 		ContractID: contractID,
 		Choice:     "ExecuteScheduledBatch",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetConfig exercises the SetConfig choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
+func (t MCMS) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetRoot exercises the SetRoot choice on this MCMS contract
+// This method uses the package name in the template ID
+func (t MCMS) SetRoot(contractID string, args SetRoot) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetRoot",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetRootWithPackageID exercises the SetRoot choice using the provided package ID instead of package name
+func (t MCMS) SetRootWithPackageID(contractID string, packageID string, args SetRoot) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "MCMS.Main", "MCMS"),
+		ContractID: contractID,
+		Choice:     "SetRoot",
 		Arguments:  argsToMap(args),
 	}
 }

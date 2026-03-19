@@ -150,6 +150,12 @@ template OnRamp
                         assertMsg "onramp: destination chain disabled" c.isEnabled
                         pure c
 
+                case Map.lookup destChainSelector feeQuoter.destChainConfigs of
+                    Some feeDestConfig ->
+                        assertMsg "onramp: payload exceeds destination maxDataBytes"
+                            (byteCount payload <= feeDestConfig.maxDataBytes)
+                    None -> pure ()
+
                 _ <- exercise feeQuoterCid CCIP.FeeQuoter.GetTokenPrice with
                     instrumentId = feeToken
                     caller = ccipOwner
@@ -167,6 +173,8 @@ template OnRamp
                         ++ destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
+                assertMsg "onramp: sequence number exceeds uint64"
+                    (newSequenceNumber <= 18446744073709551615.0)
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 let resolvedTokenReceiver = if hasTokenTransfer
@@ -175,6 +183,9 @@ template OnRamp
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
                         else destConfig.messageNetworkFeeUSDCents
+                let initialState = if hasTokenTransfer
+                        then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
+                        else CCIP.SendingMessageV1.SendingMessageState_Prepared
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -220,7 +231,7 @@ template OnRamp
                     ccvOwners = []
                     tokenSendData = None
                     observingParties = [routerPartyOwner]
-                    state = CCIP.SendingMessageV1.SendingMessageState_Prepared
+                    state = initialState
 
         -- | Validate and finalize a CCIP send.
         -- Reads accumulated data from SendingMessageV1. Fee collection happens
@@ -372,9 +383,11 @@ template OnRamp
 
             case functionName of
               "SetDeps" -> do
-                case decodeSetDepsParams operationData of
+                case decodeSetDepsParamsWithOffset operationData of
                   None -> abort "E_INVALID_PARAMS: SetDeps"
-                  Some newDeps -> do
+                  Some (newDeps, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetDeps" $
+                      finalOffset == byteCount operationData
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
@@ -477,16 +490,22 @@ validateDestChainAddress address addressBytesLength =
 -- CODEC: SetDeps parameter encoding/decoding for MCMSReceiver entrypoint
 -- ===========================================================================
 
--- | Decode SetDeps params (Optional fields)
+-- | Decode SetDeps params with final offset (Optional fields)
 -- Format: [OptRIA globalConfig][OptRIA rmnRemote][OptRIA tokenAdminRegistry][OptRIA feeQuoter][OptRIA ccvRegistry]
-decodeSetDepsParams : BytesHex -> Optional SetDepsParams
-decodeSetDepsParams encoded = do
+decodeSetDepsParamsWithOffset : BytesHex -> Optional (SetDepsParams, Int)
+decodeSetDepsParamsWithOffset encoded = do
   (globalConfig, offset1) <- decodeOptionalRawInstanceAddressAt encoded 0
   (rmnRemote, offset2) <- decodeOptionalRawInstanceAddressAt encoded offset1
   (tokenAdminRegistry, offset3) <- decodeOptionalRawInstanceAddressAt encoded offset2
   (feeQuoter, offset4) <- decodeOptionalRawInstanceAddressAt encoded offset3
-  (ccvRegistry, _offset5) <- decodeOptionalRawInstanceAddressAt encoded offset4
-  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry)
+  (ccvRegistry, finalOffset) <- decodeOptionalRawInstanceAddressAt encoded offset4
+  Some (SetDepsParams globalConfig rmnRemote tokenAdminRegistry feeQuoter ccvRegistry, finalOffset)
+
+-- | Decode SetDeps params (discards final offset)
+decodeSetDepsParams : BytesHex -> Optional SetDepsParams
+decodeSetDepsParams encoded = do
+  (result, _) <- decodeSetDepsParamsWithOffset encoded
+  Some result
 
 -- | Encode SetDeps params (Optional fields)
 encodeSetDepsParams : SetDepsParams -> BytesHex

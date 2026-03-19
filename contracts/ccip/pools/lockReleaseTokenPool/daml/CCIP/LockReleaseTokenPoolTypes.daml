@@ -35,6 +35,7 @@ data TokenTransferFeeConfig = TokenTransferFeeConfig
         destGasOverhead : Int   -- Gas charged to execute the token transfer on the destination chain.
         destBytesOverhead : Int -- Data availability bytes.
         feeUSDCents : Numeric 0 -- Fee to charge for token transfers, multiples of 0.01 USD.
+        feeBps : Numeric 0      -- Proportional token fee in bps, applied by the pool during LockOrBurn.
     deriving (Eq, Show)
 
 data RateLimiterConfigArgs = RateLimiterConfigArgs
