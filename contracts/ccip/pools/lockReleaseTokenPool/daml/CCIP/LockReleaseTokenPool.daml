@@ -71,11 +71,10 @@ parseSourcePoolDecimals localDecimals sourcePoolData =
         let decoded = fromSomeNote
                 "ReleaseFromTicket: invalid source pool decimals"
                 (CCIP.MessageCodecV1.decodeUint256 sourcePoolData)
-            remoteDecimals = truncate decoded
         in
             if decoded < 0.0 || decoded > 255.0
             then error "ReleaseFromTicket: invalid source pool decimals"
-            else remoteDecimals
+            else truncate decoded
 
 pow10Numeric0 : Int -> Numeric 0
 pow10Numeric0 exponent =
