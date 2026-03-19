@@ -77,17 +77,28 @@ parseSourcePoolDecimals localDecimals sourcePoolData =
             then error "ReleaseFromTicket: invalid source pool decimals"
             else remoteDecimals
 
-calculateLocalAmountDecimal : Decimal -> Int -> Int -> Decimal
-calculateLocalAmountDecimal remoteAmount remoteDecimals localDecimals =
+pow10Numeric0 : Int -> Numeric 0
+pow10Numeric0 exponent =
+    if exponent < 0 then error "pow10Numeric0: negative exponent"
+    else if exponent > 37 then error "pow10Numeric0: exponent exceeds Numeric 0 range"
+    else pow10Numeric0Go exponent 1.0
+
+pow10Numeric0Go : Int -> Numeric 0 -> Numeric 0
+pow10Numeric0Go remaining acc =
+    if remaining == 0 then acc
+    else pow10Numeric0Go (remaining - 1) (acc * 10.0)
+
+calculateLocalAmount : Numeric 0 -> Int -> Int -> Numeric 0
+calculateLocalAmount remoteAmount remoteDecimals localDecimals =
     if remoteDecimals == localDecimals
     then remoteAmount
     else
         let decimalsDiff = abs (remoteDecimals - localDecimals)
-            scaleFactor = intToDecimal (10 ^ decimalsDiff)
+            scaleFactor = pow10Numeric0 decimalsDiff
         in
             if remoteDecimals > localDecimals
-            then intToDecimal (truncate (remoteAmount / scaleFactor))
-            else remoteAmount * scaleFactor
+            then CCIP.Math.mulDivDown remoteAmount 1.0 scaleFactor
+            else CCIP.Math.mulDivDown remoteAmount scaleFactor 1.0
 
 -- | Convert CCIP AnyValue to Splice AnyValue at TransferFactory boundary.
 toSpliceAnyValue : CCIP.Context.AnyValue -> Splice.Api.Token.MetadataV1.AnyValue
@@ -393,8 +404,13 @@ template LockReleaseTokenPool
                     expectedRateLimitMode
                     expectedRateLimiter
                     rateLimiter
+                let sourceDecimals = parseSourcePoolDecimals decimals ticket.sourcePoolData
+                let localAmount = calculateLocalAmount
+                        ticket.amount
+                        sourceDecimals
+                        decimals
                 _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
-                    requested = ticket.amount
+                    requested = localAmount
 
                 -- Consume ticket via TAR after validating the disclosed TAR identity.
                 exercise tokenAdminRegistryCid
@@ -410,14 +426,9 @@ template LockReleaseTokenPool
                 let executeBefore = case transferTimeout of
                         Indefinite -> maxTime
                         RelativeHours h -> addRelTime now (hours h)
-                let sourceDecimals = parseSourcePoolDecimals decimals ticket.sourcePoolData
-                let remoteAmountDecimal = CCIP.Math.numeric0ToDecimalChecked
-                        "ReleaseFromTicket.ticket.amount"
-                        ticket.amount
-                let amountDecimal = calculateLocalAmountDecimal
-                        remoteAmountDecimal
-                        sourceDecimals
-                        decimals
+                let amountDecimal = CCIP.Math.numeric0ToDecimalChecked
+                        "ReleaseFromTicket.localAmount"
+                        localAmount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = poolOwner
                         receiver = ticket.tokenReceiver

@@ -998,6 +998,9 @@ testReleaseFromTicketDecimalConversion = script do
             receiverH.amount === 1234567.0
         _ -> abort "Expected completed result"
 
+    updatedRateLimiter <- fromSome <$> queryContractId poolOwner inboundRateLimiter
+    updatedRateLimiter.tokens === 9999999999999999999998765432.0
+
     debug "testReleaseFromTicketDecimalConversion: PASSED"
 
 testReleaseFromTicketWithAdditionalCCVOwner : Script ()
@@ -1246,21 +1249,21 @@ testExecutionGasLimitAggregation = script do
 testDecimalConversion_ScaleUp : Script ()
 testDecimalConversion_ScaleUp = script do
     -- remote=6, local=18: 1000000 (1 USDC in 6 decimals) -> 1000000000000000000 (1e18)
-    let result = LockReleaseTokenPool.calculateLocalAmountDecimal 1000000.0 6 18
+    let result = LockReleaseTokenPool.calculateLocalAmount 1000000.0 6 18
     result === 1000000000000000000.0
 
     -- Smaller amount: 1.0 in 6 decimals -> 1e12 in 18 decimals
-    let result2 = LockReleaseTokenPool.calculateLocalAmountDecimal 1.0 6 18
+    let result2 = LockReleaseTokenPool.calculateLocalAmount 1.0 6 18
     result2 === 1000000000000.0
     debug "testDecimalConversion_ScaleUp: PASSED"
 
 -- C-1: Equal decimals (no conversion).
 testDecimalConversion_EqualDecimals : Script ()
 testDecimalConversion_EqualDecimals = script do
-    let result = LockReleaseTokenPool.calculateLocalAmountDecimal 1234567890.0 18 18
+    let result = LockReleaseTokenPool.calculateLocalAmount 1234567890.0 18 18
     result === 1234567890.0
 
-    let result2 = LockReleaseTokenPool.calculateLocalAmountDecimal 42.0 6 6
+    let result2 = LockReleaseTokenPool.calculateLocalAmount 42.0 6 6
     result2 === 42.0
     debug "testDecimalConversion_EqualDecimals: PASSED"
 
