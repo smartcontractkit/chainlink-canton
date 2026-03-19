@@ -586,7 +586,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 								{Label: "ccvExtraContext", Value: emptyCCIPContext},
 							}}}},
 						}}}}},
-						{Label: "additionalRequiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 					}}}},
 				}},
 			}},
