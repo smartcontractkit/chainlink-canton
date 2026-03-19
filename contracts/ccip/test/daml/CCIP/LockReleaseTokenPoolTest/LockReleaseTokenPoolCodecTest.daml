@@ -24,7 +24,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                     remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
                     inboundCCVs = [RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress "ccv-inbound2@party2"]
                     outboundCCVs = [RawInstanceAddress "ccv-outbound@party1"]
-                    minBlockDepth = 0
+                    minBlockConfirmations = 0
                     inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
                     outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
@@ -34,7 +34,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                     remoteTokenAddress = ""
                     inboundCCVs = []
                     outboundCCVs = []
-                    minBlockDepth = 7
+                    minBlockConfirmations = 7
                     inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
                     outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
@@ -44,7 +44,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                     remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
                     inboundCCVs = []
                     outboundCCVs = []
-                    minBlockDepth = 3
+                    minBlockConfirmations = 3
                     inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
                     inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
                     outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
@@ -113,7 +113,7 @@ assertChainUpdateEqual got expected = do
     assertMsg ("remoteTokenAddress mismatch, got: " <> show got.remoteTokenAddress <> ", expected: " <> show expected.remoteTokenAddress) (got.remoteTokenAddress == expected.remoteTokenAddress) 
     assertMsg ("inboundCCVs mismatch, got: " <> show got.inboundCCVs <> ", expected: " <> show expected.inboundCCVs) (got.inboundCCVs == expected.inboundCCVs)
     assertMsg ("outboundCCVs mismatch, got: " <> show got.outboundCCVs <> ", expected: " <> show expected.outboundCCVs) (got.outboundCCVs == expected.outboundCCVs)
-    assertMsg ("minBlockDepth mismatch, got: " <> show got.minBlockDepth <> ", expected: " <> show expected.minBlockDepth) (got.minBlockDepth == expected.minBlockDepth)
+    assertMsg ("minBlockConfirmations mismatch, got: " <> show got.minBlockConfirmations <> ", expected: " <> show expected.minBlockConfirmations) (got.minBlockConfirmations == expected.minBlockConfirmations)
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
     assertMsg ("inboundCustomBlockConfirmationsRateLimiter mismatch, got: " <> show got.inboundCustomBlockConfirmationsRateLimiter <> ", expected: " <> show expected.inboundCustomBlockConfirmationsRateLimiter) (got.inboundCustomBlockConfirmationsRateLimiter == expected.inboundCustomBlockConfirmationsRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)

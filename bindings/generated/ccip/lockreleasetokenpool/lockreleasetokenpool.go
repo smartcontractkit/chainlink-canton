@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "e28e1009640b9d42546a4a20d7438c090c725f805662d3a9d5f6c44739dd4b45"
+	PackageID   = "968bccd630422ad877b298653c583e2946f91a875646e620c45b098e54956dab"
 	SDKVersion  = "3.4.10"
 )
 
@@ -118,7 +118,7 @@ type ChainUpdate struct {
 	RemoteTokenAddress                         types.TEXT                  `json:"remoteTokenAddress"`
 	InboundCCVs                                []common.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockDepth                              types.INT64                 `json:"minBlockDepth"`
+	MinBlockConfirmations                      types.INT64                 `json:"minBlockConfirmations"`
 	InboundRateLimiter                         common.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        common.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -166,7 +166,7 @@ func (t ChainUpdate) ToMap() map[string]any {
 		return res
 	}()
 
-	m["minBlockDepth"] = int64(t.MinBlockDepth)
+	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
 
 	m["inboundRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1446,7 +1446,7 @@ type RemoteChainConfig struct {
 	RemoteTokenAddress                         types.TEXT                  `json:"remoteTokenAddress"`
 	InboundCCVs                                []common.RawInstanceAddress `json:"inboundCCVs"`
 	OutboundCCVs                               []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockDepth                              types.INT64                 `json:"minBlockDepth"`
+	MinBlockConfirmations                      types.INT64                 `json:"minBlockConfirmations"`
 	InboundRateLimiter                         common.RawInstanceAddress   `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        common.RawInstanceAddress   `json:"outboundRateLimiter"`
@@ -1492,7 +1492,7 @@ func (t RemoteChainConfig) ToMap() map[string]any {
 		return res
 	}()
 
-	m["minBlockDepth"] = int64(t.MinBlockDepth)
+	m["minBlockConfirmations"] = int64(t.MinBlockConfirmations)
 
 	m["inboundRateLimiter"] = func() any {
 		type mapper interface{ toMap() map[string]any }

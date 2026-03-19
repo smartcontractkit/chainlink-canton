@@ -42,7 +42,7 @@ func encodeInstrumentId(admin, identifier string) []byte {
 // - Call TokenPool_ReleaseFromTicket to transfer tokens from pool to receiver
 // - Verify receiver received the tokens
 // - Validate FTF/custom-finality path by:
-//   - requiring minBlockDepth=2000 on the destination pool
+//   - requiring minBlockConfirmations=2000 on the destination pool
 //   - enabling a default inbound limiter with lower capacity
 //   - enabling a custom-finality inbound limiter with higher capacity
 //     Success proves ReleaseFromTicket selected the custom inbound limiter.
@@ -471,7 +471,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 								{Label: "remoteTokenAddress", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: hex.EncodeToString(remoteTokenAddress)}}},
 								{Label: "inboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 								{Label: "outboundCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-								{Label: "minBlockDepth", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
+								{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
 								{Label: "inboundRateLimiter", Value: rawInstanceAddress(inboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
 								{Label: "inboundCustomBlockConfirmationsRateLimiter", Value: rawInstanceAddress(inboundCustomBlockConfirmationsRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
 								{Label: "outboundRateLimiter", Value: rawInstanceAddress(outboundRateLimiterInstanceID + "@" + partyTokenPoolOwner)},
@@ -638,7 +638,7 @@ func TestLnRTokenPool_FullReceiveFlow(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "minBlockDepth", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
+						{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}}},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
