@@ -9,6 +9,7 @@ import DA.Optional
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
+import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 
 setup = script do
 
@@ -187,11 +188,13 @@ setup = script do
     let test256_0 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000000"
     let test256_1 = MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000001"
     let test256_max64 = MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
+    let test256_tooLargeForNumeric0 = MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     let test256_invalid = MessageCodecV1.decodeUint256 "0000000000000000" -- wrong length
 
     test256_0 === Some 0.0
     test256_1 === Some 1.0
     test256_max64 === Some 18446744073709551615.0
+    test256_tooLargeForNumeric0 === None
     test256_invalid === None
     debug("uint256 decoding tests passed")
 
@@ -281,3 +284,91 @@ setup = script do
     debug("--- All Cross-Chain Compatibility Tests PASSED ---")
 
     pure()
+
+-- D-002: decodeUint256 rejects values exceeding Numeric 0 range and accepts boundary values.
+testDecodeUint256_Numeric0Boundary : Script ()
+testDecodeUint256_Numeric0Boundary = script do
+    -- 38 nines — largest integer that fits in Numeric 0
+    MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+        === Some 99999999999999999999999999999999999999.0
+
+    -- 37 nines — comfortably within range
+    MessageCodecV1.decodeUint256 "000000000000000000000000000000000785ee10d5da46d900f4369fffffffff"
+        === Some 9999999999999999999999999999999999999.0
+
+    -- 10^36 — large value well within range
+    MessageCodecV1.decodeUint256 "0000000000000000000000000000000000c097ce7bc90715b34b9f1000000000"
+        === Some 1000000000000000000000000000000000000.0
+
+    -- 10^38 — one above Numeric 0 range
+    MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
+        === None
+
+    -- uint256 max — well above Numeric 0 range
+    MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        === None
+
+    debug "testDecodeUint256_Numeric0Boundary: PASSED"
+
+-- Verify hex-to-decimal string arithmetic produces correct results for values
+-- with hex digits a-f, which exercise multi-digit carries in multiplyDecimalBy16.
+testDecodeUint256_HexArithmetic : Script ()
+testDecodeUint256_HexArithmetic = script do
+    -- 0xdeadbeef = 3735928559
+    MessageCodecV1.decodeUint256 "00000000000000000000000000000000000000000000000000000000deadbeef"
+        === Some 3735928559.0
+
+    -- 1e18 (0xDE0B6B3A7640000) — standard 18-decimal token unit
+    MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+        === Some 1000000000000000000.0
+
+    -- 0xabcdef0123456789 — exercises hex digits a through f
+    MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000abcdef0123456789"
+        === Some 12379813738877118345.0
+
+    -- 0xffffffffffff (6 bytes of 0xff) — stress test for repeated carries
+    MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000ffffffffffff"
+        === Some 281474976710655.0
+
+    -- uint64 max — already tested in setup but verify here in isolation
+    MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
+        === Some 18446744073709551615.0
+
+    -- 7e12 (0x65DD0837000) — the exact amount used in decimal conversion integration test
+    MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000065dd0837000"
+        === Some 7000000000000.0
+
+    debug "testDecodeUint256_HexArithmetic: PASSED"
+
+-- End-to-end: decode a full token transfer and verify extraData round-trips
+testDecodeTokenTransfer_WithExtraData : Script ()
+testDecodeTokenTransfer_WithExtraData = script do
+    let amount = 7000000000000.0
+    let sourcePool = "7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3"
+    let sourceToken = "acdafefb07bff5b120b7afa6ea777cf7eabacc0d"
+    let destToken = "2851f23b4fbecadbe74222334f9d9032e6cb3f4a77ae563ec17de729bec33d33"
+    let receiver = "d73bc3441bce8f77ba3c605808d1b781910119725cb33636f34e2b86c7df0044"
+    let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 18.0)
+
+    let tt = MessageCodecV1.TokenTransferV1 with
+            amount
+            sourcePoolAddress = sourcePool
+            sourceTokenAddress = sourceToken
+            destTokenAddress = destToken
+            tokenReceiver = receiver
+            extraData = sourcePoolData
+
+    let encoded = MessageCodecV1.encodeTokenTransferV1 tt
+    let decoded = fromSome (MessageCodecV1.decodeTokenTransfer encoded)
+
+    decoded.amount === 7000000000000.0
+    decoded.extraData === sourcePoolData
+    decoded.sourcePoolAddress === sourcePool
+
+    let sourceDecimals = LockReleaseTokenPool.parseSourcePoolDecimals 6 decoded.extraData
+    sourceDecimals === 18
+
+    let localAmount = LockReleaseTokenPool.calculateLocalAmount decoded.amount sourceDecimals 6
+    localAmount === 7.0
+
+    debug "testDecodeTokenTransfer_WithExtraData: PASSED"

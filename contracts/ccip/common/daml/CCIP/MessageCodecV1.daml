@@ -429,7 +429,7 @@ decodeUint64 hex =
     if byteCount hex /= 8 then None
     else
         case hexToDecimalString hex of
-            Some decStr -> Some (parseDecimal decStr)
+            Some decStr -> parseDecimal decStr
             None -> None
 
 decodeUint256 : BytesHex -> Optional (Numeric 0)
@@ -437,7 +437,7 @@ decodeUint256 hex =
     if byteCount hex /= 32 then None
     else
         case hexToDecimalString hex of
-            Some decStr -> Some (parseDecimal decStr)
+            Some decStr -> parseDecimal decStr
             None -> None
 
 -- Helpers
@@ -494,43 +494,44 @@ hexStringToDigits str acc =
 hexDigitsToDecimal : [Int] -> Text
 hexDigitsToDecimal digits =
     let
-        -- Convert Int digit to Numeric 0 directly without using intToNumeric
-        digitToNumeric : Int -> Numeric 0
-        digitToNumeric d = case d of
-            0 -> 0.0
-            1 -> 1.0
-            2 -> 2.0
-            3 -> 3.0
-            4 -> 4.0
-            5 -> 5.0
-            6 -> 6.0
-            7 -> 7.0
-            8 -> 8.0
-            9 -> 9.0
-            10 -> 10.0
-            11 -> 11.0
-            12 -> 12.0
-            13 -> 13.0
-            14 -> 14.0
-            15 -> 15.0
-            _ -> 0.0 -- Should not happen for hex digits
-
-        result = foldl (\acc d -> acc * 16.0 + digitToNumeric d) (0.0 : Numeric 0) digits
-        resultStr = show result
-        -- Remove ".0" suffix if present
-        cleanStr = if Text.isSuffixOf ".0" resultStr
-                   then Text.take (Text.length resultStr - 2) resultStr
-                   else resultStr
+        digitToDecimalString d = case d of
+            0 -> "0"
+            1 -> "1"
+            2 -> "2"
+            3 -> "3"
+            4 -> "4"
+            5 -> "5"
+            6 -> "6"
+            7 -> "7"
+            8 -> "8"
+            9 -> "9"
+            10 -> "10"
+            11 -> "11"
+            12 -> "12"
+            13 -> "13"
+            14 -> "14"
+            15 -> "15"
+            _ -> error "Invalid hex digit"
     in
-        cleanStr
+        foldl
+            (\acc d -> addDecimalStrings (multiplyDecimalBy16 acc) (digitToDecimalString d))
+            "0"
+            digits
 
 -- Multiply list of digits by a base
 multiplyDigitsByBase : [Int] -> Int -> [Int]
 multiplyDigitsByBase digits base = multiplyDigitsByBaseHelper (reverse digits) base 0 []
 
+-- Decompose carry into base-10 digits prepended (most-significant first) onto acc.
+-- acc is in most-significant-first order at this point (already reversed by caller logic).
+prependCarryDigits : Int -> [Int] -> [Int]
+prependCarryDigits carry acc =
+    if carry < 10 then carry :: acc
+    else prependCarryDigits (carry / 10) ((carry % 10) :: acc)
+
 -- Helper for multiplyDigitsByBase
 multiplyDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> [Int]
-multiplyDigitsByBaseHelper [] base carry acc = if carry == 0 then reverse acc else reverse (carry :: acc)
+multiplyDigitsByBaseHelper [] _base carry acc = if carry == 0 then acc else prependCarryDigits carry acc
 multiplyDigitsByBaseHelper (d :: ds) base carry acc =
     let
         product = d * base + carry
@@ -627,9 +628,35 @@ digitsToDecimalString digits =
     in
         foldl (<>) "" (map digitToChar digits)
 
+maxNumeric0IntegerText : Text
+maxNumeric0IntegerText = "99999999999999999999999999999999999999"
+
+decimalTextWithinNumeric0 : Text -> Bool
+decimalTextWithinNumeric0 str =
+    let stripped = stripLeadingZeros str
+        normalized = if Text.length stripped == 0 then "0" else stripped
+        normalizedLength = Text.length normalized
+        maxLength = Text.length maxNumeric0IntegerText
+    in
+        normalizedLength < maxLength
+            || (normalizedLength == maxLength && normalized <= maxNumeric0IntegerText)
+
+stripLeadingZeros : Text -> Text
+stripLeadingZeros str =
+    if Text.length str == 0 then ""
+    else if Text.take 1 str == "0" then stripLeadingZeros (Text.drop 1 str)
+    else str
+
 -- Parse decimal string to Numeric 0
-parseDecimal : Text -> Numeric 0
+parseDecimal : Text -> Optional (Numeric 0)
 parseDecimal str =
+    if Text.length str == 0 then Some 0.0
+    else if not (decimalTextWithinNumeric0 str) then None
+    else
+        Some (parseDecimalUnchecked str)
+
+parseDecimalUnchecked : Text -> Numeric 0
+parseDecimalUnchecked str =
     if Text.length str == 0 then 0.0
     else
         let
@@ -649,7 +676,7 @@ parseDecimal str =
                 "9" -> 9.0
                 _ -> error ("Invalid decimal digit in parseDecimal: " <> lastChar)
         in
-            digit + 10.0 * parseDecimal rest
+            digit + 10.0 * parseDecimalUnchecked rest
 
 -- | Decode MessageV1 from bytes matching EVM MessageV1Codec._decodeMessageV1 exactly.
 -- Static section (67 bytes):
