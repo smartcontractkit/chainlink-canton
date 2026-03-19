@@ -536,3 +536,86 @@ testTimelockViewFunctions = script do
 
   debug "testTimelockViewFunctions PASSED!"
   pure ()
+
+-- ===========================================================================
+-- CLEAR ROOT RECOVERY TEST
+-- ===========================================================================
+
+-- | Test that SetConfig(clearRoot=true) resets rootMetadata (EVM/Aptos parity)
+-- Scenario: root is set with postOpCount > opCount (pending ops),
+-- clearRoot should reset postOpCount = opCount so a new SetRoot
+-- without overridePreviousRoot can succeed.
+testClearRootResetsMetadata : Script ()
+testClearRootResetsMetadata = script do
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let testInstanceId = "test-clearroot"
+      testChainId = 1
+
+  let instanceAddress = testInstanceId <> "@" <> partyToText ccipOwner
+
+  -- Create MCMS with a proposer RoleState that simulates pending ops:
+  -- opCount=1 (one op executed), postOpCount=3 (two ops still pending)
+  let stuckProposer = RoleState
+        { config = selfDispatchTestConfig
+        , seenHashes = Map.empty
+        , expiringRoot = ExpiringRoot
+            { root = "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+            , validUntil = selfDispatchTestValidUntil
+            , opCount = 1
+            }
+        , rootMetadata = RootMetadata
+            { chainId = testChainId
+            , multisigId = instanceAddress <> "-proposer"
+            , preOpCount = 0
+            , postOpCount = 3
+            , overridePreviousRoot = False
+            }
+        }
+
+  mcmsCid <- submit ccipOwner do
+    createCmd MCMS with
+      owner = ccipOwner
+      instanceId = testInstanceId
+      chainId = testChainId
+      proposer = stuckProposer
+      canceller = emptyRoleState
+      bypasser = emptyRoleState
+      minDelay = seconds 0
+      blockedFunctions = []
+      timelockTimestamps = Map.empty
+
+  -- Verify initial state: opCount=1, postOpCount=3, hasActiveRoot=True
+  stateBefore <- submit ccipOwner do
+    exerciseCmd mcmsCid GetState with
+      submitter = ccipOwner
+      targetRole = Proposer
+
+  assertMsg "Before: opCount should be 1" $ stateBefore.opCount == 1
+  assertMsg "Before: postOpCount should be 3" $ stateBefore.postOpCount == 3
+  assertMsg "Before: should have active root" stateBefore.hasActiveRoot
+
+  -- Exercise SetConfig with clearRoot=True
+  mcmsCid <- submit ccipOwner do
+    exerciseCmd mcmsCid SetConfig with
+      targetRole = Proposer
+      newSigners = selfDispatchTestSigners
+      newGroupQuorums = [2] <> replicate 31 0
+      newGroupParents = replicate 32 0
+      clearRoot = True
+
+  -- Verify state after clearRoot: opCount=1, postOpCount=1, hasActiveRoot=False
+  stateAfter <- submit ccipOwner do
+    exerciseCmd mcmsCid GetState with
+      submitter = ccipOwner
+      targetRole = Proposer
+
+  assertMsg "After: opCount should still be 1" $ stateAfter.opCount == 1
+  assertMsg "After: postOpCount should be reset to 1 (matching opCount)" $
+    stateAfter.postOpCount == 1
+  assertMsg "After: opCount should equal postOpCount (no pending ops)" $
+    stateAfter.opCount == stateAfter.postOpCount
+  assertMsg "After: root should be cleared" $ not stateAfter.hasActiveRoot
+
+  debug "testClearRootResetsMetadata PASSED!"
+  pure ()

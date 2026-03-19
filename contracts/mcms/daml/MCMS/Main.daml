@@ -17,7 +17,8 @@ import DA.Map qualified as Map
 import DA.List ((!!), dedup)
 import DA.Action (unless)
 import DA.Foldable (forA_)
-import DA.Time (RelTime, seconds, addRelTime)
+import DA.Time (RelTime, seconds, addRelTime, time)
+import DA.Date (date, Month(..))
 import DA.Text (parseInt)
 import DA.Crypto.Text (BytesHex)
 import MCMS.Types
@@ -125,12 +126,20 @@ template MCMS
         validateMultisigConfig newConfig
 
         let rs = getRoleState targetRole this
-        let newExpiringRoot = if clearRoot
-              then rs.expiringRoot with root = ""
-              else rs.expiringRoot
+        let (newExpiringRoot, newRootMetadata) = if clearRoot
+              then
+                let opCount = rs.expiringRoot.opCount
+                    instanceAddress = makeInstanceAddress instanceId owner
+                    epoch = time (date 1970 Jan 1) 0 0 0
+                in ( ExpiringRoot "" epoch opCount
+                   , RootMetadata chainId (makeMcmsId instanceAddress targetRole)
+                       opCount opCount True
+                   )
+              else (rs.expiringRoot, rs.rootMetadata)
         let newRs = rs with
               config = newConfig
               expiringRoot = newExpiringRoot
+              rootMetadata = newRootMetadata
 
         create (setRoleState targetRole newRs this)
 
@@ -592,10 +601,20 @@ executeSelfDispatch mcms call =
           let newConfig = MultisigConfig params.signers params.groupQuorums params.groupParents
           validateMultisigConfig newConfig
           let rs = getRoleState targetRole mcms
-          let clearedRoot = if params.clearRoot
-                then rs.expiringRoot with root = ""
-                else rs.expiringRoot
-          let newRs = rs with config = newConfig, expiringRoot = clearedRoot
+          let (clearedRoot, clearedMetadata) = if params.clearRoot
+                then
+                  let opCount = rs.expiringRoot.opCount
+                      instanceAddress = makeInstanceAddress mcms.instanceId mcms.owner
+                      epoch = time (date 1970 Jan 1) 0 0 0
+                  in ( ExpiringRoot "" epoch opCount
+                     , RootMetadata mcms.chainId (makeMcmsId instanceAddress targetRole)
+                         opCount opCount True
+                     )
+                else (rs.expiringRoot, rs.rootMetadata)
+          let newRs = rs with
+                config = newConfig
+                expiringRoot = clearedRoot
+                rootMetadata = clearedMetadata
           pure $ setRoleState targetRole newRs mcms
 
     "ScheduleBatch" ->
