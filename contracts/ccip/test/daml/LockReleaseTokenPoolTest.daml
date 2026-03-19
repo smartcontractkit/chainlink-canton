@@ -998,7 +998,10 @@ testReleaseFromTicketDecimalConversion = script do
             receiverH.amount === 1234567.0
         _ -> abort "Expected completed result"
 
-    updatedRateLimiter <- fromSome <$> queryContractId poolOwner inboundRateLimiter
+    -- ConsumeCapacity archives the old rate limiter and creates a new one,
+    -- so query by template type instead of the stale CID.
+    rateLimiters <- query @RateLimiter.RateLimiter poolOwner
+    let [(_, updatedRateLimiter)] = rateLimiters
     updatedRateLimiter.tokens === 9999999999999999999998765432.0
 
     debug "testReleaseFromTicketDecimalConversion: PASSED"
@@ -1266,6 +1269,62 @@ testDecimalConversion_EqualDecimals = script do
     let result2 = LockReleaseTokenPool.calculateLocalAmount 42.0 6 6
     result2 === 42.0
     debug "testDecimalConversion_EqualDecimals: PASSED"
+
+-- D-002/D-018: Scale-down (remote=18, local=6) truncates via mulDivDown.
+testDecimalConversion_ScaleDown : Script ()
+testDecimalConversion_ScaleDown = script do
+    -- 1e18 in 18 decimals = 1 token -> 1e6 in 6 decimals
+    LockReleaseTokenPool.calculateLocalAmount 1000000000000000000.0 18 6
+        === 1000000.0
+
+    -- 1234567890123456789 in 18 decimals -> floor(1234567890123456789 / 1e12) = 1234567
+    LockReleaseTokenPool.calculateLocalAmount 1234567890123456789.0 18 6
+        === 1234567.0
+
+    -- Large value near Numeric 0 range: 10^37 in 18 decimals -> 10^25 in 6 decimals
+    LockReleaseTokenPool.calculateLocalAmount 10000000000000000000000000000000000000.0 18 6
+        === 10000000000000000000000000.0
+
+    debug "testDecimalConversion_ScaleDown: PASSED"
+
+-- Edge cases: zero, truncation to zero, asymmetric gaps, floor behavior.
+testDecimalConversion_EdgeCases : Script ()
+testDecimalConversion_EdgeCases = script do
+    -- Zero amount stays zero regardless of decimal difference
+    LockReleaseTokenPool.calculateLocalAmount 0.0 6 18 === 0.0
+    LockReleaseTokenPool.calculateLocalAmount 0.0 18 6 === 0.0
+    LockReleaseTokenPool.calculateLocalAmount 0.0 18 18 === 0.0
+
+    -- Amount smaller than scale factor truncates to zero (floor)
+    -- 999999 in 18 decimals / 1e12 = 0.000000999999, floor = 0
+    LockReleaseTokenPool.calculateLocalAmount 999999.0 18 6 === 0.0
+
+    -- Exactly at scale factor boundary: 1e12 in 18 decimals -> 1 in 6 decimals
+    LockReleaseTokenPool.calculateLocalAmount 1000000000000.0 18 6 === 1.0
+
+    -- One below scale factor: floor(999999999999 / 1e12) = 0
+    LockReleaseTokenPool.calculateLocalAmount 999999999999.0 18 6 === 0.0
+
+    -- Floor behavior: verify no rounding up
+    -- floor(1500000000000 / 1e12) = 1, not 2
+    LockReleaseTokenPool.calculateLocalAmount 1500000000000.0 18 6 === 1.0
+    -- floor(1999999999999 / 1e12) = 1, not 2
+    LockReleaseTokenPool.calculateLocalAmount 1999999999999.0 18 6 === 1.0
+
+    -- Large decimal gap (remote=18, local=0): divide by 1e18
+    -- 1e18 -> 1
+    LockReleaseTokenPool.calculateLocalAmount 1000000000000000000.0 18 0 === 1.0
+    -- 5e18 -> 5
+    LockReleaseTokenPool.calculateLocalAmount 5000000000000000000.0 18 0 === 5.0
+
+    -- Scale up: 1 in 0 decimals -> 1e18 in 18 decimals
+    LockReleaseTokenPool.calculateLocalAmount 1.0 0 18 === 1000000000000000000.0
+
+    -- Large amount scale-up: 1e18 in 8 decimals -> 1e28 in 18 decimals
+    LockReleaseTokenPool.calculateLocalAmount 1000000000000000000.0 8 18
+        === 10000000000000000000000000000.0
+
+    debug "testDecimalConversion_EdgeCases: PASSED"
 
 -- C-1: Empty sourcePoolData defaults to local decimals (no conversion).
 testParseSourcePoolDecimals_Empty : Script ()
