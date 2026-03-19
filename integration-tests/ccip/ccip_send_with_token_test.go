@@ -884,7 +884,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)
-	sendDisclosures := (slices.Concat(
+	sendDisclosures := dedupeDisclosedContracts(slices.Concat(
 		[]*apiv2.DisclosedContract{
 			disclosedCCIPSender,
 			disclosedRouter,
@@ -1036,7 +1036,7 @@ func getHoldingsBalanceNumeric0(t *testing.T, ctx context.Context, participant c
 		amountStr := fields[2].GetValue().GetNumeric()
 		intPart, fracPart, hasFrac := strings.Cut(amountStr, ".")
 		if hasFrac {
-			require.Truef(t, strings.Trim(fracPart, "0") == "", "expected integer Numeric 0, got %q", amountStr)
+			require.Equalf(t, "", strings.Trim(fracPart, "0"), "expected integer Numeric 0, got %q", amountStr)
 		}
 		amt, err := strconv.ParseInt(intPart, 10, 64)
 		require.NoErrorf(t, err, "failed to parse Numeric %q", amountStr)
@@ -1057,4 +1057,20 @@ func assertSenderBalanceDeductions(t *testing.T, before, after, expectedFeeToken
 		delta,
 		"sender balance deduction should equal fee-token payment + transfer amount",
 	)
+}
+
+func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedContract {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]*apiv2.DisclosedContract, 0, len(in))
+	for _, c := range in {
+		if c == nil {
+			continue
+		}
+		if _, ok := seen[c.ContractId]; ok {
+			continue
+		}
+		seen[c.ContractId] = struct{}{}
+		out = append(out, c)
+	}
+	return out
 }
