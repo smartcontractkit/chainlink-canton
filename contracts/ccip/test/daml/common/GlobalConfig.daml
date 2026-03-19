@@ -31,13 +31,13 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 456.0
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
             ,CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 789.0
                 isEnabled = True
-                onRampAddresses = ["0x2222222222222222"]
+                onRampAddresses = ["2222222222222222"]
                 defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
                 laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
             ]
@@ -63,7 +63,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 789.0
                 isEnabled = False
-                onRampAddresses = ["0x343434"]
+                onRampAddresses = ["343434"]
                 defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
                 laneMandatedCCVs = []
             ,CCIP.GlobalConfigTypes.SourceChainConfigArgs with
@@ -99,7 +99,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 0.0 -- Invalid zero chain selector
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
             ]
@@ -111,7 +111,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 123.0 -- Invalid chain selector that is the same as the local chain selector
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
             ]
@@ -123,7 +123,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = -111.0 -- Invalid negative chain selector
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
             ]
@@ -135,7 +135,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 111.0
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 -- Empty default and mandated CCV lists, which is invalid since at least one CCV must be provided
                 defaultCCVs = []
                 laneMandatedCCVs = []
@@ -148,7 +148,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 111.0
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xabc"] -- Duplicate CCVs within the default list, which is invalid
                 laneMandatedCCVs = [RawInstanceAddress "0x123"]
             ]
@@ -160,7 +160,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 123.0
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 defaultCCVs = [RawInstanceAddress "0xabc"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x123"] -- Duplicate CCVs within the mandated list, which is invalid
             ]
@@ -172,7 +172,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             CCIP.GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 111.0
                 isEnabled = True
-                onRampAddresses = ["0x1111111111111111"]
+                onRampAddresses = ["1111111111111111"]
                 -- Duplicate CCVs across the default and mandated lists, which is invalid
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0x123"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
@@ -229,7 +229,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(123.0, CCIP.GlobalConfigTypes.SourceChainConfig with -- Invalid chain selector that is the same as the local chain selector
                     isEnabled = True
-                    onRampAddresses = ["0x1111111111111111"]
+                    onRampAddresses = ["1111111111111111"]
                     defaultCCVs = [RawInstanceAddress "0xabc"]
                     laneMandatedCCVs = [RawInstanceAddress "0x123"]
                 )]
@@ -241,7 +241,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList [(0.0, CCIP.GlobalConfigTypes.SourceChainConfig with -- Invalid zero chain selector
                     isEnabled = True
-                    onRampAddresses = ["0x1111111111111111"]
+                    onRampAddresses = ["1111111111111111"]
                     defaultCCVs = [RawInstanceAddress "0xabc"]
                     laneMandatedCCVs = [RawInstanceAddress "0x123"]
                 )]

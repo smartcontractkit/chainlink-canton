@@ -91,6 +91,9 @@ validateMultisigConfig config = do
   let signerAddrs = map (\s -> s.signerAddress) config.signers
   assertMsg "mcms: duplicate signer addresses" $
     length (dedup signerAddrs) == length signerAddrs
+  -- Validate signer addresses are valid hex
+  forA_ config.signers $ \signer ->
+    assertValidHex "signerAddress" signer.signerAddress
 
 template MCMS
   with
@@ -145,6 +148,14 @@ template MCMS
         signatures : [RawSignature]            -- Raw ECDSA signatures
       controller submitter
       do
+        -- 0. Validate BytesHex inputs
+        assertValidHex "newRoot" newRoot
+        forA_ metadataProof $ \p -> assertValidHex "metadataProof" p
+        forA_ signatures $ \sig -> do
+          assertValidHex "signature.publicKey" sig.publicKey
+          assertValidHex "signature.r" sig.r
+          assertValidHex "signature.s" sig.s
+
         now <- getTime
         let rs = getRoleState targetRole this
 
@@ -234,6 +245,10 @@ template MCMS
         targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
+        -- 0. Validate BytesHex inputs
+        forA_ opProof $ \p -> assertValidHex "opProof" p
+        assertValidHex "op.operationData" op.operationData
+
         now <- getTime
         let rs = getRoleState targetRole this
 
@@ -317,6 +332,11 @@ template MCMS
         targetCids : Map.Map Text (ContractId MCMSReceiver)       -- Map from instanceAddress to contract ID
       controller submitter
       do
+        -- 0. Validate BytesHex inputs
+        assertValidHex "predecessor" predecessor
+        assertValidHex "salt" salt
+        forA_ calls $ \call -> assertValidHex "call.operationData" call.operationData
+
         now <- getTime
 
         -- 1. Verify opId matches provided data

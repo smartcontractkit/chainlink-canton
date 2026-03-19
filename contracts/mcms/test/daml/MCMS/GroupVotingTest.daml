@@ -11,29 +11,29 @@ testGroupVoting = script do
   -- Test 1: Simple 2-of-3 passes with 2 signatures
   let config = make2of3Config
   let signers2 =
-        [ "0x1111111111111111111111111111111111111111"
-        , "0x2222222222222222222222222222222222222222"
+        [ "1111111111111111111111111111111111111111"
+        , "2222222222222222222222222222222222222222"
         ]
   case verifyGroupVoting signers2 config of
     Left err -> abort $ "Should pass with 2 signers: " <> err
     Right () -> pure ()
 
   -- Test 2: Simple 2-of-3 fails with 1 signature
-  let signers1 = ["0x1111111111111111111111111111111111111111"]
+  let signers1 = ["1111111111111111111111111111111111111111"]
   case verifyGroupVoting signers1 config of
     Left _ -> pure ()  -- Expected to fail
     Right () -> abort "Should fail with only 1 signer"
 
   -- Test 3: Fails with unknown signer
-  let unknownSigner = ["0x9999999999999999999999999999999999999999"]
+  let unknownSigner = ["9999999999999999999999999999999999999999"]
   case verifyGroupVoting unknownSigner config of
     Left _ -> pure ()  -- Expected to fail
     Right () -> abort "Should fail with unknown signer"
 
   -- Test 4: Fails with unsorted signers
   let unsortedSigners =
-        [ "0x2222222222222222222222222222222222222222"
-        , "0x1111111111111111111111111111111111111111"
+        [ "2222222222222222222222222222222222222222"
+        , "1111111111111111111111111111111111111111"
         ]
   case verifyGroupVoting unsortedSigners config of
     Left _ -> pure ()  -- Expected to fail
@@ -49,10 +49,10 @@ testHierarchicalGroups : Script ()
 testHierarchicalGroups = script do
   let config = MultisigConfig
         { signers =
-            [ SignerInfo "0x1111111111111111111111111111111111111111" 0 1  -- Eng
-            , SignerInfo "0x2222222222222222222222222222222222222222" 1 1  -- Eng
-            , SignerInfo "0x3333333333333333333333333333333333333333" 2 2  -- Sec
-            , SignerInfo "0x4444444444444444444444444444444444444444" 3 2  -- Sec
+            [ SignerInfo "1111111111111111111111111111111111111111" 0 1  -- Eng
+            , SignerInfo "2222222222222222222222222222222222222222" 1 1  -- Eng
+            , SignerInfo "3333333333333333333333333333333333333333" 2 2  -- Sec
+            , SignerInfo "4444444444444444444444444444444444444444" 3 2  -- Sec
             ]
         , groupQuorums = [2, 1, 1] <> replicate 29 0  -- Root=2, Eng=1, Sec=1
         , groupParents = [0, 0, 0] <> replicate 29 0  -- Groups 1,2 -> Root
@@ -60,8 +60,8 @@ testHierarchicalGroups = script do
 
   -- Test: 1 from each department passes
   let crossDeptSigners =
-        [ "0x1111111111111111111111111111111111111111"  -- Eng
-        , "0x3333333333333333333333333333333333333333"  -- Sec
+        [ "1111111111111111111111111111111111111111"  -- Eng
+        , "3333333333333333333333333333333333333333"  -- Sec
         ]
   case verifyGroupVoting crossDeptSigners config of
     Left err -> abort $ "Should pass with cross-dept: " <> err
@@ -69,8 +69,8 @@ testHierarchicalGroups = script do
 
   -- Test: 2 from same department fails
   let sameDeptSigners =
-        [ "0x1111111111111111111111111111111111111111"  -- Eng
-        , "0x2222222222222222222222222222222222222222"  -- Eng
+        [ "1111111111111111111111111111111111111111"  -- Eng
+        , "2222222222222222222222222222222222222222"  -- Eng
         ]
   case verifyGroupVoting sameDeptSigners config of
     Left _ -> pure ()  -- Expected to fail
@@ -84,11 +84,11 @@ testGroupVotingEdgeCases : Script ()
 testGroupVotingEdgeCases = script do
   -- Test: 1-of-1 config
   let singleSignerConfig = MultisigConfig
-        { signers = [SignerInfo "0x1111111111111111111111111111111111111111" 0 0]
+        { signers = [SignerInfo "1111111111111111111111111111111111111111" 0 0]
         , groupQuorums = [1] <> replicate 31 0
         , groupParents = replicate 32 0
         }
-  let singleSigner = ["0x1111111111111111111111111111111111111111"]
+  let singleSigner = ["1111111111111111111111111111111111111111"]
   case verifyGroupVoting singleSigner singleSignerConfig of
     Left err -> abort $ "1-of-1 should pass: " <> err
     Right () -> pure ()
@@ -96,17 +96,17 @@ testGroupVotingEdgeCases = script do
   -- Test: 3-of-3 config (all signers required)
   let allSignersConfig = MultisigConfig
         { signers =
-            [ SignerInfo "0x1111111111111111111111111111111111111111" 0 0
-            , SignerInfo "0x2222222222222222222222222222222222222222" 1 0
-            , SignerInfo "0x3333333333333333333333333333333333333333" 2 0
+            [ SignerInfo "1111111111111111111111111111111111111111" 0 0
+            , SignerInfo "2222222222222222222222222222222222222222" 1 0
+            , SignerInfo "3333333333333333333333333333333333333333" 2 0
             ]
         , groupQuorums = [3] <> replicate 31 0  -- Need ALL 3
         , groupParents = replicate 32 0
         }
   let allSigners =
-        [ "0x1111111111111111111111111111111111111111"
-        , "0x2222222222222222222222222222222222222222"
-        , "0x3333333333333333333333333333333333333333"
+        [ "1111111111111111111111111111111111111111"
+        , "2222222222222222222222222222222222222222"
+        , "3333333333333333333333333333333333333333"
         ]
   case verifyGroupVoting allSigners allSignersConfig of
     Left err -> abort $ "3-of-3 should pass with all: " <> err
@@ -114,8 +114,8 @@ testGroupVotingEdgeCases = script do
 
   -- Test: 3-of-3 fails with 2 signers
   let twoOfThree =
-        [ "0x1111111111111111111111111111111111111111"
-        , "0x2222222222222222222222222222222222222222"
+        [ "1111111111111111111111111111111111111111"
+        , "2222222222222222222222222222222222222222"
         ]
   case verifyGroupVoting twoOfThree allSignersConfig of
     Left _ -> pure ()  -- Expected to fail
@@ -130,8 +130,8 @@ testDuplicateSignerRejection = script do
   let config = make2of3Config
   -- Duplicate signers should fail (same address twice)
   let duplicateSigners =
-        [ "0x1111111111111111111111111111111111111111"
-        , "0x1111111111111111111111111111111111111111"  -- Same as first!
+        [ "1111111111111111111111111111111111111111"
+        , "1111111111111111111111111111111111111111"  -- Same as first!
         ]
   case verifyGroupVoting duplicateSigners config of
     Left _ -> pure ()  -- Expected to fail (addresses not strictly increasing)

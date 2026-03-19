@@ -224,6 +224,11 @@ isHexDigit c =
   c == "a" || c == "b" || c == "c" || c == "d" || c == "e" || c == "f" ||
   c == "A" || c == "B" || c == "C" || c == "D" || c == "E" || c == "F"
 
+assertValidHex : Text -> BytesHex -> Update ()
+assertValidHex fieldName hex =
+  assertMsg (fieldName <> ": invalid hex (must be even-length, 0-9a-fA-F only): " <> hex)
+    (isValidHex hex)
+
 -- ===========================================================================
 -- MERKLE PROOF VERIFICATION
 -- ===========================================================================
