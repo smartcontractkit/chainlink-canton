@@ -692,6 +692,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
 	senderBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
+	ccipOwnerBalanceBefore := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
 
 	// Get disclosed contract for the fee token holding
 	disclosedFeeTokenHolding, err := testhelpers.GetDisclosedContractById(t.Context(), senderParticipant, feeTokenHoldingCid)
@@ -949,6 +950,11 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	}
 	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+
+	// Verify pool feeBps haircut was applied to token transfer amount in encoded message:
+	// 10,000 sent with 5% feeBps => 9,500 bridged.
+	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
+
 	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
 	senderDelta := senderBalanceBefore - senderBalanceAfter
 	t.Logf(
@@ -957,8 +963,22 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		senderBalanceAfter,
 		senderDelta,
 	)
+	// Sender must be debited by at least the transfer amount (fees may add more).
 	require.Positive(t, senderDelta, "sender balance should decrease on send")
 	require.GreaterOrEqual(t, senderDelta, tokenTransferAmount, "sender balance deduction should include at least token transfer amount")
+
+	ccipOwnerBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), ccipParticipant)
+	ccipOwnerDelta := ccipOwnerBalanceAfter - ccipOwnerBalanceBefore
+	t.Logf(
+		"CCIP owner balance (local units): before=%d after=%d credited=%d",
+		ccipOwnerBalanceBefore,
+		ccipOwnerBalanceAfter,
+		ccipOwnerDelta,
+	)
+
+	// CCIP owner should receive the full fee-token payment side:
+	// $0.37 at $1 fee token => 37,000,000 local units.
+	require.Equal(t, int64(37_000_000), ccipOwnerDelta, "ccipOwner should receive total fee-token payment (0.37 token)")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
@@ -1011,4 +1031,30 @@ func dedupeDisclosedContracts(in []*apiv2.DisclosedContract) []*apiv2.DisclosedC
 	}
 
 	return out
+}
+
+// extractTokenTransferAmountFromEncodedMessageHex decodes encodedMessage and returns
+// tokenTransfer.amount (uint256 big-endian) from the token-transfer payload.
+// It skips the fixed CCIP message prefix, short variable fields, and destination blob,
+// then reads the amount from bytes [1:33] of tokenTransfer (byte 0 is version/tag).
+func extractTokenTransferAmountFromEncodedMessageHex(t *testing.T, encodedMessageHex string) int64 {
+	t.Helper()
+
+	b, err := hex.DecodeString(encodedMessageHex)
+	require.NoError(t, err, "decode encodedMessage")
+
+	i := 1 + 8 + 8 + 8 + 4 + 4 + 2 + 32
+	for range 4 {
+		i += 1 + int(b[i])
+	}
+	destBlobLen := int(b[i])<<8 | int(b[i+1])
+	i += 2 + destBlobLen
+	i += 2
+
+	amt := int64(0)
+	for _, x := range b[i+25 : i+33] {
+		amt = (amt << 8) | int64(x)
+	}
+
+	return amt
 }
