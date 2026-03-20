@@ -5,7 +5,8 @@ import Daml.Script
 import DA.Assert ((===))
 
 import CCIP.OnRamp
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import CCIP.RawInstanceAddress (RawInstanceAddress(..), make)
+import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 -- ===========================================================================
 -- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)
@@ -123,5 +124,30 @@ testInvalidDataRejection = do
   case decodeSetDepsParams "ff" of
     None -> pure ()
     Some _ -> abort "Expected decodeSetDepsParams to fail on invalid tag"
+
+  pure ()
+
+testOrderedVerifierDataByCCVs : Script ()
+testOrderedVerifierDataByCCVs = do
+  ccvOwner <- allocateParty "ccv-owner"
+
+  let ccv1 = make "ccv-1" ccvOwner
+      ccv2 = make "ccv-2" ccvOwner
+      vd1 = SendingMessageV1.VerifierData with
+        ccvInstanceId = "ccv-1"
+        ccvOwner = ccvOwner
+        versionTag = "11111111"
+        verifierBlob = "aaaa"
+        messageSentObservers = []
+      vd2 = SendingMessageV1.VerifierData with
+        ccvInstanceId = "ccv-2"
+        ccvOwner = ccvOwner
+        versionTag = "22222222"
+        verifierBlob = "bbbb"
+        messageSentObservers = []
+
+  let ordered = orderedVerifierDataByCCVs [ccv1, ccv2] [vd2, vd1]
+  map (.ccvInstanceId) ordered === ["ccv-1", "ccv-2"]
+  map (.verifierBlob) ordered === ["aaaa", "bbbb"]
 
   pure ()
