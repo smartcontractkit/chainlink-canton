@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "659579e388cc0fde28c241cd285e3dfd99966e962d123cfec6af2dbbff6fcd8f"
+	PackageID   = "51996b174f6647e37a3f66ee941be056bea15f95cae54b507ca5916dfadff9a3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1634,9 +1634,9 @@ func (t *ExecutingMessageDeps) UnmarshalHex(data string) error {
 type ExecutingMessageState string
 
 const (
-	ExecutingMessageStateExecutingMessageState_Prepared ExecutingMessageState = "ExecutingMessageState_Prepared"
+	ExecutingMessageStateExecutingMessageState_RequirePoolCCVs ExecutingMessageState = "ExecutingMessageState_RequirePoolCCVs"
 
-	ExecutingMessageStateExecutingMessageState_PoolVerified ExecutingMessageState = "ExecutingMessageState_PoolVerified"
+	ExecutingMessageStateExecutingMessageState_Prepared ExecutingMessageState = "ExecutingMessageState_Prepared"
 )
 
 func (e ExecutingMessageState) GetEnumConstructor() string { return string(e) }
@@ -1676,18 +1676,23 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner        types.PARTY           `json:"ccipOwner"`
-	Message          MessageV1             `json:"message"`
-	MessageId        types.TEXT            `json:"messageId"`
-	Receiver         types.PARTY           `json:"receiver"`
-	TokenReceiver    *types.PARTY          `json:"tokenReceiver" hex:"optional"`
-	Executor         types.PARTY           `json:"executor"`
-	ObservingParties []types.PARTY         `json:"observingParties"`
-	CcvVerifications []CCVVerification     `json:"ccvVerifications"`
-	CcvOwners        []types.PARTY         `json:"ccvOwners"`
-	InboundPoolCCVs  *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	Deps             ExecutingMessageDeps  `json:"deps"`
-	State            ExecutingMessageState `json:"state"`
+	CcipOwner                     types.PARTY           `json:"ccipOwner"`
+	Message                       MessageV1             `json:"message"`
+	MessageId                     types.TEXT            `json:"messageId"`
+	Receiver                      types.PARTY           `json:"receiver"`
+	TokenReceiver                 *types.PARTY          `json:"tokenReceiver" hex:"optional"`
+	Executor                      types.PARTY           `json:"executor"`
+	ObservingParties              []types.PARTY         `json:"observingParties"`
+	CcvVerifications              []CCVVerification     `json:"ccvVerifications"`
+	CcvOwners                     []types.PARTY         `json:"ccvOwners"`
+	RequiredCCVs                  []RawInstanceAddress  `json:"requiredCCVs"`
+	OptionalCCVs                  []RawInstanceAddress  `json:"optionalCCVs"`
+	OptionalCCVThreshold          types.INT64           `json:"optionalCCVThreshold"`
+	ReceiverMinBlockConfirmations types.INT64           `json:"receiverMinBlockConfirmations"`
+	SourceDefaultCCVs             []RawInstanceAddress  `json:"sourceDefaultCCVs"`
+	InboundPoolCCVs               *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
+	Deps                          ExecutingMessageDeps  `json:"deps"`
+	State                         ExecutingMessageState `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1764,6 +1769,54 @@ func (t ExecutingMessageV1) CreateCommand() *model.CreateCommand {
 		res := make([]any, 0, len(t.CcvOwners))
 		for _, e := range t.CcvOwners {
 			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourceDefaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.SourceDefaultCCVs))
+		for _, e := range t.SourceDefaultCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
 		}
 		return res
 	}()
@@ -1872,6 +1925,54 @@ func (t ExecutingMessageV1) CreateCommandWithPackageID(packageID string) *model.
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["optionalCCVThreshold"] = int64(t.OptionalCCVThreshold)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["sourceDefaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.SourceDefaultCCVs))
+		for _, e := range t.SourceDefaultCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
 	if t.InboundPoolCCVs != nil {
 		args["inboundPoolCCVs"] = map[string]any{
 			"_type": "optional",
@@ -1932,27 +2033,6 @@ func (t *ExecutingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for ExecutingMessageV1
 
-// CancelExecute exercises the CancelExecute choice on this ExecutingMessageV1 contract
-// This method uses the package name in the template ID
-func (t ExecutingMessageV1) CancelExecute(contractID string, args CancelExecute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
-		ContractID: contractID,
-		Choice:     "CancelExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CancelExecuteWithPackageID exercises the CancelExecute choice using the provided package ID instead of package name
-func (t ExecutingMessageV1) CancelExecuteWithPackageID(contractID string, packageID string, args CancelExecute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
-		ContractID: contractID,
-		Choice:     "CancelExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // AddCCVVerification exercises the AddCCVVerification choice on this ExecutingMessageV1 contract
 // This method uses the package name in the template ID
 func (t ExecutingMessageV1) AddCCVVerification(contractID string, args AddCCVVerification) *model.ExerciseCommand {
@@ -1991,6 +2071,27 @@ func (t ExecutingMessageV1) SetInboundPoolCCVsWithPackageID(contractID string, p
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CancelExecute exercises the CancelExecute choice on this ExecutingMessageV1 contract
+// This method uses the package name in the template ID
+func (t ExecutingMessageV1) CancelExecute(contractID string, args CancelExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
+		ContractID: contractID,
+		Choice:     "CancelExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CancelExecuteWithPackageID exercises the CancelExecute choice using the provided package ID instead of package name
+func (t ExecutingMessageV1) CancelExecuteWithPackageID(contractID string, packageID string, args CancelExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
+		ContractID: contractID,
+		Choice:     "CancelExecute",
 		Arguments:  argsToMap(args),
 	}
 }
