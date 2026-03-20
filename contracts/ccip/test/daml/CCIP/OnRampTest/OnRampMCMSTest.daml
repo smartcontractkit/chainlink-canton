@@ -31,6 +31,7 @@ testOnRampMCMSEntrypoint_SetDeps = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps = initialDeps
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
@@ -80,6 +81,7 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps = initialDeps
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
@@ -129,6 +131,7 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps = initialDeps
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
@@ -199,6 +202,7 @@ testOnRampMCMSEntrypoint_UnknownFunction = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
@@ -228,6 +232,7 @@ testOnRampMCMSEntrypoint_InvalidParams = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
@@ -257,6 +262,7 @@ testOnRampMCMSEntrypoint_MissingSelfCid = script do
     createCmd OnRamp with
       instanceId
       ccipOwner
+      maxUSDCentsPerMsg = 1000000000.0
       deps
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid

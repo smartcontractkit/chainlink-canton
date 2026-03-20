@@ -46,6 +46,14 @@ testAddCCVVerification = do
             observingParties = []
             ccvVerifications = []
             ccvOwners = []
+            requiredCCVs = [ RawInstanceAddress.make "0xCCV1" ccvOwner1
+                           , RawInstanceAddress.make "0xCCV2" ccvOwner1
+                           , RawInstanceAddress.make "0xCCV2" ccvOwner2
+                           ]
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            sourceDefaultCCVs = []
             inboundPoolCCVs = None
             deps = ExecutingMessageDeps with
                 offRamp = RawInstanceAddress.make "test-offramp" ccipOwner
@@ -91,7 +99,6 @@ testAddCCVVerification = do
             versionTag = "0x03"
             caller = ccvOwner3 -- not part of the authorizing parties for this submit
 
-
     -- Fetch final state and assert both CCV verifications are recorded
     finalMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
     length finalMessage.ccvVerifications === 3
@@ -100,3 +107,75 @@ testAddCCVVerification = do
         [ CCVVerification with ccvInstanceId = "0xCCV1", ccvOwner = ccvOwner1, versionTag = "0x01"
         , CCVVerification with ccvInstanceId = "0xCCV2", ccvOwner = ccvOwner1, versionTag = "0x02"
         , CCVVerification with ccvInstanceId = "0xCCV2", ccvOwner = ccvOwner2, versionTag = "0x02"]
+
+testAddCCVVerificationRequiresPoolFirstForTokenTransfer : Script ()
+testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
+    ccipOwner <- allocateParty "CCIP Owner Token"
+    ccvOwner <- allocateParty "CCV Owner Token"
+    receiver <- allocateParty "Receiver Token"
+    executor <- allocateParty "Executor Token"
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = 123.0
+            destChainSelector = 456.0
+            sequenceNumber = 1.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
+            offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
+            sender = "0000000000000000000000000000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = Some (CCIP.MessageCodecV1.TokenTransferV1 with
+                sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000004"
+                sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
+                destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
+                tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+                amount = 1.0
+                extraData = "")
+            messageData = ""
+
+    executingMessageCid <- submit ccipOwner do
+        createCmd ExecutingMessageV1 with
+            ccipOwner = ccipOwner
+            message = message
+            messageId = "0x5678"
+            receiver = receiver
+            tokenReceiver = Some receiver
+            executor = executor
+            observingParties = []
+            ccvVerifications = []
+            ccvOwners = []
+            requiredCCVs = [RawInstanceAddress.make "0xCCV1" ccvOwner]
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            sourceDefaultCCVs = []
+            inboundPoolCCVs = None
+            deps = ExecutingMessageDeps with
+                offRamp = RawInstanceAddress.make "test-offramp" ccipOwner
+                globalConfig = RawInstanceAddress.make "test-globalConfig" ccipOwner
+                rmnRemote = RawInstanceAddress.make "test-rmnRemote" ccipOwner
+                tokenAdminRegistry = RawInstanceAddress.make "test-tokenAdminRegistry" ccipOwner
+            state = ExecutingMessageState_RequirePoolCCVs
+
+    submitMustFail [ccipOwner, ccvOwner] do
+        exerciseCmd executingMessageCid AddCCVVerification with
+            ccvInstanceId = "0xCCV1"
+            versionTag = "0x01"
+            caller = ccvOwner
+
+    executingMessageCid <- submit ccipOwner do
+        exerciseCmd executingMessageCid SetInboundPoolCCVs with
+            poolCCVs = []
+
+    executingMessageCid <- submit [ccipOwner, ccvOwner] do
+        exerciseCmd executingMessageCid AddCCVVerification with
+            ccvInstanceId = "0xCCV1"
+            versionTag = "0x01"
+            caller = ccvOwner
+
+    finalMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
+    length finalMessage.ccvVerifications === 1

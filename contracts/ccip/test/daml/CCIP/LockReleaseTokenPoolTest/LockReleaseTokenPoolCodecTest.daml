@@ -90,7 +90,6 @@ testRateLimiterConfigArgsRoundtrip = do
         Some decodedArgs -> do
             forA_ (zip decodedArgs args) $ uncurry assertRateLimiterConfigArgsEqual
 
-
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
 -- ===========================================================================
@@ -103,7 +102,6 @@ testInvalidDataRejection = do
     Some _ -> abort "Expected decodeApplyChainUpdatesParams to fail on empty data"
 
   pure ()
-
 
 -- Assertion helpers
 assertChainUpdateEqual : ChainUpdate -> ChainUpdate -> Script ()

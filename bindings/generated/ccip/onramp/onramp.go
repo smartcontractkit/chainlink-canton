@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "a85a77d2026858ab5f543d40b076ebda0147802e92772a8f56eb9084ad0a0dc8"
+	PackageID   = "88c00f11c2f0af25cd39d0f22717c11640200cb778aff7f95a8bfec6b473ca34"
 	SDKVersion  = "3.4.10"
 )
 
@@ -206,6 +206,72 @@ func (t *CCIPSendFromRouterResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// FinalizeFeeFromRouter is a Record type
+type FinalizeFeeFromRouter struct {
+	RouterPartyOwner  types.PARTY       `json:"routerPartyOwner"`
+	RouterInstanceId  types.TEXT        `json:"routerInstanceId"`
+	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
+	FeeQuoterCid      types.CONTRACT_ID `json:"feeQuoterCid"`
+	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+}
+
+// ToMap converts FinalizeFeeFromRouter to a map for DAML arguments
+func (t FinalizeFeeFromRouter) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
+
+	m["routerInstanceId"] = string(t.RouterInstanceId)
+
+	m["globalConfigCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["feeQuoterCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeQuoterCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeQuoterCid
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	return m
+}
+
+func (t FinalizeFeeFromRouter) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FinalizeFeeFromRouter) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FinalizeFeeFromRouter to hex string (Canton MCMS format)
+func (t FinalizeFeeFromRouter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FinalizeFeeFromRouter from hex string (Canton MCMS format)
+func (t *FinalizeFeeFromRouter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
 	GlobalConfigCid   types.CONTRACT_ID `json:"globalConfigCid"`
@@ -253,9 +319,10 @@ func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
 
 // OnRamp is a Template type
 type OnRamp struct {
-	InstanceId types.TEXT  `json:"instanceId"`
-	CcipOwner  types.PARTY `json:"ccipOwner"`
-	Deps       OnRampDeps  `json:"deps"`
+	InstanceId        types.TEXT    `json:"instanceId"`
+	CcipOwner         types.PARTY   `json:"ccipOwner"`
+	MaxUSDCentsPerMsg types.NUMERIC `json:"maxUSDCentsPerMsg"`
+	Deps              OnRampDeps    `json:"deps"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -277,6 +344,10 @@ func (t OnRamp) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	if t.MaxUSDCentsPerMsg != "" {
+		args["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = func() any {
@@ -302,6 +373,10 @@ func (t OnRamp) CreateCommandWithPackageID(packageID string) *model.CreateComman
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	if t.MaxUSDCentsPerMsg != "" {
+		args["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = func() any {
@@ -341,6 +416,27 @@ func (t *OnRamp) UnmarshalHex(data string) error {
 }
 
 // Choice methods for OnRamp
+
+// FinalizeFeeFromRouter exercises the FinalizeFeeFromRouter choice on this OnRamp contract
+// This method uses the package name in the template ID
+func (t OnRamp) FinalizeFeeFromRouter(contractID string, args FinalizeFeeFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "FinalizeFeeFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFeeFromRouterWithPackageID exercises the FinalizeFeeFromRouter choice using the provided package ID instead of package name
+func (t OnRamp) FinalizeFeeFromRouterWithPackageID(contractID string, packageID string, args FinalizeFeeFromRouter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.OnRamp", "OnRamp"),
+		ContractID: contractID,
+		Choice:     "FinalizeFeeFromRouter",
+		Arguments:  argsToMap(args),
+	}
+}
 
 // CCIPSendFromRouter exercises the CCIPSendFromRouter choice on this OnRamp contract
 // This method uses the package name in the template ID
@@ -829,6 +925,7 @@ func (t *SetDepsParams) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error)
+	FinalizeFeeFromRouter(args FinalizeFeeFromRouter) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend(args GetRequiredCCVsForSend) (*bind.EncodedChoice, error)
 	PrepareSendFromRouter(args PrepareSendFromRouter) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
@@ -865,6 +962,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 // CCIPSendFromRouter encodes parameters for the CCIPSendFromRouter choice.
 func (e *encoder) CCIPSendFromRouter(args CCIPSendFromRouter) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CCIPSendFromRouter", args)
+}
+
+// FinalizeFeeFromRouter encodes parameters for the FinalizeFeeFromRouter choice.
+func (e *encoder) FinalizeFeeFromRouter(args FinalizeFeeFromRouter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeFeeFromRouter", args)
 }
 
 // GetRequiredCCVsForSend encodes parameters for the GetRequiredCCVsForSend choice.
