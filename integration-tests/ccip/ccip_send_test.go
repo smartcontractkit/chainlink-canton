@@ -347,7 +347,12 @@ func TestCCIPSend(t *testing.T) {
 									UsdPerToken:  types.NUMERIC("1500000000"),
 								},
 							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{},
+							GasPriceUpdates: []feequoter.GasPriceUpdate{
+								{
+									DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+									UsdPerUnitGas:     types.NUMERIC("38"),
+								},
+							},
 						},
 						Caller: types.PARTY(partyCCIP),
 					}),
