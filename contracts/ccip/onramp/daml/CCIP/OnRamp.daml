@@ -3,7 +3,7 @@ module CCIP.OnRamp where
 
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, isSome)
 
@@ -169,7 +169,7 @@ template OnRamp
                     None -> pure ()
 
                 assertMsg "onramp: sender required CCVs cannot contain duplicates"
-                    (length senderRequiredCCVs == length (dedup senderRequiredCCVs))
+                    (unique senderRequiredCCVs)
 
                 let hasTokenTransfer = isSome tokenInstrumentId
                 let isTokenOnlyTransfer = hasTokenTransfer
