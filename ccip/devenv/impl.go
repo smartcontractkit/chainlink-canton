@@ -66,7 +66,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
-	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
 var (
@@ -1117,7 +1116,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("refresh fee quoter after price update: %w", err)
 	}
 
-	feeTransferFactoryCID, feeTransferFactoryExtraArgs, feeTransferFactoryDisclosures, err := devenvtests.GetFeeTransferFactoryInput(ctx, participant, party, party)
+	feeTransferFactoryCID, feeTransferFactoryExtraArgs, feeTransferFactoryDisclosures, err := getFeeTransferFactoryInput(ctx, participant, party, party)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee transfer factory input: %w", err)
 	}
