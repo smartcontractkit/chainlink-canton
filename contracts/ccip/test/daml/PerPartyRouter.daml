@@ -878,6 +878,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
                 laneMandatedCCVs = []
                 defaultCCVs = []
@@ -912,13 +913,13 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
