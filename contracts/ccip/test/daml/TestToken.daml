@@ -9,7 +9,6 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
 
-
 -- | Token holding template (like Amulet but simplified).
 -- No expiry, no fees - just a simple UTXO holding.
 template TestHolding
@@ -28,7 +27,6 @@ template TestHolding
         amount
         lock = None
         meta = MetadataV1.emptyMetadata
-
 
 -- | Transfer Preapproval (like Canton Coin's TransferPreapproval).
 -- Receiver + admin create this to allow ANY sender to send tokens directly.
@@ -67,7 +65,6 @@ template TestTransferPreapproval
           output = TransferV1.TransferInstructionResult_Completed with
             receiverHoldingCids = [toInterfaceContractId receiverCid]
           meta = MetadataV1.emptyMetadata
-
 
 -- | Pending Transfer Instruction (like AmuletTransferInstruction).
 -- Created when receiver doesn't have preapproval.
@@ -141,7 +138,6 @@ template TestTransferInstruction
       transferInstruction_updateImpl _self _arg =
         abort "TestTransferInstruction: update not supported"
 
-
 -- | TransferFactory (like ExternalPartyAmuletRules).
 -- Checks for preapproval; if exists -> direct, else -> pending.
 template TestTransferFactory
@@ -186,7 +182,6 @@ template TestTransferFactory
       controller admin
       do create this with preapprovalCid = newPreapprovalCid
 
-
 -- Helper: Sum inputs, validate ownership/instrument, and archive them.
 sumAndArchiveInputs : Party -> Party -> HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> Update Decimal
 sumAndArchiveInputs admin sender instrumentId cids =
@@ -201,7 +196,6 @@ sumAndArchiveInputs admin sender instrumentId cids =
     0.0
     cids
 
-
 -- Helper: Create change holding if amount > 0.
 createChangeIfNeeded : Party -> Party -> HoldingV1.InstrumentId -> Decimal -> Update [ContractId HoldingV1.Holding]
 createChangeIfNeeded admin owner instrumentId change =
@@ -210,7 +204,6 @@ createChangeIfNeeded admin owner instrumentId change =
       changeCid <- create TestHolding with owner, admin, instrumentId, amount = change
       pure [toInterfaceContractId changeCid]
     else pure []
-
 
 -- Helper: Execute direct self-transfer.
 executeDirect : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
@@ -228,7 +221,6 @@ executeDirect admin transfer = do
     output = TransferV1.TransferInstructionResult_Completed with
       receiverHoldingCids = [toInterfaceContractId receiverCid]
     meta = MetadataV1.emptyMetadata
-
 
 -- Helper: Create pending transfer instruction when no preapproval.
 createPendingTransfer : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult

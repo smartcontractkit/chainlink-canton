@@ -526,10 +526,21 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 			LaneMandatedOutboundCCVs: nil,
 			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
-			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{NetworkFeeUSDCents: 0, DefaultTokenFeeUSDCents: 0},
-			ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
-			AddressBytesLength:       addressBytesLength,
-			BaseExecutionGasCost:     0,
+			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+				IsEnabled:                   true,
+				MaxDataBytes:                50000,
+				MaxPerMsgGasLimit:           4000000,
+				DestGasOverhead:             300000,
+				DestGasPerPayloadByteBase:   16,
+				ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+				DefaultTxGasLimit:           200000,
+				DefaultTokenFeeUSDCents:     0,
+				DefaultTokenDestGasOverhead: 34000,
+				NetworkFeeUSDCents:          0,
+			},
+			ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+			AddressBytesLength:      addressBytesLength,
+			BaseExecutionGasCost:    0,
 		}
 		config.Config.Input.RemoteChains[remoteSelector] = remoteChainConfig
 	}
@@ -1079,7 +1090,16 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 								{InstrumentId: linkTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 							},
-							GasPriceUpdates: []feequoter.GasPriceUpdate{},
+							// Gas price must be 0 until TransferFactory is
+							// properly wired (see TODO above). A non-zero gas
+							// price produces a non-zero fee, triggering a
+							// TransferFactory_Transfer on the invalid CID.
+							GasPriceUpdates: []feequoter.GasPriceUpdate{
+								{
+									DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+									UsdPerUnitGas:     types.NUMERIC("0"),
+								},
+							},
 						},
 						Caller: types.PARTY(party),
 					}),
@@ -1197,13 +1217,19 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(opts.ExecutionGasLimit),
 			SenderRequiredCCVs: senderRequiredCCVs,
-			ExecutorCid:        executorCID,
+			ExecutorCid:        &executorCID,
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
 			TokenArgs:          types.TEXT(""),
 		},
 		FeeToken: feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
+			// TODO: replace with a real Splice TransferFactory CID from the
+			// transfer-instruction API. Using routerCID is invalid because
+			// CCIPSend is a consuming choice on the router, so exercising
+			// TransferFactory_Transfer on the same CID fails with
+			// CONTRACT_NOT_ACTIVE. This only works today because total fees
+			// are 0 (gas price set to 0 below) so the transfer is skipped.
 			TransferFactory: routerCID,
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},

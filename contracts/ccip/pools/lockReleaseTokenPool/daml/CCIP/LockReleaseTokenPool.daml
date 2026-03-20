@@ -174,7 +174,13 @@ template LockReleaseTokenPool
     where
         signatory poolOwner
 
-        ensure all (\cfg -> cfg.feeBps >= 0.0 && cfg.feeBps < bpsDenominator) (Map.values tokenTransferFeeConfigs)
+        ensure all
+            (\cfg ->
+                cfg.feeBps >= 0.0
+                    && cfg.feeBps < bpsDenominator
+                    && cfg.destBytesOverhead >= 32
+            )
+            (Map.values tokenTransferFeeConfigs)
 
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with

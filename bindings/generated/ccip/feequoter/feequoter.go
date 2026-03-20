@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "268f080e1be9e54348acf99133a87cbb3654e6cb6c73f30633ad15ee2cf794f5"
+	PackageID   = "971b8ccce626ccbba5dca5e393c43bb82a3348d029e20014ec4baf76ceeed17e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -170,7 +170,6 @@ type DestChainConfig2 struct {
 	DestGasPerPayloadByteBase   types.INT64   `json:"destGasPerPayloadByteBase"`
 	ChainFamilySelector         types.TEXT    `json:"chainFamilySelector" hex:"bytes"`
 	DefaultTxGasLimit           types.INT64   `json:"defaultTxGasLimit"`
-	NetworkFeeUSD               types.NUMERIC `json:"networkFeeUSD"`
 	DefaultTokenFeeUSD          types.NUMERIC `json:"defaultTokenFeeUSD"`
 	DefaultTokenDestGasOverhead types.INT64   `json:"defaultTokenDestGasOverhead"`
 }
@@ -192,8 +191,6 @@ func (t DestChainConfig2) ToMap() map[string]any {
 	m["chainFamilySelector"] = string(t.ChainFamilySelector)
 
 	m["defaultTxGasLimit"] = int64(t.DefaultTxGasLimit)
-
-	m["networkFeeUSD"] = t.NetworkFeeUSD
 
 	m["defaultTokenFeeUSD"] = t.DefaultTokenFeeUSD
 
@@ -279,7 +276,6 @@ type FeeQuoter struct {
 	UsdPerUnitGasByDestChainSelector types.GENMAP                             `json:"usdPerUnitGasByDestChainSelector"`
 	UsdPerToken                      types.GENMAP                             `json:"usdPerToken"`
 	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
-	MaxFeeJuelsPerMsg                types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
 	PriceUpdaters                    []types.PARTY                            `json:"priceUpdaters"`
 }
 
@@ -351,10 +347,6 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 		}
 		return t.LinkTokenInstrumentId
 	}()
-
-	if t.MaxFeeJuelsPerMsg != "" {
-		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
-	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
@@ -430,10 +422,6 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 		return t.LinkTokenInstrumentId
 	}()
 
-	if t.MaxFeeJuelsPerMsg != "" {
-		args["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
-	}
-
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["priceUpdaters"] = func() []any {
 		res := make([]any, 0, len(t.PriceUpdaters))
@@ -472,6 +460,27 @@ func (t *FeeQuoter) UnmarshalHex(data string) error {
 }
 
 // Choice methods for FeeQuoter
+
+// QuoteGasForExec exercises the QuoteGasForExec choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) QuoteGasForExec(contractID string, args QuoteGasForExec) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "QuoteGasForExec",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// QuoteGasForExecWithPackageID exercises the QuoteGasForExec choice using the provided package ID instead of package name
+func (t FeeQuoter) QuoteGasForExecWithPackageID(contractID string, packageID string, args QuoteGasForExec) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "QuoteGasForExec",
+		Arguments:  argsToMap(args),
+	}
+}
 
 // GetTokenPrice exercises the GetTokenPrice choice on this FeeQuoter contract
 // This method uses the package name in the template ID
@@ -553,27 +562,6 @@ func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterFinalizeFee exercises the FeeQuoter_FinalizeFee choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) FeeQuoterFinalizeFee(contractID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// FeeQuoterFinalizeFeeWithPackageID exercises the FeeQuoter_FinalizeFee choice using the provided package ID instead of package name
-func (t FeeQuoter) FeeQuoterFinalizeFeeWithPackageID(contractID string, packageID string, args FeeQuoterFinalizeFee) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "FeeQuoter_FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -749,69 +737,6 @@ func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 // Verify interface implementations for FeeQuoter
 
 var _ mcms.IMCMSReceiver = (*FeeQuoter)(nil)
-
-// FeeQuoterFinalizeFee is a Record type
-type FeeQuoterFinalizeFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	Caller            types.PARTY       `json:"caller"`
-}
-
-// ToMap converts FeeQuoterFinalizeFee to a map for DAML arguments
-func (t FeeQuoterFinalizeFee) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sendingMessageCid"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.SendingMessageCid).(mapper); ok {
-			return m.toMap()
-		}
-		return t.SendingMessageCid
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t FeeQuoterFinalizeFee) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *FeeQuoterFinalizeFee) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes FeeQuoterFinalizeFee to hex string (Canton MCMS format)
-func (t FeeQuoterFinalizeFee) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeQuoterFinalizeFee from hex string (Canton MCMS format)
-func (t *FeeQuoterFinalizeFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// FeeQuoterFinalizeFeeMCMSParams is FeeQuoterFinalizeFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type FeeQuoterFinalizeFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-}
-
-// MarshalHex encodes FeeQuoterFinalizeFeeMCMSParams to hex string for MCMS operationData.
-func (t FeeQuoterFinalizeFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes FeeQuoterFinalizeFeeMCMSParams from hex string.
-func (t *FeeQuoterFinalizeFeeMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
 
 // FeeQuoterGetTokenTransferFee is a Record type
 type FeeQuoterGetTokenTransferFee struct {
@@ -1371,6 +1296,126 @@ func (t *PriceUpdates) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// QuoteGasForExec is a Record type
+type QuoteGasForExec struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                              `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	Caller            types.PARTY                              `json:"caller"`
+}
+
+// ToMap converts QuoteGasForExec to a map for DAML arguments
+func (t QuoteGasForExec) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["nonCalldataGas"] = int64(t.NonCalldataGas)
+
+	m["calldataSize"] = int64(t.CalldataSize)
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t QuoteGasForExec) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *QuoteGasForExec) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes QuoteGasForExec to hex string (Canton MCMS format)
+func (t QuoteGasForExec) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExec from hex string (Canton MCMS format)
+func (t *QuoteGasForExec) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// QuoteGasForExecMCMSParams is QuoteGasForExec without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type QuoteGasForExecMCMSParams struct {
+	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                              `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+}
+
+// MarshalHex encodes QuoteGasForExecMCMSParams to hex string for MCMS operationData.
+func (t QuoteGasForExecMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExecMCMSParams from hex string.
+func (t *QuoteGasForExecMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// QuoteGasForExecResult is a Record type
+type QuoteGasForExecResult struct {
+	TotalGas          types.INT64   `json:"totalGas"`
+	GasCostUSDCents   types.NUMERIC `json:"gasCostUSDCents"`
+	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
+	PremiumMultiplier types.NUMERIC `json:"premiumMultiplier"`
+}
+
+// ToMap converts QuoteGasForExecResult to a map for DAML arguments
+func (t QuoteGasForExecResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["totalGas"] = int64(t.TotalGas)
+
+	m["gasCostUSDCents"] = t.GasCostUSDCents
+
+	m["feeTokenPrice"] = t.FeeTokenPrice
+
+	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	return m
+}
+
+func (t QuoteGasForExecResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *QuoteGasForExecResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes QuoteGasForExecResult to hex string (Canton MCMS format)
+func (t QuoteGasForExecResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExecResult from hex string (Canton MCMS format)
+func (t *QuoteGasForExecResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TimestampedPrice is a Record type
 type TimestampedPrice struct {
 	Price     types.NUMERIC   `json:"price"`
@@ -1568,8 +1613,6 @@ func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
 	ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error)
-	FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error)
-	FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFee(args FeeQuoterGetTokenTransferFee) (*bind.EncodedChoice, error)
 	FeeQuoterGetTokenTransferFeeMCMSParams(args FeeQuoterGetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
 	Get(args Get) (*bind.EncodedChoice, error)
@@ -1584,6 +1627,8 @@ type MCMSEncoder interface {
 	GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error)
 	GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error)
 	GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error)
+	QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error)
+	QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error)
 	UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error)
 	UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error)
 }
@@ -1623,16 +1668,6 @@ func (e *encoder) ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2
 // ApplyFeeTokenUpdates encodes parameters for the ApplyFeeTokenUpdates choice.
 func (e *encoder) ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyFeeTokenUpdates", args)
-}
-
-// FeeQuoterFinalizeFee encodes parameters for the FeeQuoterFinalizeFee choice.
-func (e *encoder) FeeQuoterFinalizeFee(args FeeQuoterFinalizeFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FeeQuoterFinalizeFee", args)
-}
-
-// FeeQuoterFinalizeFeeMCMSParams encodes MCMS parameters (without Caller) for the FeeQuoterFinalizeFee choice.
-func (e *encoder) FeeQuoterFinalizeFeeMCMSParams(args FeeQuoterFinalizeFeeMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("FeeQuoterFinalizeFee", args)
 }
 
 // FeeQuoterGetTokenTransferFee encodes parameters for the FeeQuoterGetTokenTransferFee choice.
@@ -1703,6 +1738,16 @@ func (e *encoder) GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error)
 // GetTokenPriceMCMSParams encodes MCMS parameters (without Caller) for the GetTokenPrice choice.
 func (e *encoder) GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetTokenPrice", args)
+}
+
+// QuoteGasForExec encodes parameters for the QuoteGasForExec choice.
+func (e *encoder) QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("QuoteGasForExec", args)
+}
+
+// QuoteGasForExecMCMSParams encodes MCMS parameters (without Caller) for the QuoteGasForExec choice.
+func (e *encoder) QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("QuoteGasForExec", args)
 }
 
 // UpdatePrices encodes parameters for the UpdatePrices choice.

@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "c26293a3d59a84bd581585ed17cfe1a1a80a5abdc8da48d71ae41ab3df922de0"
+	PackageID   = "3570d1bb31fc91c1f2204457fd793513e9bd0941f7d9b0c98548d7306634ab57"
 	SDKVersion  = "3.4.10"
 )
 
@@ -55,15 +55,11 @@ func argsToMap(args any) map[string]any {
 
 // ExecuteFromRouter is a Record type
 type ExecuteFromRouter struct {
-	RouterPartyOwner              types.PARTY                 `json:"routerPartyOwner"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
-	ExecutingMessageCid           types.CONTRACT_ID           `json:"executingMessageCid"`
-	GlobalConfigCid               types.CONTRACT_ID           `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
-	RmnRemoteCid                  types.CONTRACT_ID           `json:"rmnRemoteCid"`
+	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
+	ExecutingMessageCid   types.CONTRACT_ID `json:"executingMessageCid"`
+	GlobalConfigCid       types.CONTRACT_ID `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
+	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
 }
 
 // ToMap converts ExecuteFromRouter to a map for DAML arguments
@@ -71,36 +67,6 @@ func (t ExecuteFromRouter) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
-
-	m["receiverRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverRequiredCCVs))
-		for _, e := range t.ReceiverRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
-		for _, e := range t.ReceiverOptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
-
-	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	m["executingMessageCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -573,11 +539,17 @@ func (t *OffRampDeps) UnmarshalHex(data string) error {
 
 // PrepareExecute is a Record type
 type PrepareExecute struct {
-	EncodedMessage     types.TEXT        `json:"encodedMessage"`
-	RmnRemoteCid       types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ReceiverParty      types.PARTY       `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty" hex:"optional"`
-	Caller             types.PARTY       `json:"caller"`
+	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
+	GlobalConfigCid               types.CONTRACT_ID           `json:"globalConfigCid"`
+	TokenAdminRegistryCid         types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	RmnRemoteCid                  types.CONTRACT_ID           `json:"rmnRemoteCid"`
+	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
+	Caller                        types.PARTY                 `json:"caller"`
 }
 
 // ToMap converts PrepareExecute to a map for DAML arguments
@@ -585,6 +557,52 @@ func (t PrepareExecute) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["encodedMessage"] = string(t.EncodedMessage)
+
+	m["globalConfigCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.GlobalConfigCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.GlobalConfigCid
+	}()
+
+	m["tokenAdminRegistryCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.TokenAdminRegistryCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.TokenAdminRegistryCid
+	}()
+
+	m["receiverRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverRequiredCCVs))
+		for _, e := range t.ReceiverRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
+		for _, e := range t.ReceiverOptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
+
+	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	m["rmnRemoteCid"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -637,10 +655,16 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 // PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecuteMCMSParams struct {
-	EncodedMessage     types.TEXT        `json:"encodedMessage"`
-	RmnRemoteCid       types.CONTRACT_ID `json:"rmnRemoteCid"`
-	ReceiverParty      types.PARTY       `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY      `json:"tokenReceiverParty" hex:"optional"`
+	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
+	GlobalConfigCid               types.CONTRACT_ID           `json:"globalConfigCid"`
+	TokenAdminRegistryCid         types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	RmnRemoteCid                  types.CONTRACT_ID           `json:"rmnRemoteCid"`
+	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
 }
 
 // MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.

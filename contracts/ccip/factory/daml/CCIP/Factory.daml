@@ -394,7 +394,6 @@ template CCIPFactory
                     factoryCid = newFactoryCid
                     deployedCid = coerceContractId deployedCid
 
-
 data DeployResult = DeployResult
     with
         factoryCid : ContractId CCIPFactory
@@ -420,7 +419,6 @@ data DeployFeeQuoterParams = DeployFeeQuoterParams
     with
         instanceId : Text
         linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        maxFeeJuelsPerMsg : Numeric 0
     deriving (Eq, Show)
 
 data DeployTokenAdminRegistryParams = DeployTokenAdminRegistryParams
@@ -436,6 +434,7 @@ data DeployOnRampParams = DeployOnRampParams
         tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
         feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
         ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        maxUSDCentsPerMsg : Numeric 0
     deriving (Eq, Show)
 
 data DeployOffRampParams = DeployOffRampParams
@@ -545,7 +544,6 @@ mkFeeQuoterContract owner params = CCIP.FeeQuoter.FeeQuoter with
     usdPerUnitGasByDestChainSelector = Map.empty
     usdPerToken = Map.empty
     linkTokenInstrumentId = params.linkTokenInstrumentId
-    maxFeeJuelsPerMsg = params.maxFeeJuelsPerMsg
     priceUpdaters = []
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
@@ -558,6 +556,7 @@ mkOnRampContract : Party -> DeployOnRampParams -> CCIP.OnRamp.OnRamp
 mkOnRampContract ccipOwner params = CCIP.OnRamp.OnRamp with
     instanceId = params.instanceId
     ccipOwner
+    maxUSDCentsPerMsg = params.maxUSDCentsPerMsg
     deps = CCIP.OnRamp.OnRampDeps with
         globalConfig = params.globalConfig
         rmnRemote = params.rmnRemote
@@ -669,12 +668,10 @@ decodeDeployGlobalConfigParams encoded = do
 decodeDeployFeeQuoterParams : BytesHex -> Optional DeployFeeQuoterParams
 decodeDeployFeeQuoterParams encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
-    (linkTokenInstrumentId, offset2) <- decodeInstrumentId encoded offset1
-    (maxFeeJuelsPerMsg, _) <- decodeNumeric0At encoded offset2
+    (linkTokenInstrumentId, _) <- decodeInstrumentId encoded offset1
     Some DeployFeeQuoterParams with
         instanceId
         linkTokenInstrumentId
-        maxFeeJuelsPerMsg
 
 decodeDeployTokenAdminRegistryParams : BytesHex -> Optional DeployTokenAdminRegistryParams
 decodeDeployTokenAdminRegistryParams encoded = do
@@ -688,7 +685,8 @@ decodeDeployOnRampParams encoded = do
     (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
     (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
     (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
-    (ccvRegistry, _) <- decodeRawInstanceAddressAt encoded offset5
+    (ccvRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
+    (maxUSDCentsPerMsg, _) <- decodeNumeric0At encoded offset6
     Some DeployOnRampParams with
         instanceId
         globalConfig
@@ -696,6 +694,7 @@ decodeDeployOnRampParams encoded = do
         tokenAdminRegistry
         feeQuoter
         ccvRegistry
+        maxUSDCentsPerMsg
 
 decodeDeployOffRampParams : BytesHex -> Optional DeployOffRampParams
 decodeDeployOffRampParams encoded = do
