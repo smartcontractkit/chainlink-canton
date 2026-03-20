@@ -10,7 +10,6 @@ module CCIP.CCIPReceiver where
 import DA.Crypto.Text (BytesHex)
 import DA.Action (foldlA)
 import DA.List (unique)
-import DA.Optional (isSome)
 
 import qualified CCIP.Context
 import qualified CCIP.Interfaces.CrossChainVerifier
