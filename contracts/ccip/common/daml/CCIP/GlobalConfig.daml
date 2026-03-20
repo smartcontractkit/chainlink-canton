@@ -7,6 +7,7 @@ module CCIP.GlobalConfig
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (byteCount)
+import DA.Text qualified as T
 import DA.Foldable (forA_)
 
 import qualified CCIP.Context
@@ -31,7 +32,8 @@ template GlobalConfig
     where
         signatory ccipOwner
 
-        ensure chainSelector > 0.0 -- Local chain selector must be greater than zero
+        ensure not (T.isInfixOf "@" instanceId)
+          && chainSelector > 0.0 -- Local chain selector must be greater than zero
           && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
           && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
 

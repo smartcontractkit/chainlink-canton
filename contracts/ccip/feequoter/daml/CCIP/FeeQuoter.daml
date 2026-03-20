@@ -7,6 +7,7 @@ import DA.Crypto.Text (byteCount)
 import DA.Foldable qualified as Foldable
 import DA.Map qualified as Map
 import DA.Optional
+import DA.Text qualified as T
 
 import Splice.Api.Token.HoldingV1
 
@@ -53,6 +54,7 @@ template FeeQuoter
     where
         signatory owner
         observer priceUpdaters
+        ensure not (T.isInfixOf "@" instanceId)
 
         nonconsuming choice Get : FeeQuoter
             with
