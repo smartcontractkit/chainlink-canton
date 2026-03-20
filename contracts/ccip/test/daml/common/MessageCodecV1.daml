@@ -3,6 +3,7 @@ module MessageCodecV1 where
 import Daml.Script
 
 import DA.Assert
+import DA.Crypto.Text (byteCount)
 import DA.Text qualified as Text
 import DA.Optional
 
@@ -10,6 +11,7 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
+import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 setup = script do
 
@@ -83,6 +85,20 @@ setup = script do
     -- Test encodeInstanceAddress produces 32-byte hash
     let instanceAddr = MessageCodecV1.encodeInstanceAddress "test-instance" party
     Text.length instanceAddr === 64  -- 32 bytes = 64 hex chars
+
+    let ccvAddr1 = "1111111111111111111111111111111111111111111111111111111111111111"
+    let ccvAddr2 = "2222222222222222222222222222222222222222222222222222222222222222"
+    let executorAddr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    let hashForward = MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] executorAddr
+    let hashReverse = MessageCodecV1.computeCCVAndExecutorHash [ccvAddr2, ccvAddr1] executorAddr
+    assertMsg "ccvAndExecutorHash must preserve CCV ordering"
+        (hashForward /= hashReverse)
+    debug("ccvAndExecutorHash ordering test passed")
+
+    SendingMessageV1.noExecutionAddressBytes
+        === "eba517d200000000000000000000000000000000000000000000000000000000"
+    byteCount SendingMessageV1.noExecutionAddressBytes === 32
+    debug("no-execution sentinel encoding test passed")
 
     -- Test InstrumentId round-trip with new id@party format
     let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
@@ -197,7 +213,6 @@ setup = script do
     test256_tooLargeForNumeric0 === None
     test256_invalid === None
     debug("uint256 decoding tests passed")
-
 
     -- ======== Round-Trip Tests ========
 

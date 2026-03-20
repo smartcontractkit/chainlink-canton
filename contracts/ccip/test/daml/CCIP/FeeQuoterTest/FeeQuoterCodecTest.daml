@@ -107,7 +107,6 @@ testDestChainConfigArgsRoundtrip = do
         destGasPerPayloadByteBase = 16
         chainFamilySelector = "2812d52c"  -- EVM family selector
         defaultTxGasLimit = 200000
-        networkFeeUSD = usdToCents 0.01
         defaultTokenFeeUSD = usdToCents 0.5
         defaultTokenDestGasOverhead = 50000
 
@@ -128,7 +127,6 @@ testDestChainConfigArgsRoundtrip = do
       decoded.destChainConfig.destGasPerPayloadByteBase === 16
       decoded.destChainConfig.chainFamilySelector === "2812d52c"
       decoded.destChainConfig.defaultTxGasLimit === 200000
-      decoded.destChainConfig.networkFeeUSD === usdToCents 0.01
       decoded.destChainConfig.defaultTokenFeeUSD === usdToCents 0.5
       decoded.destChainConfig.defaultTokenDestGasOverhead === 50000
 
@@ -144,7 +142,6 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
         destGasPerPayloadByteBase = 16
         chainFamilySelector = "2812d52c"
         defaultTxGasLimit = 200000
-        networkFeeUSD = usdToCents 0.01
         defaultTokenFeeUSD = usdToCents 0.5
         defaultTokenDestGasOverhead = 50000
 
@@ -156,7 +153,6 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
         destGasPerPayloadByteBase = 8
         chainFamilySelector = "00000001"
         defaultTxGasLimit = 100000
-        networkFeeUSD = usdToCents 0.02
         defaultTokenFeeUSD = usdToCents 1.0
         defaultTokenDestGasOverhead = 25000
 
@@ -213,7 +209,6 @@ testDestChainConfigArgsLargeSelector = do
         destGasPerPayloadByteBase = 16
         chainFamilySelector = "2812d52c"
         defaultTxGasLimit = 200000
-        networkFeeUSD = usdToCents 0.01
         defaultTokenFeeUSD = usdToCents 0.5
         defaultTokenDestGasOverhead = 50000
 
@@ -230,7 +225,7 @@ testDestChainConfigArgsLargeSelector = do
 
 testDestChainConfigArgsEdgeCases : Script ()
 testDestChainConfigArgsEdgeCases = do
-  let mkConfig selector = DestChainConfigArgs selector (DestChainConfig True 1000 1000 1000 16 "00000000" 1000 (usdToCents 0.01) (usdToCents 0.01) 1000)
+  let mkConfig selector = DestChainConfigArgs selector (DestChainConfig True 1000 1000 1000 16 "00000000" 1000 (usdToCents 0.01) 1000)
 
   -- Test zero selector
   let zeroEncoded = encodeDestChainConfigArgs (mkConfig 0.0)

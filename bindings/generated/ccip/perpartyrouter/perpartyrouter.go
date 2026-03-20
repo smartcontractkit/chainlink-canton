@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "b48debc166e5ad4a818f54db3ddb099398c40f2ca923b773f52fbe2768188dab"
+	PackageID   = "5bac4b924d1f6a3e21f069095c3b9967ad5a78226e5cd4dbd6e45bd711260845"
 	SDKVersion  = "3.4.10"
 )
 
@@ -279,12 +279,8 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context                       common.CCIPContext          `json:"context"`
-	ExecutingMessageCid           types.CONTRACT_ID           `json:"executingMessageCid"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	Context             common.CCIPContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -306,36 +302,6 @@ func (t Execute) ToMap() map[string]any {
 		}
 		return t.ExecutingMessageCid
 	}()
-
-	m["receiverRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverRequiredCCVs))
-		for _, e := range t.ReceiverRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
-		for _, e := range t.ReceiverOptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
-
-	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	return m
 }
@@ -484,6 +450,57 @@ func (t FactorySetDeps) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes FactorySetDeps from hex string (Canton MCMS format)
 func (t *FactorySetDeps) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FinalizeFee2 is a Record type
+type FinalizeFee2 struct {
+	Context           common.CCIPContext `json:"context"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+}
+
+// ToMap converts FinalizeFee2 to a map for DAML arguments
+func (t FinalizeFee2) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Context).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Context
+	}()
+
+	m["sendingMessageCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SendingMessageCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SendingMessageCid
+	}()
+
+	return m
+}
+
+func (t FinalizeFee2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FinalizeFee2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FinalizeFee2 to hex string (Canton MCMS format)
+func (t FinalizeFee2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FinalizeFee2 from hex string (Canton MCMS format)
+func (t *FinalizeFee2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -891,6 +908,27 @@ func (t PerPartyRouter) PrepareSendWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "PrepareSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFee exercises the FinalizeFee choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) FinalizeFee(contractID string, args FinalizeFee2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
+func (t PerPartyRouter) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee2) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "FinalizeFee",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1394,11 +1432,15 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context            common.CCIPContext `json:"context"`
-	EncodedMessage     types.TEXT         `json:"encodedMessage"`
-	ReceiverParty      types.PARTY        `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
-	Caller             types.PARTY        `json:"caller"`
+	Context                       common.CCIPContext          `json:"context"`
+	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	Caller                        types.PARTY                 `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1427,6 +1469,36 @@ func (t PrepareExecute2) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["receiverRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverRequiredCCVs))
+		for _, e := range t.ReceiverRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
+		for _, e := range t.ReceiverOptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
+
+	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1458,10 +1530,14 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context            common.CCIPContext `json:"context"`
-	EncodedMessage     types.TEXT         `json:"encodedMessage"`
-	ReceiverParty      types.PARTY        `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
+	Context                       common.CCIPContext          `json:"context"`
+	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
@@ -1734,6 +1810,7 @@ type MCMSEncoder interface {
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
 	Execute(args Execute) (*bind.EncodedChoice, error)
 	FactorySetDeps(args FactorySetDeps) (*bind.EncodedChoice, error)
+	FinalizeFee2(args FinalizeFee2) (*bind.EncodedChoice, error)
 	GetExecutionState(args GetExecutionState) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForExecute2(args GetRequiredCCVsForExecute2) (*bind.EncodedChoice, error)
 	GetRequiredCCVsForSend2(args GetRequiredCCVsForSend2) (*bind.EncodedChoice, error)
@@ -1791,6 +1868,11 @@ func (e *encoder) Execute(args Execute) (*bind.EncodedChoice, error) {
 // FactorySetDeps encodes parameters for the FactorySetDeps choice.
 func (e *encoder) FactorySetDeps(args FactorySetDeps) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("FactorySetDeps", args)
+}
+
+// FinalizeFee2 encodes parameters for the FinalizeFee2 choice.
+func (e *encoder) FinalizeFee2(args FinalizeFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("FinalizeFee2", args)
 }
 
 // GetExecutionState encodes parameters for the GetExecutionState choice.

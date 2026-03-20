@@ -70,7 +70,6 @@ data TokenTransferV1 = TokenTransferV1
         extraData : BytesHex -- bytes
     deriving (Eq, Show)
 
-
 extractBytes : BytesHex -> Int -> Int -> Optional BytesHex
 extractBytes bs start len =
     let totalLen = byteCount bs
@@ -297,10 +296,6 @@ compareDecimalStrings str1 str2 =
             (len1 > len2) ||
             ((len1 >= len2) &&
             (str1 > str2)))  -- Same length, can use lexicographic comparison
-
-
-
-
 
 -- Helper to parse digits from a text string
 parseDigits : Text -> [Int] -> [Int]

@@ -75,7 +75,6 @@ template CCIPReceiver
                 assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in new required CCVs" (unique newRequiredCCVs)
                 create this with requiredCCVs = newRequiredCCVs
 
-
         -- | Executes an inbound CCIP message end-to-end.
         -- TODO: consider allowing arbitrary callers
         nonconsuming choice Execute : ContractId CCIPMessageReceived
@@ -107,22 +106,21 @@ template CCIPReceiver
                     encodedMessage = encodedMessage
                     receiverParty = owner
                     tokenReceiverParty = fmap (.tokenReceiverParty) tokenTransfer
+                    receiverRequiredCCVs = requiredCCVs
+                    receiverOptionalCCVs = optionalCCVs
+                    receiverOptionalThreshold = optionalThreshold
+                    receiverMinBlockConfirmations = minBlockConfirmations
                     caller = owner
 
-                em <- fetch emCid
-                let isTokenOnlyTransfer =
-                        em.message.messageData == ""
-                        && em.message.ccipReceiveGasLimit == 0
-                        && isSome em.message.tokenTransfer
-                if isTokenOnlyTransfer
-                    then pure ()
-                    else if em.message.finality /= 0
-                        then do
-                            assertMsg "receiver: finalized-only receiver rejects FTF messages"
-                                (minBlockConfirmations /= 0)
-                            assertMsg "receiver: message finality below receiver minBlockConfirmations"
-                                (em.message.finality >= minBlockConfirmations)
-                        else pure ()
+                -- Token transfers must resolve pool CCVs before any CCV can contribute.
+                emCid <- case tokenTransfer of
+                    None -> pure emCid
+                    Some tt -> exercise tt.tokenPoolCid
+                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
+                            tokenAdminRegistryCid = tokenAdminRegistryCid
+                            extraContext = tt.poolExtraContext
+                            executingMessageCid = emCid
+                            caller = owner
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->
@@ -135,24 +133,10 @@ template CCIPReceiver
                             caller = owner
                     ) emCid ccvInputs
 
-                -- Pool CCV verification: confirm that CCV results contain token pool required CCVs
-                emCid <- case tokenTransfer of
-                    None -> pure emCid
-                    Some tt -> exercise tt.tokenPoolCid
-                        CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            extraContext = tt.poolExtraContext
-                            executingMessageCid = emCid
-                            caller = owner
-
                 -- Execute with the final executingMessageCid
                 result <- exercise routerCid CCIP.PerPartyRouter.Execute with
                     context = context
                     executingMessageCid = emCid
-                    receiverRequiredCCVs = requiredCCVs
-                    receiverOptionalCCVs = optionalCCVs
-                    receiverOptionalThreshold = optionalThreshold
-                    receiverMinBlockConfirmations = minBlockConfirmations
 
                 -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
