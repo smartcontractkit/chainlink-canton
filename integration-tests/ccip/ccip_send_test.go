@@ -667,7 +667,7 @@ func TestCCIPSend(t *testing.T) {
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        contractIDPtr(executorCid),
+			ExecutorCid:        func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
 			TokenArgs:          types.TEXT(""),
@@ -747,9 +747,4 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 	t.Logf("  Encoded message: %s", returnedEncodedMessage)
-}
-
-func contractIDPtr(s string) *types.CONTRACT_ID {
-	cid := types.CONTRACT_ID(s)
-	return &cid
 }

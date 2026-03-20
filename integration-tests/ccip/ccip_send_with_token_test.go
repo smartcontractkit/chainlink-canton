@@ -885,7 +885,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        contractIDPtr(executorCid),
+			ExecutorCid:        func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
 			TokenArgs:          types.TEXT(""),
