@@ -8,7 +8,7 @@ module CCIP.SendingMessageV1 where
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (isNone, fromOptional)
+import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
 import qualified CCIP.Math
@@ -231,7 +231,7 @@ template SendingMessageV1
                 assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved"
                     (state == SendingMessageState_Prepared)
                 assertMsg "sendingMessage: AddTokenSendFee only valid for token sends"
-                    (expectedTokenInstrumentId /= None)
+                    (isSome expectedTokenInstrumentId)
                 assertMsg "token send fee already set"
                     (isNone tokenSendFee)
                 let fee = TokenSendFee with
@@ -248,8 +248,8 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required"
                     (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends"
-                    (expectedTokenInstrumentId /= None)
-                assertMsg "setOutboundPoolCCVs: already set" (outboundPoolCCVs == None)
+                    (isSome expectedTokenInstrumentId)
+                assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
                 create this with
                     outboundPoolCCVs = Some poolCCVs
                     state = SendingMessageState_Prepared
@@ -267,14 +267,14 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                let isTokenSend = expectedTokenInstrumentId /= None
+                let isTokenSend = isSome expectedTokenInstrumentId
                 assertMsg "sendingMessage: invalid state for AddExecutorWithFee"
                     (if isTokenSend
                         then state == SendingMessageState_TokenLocked
                         else state == SendingMessageState_Prepared)
-                assertMsg "addExecutorWithFee: already set" (executorFee == None)
+                assertMsg "addExecutorWithFee: already set" (isNone executorFee)
                 assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved"
-                    (if isTokenSend then outboundPoolCCVs /= None else True)
+                    (not isTokenSend || isSome outboundPoolCCVs)
 
                 let poolCCVs = fromOptional [] outboundPoolCCVs
                 let finalCCVs = dedup (requiredCCVs ++ poolCCVs)
@@ -376,11 +376,13 @@ template SendingMessageV1
                 extraData : BytesHex
             controller ccipOwner
             do
-                assertMsg "sendingMessage: AddTokenSend only allowed after pool CCVs are resolved"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: token send requires expected instrument"
-                    (expectedTokenInstrumentId /= None)
+                assertMsg "sendingMessage: AddTokenSend only allowed after pool CCVs are resolved" (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: token send requires expected instrument" (isSome expectedTokenInstrumentId)
+                assertMsg "sendingMessage: token send requires token send fee" (isSome tokenSendFee)
                 assertMsg "token send already set" (isNone tokenSendData)
+
+                -- Enforce that the token pool payload (extraData) is not larger than the destBytesOverhead that's been quoted as part of AddTokenSendFee
+                assertMsg "SourceTokenDataTooLarge: extraData size exceeds destBytesOverhead" (byteCount extraData <= (fromSome tokenSendFee).destBytesOverhead)
 
                 let tsd = TokenSendData with
                         poolInstanceId, poolOwner, instrumentId, amount
@@ -452,7 +454,7 @@ template SendingMessageV1
             do
                 assertMsg "finalizeSend: only allowed after fee finalization"
                     (state == SendingMessageState_FeeFinalized)
-                assertMsg "finalizeSend: message not yet constructed" (message /= None)
+                assertMsg "finalizeSend: message not yet constructed" (isSome message)
                 assertMsg "finalizeSend: sender mismatch" (messageSender == sender)
                 eventCid <- create CCIP.Events.CCIPMessageSent with
                     ccipOwner = ccipOwner
