@@ -79,7 +79,7 @@ encodeApplySourceChainConfigUpdatesParams sourceChainConfigUpdates =
 
 -- ===========================================================================
 -- DEST CHAIN CONFIG ENCODING/DECODING
--- Format: [bool isEnabled][bytesHex offRampAddress][rawInstanceAddressList laneMandatedCCVs]
+-- Format: [bool isEnabled][int64 baseExecutionGasCost][bytesHex offRampAddress][rawInstanceAddressList laneMandatedCCVs]
 --         [rawInstanceAddressList defaultCCVs][numeric0 messageNetworkFeeUSDCents]
 --         [numeric0 tokenNetworkFeeUSDCents]
 -- ===========================================================================
@@ -89,6 +89,7 @@ encodeDestChainConfigArgs dcc =
   encodeNumeric0 dcc.destChainSelector <>
   encodeBool dcc.isEnabled <>
   fromSome (encodeInt64 dcc.addressBytesLength) <>
+  fromSome (encodeInt64 dcc.baseExecutionGasCost) <>
   encodeBytesHex dcc.offRampAddress <>
   encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
   encodeRawInstanceAddressList dcc.defaultCCVs <>
@@ -100,22 +101,24 @@ decodeDestChainConfigArgsAt encoded offset = do
   (destChainSelector, offset1) <- decodeNumeric0At encoded offset
   (isEnabled, offset2) <- decodeBoolAt encoded offset1
   (addressBytesLength, offset3) <- decodeInt64At encoded offset2
-  (offRampAddress, offset4) <- decodeBytesHexAt encoded offset3
-  (laneMandatedCCVs, offset5) <- decodeRawInstanceAddressList encoded offset4
-  (defaultCCVs, offset6) <- decodeRawInstanceAddressList encoded offset5
-  (messageNetworkFeeUSDCents, offset7) <- decodeNumeric0At encoded offset6
-  (tokenNetworkFeeUSDCents, offset8) <- decodeNumeric0At encoded offset7
+  (baseExecutionGasCost, offset4) <- decodeInt64At encoded offset3
+  (offRampAddress, offset5) <- decodeBytesHexAt encoded offset4
+  (laneMandatedCCVs, offset6) <- decodeRawInstanceAddressList encoded offset5
+  (defaultCCVs, offset7) <- decodeRawInstanceAddressList encoded offset6
+  (messageNetworkFeeUSDCents, offset8) <- decodeNumeric0At encoded offset7
+  (tokenNetworkFeeUSDCents, offset9) <- decodeNumeric0At encoded offset8
   Some 
     ( DestChainConfigArgs with
         destChainSelector = destChainSelector
         isEnabled = isEnabled
         addressBytesLength = addressBytesLength
+        baseExecutionGasCost = baseExecutionGasCost
         offRampAddress = offRampAddress
         laneMandatedCCVs = laneMandatedCCVs
         defaultCCVs = defaultCCVs
         messageNetworkFeeUSDCents = messageNetworkFeeUSDCents
         tokenNetworkFeeUSDCents = tokenNetworkFeeUSDCents
-    ,offset8)
+    ,offset9)
 
 -- ===========================================================================
 -- SOURCE CHAIN CONFIG ENCODING/DECODING
@@ -146,4 +149,3 @@ decodeSourceChainConfigArgsAt encoded offset = do
         laneMandatedCCVs = laneMandatedCCVs
         defaultCCVs = defaultCCVs
     ,offset5)
-

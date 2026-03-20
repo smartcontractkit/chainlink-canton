@@ -9,6 +9,7 @@ import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome)
 
 import qualified CCIP.Events
+import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import CCIP.RawInstanceAddress (RawInstanceAddress)
@@ -26,8 +27,8 @@ data CCVVerification = CCVVerification
     deriving (Eq, Show)
 
 data ExecutingMessageState
-    = ExecutingMessageState_Prepared
-    | ExecutingMessageState_PoolVerified
+    = ExecutingMessageState_RequirePoolCCVs
+    | ExecutingMessageState_Prepared
     deriving (Eq, Show)
 
 data ExecutingMessageDeps = ExecutingMessageDeps
@@ -47,6 +48,44 @@ buildObservingParties receiver tokenReceiver executor =
             Some p -> [p]
             None -> []
 
+assertCCVInstanceId
+    : Text
+    -> [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> Text
+    -> Party
+    -> Update ()
+assertCCVInstanceId msg requiredCCVs optionalCCVs ccvInstanceId caller =
+    let claimed = CCIP.RawInstanceAddress.make ccvInstanceId caller
+        allowedCCVs = dedup (requiredCCVs ++ optionalCCVs)
+    in assertMsg msg (claimed `elem` allowedCCVs)
+
+resolveDefaultCCVs : [RawInstanceAddress] -> [RawInstanceAddress] -> [RawInstanceAddress]
+resolveDefaultCCVs defaultCCVs ccvs =
+    foldl (\acc ccv ->
+        if ccv == CCIP.GlobalConfig.useDefaultCCVs
+        then acc ++ defaultCCVs
+        else acc ++ [ccv]
+    ) [] ccvs
+
+resolveOptionalCCVs
+    : [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> Int
+    -> ([RawInstanceAddress], Int)
+resolveOptionalCCVs requiredCCVs optionalCCVs optionalThreshold =
+    foldl
+        (\(remainingOptional, remainingThreshold) requiredCCV ->
+            if requiredCCV `elem` remainingOptional
+            then
+                ( filter (/= requiredCCV) remainingOptional
+                , if remainingThreshold > 0 then remainingThreshold - 1 else 0
+                )
+            else (remainingOptional, remainingThreshold)
+        )
+        (optionalCCVs, optionalThreshold)
+        requiredCCVs
+
 template ExecutingMessageV1
     with
         ccipOwner : Party
@@ -59,13 +98,19 @@ template ExecutingMessageV1
         ccvVerifications : [CCVVerification]
         -- Explicit list of CCV owner parties accumulated via AddCCVVerification.
         ccvOwners : [Party]
+        -- Resolved execute-time CCV requirements, computed during PrepareExecute.
+        requiredCCVs : [RawInstanceAddress]
+        optionalCCVs : [RawInstanceAddress]
+        optionalCCVThreshold : Int
+        receiverMinBlockConfirmations : Int
+        sourceDefaultCCVs : [RawInstanceAddress]
         -- Pool's declared inbound CCV requirements, set via SetInboundPoolCCVs.
         -- None = pool hasn't been called; Some [] = called, no requirements.
         inboundPoolCCVs : Optional [RawInstanceAddress]
         deps : ExecutingMessageDeps
         -- State machine:
         --   message-only: Prepared -(FinalizeExecute)-> consumed
-        --   token-receive: Prepared -> PoolVerified -(FinalizeExecute)-> consumed
+        --   token-receive: RequirePoolCCVs -> Prepared -(FinalizeExecute)-> consumed
         state : ExecutingMessageState
     where
         signatory dedup (ccipOwner :: ccvOwners)
@@ -91,6 +136,14 @@ template ExecutingMessageV1
                 caller : Party
             controller caller
             do
+                assertMsg "executingMessage: AddCCVVerification only allowed in Prepared"
+                    (state == ExecutingMessageState_Prepared)
+                assertCCVInstanceId
+                    "executingMessage: caller is not an allowed CCV"
+                    requiredCCVs
+                    optionalCCVs
+                    ccvInstanceId
+                    caller
                 assertMsg "executingMessage: duplicate CCV verification"
                     (not (any (\v -> v.ccvInstanceId == ccvInstanceId && v.ccvOwner == caller) ccvVerifications))
 
@@ -109,15 +162,24 @@ template ExecutingMessageV1
                 poolCCVs : [RawInstanceAddress]
             controller ccipOwner
             do
-                assertMsg "executingMessage: SetInboundPoolCCVs only allowed in Prepared"
-                    (state == ExecutingMessageState_Prepared)
+                assertMsg "executingMessage: SetInboundPoolCCVs only allowed while pool CCVs are required"
+                    (state == ExecutingMessageState_RequirePoolCCVs)
                 assertMsg "executingMessage: inbound pool verification only valid for token transfers"
                     (isSome tokenReceiver)
                 assertMsg "SetInboundPoolCCVs: already set" (isNone inboundPoolCCVs)
                 assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
+                let resolvedPoolCCVs = case poolCCVs of
+                        [] -> sourceDefaultCCVs
+                        _ -> resolveDefaultCCVs sourceDefaultCCVs poolCCVs
+                let mergedRequiredCCVs = dedup (requiredCCVs ++ resolvedPoolCCVs)
+                let (mergedOptionalCCVs, mergedOptionalCCVThreshold) =
+                        resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
                 create this with
+                    requiredCCVs = mergedRequiredCCVs
+                    optionalCCVs = mergedOptionalCCVs
+                    optionalCCVThreshold = mergedOptionalCCVThreshold
                     inboundPoolCCVs = Some poolCCVs
-                    state = ExecutingMessageState_PoolVerified
+                    state = ExecutingMessageState_Prepared
 
         -- Consuming finalize choice for the success path. Always consumes the
         -- executing message and emits an ExecutionStateChanged event. For token
@@ -133,11 +195,8 @@ template ExecutingMessageV1
                 returnData : BytesHex
             controller ccipOwner
             do
-                let isTokenTransfer = isSome tokenReceiver
                 assertMsg "executingMessage: invalid state for FinalizeExecute"
-                    (if isTokenTransfer
-                        then state == ExecutingMessageState_PoolVerified
-                        else state == ExecutingMessageState_Prepared)
+                    (state == ExecutingMessageState_Prepared)
                 tokenReceiveTicket <- case (maybePoolOwner, maybeTicketReceiver, maybeTokenReceiver, maybeInstrumentId, maybeAmount) of
                     (Some poolOwner, Some ticketReceiver, Some resolvedTokenReceiver, Some instrumentId, Some amount) -> do
                         assertMsg "executingMessage: ticket receiver mismatch"
