@@ -91,8 +91,9 @@ setup = script do
     let executorAddr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     let hashForward = MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] executorAddr
     let hashReverse = MessageCodecV1.computeCCVAndExecutorHash [ccvAddr2, ccvAddr1] executorAddr
-    hashForward === hashReverse
-    debug("ccvAndExecutorHash canonical ordering test passed")
+    assertMsg "ccvAndExecutorHash must preserve CCV ordering"
+        (hashForward /= hashReverse)
+    debug("ccvAndExecutorHash ordering test passed")
 
     SendingMessageV1.noExecutionAddressBytes
         === "eba517d200000000000000000000000000000000000000000000000000000000"

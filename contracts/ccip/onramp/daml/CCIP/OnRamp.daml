@@ -526,18 +526,19 @@ template OnRamp
                     _ -> abort "token transfer / token send data mismatch"
 
                 let receipts = assembleReceipts sendingMsg
+                let finalVerifierData = orderedVerifierData sendingMsg
                 finalizeResult <- exercise sendingMessageCid CCIP.SendingMessageV1.FinalizeSend with
                     messageSender = routerPartyOwner
-                    messageSentObservers = concatMap (.messageSentObservers) sendingMsg.verifierData
-                    verifierBlobs = map (.verifierBlob) sendingMsg.verifierData
+                    messageSentObservers = concatMap (.messageSentObservers) finalVerifierData
+                    verifierBlobs = map (.verifierBlob) finalVerifierData
                     receipts = receipts
 
                 pure CCIPSendFromRouterResult with
                     ccipMessageSent = finalizeResult.ccipMessageSent
                     verifierBlobs =
-                        map (.verifierBlob) sendingMsg.verifierData
+                        map (.verifierBlob) finalVerifierData
                     messageSentObservers =
-                        concatMap (.messageSentObservers) sendingMsg.verifierData
+                        concatMap (.messageSentObservers) finalVerifierData
                     receipts
 
         interface instance MCMSReceiver for OnRamp where
@@ -571,16 +572,40 @@ data CCIPSendFromRouterResult = CCIPSendFromRouterResult
         receipts : [CCIP.Tickets.Receipt]
     deriving (Eq, Show)
 
+orderedVerifierDataByCCVs
+    : [CCIP.RawInstanceAddress.RawInstanceAddress]
+    -> [CCIP.SendingMessageV1.VerifierData]
+    -> [CCIP.SendingMessageV1.VerifierData]
+orderedVerifierDataByCCVs finalCCVs verifierData =
+    let
+        lookupVerifier ccvAddr =
+            case filter
+                (\vd -> CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner == ccvAddr)
+                verifierData of
+                [vd] -> vd
+                [] -> error ("missing verifier data for CCV address " <> ccvAddr)
+                _ -> error ("duplicate verifier data for CCV address " <> ccvAddr)
+    in
+        map (\ccv -> lookupVerifier (CCIP.RawInstanceAddress.toInstanceAddress ccv)) finalCCVs
+
+orderedVerifierData : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.SendingMessageV1.VerifierData]
+orderedVerifierData sendingMsg =
+    let
+        finalCCVs = dedup (sendingMsg.requiredCCVs ++ fromOptional [] sendingMsg.outboundPoolCCVs)
+    in
+        orderedVerifierDataByCCVs finalCCVs sendingMsg.verifierData
+
 -- | Assemble final receipts from the separated fee fields, verifier data,
 -- token send data, executor fee, and the network fee. Receipt order matches
 -- EVM: CCV receipts, pool receipt, executor receipt, network fee receipt.
 assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.Tickets.Receipt]
 assembleReceipts sendingMsg =
     let
+        finalVerifierData = orderedVerifierData sendingMsg
         ccvReceipts = map
             (assembleCCVReceipt sendingMsg.ccvFees
                 sendingMsg.ccvFeeTokenAmounts)
-            sendingMsg.verifierData
+            finalVerifierData
 
         poolReceipt = case (sendingMsg.tokenSendData, sendingMsg.tokenSendFee) of
             (Some tsd, Some fee) ->
