@@ -22,6 +22,9 @@ import (
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
 
+// SpliceVersion overrides the default version specified by CTF
+const SpliceVersion = "0.5.16"
+
 type TestEnvironment struct {
 	Logger zerolog.Logger
 	Chain  canton.Chain
@@ -107,6 +110,7 @@ func LoadChainWithCTF(t *testing.T, numberOfValidators int) (*canton.Chain, erro
 	bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
 		NumberOfValidators: numberOfValidators,
 		Once:               defaultNetworkOnce,
+		Image:              SpliceVersion,
 	}).Initialize(t.Context())
 	require.NoError(t, err, "Failed to initialize CTF chain provider")
 
