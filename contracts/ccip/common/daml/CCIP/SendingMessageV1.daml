@@ -5,7 +5,7 @@
 -- caller can trigger the mutation.
 module CCIP.SendingMessageV1 where
 
-import DA.Crypto.Text (BytesHex, keccak256, byteCount, toHex)
+import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import DA.Optional (isNone, fromOptional, isSome)
@@ -97,7 +97,11 @@ usd8PerUsdCent : Numeric 0
 usd8PerUsdCent = 1000000.0
 
 noExecutionAddressBytes : BytesHex
-noExecutionAddressBytes = keccak256 (toHex "NO_EXECUTION_TAG")
+noExecutionAddressBytes =
+    -- EVM uses keccak256("NO_EXECUTION_TAG")[:4] embedded at the front of the
+    -- address, with the remaining bytes zero-padded. Canton keeps the same
+    -- 4-byte tag semantics but adapts them to the 32-byte instance-address domain.
+    "eba517d200000000000000000000000000000000000000000000000000000000"
 
 gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
