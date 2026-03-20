@@ -382,7 +382,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 						DestGasPerPayloadByteBase:   16,
 						ChainFamilySelector:         "2812d52c",
 						DefaultTxGasLimit:           200000,
-						NetworkFeeUSD:               types.NUMERIC("25"),
 						DefaultTokenFeeUSD:          types.NUMERIC("10"),
 						DefaultTokenDestGasOverhead: 34000,
 					},
