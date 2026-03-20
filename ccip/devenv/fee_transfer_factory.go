@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
+// TODO: dedupe with integration-tests GetTransferFactory helper once shared helper location is established.
 func getFeeTransferFactoryInput(
 	ctx context.Context,
 	participant canton.Participant,
