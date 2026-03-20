@@ -231,8 +231,16 @@ func TestCCIPSend(t *testing.T) {
 						LaneMandatedOutboundCCVs: nil,
 						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // random executor
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
-							NetworkFeeUSDCents:      25,
-							DefaultTokenFeeUSDCents: 10,
+							IsEnabled:                   true,
+							MaxDataBytes:                50000,
+							MaxPerMsgGasLimit:           4000000,
+							DestGasOverhead:             300000,
+							DestGasPerPayloadByteBase:   16,
+							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+							DefaultTxGasLimit:           200000,
+							DefaultTokenFeeUSDCents:     10,
+							DefaultTokenDestGasOverhead: 34000,
+							NetworkFeeUSDCents:          25,
 						},
 						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
 						AddressBytesLength:      20,
