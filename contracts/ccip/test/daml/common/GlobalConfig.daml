@@ -500,7 +500,6 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     pure()
 
-
 -- Assertion helpers
 -- These compare Config <> Args, and therefore cannot assert on the chain selector since it's not part of the config itself, but rather the key in the map. The rest of the fields can be compared directly.
 

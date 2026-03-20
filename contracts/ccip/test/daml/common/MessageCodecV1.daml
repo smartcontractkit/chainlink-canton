@@ -206,7 +206,6 @@ setup = script do
     test256_invalid === None
     debug("uint256 decoding tests passed")
 
-
     -- ======== Round-Trip Tests ========
 
     -- Test round-trip encoding/decoding

@@ -49,7 +49,6 @@ interface ICrossChainVerifier where
         controller caller
         do crossChainVerifier_forwardToVerifierImpl this self arg
 
-
 data CrossChainVerifierView = CrossChainVerifierView
     with
         ccipOwner : Party

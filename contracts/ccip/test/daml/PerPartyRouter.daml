@@ -102,15 +102,26 @@ testCCIPSend = script do
             instanceId = "test-feequoter"
             owner = ccipOwner
             feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
-            destChainConfigs = Map.empty
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "45564d"
+                defaultTxGasLimit = 1
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     -- Deploy OnRamp
@@ -118,6 +129,7 @@ testCCIPSend = script do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
@@ -303,7 +315,6 @@ testCCIPSend = script do
     debug ("second message sent: " <> show sendResult2.messageId)
 
     pure ()
-
 
 -- | Test CCIP execute via PerPartyRouter.
 testCCIPExecute = script do
@@ -521,21 +532,33 @@ testPrepareSendExtraArgs = script do
             instanceId = "test-feequoter"
             owner = ccipOwner
             feeTokens = Map.fromList [(feeTokenId, mult 1.0)]
-            destChainConfigs = Map.empty
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "45564d"
+                defaultTxGasLimit = 1
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
             usdPerToken = Map.fromList [(feeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = feeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
@@ -748,23 +771,25 @@ testPrepareSendRejectsOversizedPayload = script do
                 destGasPerPayloadByteBase = 0
                 chainFamilySelector = "45564d"
                 defaultTxGasLimit = 1
-                networkFeeUSD = 0.0
                 defaultTokenFeeUSD = 0.0
                 defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
@@ -880,21 +905,33 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             instanceId = feeQuoterInstanceId
             owner = ccipOwner
             feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
-            destChainConfigs = Map.empty
+            destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
+                isEnabled = True
+                maxDataBytes = 100000
+                maxPerMsgGasLimit = 1000000
+                destGasOverhead = 0
+                destGasPerPayloadByteBase = 0
+                chainFamilySelector = "45564d"
+                defaultTxGasLimit = 1
+                defaultTokenFeeUSD = 0.0
+                defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.fromList [(destChainSelector,
+                CCIP.FeeQuoter.TimestampedPrice with
+                    price = 0.0
+                    timestamp = datetime 2025 Jan 1 0 0 0)]
             usdPerToken = Map.fromList [(testFeeTokenId,
                 CCIP.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0)]
             linkTokenInstrumentId = testFeeTokenId
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
         createCmd CCIP.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
             deps = CCIP.OnRamp.OnRampDeps with
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress

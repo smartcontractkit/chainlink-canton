@@ -12,7 +12,6 @@ import Splice.Api.Token.HoldingV1
 
 import CCIP.Common qualified as Common
 import qualified CCIP.Context
-import qualified CCIP.Math as Math
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -27,6 +26,10 @@ lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 
 rawInstanceAddress : FeeQuoter -> CCIP.RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress feeQuoter = CCIP.RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
+
+gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
+gasCostUsdCents usdPerUnitGas gasUnits =
+    CCIP.SendingMessageV1.gasCostUsdCents usdPerUnitGas gasUnits
 
 -- TODO: double check and readd fee/price quoting
 template FeeQuoter
@@ -43,7 +46,6 @@ template FeeQuoter
         usdPerUnitGasByDestChainSelector : Map.Map (Numeric 0) TimestampedPrice
         usdPerToken : Map.Map Splice.Api.Token.HoldingV1.InstrumentId TimestampedPrice
         linkTokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        maxFeeJuelsPerMsg : Numeric 0 -- Max fee in LINK smallest units (juels).
         -- | Token prices are stored as usd8 integers: 8-decimal USD price for
         -- | 1e8 local smallest units of the token/gas asset.
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
@@ -123,6 +125,45 @@ template FeeQuoter
                                 (Map.lookup destChainSelector destChainConfigs)
                         return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
 
+        nonconsuming choice QuoteGasForExec : QuoteGasForExecResult
+            with
+                destChainSelector : Numeric 0
+                nonCalldataGas : Int
+                calldataSize : Int
+                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                caller : Party
+            controller caller
+            do
+                let destChainConfig = fromSomeNote
+                        ("No dest chain config found for " <> show destChainSelector)
+                        (Map.lookup destChainSelector destChainConfigs)
+                assertMsg "feequoter: destination chain disabled" destChainConfig.isEnabled
+
+                let totalGas =
+                        nonCalldataGas + calldataSize * destChainConfig.destGasPerPayloadByteBase
+                assertMsg "feequoter: message gas limit too high"
+                    (totalGas <= destChainConfig.maxPerMsgGasLimit)
+                assertMsg "feequoter: message too large"
+                    (calldataSize <= destChainConfig.maxDataBytes)
+
+                gasPrice <- exercise self GetDestinationChainGasPrice with
+                    destChainSelector
+                    caller
+                feeTokenPrice <- exercise self GetTokenPrice with
+                    instrumentId = feeToken
+                    caller
+                let premiumMultiplier = fromSomeNote
+                        ("Fee token not configured: " <> feeToken.id)
+                        (Map.lookup feeToken feeTokens)
+                let gasCostUSDCents =
+                        -- Convert usd8 price-per-gas into integer USD cents, rounding up.
+                        gasCostUsdCents gasPrice.price totalGas
+                pure QuoteGasForExecResult with
+                    totalGas
+                    gasCostUSDCents
+                    feeTokenPrice = feeTokenPrice.price
+                    premiumMultiplier
+
         -- Deprecated compatibility helper for isolated tests. The production
         -- send path now finalizes fees through PerPartyRouter -> OnRamp.
         nonconsuming choice FeeQuoter_FinalizeFee
@@ -138,36 +179,30 @@ template FeeQuoter
                 let tokenPrice = fromSomeNote
                         ("No price found for " <> sm.feeToken.id)
                         (Map.lookup sm.feeToken usdPerToken)
-                let linkTokenPrice = fromSomeNote
-                        ("No price found for LINK token " <> linkTokenInstrumentId.id)
-                        (Map.lookup linkTokenInstrumentId usdPerToken)
-                assertMsg "feequoter: LINK token price must be positive"
-                    (linkTokenPrice.price > 0.0)
-                let premiumMultiplier = fromSomeNote
-                        ("Fee token not configured: " <> sm.feeToken.id)
-                        (Map.lookup sm.feeToken feeTokens)
-                let usdPerUnitGas = case Map.lookup sm.destChainSelector usdPerUnitGasByDestChainSelector of
-                        Some gasPrice -> gasPrice.price
-                        None -> 0.0
-                let destChainConfig = fromSomeNote
-                        ("No dest chain config found for " <> show sm.destChainSelector)
-                        (Map.lookup sm.destChainSelector destChainConfigs)
+                let ccvGasSum = foldl (\acc fee -> acc + fee.destGasLimit) 0 sm.ccvFees
+                let ccvBytesSum = foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sm.ccvFees
+                let poolGas = case sm.tokenSendFee of
+                        Some fee -> fee.destGasOverhead
+                        None -> 0
+                let poolBytes = case sm.tokenSendFee of
+                        Some fee -> fee.destBytesOverhead
+                        None -> 0
+                quote <- exercise self QuoteGasForExec with
+                    destChainSelector = sm.destChainSelector
+                    nonCalldataGas = ccvGasSum + poolGas + sm.executorDestGasLimit
+                    calldataSize = byteCount sm.payload + ccvBytesSum + poolBytes + sm.executorDestBytesOverhead
+                    feeToken = sm.feeToken
+                    caller
                 finalizedCid <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.FinalizeFee with
                         feeTokenPrice = tokenPrice.price
-                        premiumMultiplier
-                        usdPerUnitGas
-                        destGasOverhead = destChainConfig.destGasOverhead
-                        destGasPerPayloadByteBase = destChainConfig.destGasPerPayloadByteBase
+                        premiumMultiplier = quote.premiumMultiplier
+                        totalExecutionGasLimit = quote.totalGas
                         executorDestGasLimit = sm.executorDestGasLimit
                         executorDestBytesOverhead = sm.executorDestBytesOverhead
-                finalizedFeeTokenAmount <- exercise finalizedCid
-                    CCIP.SendingMessageV1.FeeTokenAmount with
-                        caller
-                assertMsg "feequoter: message fee exceeds maxFeeJuelsPerMsg"
-                    (if sm.feeToken == linkTokenInstrumentId
-                     then Math.integerAmountWithinCap finalizedFeeTokenAmount maxFeeJuelsPerMsg
-                     else Math.normalizedFeeWithinCap finalizedFeeTokenAmount tokenPrice.price linkTokenPrice.price maxFeeJuelsPerMsg)
+                        executionCostUSDCents = case sm.executionMode of
+                            Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor -> 0.0
+                            _ -> quote.gasCostUSDCents
                 pure finalizedCid
 
         -- ================================================================
@@ -265,7 +300,6 @@ template FeeQuoter
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
-
 -- DestChainConfigArgs and DestChainConfig are imported from CCIP.FeeQuoterTypes
 
 data TokenTransferFeeConfig = TokenTransferFeeConfig
@@ -283,7 +317,6 @@ data TimestampedPrice = TimestampedPrice
         price : Numeric 0
         timestamp : Time
     deriving (Eq, Show)
-
 
 data PriceUpdates = PriceUpdates
     with
@@ -305,5 +338,12 @@ data GasPriceUpdate = GasPriceUpdate
         usdPerUnitGas : Numeric 0
     deriving (Eq, Show)
 
+data QuoteGasForExecResult = QuoteGasForExecResult
+    with
+        totalGas : Int
+        gasCostUSDCents : Numeric 0
+        feeTokenPrice : Numeric 0
+        premiumMultiplier : Numeric 0
+    deriving (Eq, Show)
 
 -- FeeTokenArgs is imported from CCIP.FeeQuoterTypes

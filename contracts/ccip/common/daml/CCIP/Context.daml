@@ -33,7 +33,6 @@ data CCIPContext = CCIPContext
 emptyCCIPContext : CCIPContext
 emptyCCIPContext = CCIPContext with values = TextMap.empty
 
-
 class ToAnyValue a where
   toAnyValue : a -> AnyValue
 

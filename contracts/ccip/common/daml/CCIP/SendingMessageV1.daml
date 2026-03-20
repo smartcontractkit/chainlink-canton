@@ -99,6 +99,10 @@ usd8PerUsdCent = 1000000.0
 noExecutionAddressBytes : BytesHex
 noExecutionAddressBytes = keccak256 (toHex "NO_EXECUTION_TAG")
 
+gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
+gasCostUsdCents usdPerUnitGas gasUnits =
+    CCIP.Math.mulDivUp (intToNumeric gasUnits) usdPerUnitGas usd8PerUsdCent
+
 sumExecutionGasLimit : [CCVFee] -> Optional TokenSendFee -> Int -> Int
 sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
     let
@@ -359,12 +363,10 @@ template SendingMessageV1
             with
                 feeTokenPrice : Numeric 0
                 premiumMultiplier : Numeric 0
-                -- 8-decimal USD price per destination gas unit from FeeQuoter.
-                usdPerUnitGas : Numeric 0
-                destGasOverhead : Int
-                destGasPerPayloadByteBase : Int
+                totalExecutionGasLimit : Int
                 executorDestGasLimit : Int
                 executorDestBytesOverhead : Int
+                executionCostUSDCents : Numeric 0
             controller ccipOwner
             do
                 assertMsg "sendingMessage: FinalizeFee only allowed after executor selection"
@@ -375,9 +377,6 @@ template SendingMessageV1
                 assertMsg "premium multiplier must be positive"
                     (premiumMultiplier > 0.0)
 
-                let finalExecutionGasLimit =
-                        sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit
-
                 let promoteUsdCentsToUsd8 feeUSDCents =
                         CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
                 let convertWithPremium feeUSDCents =
@@ -386,21 +385,10 @@ template SendingMessageV1
                 let convertDirect feeUSDCents =
                         let feeUsd8 = promoteUsdCentsToUsd8 feeUSDCents
                         in CCIP.Math.mulDivDown feeUsd8 premiumIdentity feeTokenPrice
-                let gasCostUsdCents gasUnits =
-                        CCIP.Math.mulDivUp (intToNumeric gasUnits) usdPerUnitGas usd8PerUsdCent
-
-                let totalReceiptGas =
-                        foldl (\acc fee -> acc + fee.destGasLimit) 0 ccvFees
-                        + (case tokenSendFee of
-                            Some fee -> fee.destGasOverhead
-                            None -> 0)
-                        + executorDestGasLimit
-                let payloadGas = byteCount payload * destGasPerPayloadByteBase
                 let executionCostAmount =
                         if executionMode == Some ExecutionMode_NoExecutor
                         then 0.0
-                        else convertDirect
-                            (gasCostUsdCents (destGasOverhead + totalReceiptGas + payloadGas))
+                        else convertDirect executionCostUSDCents
 
                 let ccvAmounts = map (\fee -> convertWithPremium fee.feeUSDCents) ccvFees
                 let poolAmount = case tokenSendFee of
@@ -415,7 +403,7 @@ template SendingMessageV1
                 let networkAmount = convertWithPremium networkFeeUSDCents
 
                 create this with
-                    executionGasLimit = finalExecutionGasLimit
+                    executionGasLimit = totalExecutionGasLimit
                     executorDestGasLimit = executorDestGasLimit
                     executorDestBytesOverhead = executorDestBytesOverhead
                     ccvFeeTokenAmounts = ccvAmounts

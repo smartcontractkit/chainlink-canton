@@ -254,7 +254,6 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
 
   pure ()
 
-
 -- ===========================================================================
 -- ERROR CASE TESTS
 -- ===========================================================================

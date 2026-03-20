@@ -138,13 +138,11 @@ template PerPartyRouterFactory
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
-
 data CreateRouterResult = CreateRouterResult
     with
         router : ContractId PerPartyRouter
         factory : ContractId PerPartyRouterFactory
     deriving (Eq, Show)
-
 
 -- | Per-party router - state container with delegation to OnRamp/OffRamp.
 -- No stored CIDs; users pass all CIDs via explicit disclosure.
@@ -444,7 +442,6 @@ template PerPartyRouter
                     tokenReceiverParty = tokenReceiverParty
                     caller = caller
 
-
         -- TODO: consider relaxing to allow `controller caller`
         -- | Execute an inbound CCIP message.
         -- Parameters:
@@ -589,7 +586,6 @@ template PerPartyRouter
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
 
 data CCIPSendResult = CCIPSendResult
     with

@@ -119,7 +119,6 @@ testInvalidDataRejection = do
 
   pure ()
 
-
 -- Assertion helpers
 
 assertDestChainConfigArgsEqual : DestChainConfigArgs -> DestChainConfigArgs -> Script ()

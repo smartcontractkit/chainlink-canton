@@ -99,7 +99,6 @@ testAddCCVVerification = do
             versionTag = "0x03"
             caller = ccvOwner3 -- not part of the authorizing parties for this submit
 
-
     -- Fetch final state and assert both CCV verifications are recorded
     finalMessage <- fromSome <$> queryContractId ccipOwner executingMessageCid
     length finalMessage.ccvVerifications === 3

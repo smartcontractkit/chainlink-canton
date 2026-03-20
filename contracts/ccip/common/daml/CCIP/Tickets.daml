@@ -7,7 +7,6 @@ import DA.List (dedup)
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 import qualified Splice.Api.Token.HoldingV1
 
-
 -- | Issuer type for receipts.
 data IssuerType
     = IssuerType_CCV      -- Cross-chain verifier
@@ -27,7 +26,6 @@ data Receipt = Receipt
         feeTokenAmount : Numeric 0     -- Fee amount in fee token units
         extraArgs : BytesHex           -- Entity-specific arguments
     deriving (Eq, Show)
-
 
 -- | Ticket issued by consuming ExecutingMessageV1 after successful message verification.
 -- The signatory set includes CCV-owner parties accumulated during inbound verification,

@@ -188,7 +188,6 @@ template CommitteeVerifier
                 create this with
                     remoteChainConfigs = updatedRemoteChainConfigs
 
-
         choice ApplyRemoteChainConfigUpdates : ContractId CommitteeVerifier
             with
                 remoteChainConfigArgs : [RemoteChainConfigArgs]
@@ -453,7 +452,6 @@ template CommitteeVerifier
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
 
 parseSignatures : BytesHex -> [(BytesHex, BytesHex)]
 parseSignatures signatureData =
