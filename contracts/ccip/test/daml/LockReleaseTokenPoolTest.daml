@@ -3,6 +3,7 @@ module LockReleaseTokenPoolTest where
 
 import Daml.Script
 
+import DA.Crypto.Text (BytesHex)
 import DA.Assert
 import DA.Date (date, Month(..))
 import DA.List (head, (!!))
@@ -52,6 +53,20 @@ mkRateLimiterContext : ContractId RateLimiter.RateLimiter -> CCIP.Context.CCIPCo
 mkRateLimiterContext rateLimiterCid = CCIP.Context.CCIPContext with
     values = TextMap.fromList
         [(RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)]
+
+template ParseSourcePoolDecimalsHarness
+  with
+    owner : Party
+  where
+    signatory owner
+
+    choice ParseSourcePoolDecimals : Int
+      with
+        localDecimals : Int
+        sourcePoolData : BytesHex
+      controller owner
+      do pure (LockReleaseTokenPool.parseSourcePoolDecimals localDecimals sourcePoolData)
+
 
 mkPoolDeps : Text -> Text -> Text -> Party -> Party -> LockReleaseTokenPool.LockReleaseTokenPoolDeps
 mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner =
@@ -1382,6 +1397,21 @@ testParseSourcePoolDecimals_Valid = script do
     let result = LockReleaseTokenPool.parseSourcePoolDecimals 18 encoded
     result === 6
     debug "testParseSourcePoolDecimals_Valid: PASSED"
+
+testParseSourcePoolDecimals_TooLarge : Script ()
+testParseSourcePoolDecimals_TooLarge = script do
+    owner <- allocateParty "parse-source-pool-decimals-owner"
+    harnessCid <- submit owner do
+        createCmd ParseSourcePoolDecimalsHarness with owner
+
+    let encoded = fromSome (MessageCodecV1.encodeUint256 3000000000.0)
+
+    submitMustFail owner do
+        exerciseCmd harnessCid ParseSourcePoolDecimals with
+            localDecimals = 18
+            sourcePoolData = encoded
+
+    debug "testParseSourcePoolDecimals_TooLarge: PASSED"
 
 -- C-3: tokenSendFee contributes destGasOverhead to execution gas limit.
 testExecutionGasLimitWithTokenSendFee : Script ()
