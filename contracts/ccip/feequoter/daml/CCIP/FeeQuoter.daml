@@ -123,9 +123,8 @@ template FeeQuoter
                                 (Map.lookup destChainSelector destChainConfigs)
                         return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
 
-        -- Looks up the fee token price and premium multiplier from
-        -- internal state, then exercises SendingMessageV1.FinalizeFee
-        -- with ccipOwner authority.
+        -- Deprecated compatibility helper for isolated tests. The production
+        -- send path now finalizes fees through PerPartyRouter -> OnRamp.
         nonconsuming choice FeeQuoter_FinalizeFee
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
@@ -150,11 +149,18 @@ template FeeQuoter
                 let usdPerUnitGas = case Map.lookup sm.destChainSelector usdPerUnitGasByDestChainSelector of
                         Some gasPrice -> gasPrice.price
                         None -> 0.0
+                let destChainConfig = fromSomeNote
+                        ("No dest chain config found for " <> show sm.destChainSelector)
+                        (Map.lookup sm.destChainSelector destChainConfigs)
                 finalizedCid <- exercise sendingMessageCid
                     CCIP.SendingMessageV1.FinalizeFee with
                         feeTokenPrice = tokenPrice.price
                         premiumMultiplier
                         usdPerUnitGas
+                        destGasOverhead = destChainConfig.destGasOverhead
+                        destGasPerPayloadByteBase = destChainConfig.destGasPerPayloadByteBase
+                        executorDestGasLimit = sm.executorDestGasLimit
+                        executorDestBytesOverhead = sm.executorDestBytesOverhead
                 finalizedFeeTokenAmount <- exercise finalizedCid
                     CCIP.SendingMessageV1.FeeTokenAmount with
                         caller
