@@ -264,16 +264,15 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: AddCCVFee only allowed in Prepared"
-                    (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: AddCCVFee only allowed in Prepared" (state == SendingMessageState_Prepared)
                 assertCCVInstanceId
                     "sendingMessage: caller is not an allowed CCV"
                     requiredCCVs
                     outboundPoolCCVs
                     ccvInstanceId
                     caller
-                assertMsg "sendingMessage: duplicate CCV fee"
-                    (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+                assertMsg "sendingMessage: duplicate CCV fee" (all (\fee -> fee.ccvInstanceId /= ccvInstanceId) ccvFees)
+
                 let fee = CCVFee with
                         ccvInstanceId, ccvOwner = caller
                         feeUSDCents, destGasLimit, destBytesOverhead
@@ -290,12 +289,10 @@ template SendingMessageV1
                 destBytesOverhead : Int
             controller ccipOwner
             do
-                assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: AddTokenSendFee only valid for token sends"
-                    (isSome expectedTokenInstrumentId)
-                assertMsg "token send fee already set"
-                    (isNone tokenSendFee)
+                assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved" (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: AddTokenSendFee only valid for token sends" (isSome expectedTokenInstrumentId)
+                assertMsg "token send fee already set" (isNone tokenSendFee)
+
                 let fee = TokenSendFee with
                         poolInstanceId, poolOwner
                         feeUSDCents, destGasOverhead, destBytesOverhead
@@ -307,11 +304,10 @@ template SendingMessageV1
                 poolCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
-                assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required"
-                    (state == SendingMessageState_RequirePoolCCVs)
-                assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends"
-                    (isSome expectedTokenInstrumentId)
+                assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
+                assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
+
                 create this with
                     outboundPoolCCVs = Some poolCCVs
                     state = SendingMessageState_Prepared
@@ -326,12 +322,9 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: invalid state for AddExecutorFee"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "addExecutorFee: already set"
-                    (executorFee == None && executionMode == None)
-                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved"
-                    (if expectedTokenInstrumentId /= None then outboundPoolCCVs /= None else True)
+                assertMsg "sendingMessage: invalid state for AddExecutorFee" (state == SendingMessageState_Prepared)
+                assertMsg "addExecutorFee: already set" (isNone executorFee && isNone executionMode)
+                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
 
                 let derivedExecutor = CCIP.RawInstanceAddress.make executorInstanceId caller
 
@@ -351,12 +344,10 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: invalid state for SetNoExecutor"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "setNoExecutor: already set"
-                    (executorFee == None && executionMode == None)
-                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved"
-                    (if expectedTokenInstrumentId /= None then outboundPoolCCVs /= None else True)
+                assertMsg "sendingMessage: invalid state for SetNoExecutor" (state == SendingMessageState_Prepared)
+                assertMsg "setNoExecutor: already set" (isNone executorFee && isNone executionMode)
+                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
+
                 create this with
                     executionMode = Some ExecutionMode_NoExecutor
                     executorArgs = executorArgs
@@ -373,13 +364,10 @@ template SendingMessageV1
                 executionCostUSDCents : Numeric 0
             controller ccipOwner
             do
-                assertMsg "sendingMessage: FinalizeFee only allowed after executor selection"
-                    (state == SendingMessageState_Prepared)
-                assertMsg "sendingMessage: execution mode not set" (executionMode /= None)
-                assertMsg "fee token price must be positive"
-                    (feeTokenPrice > 0.0)
-                assertMsg "premium multiplier must be positive"
-                    (premiumMultiplier > 0.0)
+                assertMsg "sendingMessage: FinalizeFee only allowed after executor selection" (state == SendingMessageState_Prepared)
+                assertMsg "sendingMessage: execution mode not set" (isSome executionMode)
+                assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
+                assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
 
                 let promoteUsdCentsToUsd8 feeUSDCents =
                         CCIP.Math.mulDivDown feeUSDCents usd8PerUsdCent 1.0
@@ -421,12 +409,11 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: BuildMessage only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
-                assertMsg "sendingMessage: message already built" (message == None)
+                assertMsg "sendingMessage: BuildMessage only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
+                assertMsg "sendingMessage: message already built" (isNone message)
                 assertMsg "sendingMessage: execution mode not set" (isSome executionMode)
-                assertMsg "sendingMessage: token sends require token data before message build"
-                    (if expectedTokenInstrumentId /= None then isSome tokenSendData else True)
+                assertMsg "sendingMessage: token sends require token data before message build" (isNone expectedTokenInstrumentId || isSome tokenSendData)
+
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts this
                 create this with
@@ -445,18 +432,16 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: AddVerifierData only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
+                assertMsg "sendingMessage: AddVerifierData only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
                 assertCCVInstanceId
                     "sendingMessage: caller is not an allowed CCV"
                     requiredCCVs
                     outboundPoolCCVs
                     ccvInstanceId
                     caller
-                assertMsg "version tag must be 4 bytes"
-                    (byteCount versionTag == 4)
-                assertMsg "sendingMessage: duplicate verifier data for CCV"
-                    (all (\v -> v.ccvInstanceId /= ccvInstanceId) verifierData)
+                assertMsg "version tag must be 4 bytes" (byteCount versionTag == 4)
+                assertMsg "sendingMessage: duplicate verifier data for CCV" (all (\v -> v.ccvInstanceId /= ccvInstanceId) verifierData)
+
                 let vd = VerifierData with
                         ccvInstanceId
                         ccvOwner = caller
@@ -514,10 +499,10 @@ template SendingMessageV1
                 receipts : [CCIP.Tickets.Receipt]
             controller ccipOwner
             do
-                assertMsg "finalizeSend: only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
+                assertMsg "finalizeSend: only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
                 assertMsg "finalizeSend: message not yet constructed" (isSome message)
                 assertMsg "finalizeSend: sender mismatch" (messageSender == sender)
+
                 eventCid <- create CCIP.Events.CCIPMessageSent with
                     ccipOwner = ccipOwner
                     ccvOwners = ccvOwners
@@ -541,8 +526,8 @@ template SendingMessageV1
                 caller : Party
             controller caller
             do
-                assertMsg "sendingMessage: FeeTokenAmount only allowed after fee finalization"
-                    (state == SendingMessageState_FeeFinalized)
+                assertMsg "sendingMessage: FeeTokenAmount only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
+
                 pure (Foldable.sum ccvFeeTokenAmounts
                     + tokenSendFeeTokenAmount
                     + executorFeeTokenAmount

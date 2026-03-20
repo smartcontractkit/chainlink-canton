@@ -126,30 +126,6 @@ testLockOrBurn = script do
             customObservers = []
             cursedSubjects = []
 
-    -- Deploy FeeQuoter
-    feeQuoter <- submit ccipOwner do
-        createCmd FeeQuoter.FeeQuoter with
-            owner = ccipOwner
-            instanceId = feeQuoterInstanceId
-            feeTokens = Map.fromList [(linkToken, 100000000.0)]
-            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
-                isEnabled = True
-                maxDataBytes = 100000
-                maxPerMsgGasLimit = 5000000
-                destGasOverhead = 0
-                destGasPerPayloadByteBase = 0
-                chainFamilySelector = "2812d52c"
-                defaultTxGasLimit = 200000
-                networkFeeUSD = usdToCents 0.0
-                defaultTokenFeeUSD = usdToCents 0.75
-                defaultTokenDestGasOverhead = 12345)]
-            tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
-            linkTokenInstrumentId = linkToken
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
-            priceUpdaters = [ccipOwner]
-
     -- Deploy TokenAdminRegistry and register pool
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
@@ -300,23 +276,12 @@ testLockOrBurn = script do
             tokenPoolHoldings = []
 
     -- Disclose contracts
-    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
-
-    -- Required: Call CalculateFee on TP for it to add its quoted fee to the SendingMessage.
-    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedFq) do
-        exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
-            ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                sendingMessageCid = sendingMessageCid
-                feeQuoterCid = feeQuoter
-                tokenInstrumentId = testInstrumentId
-                caller = sender
 
     -- Test that LockOrBurn with 0 amount fails.
     submitMustFail (actAs sender
@@ -415,29 +380,6 @@ testLockOrBurnDeductsFeeBps = script do
             ccipOwner = ccipOwner
             customObservers = []
             cursedSubjects = []
-
-    feeQuoter <- submit ccipOwner do
-        createCmd FeeQuoter.FeeQuoter with
-            owner = ccipOwner
-            instanceId = feeQuoterInstanceId
-            feeTokens = Map.fromList [(linkToken, 100000000.0)]
-            destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
-                isEnabled = True
-                maxDataBytes = 100000
-                maxPerMsgGasLimit = 5000000
-                destGasOverhead = 0
-                destGasPerPayloadByteBase = 0
-                chainFamilySelector = "2812d52c"
-                defaultTxGasLimit = 200000
-                networkFeeUSD = usdToCents 0.0
-                defaultTokenFeeUSD = usdToCents 0.75
-                defaultTokenDestGasOverhead = 12345)]
-            tokenTransferFeeConfigs = Map.empty
-            usdPerUnitGasByDestChainSelector = Map.empty
-            usdPerToken = Map.fromList [(linkToken, FeeQuoter.TimestampedPrice 1500000000.0 (time (date 2026 Jan 1) 0 0 0))]
-            linkTokenInstrumentId = linkToken
-            maxFeeJuelsPerMsg = 1000000000000000000000000.0
-            priceUpdaters = [ccipOwner]
 
     tokenAdminRegistry <- submit ccipOwner do
         createCmd TokenAdminRegistry.TokenAdminRegistry with
@@ -581,23 +523,12 @@ testLockOrBurnDeductsFeeBps = script do
                 meta = MetadataV1.emptyMetadata
             tokenPoolHoldings = []
 
-    disclosedFq <- fromSome <$> queryDisclosure ccipOwner feeQuoter
     disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
     disclosedPreapproval <- fromSome <$> queryDisclosure poolOwner poolPreapproval
     disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
     disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner outboundRateLimiter
-
-    -- Required: Call CalculateFee on TP for it to add its quoted fee to the SendingMessage.
-    sendingMessageCid <- submit (actAs sender <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedFq) do
-        exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
-            ITokenPool.TokenPool_CalculateFee with
-                tokenAdminRegistryCid = tokenAdminRegistry
-                sendingMessageCid = sendingMessageCid
-                feeQuoterCid = feeQuoter
-                tokenInstrumentId = testInstrumentId
-                caller = sender
 
     result <- submit (actAs sender
                       <> disclose disclosedPool <> disclose disclosedTar
