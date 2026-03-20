@@ -188,7 +188,6 @@ template CommitteeVerifier
                 create this with
                     remoteChainConfigs = updatedRemoteChainConfigs
 
-
         choice ApplyRemoteChainConfigUpdates : ContractId CommitteeVerifier
             with
                 remoteChainConfigArgs : [RemoteChainConfigArgs]
@@ -198,6 +197,7 @@ template CommitteeVerifier
                 forA_ remoteChainConfigArgs $ \args -> do
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid chain selector: " <> show args.remoteChainSelector ) (args.remoteChainSelector >= 0.0)
                     assertMsg ("ApplyRemoteChainConfigUpdates: invalid gas for verification: " <> show args.gasForVerification) (args.gasForVerification > 0)
+                    assertMsg ("ApplyRemoteChainConfigUpdates: invalid payload size bytes: " <> show args.payloadSizeBytes) (args.payloadSizeBytes >= 0)
                 -- Update
                 let updatedRemoteChainConfigs = foldl
                         (\configs args -> do
@@ -452,7 +452,6 @@ template CommitteeVerifier
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
 
 parseSignatures : BytesHex -> [(BytesHex, BytesHex)]
 parseSignatures signatureData =

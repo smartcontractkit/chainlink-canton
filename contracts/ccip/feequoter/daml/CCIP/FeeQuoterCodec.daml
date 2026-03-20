@@ -125,8 +125,7 @@ decodeFeeTokenArgsAt encoded offset = do
 -- DestChainConfig: [bool isEnabled][int maxDataBytes][int maxPerMsgGasLimit]
 --                  [int destGasOverhead][int destGasPerPayloadByteBase]
 --                  [bytesHex chainFamilySelector][int defaultTxGasLimit]
---                  [numeric0 networkFeeUSD cents][numeric0 defaultTokenFeeUSD cents]
---                  [int defaultTokenDestGasOverhead]
+--                  [numeric0 defaultTokenFeeUSD cents][int defaultTokenDestGasOverhead]
 -- ===========================================================================
 
 encodeDestChainConfigArgsList : [DestChainConfigArgs] -> BytesHex
@@ -147,7 +146,6 @@ encodeDestChainConfig dcc =
   encodeInt dcc.destGasPerPayloadByteBase <>
   encodeBytesHex dcc.chainFamilySelector <>
   encodeInt dcc.defaultTxGasLimit <>
-  encodeNumeric0 dcc.networkFeeUSD <>
   encodeNumeric0 dcc.defaultTokenFeeUSD <>
   encodeInt dcc.defaultTokenDestGasOverhead
 
@@ -178,12 +176,11 @@ decodeDestChainConfigAt encoded offset = do
   (destGasPerPayloadByteBase, offset5) <- decodeIntAt encoded offset4
   (chainFamilySelector, offset6) <- decodeBytesHexAt encoded offset5
   (defaultTxGasLimit, offset7) <- decodeIntAt encoded offset6
-  (networkFeeUSD, offset8) <- decodeNumeric0At encoded offset7
-  (defaultTokenFeeUSD, offset9) <- decodeNumeric0At encoded offset8
-  (defaultTokenDestGasOverhead, offset10) <- decodeIntAt encoded offset9
+  (defaultTokenFeeUSD, offset8) <- decodeNumeric0At encoded offset7
+  (defaultTokenDestGasOverhead, offset9) <- decodeIntAt encoded offset8
   Some (DestChainConfig isEnabled maxDataBytes maxPerMsgGasLimit destGasOverhead
                         destGasPerPayloadByteBase chainFamilySelector defaultTxGasLimit
-                        networkFeeUSD defaultTokenFeeUSD defaultTokenDestGasOverhead, offset10)
+                        defaultTokenFeeUSD defaultTokenDestGasOverhead, offset9)
 
 -- ===========================================================================
 -- PRIMITIVE TYPE HELPERS

@@ -199,6 +199,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             destChainConfigs = Map.fromList [(123.0, CCIP.GlobalConfigTypes.DestChainConfig with -- Invalid chain selector that is the same as the local chain selector
                     isEnabled = True
                     addressBytesLength = 20
+                    baseExecutionGasCost = 0
                     offRampAddress = "8ffecae212a6c3d2cbd5bfdeedccfa4f0bfde53f"
                     laneMandatedCCVs = [RawInstanceAddress "0x123"]
                     defaultCCVs = [RawInstanceAddress "0xabc"]
@@ -214,6 +215,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
             destChainConfigs = Map.fromList [(0.0, CCIP.GlobalConfigTypes.DestChainConfig with -- Invalid zero chain selector
                     isEnabled = True
                     addressBytesLength = 20
+                    baseExecutionGasCost = 0
                     offRampAddress = "8ffecae212a6c3d2cbd5bfdeedccfa4f0bfde53f"
                     laneMandatedCCVs = [RawInstanceAddress "0x123"]
                     defaultCCVs = [RawInstanceAddress "0xabc"]
@@ -270,6 +272,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 456.0
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "1111111111111111111111111111111111111111"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
@@ -279,6 +282,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 789.0
                 isEnabled = True
                 addressBytesLength = 32
+                baseExecutionGasCost = 0
                 offRampAddress = "2222222222222222222222222222222222222222222222222222222222222222"
                 defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
                 laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
@@ -308,6 +312,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 789.0 -- Update the existing config
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "7b546b15ab63b57e65ffeeffd6ccefbf8f164efd"
                 defaultCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x567"]
                 laneMandatedCCVs = []
@@ -317,6 +322,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 123123.0 -- Add a new config
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "6dcb7fde9ac46dba422dcd6627cab455d7e93b14"
                 defaultCCVs = []
                 laneMandatedCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
@@ -350,6 +356,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 0.0 -- Invalid zero chain selector
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
@@ -365,6 +372,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 123.0 -- Invalid chain selector that is the same as the local chain selector
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
@@ -380,6 +388,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = -111.0 -- Invalid negative chain selector
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "529982d7c7bb378a77d2ecaeb1cbca37b65fd92f"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xdef"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x456"]
@@ -395,6 +404,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "bc30fdec959bce0af7a36ac681dfadddfddac2ab"
                 -- Empty default and mandated CCV lists, which is invalid since at least one CCV must be provided
                 defaultCCVs = []
@@ -411,6 +421,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "beafb8e4f9fab41badca6edfb9f0aaea8b6cc9c3"
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0xabc"] -- Duplicate CCVs within the default list, which is invalid
                 laneMandatedCCVs = [RawInstanceAddress "0x123"]
@@ -426,6 +437,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "8a16cb05dcffcbe196a5c8c2d6ebc4ba664fd41b"
                 defaultCCVs = [RawInstanceAddress "0xabc"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123", RawInstanceAddress "0x123"] -- Duplicate CCVs within the mandated list, which is invalid
@@ -442,6 +454,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 20
+                baseExecutionGasCost = 0
                 offRampAddress = "8fd2fe964b7ebbdf1ba2eaf949fdcf05baead07f"
                 -- Duplicate CCVs across the default and mandated lists, which is invalid
                 defaultCCVs = [RawInstanceAddress "0xabc", RawInstanceAddress "0x123"]
@@ -458,6 +471,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 3
+                baseExecutionGasCost = 0
                 offRampAddress = "12345678" -- 4 bytes, which is invalid given the addressBytesLength of 3
                 defaultCCVs = [RawInstanceAddress "0xabc"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123"]
@@ -473,6 +487,7 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
                 destChainSelector = 111.0
                 isEnabled = True
                 addressBytesLength = 0 -- Invalid zero address byte length
+                baseExecutionGasCost = 0
                 offRampAddress = ""
                 defaultCCVs = [RawInstanceAddress "0xabc"]
                 laneMandatedCCVs = [RawInstanceAddress "0x123"]
@@ -485,13 +500,14 @@ testGlobalConfig_ApplyDestChainConfigUpdates = do
     
     pure()
 
-
 -- Assertion helpers
 -- These compare Config <> Args, and therefore cannot assert on the chain selector since it's not part of the config itself, but rather the key in the map. The rest of the fields can be compared directly.
 
 assertDestChainConfigsEqual : CCIP.GlobalConfigTypes.DestChainConfig -> CCIP.GlobalConfigTypes.DestChainConfigArgs -> Script ()
 assertDestChainConfigsEqual got expected = do
   assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
+  assertMsg ("addressBytesLength mismatch, got: " <> show got.addressBytesLength <> ", expected: " <> show expected.addressBytesLength) (got.addressBytesLength == expected.addressBytesLength)
+  assertMsg ("baseExecutionGasCost mismatch, got: " <> show got.baseExecutionGasCost <> ", expected: " <> show expected.baseExecutionGasCost) (got.baseExecutionGasCost == expected.baseExecutionGasCost)
   assertMsg ("offRampAddress mismatch, got: " <> show got.offRampAddress <> ", expected: " <> show expected.offRampAddress) (got.offRampAddress == expected.offRampAddress)
   assertMsg ("laneMandatedCCVs mismatch, got: " <> show got.laneMandatedCCVs <> ", expected: " <> show expected.laneMandatedCCVs) (got.laneMandatedCCVs == expected.laneMandatedCCVs)
   assertMsg ("defaultCCVs mismatch, got: " <> show got.defaultCCVs <> ", expected: " <> show expected.defaultCCVs) (got.defaultCCVs == expected.defaultCCVs)

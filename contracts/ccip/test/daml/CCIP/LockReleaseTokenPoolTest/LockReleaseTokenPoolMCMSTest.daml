@@ -22,7 +22,6 @@ dummyPoolDeps ccipOwner =
     rmnRemote = RawInstanceAddress ("dummy-rmn@" <> partyToText ccipOwner)
     feeQuoter = RawInstanceAddress ("dummy-fq@" <> partyToText ccipOwner)
 
-
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - ApplyChainUpdates
 -- ===========================================================================

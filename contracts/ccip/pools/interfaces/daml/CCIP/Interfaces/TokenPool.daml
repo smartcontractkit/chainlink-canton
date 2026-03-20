@@ -19,7 +19,6 @@ import qualified CCIP.TokenAdminRegistry
 data TransferDirection = Outbound | Inbound
     deriving (Eq, Show)
 
-
 interface ITokenPool where
     viewtype TokenPoolView
 

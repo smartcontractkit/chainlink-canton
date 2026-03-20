@@ -127,7 +127,7 @@ template Executor
             do
                 pure dynamicConfig.minBlockConfirmations
 
-        -- Calculates executor fee and finalizes message state via SendingMessageV1.
+        -- Calculates the executor flat fee and validates the message.
         nonconsuming choice Executor_CalculateFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -152,10 +152,8 @@ template Executor
                 assertMsg "executor: too many CCVs in message"
                     (length canonicalCCVs <= maxCCVsPerMsg)
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddExecutorWithFee with
+                exercise sendingMessageCid CCIP.SendingMessageV1.AddExecutorFee with
                     executorInstanceId = instanceId
                     executorArgs = executorArgs
                     feeUSDCents = remoteCfg.feeUSDCents
-                    destGasLimit = 0
-                    destBytesOverhead = 0
                     caller = owner
