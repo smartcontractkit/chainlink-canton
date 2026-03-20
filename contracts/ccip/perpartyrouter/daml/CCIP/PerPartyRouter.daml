@@ -348,15 +348,29 @@ template PerPartyRouter
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
+                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverOptionalCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverOptionalThreshold : Int
+                receiverMinBlockConfirmations : Int
                 caller : Party
             controller partyOwner
             do
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
                 CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
+
+                globalConfig <- fetch globalConfigCid
+                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                tokenAdminRegistry <- fetch tokenAdminRegistryCid
+                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
@@ -374,6 +388,12 @@ template PerPartyRouter
 
                 exercise offRampCid CCIP.OffRamp.PrepareExecute with
                     encodedMessage = encodedMessage
+                    globalConfigCid = globalConfigCid
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    receiverRequiredCCVs = receiverRequiredCCVs
+                    receiverOptionalCCVs = receiverOptionalCCVs
+                    receiverOptionalThreshold = receiverOptionalThreshold
+                    receiverMinBlockConfirmations = receiverMinBlockConfirmations
                     rmnRemoteCid = rmnRemoteCid
                     receiverParty = receiverParty
                     tokenReceiverParty = tokenReceiverParty
@@ -385,18 +405,10 @@ template PerPartyRouter
         -- Parameters:
         -- context: The CCIP context for this message, retrieved from EDS.
         -- executingMessageCid: The contract ID of the ExecutingMessageV1 that was created in PrepareExecute and is being executed. This is used to read the message data, CCV verifications, and pool verification state for the execute request.
-        -- receiverRequiredCCVs: The list of CCVs that the receiver requires for message execution, can be empty in which case the source chain defaults will be used. All of these CCVs must pass verification for a message to be executed.
-        -- receiverOptionalCCVs: The list of optional CCVs for this message. If any optional CCVs are provided, at least receiverOptionalThreshold of them must pass verification for the message to be executed. Can be empty if there are no optional CCVs.
-        -- receiverOptionalThreshold: The number of optional CCVs that must pass verification if any optional CCVs are provided.
-        -- receiverMinBlockConfirmations: The minimum number of block confirmations that the receiver requires for this message. A value of 0 means only finalized messages are accepted. A non-zero value allows FTF messages whose requested block confirmations meets or exceeds this threshold.
         choice Execute : ExecuteResult
             with
                 context : CCIP.Context.CCIPContext
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
-                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-                receiverOptionalCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-                receiverOptionalThreshold : Int
-                receiverMinBlockConfirmations : Int
             controller partyOwner
             do
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
@@ -434,10 +446,6 @@ template PerPartyRouter
 
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
-                    receiverRequiredCCVs = receiverRequiredCCVs
-                    receiverOptionalCCVs = receiverOptionalCCVs
-                    receiverOptionalThreshold = receiverOptionalThreshold
-                    receiverMinBlockConfirmations = receiverMinBlockConfirmations
                     executingMessageCid = executingMessageCid
                     rmnRemoteCid = rmnRemoteCid
                     globalConfigCid = globalConfigCid
