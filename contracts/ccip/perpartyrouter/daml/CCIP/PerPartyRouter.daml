@@ -4,6 +4,7 @@ module CCIP.PerPartyRouter where
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Optional (fromOptional)
+import DA.Text qualified as T
 import DA.Time (addRelTime, hours)
 
 import qualified CCIP.ExecutingMessageV1
@@ -64,6 +65,7 @@ template PerPartyRouterFactory
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
+        ensure not (T.isInfixOf "@" instanceId)
 
         choice FactorySetDeps : ContractId PerPartyRouterFactory
             with
@@ -157,6 +159,7 @@ template PerPartyRouter
     where
         signatory ccipOwner
         observer partyOwner
+        ensure not (T.isInfixOf "@" instanceId)
 
         choice SetDeps : ContractId PerPartyRouter
             with

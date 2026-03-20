@@ -61,6 +61,10 @@ validateMultisigConfig config = do
     length config.groupQuorums == numGroups
   assertMsg "mcms: group parents array must have 32 entries" $
     length config.groupParents == numGroups
+  -- Validate groupQuorums are non-negative
+  forA_ (zip [0..(numGroups - 1)] config.groupQuorums) $ \(idx, quorum) ->
+    assertMsg ("mcms: groupQuorum[" <> show idx <> "] must be non-negative, got " <> show quorum) $
+      quorum >= 0
   assertMsg "mcms: root group must be its own parent" $
     (config.groupParents !! 0) == 0
   -- Validate signerGroup bounds [0, 31] for all signers

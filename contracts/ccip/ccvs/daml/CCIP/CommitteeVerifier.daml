@@ -6,6 +6,7 @@ import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
+import DA.Text qualified as T
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
@@ -111,7 +112,8 @@ template CommitteeVerifier
 
         -- Ensure signer configs have a positive threshold, enough signers,
         -- and no duplicate signer keys.
-        ensure versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
+        ensure not (T.isInfixOf "@" instanceId)
+          && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
