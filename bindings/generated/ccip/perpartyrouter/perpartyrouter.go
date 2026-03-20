@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "f782f7ecdd5ce2e059be25cac833f9aad241bd61acc300edfb8798336cbab57b"
+	PackageID   = "52f3e21473669f3da098d7ec7217734703df2bbf2a6c0fc079f977d6d3d0e5be"
 	SDKVersion  = "3.4.10"
 )
 
@@ -279,12 +279,8 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context                       common.CCIPContext          `json:"context"`
-	ExecutingMessageCid           types.CONTRACT_ID           `json:"executingMessageCid"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	Context             common.CCIPContext `json:"context"`
+	ExecutingMessageCid types.CONTRACT_ID  `json:"executingMessageCid"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
@@ -306,36 +302,6 @@ func (t Execute) ToMap() map[string]any {
 		}
 		return t.ExecutingMessageCid
 	}()
-
-	m["receiverRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverRequiredCCVs))
-		for _, e := range t.ReceiverRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
-		for _, e := range t.ReceiverOptionalCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
-
-	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	return m
 }
@@ -1394,11 +1360,15 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context            common.CCIPContext `json:"context"`
-	EncodedMessage     types.TEXT         `json:"encodedMessage"`
-	ReceiverParty      types.PARTY        `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
-	Caller             types.PARTY        `json:"caller"`
+	Context                       common.CCIPContext          `json:"context"`
+	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	Caller                        types.PARTY                 `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1427,6 +1397,36 @@ func (t PrepareExecute2) ToMap() map[string]any {
 			"_type": "optional",
 		}
 	}
+
+	m["receiverRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverRequiredCCVs))
+		for _, e := range t.ReceiverRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.ReceiverOptionalCCVs))
+		for _, e := range t.ReceiverOptionalCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
+
+	m["receiverMinBlockConfirmations"] = int64(t.ReceiverMinBlockConfirmations)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1458,10 +1458,14 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context            common.CCIPContext `json:"context"`
-	EncodedMessage     types.TEXT         `json:"encodedMessage"`
-	ReceiverParty      types.PARTY        `json:"receiverParty"`
-	TokenReceiverParty *types.PARTY       `json:"tokenReceiverParty" hex:"optional"`
+	Context                       common.CCIPContext          `json:"context"`
+	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.

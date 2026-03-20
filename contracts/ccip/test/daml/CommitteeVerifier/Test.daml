@@ -31,6 +31,22 @@ createExecMsg owner rmnOwner = submit owner do
         observingParties = [owner]
         ccvVerifications = []
         ccvOwners = []
+        requiredCCVs =
+          [ CCIP.RawInstanceAddress.make "test-ccv1" owner
+          , CCIP.RawInstanceAddress.make "test-ccv2" owner
+          , CCIP.RawInstanceAddress.make "test-ccv3" owner
+          , CCIP.RawInstanceAddress.make "test-ccv4" owner
+          , CCIP.RawInstanceAddress.make "test-ccv5" owner
+          , CCIP.RawInstanceAddress.make "test-ccv6" owner
+          , CCIP.RawInstanceAddress.make "test-ccv7" owner
+          , CCIP.RawInstanceAddress.make "test-ccv8" owner
+          , CCIP.RawInstanceAddress.make "test-ccv9" owner
+          , CCIP.RawInstanceAddress.make "test-ccv10" owner
+          ]
+        optionalCCVs = []
+        optionalCCVThreshold = 0
+        receiverMinBlockConfirmations = 0
+        sourceDefaultCCVs = []
         inboundPoolCCVs = None
         deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
             offRamp = CCIP.RawInstanceAddress.make "test-offramp" owner
