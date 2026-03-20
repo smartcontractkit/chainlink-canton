@@ -3,6 +3,7 @@ module FeeQuoter where
 import Daml.Script
 
 import DA.Assert
+import DA.Crypto.Text (byteCount)
 import DA.Date (Month(Jan), date)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
@@ -37,6 +38,43 @@ testDestChainConfig = DestChainConfig with
     defaultTxGasLimit = 50000
     defaultTokenFeeUSD = 0.0
     defaultTokenDestGasOverhead = 0
+
+finalizeUsingQuote
+    : Party
+    -> ContractId CCIP.FeeQuoter.FeeQuoter
+    -> ContractId SendingMessageV1.SendingMessageV1
+    -> Script (ContractId SendingMessageV1.SendingMessageV1)
+finalizeUsingQuote owner feeQuoter sendingMessageCid = do
+    Some sm <- queryContractId owner sendingMessageCid
+    quote <- submit owner do
+        exerciseCmd feeQuoter QuoteGasForExec with
+            destChainSelector = sm.destChainSelector
+            nonCalldataGas =
+                foldl (\acc fee -> acc + fee.destGasLimit) 0 sm.ccvFees
+                    + (case sm.tokenSendFee of
+                        Some fee -> fee.destGasOverhead
+                        None -> 0)
+                    + sm.executorDestGasLimit
+            calldataSize =
+                byteCount sm.payload
+                    + foldl (\acc fee -> acc + fee.destBytesOverhead) 0 sm.ccvFees
+                    + (case sm.tokenSendFee of
+                        Some fee -> fee.destBytesOverhead
+                        None -> 0)
+                    + sm.executorDestBytesOverhead
+            feeToken = sm.feeToken
+            caller = owner
+    submit owner do
+        exerciseCmd sendingMessageCid SendingMessageV1.FinalizeFee with
+            feeTokenPrice = quote.feeTokenPrice
+            premiumMultiplier = quote.premiumMultiplier
+            totalExecutionGasLimit = quote.totalGas
+            executorDestGasLimit = sm.executorDestGasLimit
+            executorDestBytesOverhead = sm.executorDestBytesOverhead
+            executionCostUSDCents =
+                case sm.executionMode of
+                    Some SendingMessageV1.ExecutionMode_NoExecutor -> 0.0
+                    _ -> quote.gasCostUSDCents
 
 setup = script do
     owner <- allocateParty "owner"
@@ -305,10 +343,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
             messageId = ""
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit owner do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-            sendingMessageCid = sendingMessageCid
-            caller = owner
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
@@ -495,11 +530,8 @@ testFinalizeFee_PremiumAndExecutor = script do
             feeUSDCents = cents 300.0
             caller = executorOwner
 
-    -- FinalizeFee via FeeQuoter
-    sendingMessageCid <- submit owner do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-            sendingMessageCid = sendingMessageCid
-            caller = owner
+    -- Finalize using QuoteGasForExec + SendingMessageV1.FinalizeFee.
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
@@ -601,10 +633,7 @@ testFinalizeFee_SmallFee = script do
             feeUSDCents = cents 1.0
             caller = executorOwner
 
-    sendingMessageCid <- submit owner do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-            sendingMessageCid = sendingMessageCid
-            caller = owner
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     finalized <- queryContractId owner sendingMessageCid
     let sm = fromSome finalized
@@ -616,8 +645,8 @@ testFinalizeFee_SmallFee = script do
 
     debug "testFinalizeFee_SmallFee: PASSED"
 
--- FeeQuoter_FinalizeFee no longer applies a LINK-denominated cap.
--- It should still convert non-LINK fees into the selected fee token correctly.
+-- QuoteGasForExec + SendingMessageV1.FinalizeFee should still convert
+-- non-LINK fees into the selected fee token correctly.
 testFinalizeFee_LinkCapAfterConversion = script do
     owner <- allocateParty "owner-link-cap"
     sender <- allocateParty "sender-link-cap"
@@ -699,17 +728,15 @@ testFinalizeFee_LinkCapAfterConversion = script do
             messageId = ""
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit owner do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-            sendingMessageCid = sendingMessageCid
-            caller = owner
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     Some sm <- queryContractId owner sendingMessageCid
     sm.networkFeeTokenAmount === 150000000.0
 
     debug "testFinalizeFee_LinkCapAfterConversion: PASSED"
 
--- FeeQuoter_FinalizeFee should convert direct LINK fees at par when LINK is the fee token.
+-- QuoteGasForExec + SendingMessageV1.FinalizeFee should convert direct LINK
+-- fees at par when LINK is the fee token.
 testFinalizeFee_LinkCapDirect = script do
     owner <- allocateParty "owner-link-direct-cap"
     sender <- allocateParty "sender-link-direct-cap"
@@ -784,17 +811,15 @@ testFinalizeFee_LinkCapDirect = script do
             messageId = ""
             state = SendingMessageV1.SendingMessageState_Prepared
 
-    sendingMessageCid <- submit owner do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-            sendingMessageCid = sendingMessageCid
-            caller = owner
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     Some sm <- queryContractId owner sendingMessageCid
     sm.networkFeeTokenAmount === 10000000.0
 
     debug "testFinalizeFee_LinkCapDirect: PASSED"
 
--- FeeQuoter_FinalizeFee should still sum all converted fee components correctly.
+-- QuoteGasForExec + SendingMessageV1.FinalizeFee should still sum all
+-- converted fee components correctly.
 testFinalizeFee_LinkCapMixedFees = script do
     owner <- allocateParty "owner-link-mixed-cap"
     sender <- allocateParty "sender-link-mixed-cap"
@@ -895,10 +920,7 @@ testFinalizeFee_LinkCapMixedFees = script do
             feeUSDCents = cents 100.0
             caller = executorOwner
 
-    sendingMessageCid <- submit owner do
-        exerciseCmd feeQuoter CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-            sendingMessageCid = sendingMessageCid
-            caller = owner
+    sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
 
     Some sm <- queryContractId owner sendingMessageCid
     sm.ccvFeeTokenAmounts === [5000000.0]
