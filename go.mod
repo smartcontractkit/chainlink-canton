@@ -38,7 +38,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260305154844-97e629fb946e
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260305154844-97e629fb946e
 	github.com/smartcontractkit/chainlink-ccv/deployments v0.0.0-20260305154844-97e629fb946e
-	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260217160002-b56cb5356cc7
+	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260319222221-2bac99c7a470
 	github.com/smartcontractkit/chainlink-deployments-framework v0.89.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.15.8
 	github.com/smartcontractkit/go-daml v0.0.0-20260316142024-d944255f540a
