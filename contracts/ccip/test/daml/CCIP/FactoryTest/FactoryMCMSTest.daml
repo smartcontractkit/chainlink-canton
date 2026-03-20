@@ -314,7 +314,6 @@ testDeployFeeQuoter_MCMS = script do
   let params = DeployFeeQuoterParams with
         instanceId = "fee-quoter-1"
         linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-        maxFeeJuelsPerMsg = 1000000000000000000.0
       encoded = encodeDeployFeeQuoterParams params
 
   submit mcmsParty do
@@ -378,6 +377,7 @@ testDeployOnRamp_MCMS = script do
         tokenAdminRegistry = RawInstanceAddress "tar@owner"
         feeQuoter = RawInstanceAddress "fq@owner"
         ccvRegistry = RawInstanceAddress "ccv@owner"
+        maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
   submit mcmsParty do

@@ -75,7 +75,6 @@ template CCIPReceiver
                 assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in new required CCVs" (unique newRequiredCCVs)
                 create this with requiredCCVs = newRequiredCCVs
 
-
         -- | Executes an inbound CCIP message end-to-end.
         -- TODO: consider allowing arbitrary callers
         nonconsuming choice Execute : ContractId CCIPMessageReceived

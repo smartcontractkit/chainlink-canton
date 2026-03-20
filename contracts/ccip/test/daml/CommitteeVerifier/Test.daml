@@ -86,7 +86,6 @@ testCommitteeVerifier = script do
         let verified = CommitteeVerifier.validateSignature signedHash pubKey r s
         assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
 
-
     debug ("===== Test1 =====")
     -- single signer, threshold 1
     executingMessageCid <- createExecMsg owner rmnOwner

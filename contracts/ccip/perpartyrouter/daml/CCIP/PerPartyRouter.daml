@@ -138,13 +138,11 @@ template PerPartyRouterFactory
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
-
 data CreateRouterResult = CreateRouterResult
     with
         router : ContractId PerPartyRouter
         factory : ContractId PerPartyRouterFactory
     deriving (Eq, Show)
-
 
 -- | Per-party router - state container with delegation to OnRamp/OffRamp.
 -- No stored CIDs; users pass all CIDs via explicit disclosure.
@@ -235,6 +233,51 @@ template PerPartyRouter
                     tokenReceiver
                     tokenArgs
                     feeToken
+
+        nonconsuming choice FinalizeFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            with
+                context : CCIP.Context.CCIPContext
+                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+            controller partyOwner
+            do
+                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
+                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+
+                onRamp <- fetch onRampCid
+                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                    onRamp.instanceId onRamp.ccipOwner deps.onRamp
+
+                globalConfig <- fetch globalConfigCid
+                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                    globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
+
+                feeQuoter <- fetch feeQuoterCid
+                CCIP.RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+
+                sendingMsg <- fetch sendingMessageCid
+                CCIP.RawInstanceAddress.assertEqual "router instance mismatch"
+                    instanceId partyOwner sendingMsg.deps.router
+                CCIP.RawInstanceAddress.assertEqual "router: onramp sending message mismatch"
+                    onRamp.instanceId onRamp.ccipOwner sendingMsg.deps.onRamp
+                assertMsg "router: feequoter sending message mismatch"
+                    (sendingMsg.deps.feeQuoter == deps.feeQuoter)
+                assertMsg "router: globalconfig sending message mismatch"
+                    (sendingMsg.deps.globalConfig == deps.globalConfig)
+
+                smCid <- exercise onRampCid CCIP.OnRamp.FinalizeFeeFromRouter with
+                    routerPartyOwner = partyOwner
+                    routerInstanceId = instanceId
+                    globalConfigCid = globalConfigCid
+                    feeQuoterCid = feeQuoterCid
+                    sendingMessageCid = sendingMessageCid
+
+                sm <- fetch smCid
+                if sm.expectedTokenInstrumentId == None
+                    then exercise smCid CCIP.SendingMessageV1.BuildMessage with
+                        caller = partyOwner
+                    else pure smCid
 
         -- | Finalize a CCIP send. Collects total fee from sender, delegates to
         -- OnRamp, updates sequence number state, emits CCIPMessageSent event.
@@ -399,7 +442,6 @@ template PerPartyRouter
                     tokenReceiverParty = tokenReceiverParty
                     caller = caller
 
-
         -- TODO: consider relaxing to allow `controller caller`
         -- | Execute an inbound CCIP message.
         -- Parameters:
@@ -544,7 +586,6 @@ template PerPartyRouter
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
 
 data CCIPSendResult = CCIPSendResult
     with

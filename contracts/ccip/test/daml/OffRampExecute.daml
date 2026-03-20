@@ -23,7 +23,6 @@ import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
 import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
 
-
 -- | Test execute with CCV verification via collecting contract pattern.
 --
 -- This test exercises AddCCVVerification directly on ExecutingMessageV1 rather
@@ -915,7 +914,6 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
 
     pure ()
 
-
 -- M-3 positive control: message-only (non-token-only) execute with receiver CCVs
 -- must fail when those CCVs are not verified. This complements the token-only test
 -- above which verifies receiver CCVs are skipped for token-only messages.
@@ -1044,7 +1042,6 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
             executingMessageCid = executingMessageCid
 
     debug "testExecuteMessageOnlyRequiresReceiverCCVs: PASSED"
-
 
 -- | Test that execute fails when required CCV is missing.
 -- Verifies that lane-mandated CCVs must be provided.
@@ -1184,7 +1181,6 @@ testExecuteFailsMissingCCV = script do
     debug ("Execute fails with missing CCV: PASSED")
     pure ()
 
-
 -- | Test that message for wrong receiver fails.
 -- Verifies receiver validation in OffRamp.
 testExecuteWrongReceiver : Script ()
@@ -1310,7 +1306,6 @@ testExecuteWrongReceiver = script do
     debug ("Execute fails with wrong receiver: PASSED")
     pure ()
 
-
 -- | Test that execute accepts a message from any configured source onramp.
 testExecuteAllowsMultipleOnRamps : Script ()
 testExecuteAllowsMultipleOnRamps = script do
@@ -1427,7 +1422,6 @@ testExecuteAllowsMultipleOnRamps = script do
             receiverMinBlockConfirmations = 2000
             caller = receiver
 
-
     -- Add CCV verification
     executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
         exerciseCmd executingMessageCid ExecutingMessageV1.AddCCVVerification with
@@ -1447,7 +1441,6 @@ testExecuteAllowsMultipleOnRamps = script do
     executeResult.state === Internal.SUCCESS
     debug ("Execute succeeds with alternate configured onramp: PASSED")
     pure ()
-
 
 -- | Test that execute rejects a message from an unconfigured source onramp.
 testExecuteRejectsUnconfiguredOnRamp : Script ()

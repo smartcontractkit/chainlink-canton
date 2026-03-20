@@ -132,10 +132,6 @@ var DeployChainContracts = operations.NewSequence(
 				Id:    types.TEXT("link-token"),
 			}
 		}
-		maxFeeJuels := input.FeeQuoterConfig.Template.MaxFeeJuelsPerMsg
-		if maxFeeJuels == "" {
-			maxFeeJuels = types.NUMERIC("1000000000000000000000000")
-		}
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[feequoter.FeeQuoter]{
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
@@ -147,7 +143,6 @@ var DeployChainContracts = operations.NewSequence(
 				UsdPerUnitGasByDestChainSelector: nil,
 				UsdPerToken:                      nil,
 				LinkTokenInstrumentId:            linkTokenId,
-				MaxFeeJuelsPerMsg:                maxFeeJuels,
 				PriceUpdaters:                    input.FeeQuoterConfig.Template.PriceUpdaters,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
@@ -189,7 +184,8 @@ var DeployChainContracts = operations.NewSequence(
 			ChainSelector: deps.Chain.Selector,
 			ActAs:         []string{party},
 			Template: onrampBinding.OnRamp{
-				CcipOwner: types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:         types.PARTY(input.CCIPOwnerParty),
+				MaxUSDCentsPerMsg: types.NUMERIC("100000000"),
 				Deps: onrampBinding.OnRampDeps{
 					GlobalConfig:       globalConfigRawInstanceAddress.Binding(),
 					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),

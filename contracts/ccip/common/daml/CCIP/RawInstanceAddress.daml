@@ -10,7 +10,6 @@ module CCIP.RawInstanceAddress where
 import DA.Crypto.Text (BytesHex, keccak256, toHex)
 import DA.Text qualified as Text
 
-
 -- | Raw instance address in format "instanceId@partyId".
 -- Human-readable form used for configuration and comparison.
 newtype RawInstanceAddress = RawInstanceAddress Text

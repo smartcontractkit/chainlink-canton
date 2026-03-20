@@ -21,8 +21,6 @@ import CCIP.RMNRemoteCodec
   , decodeRemoveCustomObserversParamsWithOffset
   )
 
-
-
 -- Global curse subject matching EVM: bytes16(uint128(0x01000000000000000000000000000001))
 globalCurseSubject : BytesHex
 globalCurseSubject = "01000000000000000000000000000001"

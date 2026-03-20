@@ -44,7 +44,6 @@ encodeDeployFeeQuoterParams : DeployFeeQuoterParams -> BytesHex
 encodeDeployFeeQuoterParams params =
   encodeText params.instanceId
   <> encodeInstrumentId params.linkTokenInstrumentId
-  <> encodeNumeric0 params.maxFeeJuelsPerMsg
 
 encodeDeployTokenAdminRegistryParams : DeployTokenAdminRegistryParams -> BytesHex
 encodeDeployTokenAdminRegistryParams params =
@@ -58,6 +57,7 @@ encodeDeployOnRampParams params =
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.ccvRegistry
+  <> encodeNumeric0 params.maxUSDCentsPerMsg
 
 encodeDeployOffRampParams : DeployOffRampParams -> BytesHex
 encodeDeployOffRampParams params =
@@ -183,7 +183,6 @@ testDecodeDeployFeeQuoterParams = script do
   let params = DeployFeeQuoterParams with
         instanceId = "fq-1"
         linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-        maxFeeJuelsPerMsg = 1000000000000000000.0
       encoded = encodeDeployFeeQuoterParams params
 
   case decodeDeployFeeQuoterParams encoded of
@@ -191,7 +190,6 @@ testDecodeDeployFeeQuoterParams = script do
     Some decoded -> do
       decoded.instanceId === params.instanceId
       decoded.linkTokenInstrumentId === params.linkTokenInstrumentId
-      decoded.maxFeeJuelsPerMsg === params.maxFeeJuelsPerMsg
 
   pure ()
 
@@ -216,6 +214,7 @@ testDecodeDeployOnRampParams = script do
         tokenAdminRegistry = RawInstanceAddress "tar@owner"
         feeQuoter = RawInstanceAddress "fq@owner"
         ccvRegistry = RawInstanceAddress "ccv@owner"
+        maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
   case decodeDeployOnRampParams encoded of
@@ -227,6 +226,7 @@ testDecodeDeployOnRampParams = script do
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
       decoded.ccvRegistry === params.ccvRegistry
+      decoded.maxUSDCentsPerMsg === params.maxUSDCentsPerMsg
 
   pure ()
 

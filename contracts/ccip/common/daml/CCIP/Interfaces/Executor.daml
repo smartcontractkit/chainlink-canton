@@ -19,7 +19,6 @@ interface IExecutor where
         controller caller
         do executor_calculateFeeImpl this self arg
 
-
 data ExecutorView = ExecutorView
     with
         owner : Party
