@@ -1566,13 +1566,18 @@ testVerifyInboundMessage = script do
             observingParties = [receiver, ccipOwner, poolOwner]
             ccvVerifications = []
             ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            sourceDefaultCCVs = []
             inboundPoolCCVs = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
                 rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
-            state = ExecutingMessageV1.ExecutingMessageState_Prepared
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
     -- Exercise VerifyInboundMessage - should succeed
     disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
@@ -1700,13 +1705,18 @@ testVerifyInboundMessageInvalidSourcePool = script do
             observingParties = [receiver, ccipOwner, poolOwner]
             ccvVerifications = []
             ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            sourceDefaultCCVs = []
             inboundPoolCCVs = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
                 rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
-            state = ExecutingMessageV1.ExecutingMessageState_Prepared
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
     -- Exercise VerifyInboundMessage - should fail
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
@@ -1825,13 +1835,18 @@ testVerifyInboundMessageMissingChainConfig = script do
             observingParties = [receiver, ccipOwner, poolOwner]
             ccvVerifications = []
             ccvOwners = []
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalCCVThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            sourceDefaultCCVs = []
             inboundPoolCCVs = None
             deps = ExecutingMessageV1.ExecutingMessageDeps with
                 offRamp = offRampInstanceAddress
                 globalConfig = RawInstanceAddress.make "test-globalconfig" ccipOwner
                 rmnRemote = RawInstanceAddress.make "test-rmn" ccipOwner
                 tokenAdminRegistry = tarInstanceAddress
-            state = ExecutingMessageV1.ExecutingMessageState_Prepared
+            state = ExecutingMessageV1.ExecutingMessageState_RequirePoolCCVs
 
     -- Exercise VerifyInboundMessage - should fail (missing chain config)
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
