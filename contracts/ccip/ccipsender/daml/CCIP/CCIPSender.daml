@@ -14,6 +14,7 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import CCIP.RawInstanceAddress (RawInstanceAddress)
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified Splice.Api.Token.HoldingV1
@@ -32,7 +33,7 @@ data CantonExtraArgsV1 = CantonExtraArgsV1
     with
         gasLimit : Int
         senderRequiredCCVs : [RawInstanceAddress]
-        executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
+        executorCid : Optional (ContractId CCIP.Interfaces.Executor.IExecutor)
         executorArgs : Optional BytesHex
         tokenReceiver : Optional BytesHex
         tokenArgs : BytesHex
@@ -137,7 +138,25 @@ template CCIPSender
                             tokenInstrumentId = tt.tokenInstrumentId
                             caller = owner
 
-                -- LockOrBurn (stores token data before executor finalization)
+                -- Executor contributes its flat fee, or the message is marked as
+                -- explicitly no-exec.
+                let resolvedExecutorArgs = fromOptional "" extraArgs.executorArgs
+                smCid <- case extraArgs.executorCid of
+                    Some executorCid -> exercise executorCid
+                        CCIP.Interfaces.Executor.Executor_CalculateFee with
+                            sendingMessageCid = smCid
+                            executorArgs = resolvedExecutorArgs
+                            caller = owner
+                    None -> exercise smCid
+                        CCIP.SendingMessageV1.SetNoExecutor with
+                            executorArgs = resolvedExecutorArgs
+                            caller = owner
+
+                smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with
+                    context
+                    sendingMessageCid = smCid
+
+                -- LockOrBurn records token send data after fees are finalized.
                 smCid <- case tokenTransfer of
                     None -> pure smCid
                     Some tt -> do
@@ -152,20 +171,6 @@ template CCIPSender
                                 amount = tt.amount
                                 caller = owner
                         pure lockResult.sendingMessageCid
-
-                -- Executor computes fee and finalizes message via AddExecutorWithFee.
-                let resolvedExecutorArgs = fromOptional "" extraArgs.executorArgs
-                smCid <- exercise extraArgs.executorCid
-                    CCIP.Interfaces.Executor.Executor_CalculateFee with
-                        sendingMessageCid = smCid
-                        executorArgs = resolvedExecutorArgs
-                        caller = owner
-
-                -- FinalizeFee (FeeQuoter looks up price internally)
-                smCid <- exercise feeQuoterCid
-                    CCIP.FeeQuoter.FeeQuoter_FinalizeFee with
-                        sendingMessageCid = smCid
-                        caller = owner
 
                 -- ForwardToVerifier (verifiers see committed token state)
                 smCid <- foldlA (\cid input ->
