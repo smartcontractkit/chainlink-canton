@@ -1090,10 +1090,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 								{InstrumentId: linkTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 							},
+							// Gas price must be 0 until TransferFactory is
+							// properly wired (see TODO above). A non-zero gas
+							// price produces a non-zero fee, triggering a
+							// TransferFactory_Transfer on the invalid CID.
 							GasPriceUpdates: []feequoter.GasPriceUpdate{
 								{
 									DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
-									UsdPerUnitGas:     types.NUMERIC("38"),
+									UsdPerUnitGas:     types.NUMERIC("0"),
 								},
 							},
 						},
@@ -1220,6 +1224,12 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 		FeeToken: feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
+			// TODO: replace with a real Splice TransferFactory CID from the
+			// transfer-instruction API. Using routerCID is invalid because
+			// CCIPSend is a consuming choice on the router, so exercising
+			// TransferFactory_Transfer on the same CID fails with
+			// CONTRACT_NOT_ACTIVE. This only works today because total fees
+			// are 0 (gas price set to 0 below) so the transfer is skipped.
 			TransferFactory: routerCID,
 			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
