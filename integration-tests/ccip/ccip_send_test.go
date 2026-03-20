@@ -360,6 +360,47 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to update prices")
 	t.Logf("Updated FeeToken price to $%s per token", usdPerToken)
 
+	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
+	disclosedFeeQuoterForConfig, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
+		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
+	})
+	require.NoError(t, err)
+	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.Must(uuid.NewUUID()).String(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
+					ContractId: disclosedFeeQuoterForConfig.ContractId,
+					Choice:     "ApplyDestChainConfigUpdates",
+					ChoiceArgument: ledger.MapToValue(feequoter.ApplyDestChainConfigUpdates2{
+						DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
+							{
+								DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+								DestChainConfig: feequoter.DestChainConfig2{
+									IsEnabled:                   true,
+									MaxDataBytes:                50000,
+									MaxPerMsgGasLimit:           4000000,
+									DestGasOverhead:             300000,
+									DestGasPerPayloadByteBase:   16,
+									ChainFamilySelector:         "2812d52c",
+									DefaultTxGasLimit:           200000,
+									NetworkFeeUSD:               types.NUMERIC("25"),
+									DefaultTokenFeeUSD:          types.NUMERIC("10"),
+									DefaultTokenDestGasOverhead: 34000,
+								},
+							},
+						},
+					}),
+				}},
+			}},
+			ActAs:              []string{partyCCIP},
+			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFeeQuoterForConfig},
+		},
+	})
+	require.NoError(t, err, "failed to apply FeeQuoter dest chain config")
+	t.Log("Applied FeeQuoter dest chain config")
+
 	// Create PerPartyRouter for sender
 	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
@@ -626,7 +667,7 @@ func TestCCIPSend(t *testing.T) {
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        types.CONTRACT_ID(executorCid),
+			ExecutorCid:        contractIDPtr(executorCid),
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
 			TokenArgs:          types.TEXT(""),
@@ -706,4 +747,9 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("  Message ID: %s", returnedMessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 	t.Logf("  Encoded message: %s", returnedEncodedMessage)
+}
+
+func contractIDPtr(s string) *types.CONTRACT_ID {
+	cid := types.CONTRACT_ID(s)
+	return &cid
 }

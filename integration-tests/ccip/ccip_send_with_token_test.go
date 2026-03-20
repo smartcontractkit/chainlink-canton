@@ -365,6 +365,34 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to update prices")
 	t.Logf("Updated prices: FeeToken=$%s, LINK=$%s, destUsdPerUnitGas=%s", usdPerToken, "1500000000", destUsdPerUnitGas)
 
+	// Configure FeeQuoter dest chain config (fallback for token transfer fees)
+	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.ApplyDestChainConfigUpdates, ccipDeps, contractops.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
+		ChainSelector:   env.Chain.ChainSelector(),
+		InstanceAddress: feeQuoterInstanceAddress,
+		ActAs:           []string{partyCCIP},
+		Args: feequoter.ApplyDestChainConfigUpdates2{
+			DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
+				{
+					DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+					DestChainConfig: feequoter.DestChainConfig2{
+						IsEnabled:                   true,
+						MaxDataBytes:                50000,
+						MaxPerMsgGasLimit:           4000000,
+						DestGasOverhead:             300000,
+						DestGasPerPayloadByteBase:   16,
+						ChainFamilySelector:         "2812d52c",
+						DefaultTxGasLimit:           200000,
+						NetworkFeeUSD:               types.NUMERIC("25"),
+						DefaultTokenFeeUSD:          types.NUMERIC("10"),
+						DefaultTokenDestGasOverhead: 34000,
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "failed to apply FeeQuoter dest chain config")
+	t.Log("Applied FeeQuoter dest chain config")
+
 	// Setup token pool for outbound token transfer in Send.
 	tokenAdminRegistryRawAddr, err := contracts.RawInstanceAddressFromString(tokenAdminRegistry.Labels.List()[0])
 	require.NoError(t, err, "failed to parse TokenAdminRegistry raw address")
@@ -429,7 +457,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				strconv.FormatUint(remoteSelector, 10): map[string]any{
 					"isEnabled":         true,
 					"destGasOverhead":   poolDestGasOverhead,
-					"destBytesOverhead": int64(0),
+					"destBytesOverhead": int64(32),
 					"feeUSDCents":       types.NUMERIC("10"),
 					"feeBps":            types.NUMERIC("500"),
 				},
@@ -857,7 +885,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
 			GasLimit:           types.INT64(100000),
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        types.CONTRACT_ID(executorCid),
+			ExecutorCid:        contractIDPtr(executorCid),
 			ExecutorArgs:       nil,
 			TokenReceiver:      nil,
 			TokenArgs:          types.TEXT(""),
