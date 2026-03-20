@@ -538,9 +538,9 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				DefaultTokenDestGasOverhead: 34000,
 				NetworkFeeUSDCents:          0,
 			},
-			ExecutorDestChainConfig:  adapters.ExecutorDestChainConfig{},
-			AddressBytesLength:       addressBytesLength,
-			BaseExecutionGasCost:     0,
+			ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+			AddressBytesLength:      addressBytesLength,
+			BaseExecutionGasCost:    0,
 		}
 		config.Config.Input.RemoteChains[remoteSelector] = remoteChainConfig
 	}
