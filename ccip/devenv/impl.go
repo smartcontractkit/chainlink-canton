@@ -46,7 +46,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
@@ -67,6 +66,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
 	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
 var (
@@ -1090,14 +1090,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{InstrumentId: feeTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 								{InstrumentId: linkTokenInstrument, UsdPerToken: types.NUMERIC("100000000")},
 							},
-							// Gas price must be 0 until TransferFactory is
-							// properly wired (see TODO above). A non-zero gas
-							// price produces a non-zero fee, triggering a
-							// TransferFactory_Transfer on the invalid CID.
 							GasPriceUpdates: []feequoter.GasPriceUpdate{
 								{
 									DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
-									UsdPerUnitGas:     types.NUMERIC("0"),
+									UsdPerUnitGas:     types.NUMERIC("38"),
 								},
 							},
 						},
@@ -1119,6 +1115,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("refresh fee quoter after price update: %w", err)
+	}
+
+	feeTransferFactoryCID, feeTransferFactoryExtraArgs, feeTransferFactoryDisclosures, err := devenvtests.GetFeeTransferFactoryInput(ctx, participant, party, party)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve fee transfer factory input: %w", err)
 	}
 
 	defaultCCVRef, defaultCCVRefErr := c.e.DataStore.Addresses().Get(
@@ -1224,17 +1225,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		},
 		FeeToken: feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
-			// TODO: replace with a real Splice TransferFactory CID from the
-			// transfer-instruction API. Using routerCID is invalid because
-			// CCIPSend is a consuming choice on the router, so exercising
-			// TransferFactory_Transfer on the same CID fails with
-			// CONTRACT_NOT_ACTIVE. This only works today because total fees
-			// are 0 (gas price set to 0 below) so the transfer is skipped.
-			TransferFactory: routerCID,
-			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-				Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-			},
+			TransferFactory:   feeTransferFactoryCID,
+			ExtraArgs:         feeTransferFactoryExtraArgs,
 			TokenPoolHoldings: nil,
 		},
 		FeeTokenHoldingCids: nil,
@@ -1260,6 +1252,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		disclosedRMNRemote,
 		disclosedFeeQuoter,
 	)
+	disclosedContracts = append(disclosedContracts, feeTransferFactoryDisclosures...)
 	disclosedContracts = append(disclosedContracts, disclosedVerifierContracts...)
 	for _, dc := range disclosedContracts {
 		if dc != nil && dc.GetContractId() == "" {
