@@ -17,6 +17,36 @@ import (
 )
 
 // TODO: dedupe with integration-tests GetTransferFactory helper once shared helper location is established.
+func getTokenRegistryAdmin(ctx context.Context, participant canton.Participant) (types.PARTY, error) {
+	auth := func(ctx context.Context, req *http.Request) error {
+		token, err := participant.TokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("get participant token: %w", err)
+		}
+
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+
+	scanProxyBaseURL := fmt.Sprintf("%s/v0/scan-proxy", participant.Endpoints.ValidatorAPIURL)
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(scanProxyBaseURL, tokenMetadataV1.WithRequestEditorFn(auth))
+	if err != nil {
+		return "", fmt.Errorf("create token metadata client: %w", err)
+	}
+
+	registryInfoResponse, err := tokenMetadataClient.GetRegistryInfoWithResponse(ctx)
+	if err != nil {
+		return "", fmt.Errorf("get registry info: %w", err)
+	}
+	if registryInfoResponse.StatusCode() != http.StatusOK || registryInfoResponse.JSON200 == nil {
+		return "", fmt.Errorf("get registry info unexpected status: %d", registryInfoResponse.StatusCode())
+	}
+
+	return types.PARTY(registryInfoResponse.JSON200.AdminId), nil
+}
+
+// TODO: dedupe with integration-tests GetTransferFactory helper once shared helper location is established.
 func getFeeTransferFactoryInput(
 	ctx context.Context,
 	participant canton.Participant,
@@ -28,7 +58,9 @@ func getFeeTransferFactoryInput(
 		if err != nil {
 			return fmt.Errorf("get participant token: %w", err)
 		}
+
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
 		return nil
 	}
 

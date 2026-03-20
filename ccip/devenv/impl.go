@@ -1030,10 +1030,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolved empty executor contract ID")
 	}
 
-	// Keep fee token setup local and deterministic for devenv sends.
+	registryAdmin, err := getTokenRegistryAdmin(ctx, participant)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("resolve token registry admin: %w", err)
+	}
+
+	// Use Amulet as fee token so FeeTokenInput transfer-factory admin matches token admin.
 	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(party),
-		Id:    types.TEXT("devenv-fee-token"),
+		Admin: registryAdmin,
+		Id:    types.TEXT("Amulet"),
 	}
 	linkTokenInstrument := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(party),
