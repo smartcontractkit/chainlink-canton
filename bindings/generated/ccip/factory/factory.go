@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "0095d80f42e695019d6358b9f438f18ad154603da78a4d7a3cfa71573607b9f2"
+	PackageID   = "0eb2613784ce5d69c529168c4eeb2a400135ed73fa4cb68aaf1987d7276aba07"
 	SDKVersion  = "3.4.10"
 )
 
@@ -891,7 +891,6 @@ func (t *DeployFeeQuoter) UnmarshalHex(data string) error {
 type DeployFeeQuoterParams struct {
 	InstanceId            types.TEXT                               `json:"instanceId"`
 	LinkTokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
-	MaxFeeJuelsPerMsg     types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
 }
 
 // ToMap converts DeployFeeQuoterParams to a map for DAML arguments
@@ -907,8 +906,6 @@ func (t DeployFeeQuoterParams) ToMap() map[string]any {
 		}
 		return t.LinkTokenInstrumentId
 	}()
-
-	m["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
 
 	return m
 }
@@ -1294,6 +1291,7 @@ type DeployOnRampParams struct {
 	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
 	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
 	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+	MaxUSDCentsPerMsg  types.NUMERIC             `json:"maxUSDCentsPerMsg"`
 }
 
 // ToMap converts DeployOnRampParams to a map for DAML arguments
@@ -1341,6 +1339,8 @@ func (t DeployOnRampParams) ToMap() map[string]any {
 		}
 		return t.CcvRegistry
 	}()
+
+	m["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
 
 	return m
 }
