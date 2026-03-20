@@ -561,6 +561,16 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                 payloadSizeBytes = 200
                 allowListEnabled = False]
 
+    -- Test invalid negative payload size
+    submitMustFail owner do
+        exerciseCmd ccvCid CommitteeVerifier.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CommitteeVerifier.RemoteChainConfigArgs with
+                remoteChainSelector = 123.0
+                feeUSDCents = 100.0
+                gasForVerification = 5000
+                payloadSizeBytes = -1
+                allowListEnabled = False]
+
     pure ()
  
 testCommitteeVerifier_ApplyAllowListUpdates : Script ()
