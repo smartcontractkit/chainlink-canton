@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
-	fee_quoter "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
+	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -127,6 +127,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),
 				TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)), // TODO: check if this is accurate
 			})
+
 			fqConfig := remoteConfig.FeeQuoterDestChainConfig
 			chainFamilyHex := hex.EncodeToString(fqConfig.ChainFamilySelector[:])
 			feeQuoterDestChainConfigArgs = append(feeQuoterDestChainConfigArgs, feequoter.DestChainConfigArgs2{
@@ -183,7 +184,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 		}
 
 		// Apply DestChainConfigs to FeeQuoter
-		_, err = operations.ExecuteOperation(b, fee_quoter.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
+		_, err = operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, deps, contract.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
 			ChainSelector:   deps.Chain.Selector,
 			InstanceAddress: input.FeeQuoter,
 			ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
