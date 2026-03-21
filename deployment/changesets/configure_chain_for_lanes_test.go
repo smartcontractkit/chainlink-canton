@@ -101,7 +101,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
 		ccvSignerPubKeys = append(ccvSignerPubKeys, pubKeyHex)
 	}
-	versionTag := "49ff34ed"
+	versionTag := "e9a05a20"
 	ccvQualifier := "default"
 
 	// Deploy Chain Contracts

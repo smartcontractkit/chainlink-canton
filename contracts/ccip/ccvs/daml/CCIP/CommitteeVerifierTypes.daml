@@ -1,0 +1,56 @@
+module CCIP.CommitteeVerifierTypes where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified CCIP.RawInstanceAddress
+
+data CommitteeVerifierDeps = CommitteeVerifierDeps
+    with
+        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+-- | Parameters for SetDeps - optional fields for selective updates
+data SetDepsParams = SetDepsParams
+    with
+        rmnRemote : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+data DynamicConfig = DynamicConfig
+    with
+        allowListAdmin : Optional Party -- Party capable of adding or removing allowed senders
+        messageSentObservers : [Party]  -- List of parties that will be added to CCIPMessageSent contracts as additional observers
+    deriving (Eq, Show)
+
+-- | Per-source-chain signature config for inbound message verification.
+data SignatureConfig = SignatureConfig
+    with
+        sourceChainSelector : Numeric 0
+        threshold : Int
+        signerKeys : [BytesHex]
+    deriving (Eq, Show)
+
+data RemoteChainConfigArgs = RemoteChainConfigArgs
+    with
+        remoteChainSelector : Numeric 0 -- The chain selector that this config applies to.
+        feeUSDCents : Numeric 0         -- The fee in USD cents for messages to this remote chain.
+        gasForVerification : Int        -- The gas to reserve for verification of messages on the remote chain.
+        payloadSizeBytes : Int          -- The size of the verification payload on the remote chain.
+        allowListEnabled : Bool         -- True if the allowlist is enabled. To update the list of allowed senders, see ApplyAllowlistUpdates.
+    deriving (Eq, Show)
+
+data RemoteChainConfig = RemoteChainConfig
+    with
+        feeUSDCents : Numeric 0      -- The fee in USD cents for messages to this remote chain.
+        gasForVerification : Int     -- The gas to reserve for verification of messages on the remote chain.
+        payloadSizeBytes : Int       -- The size of the verification payload on the remote chain.
+        allowListEnabled : Bool      -- True if the allowlist is enabled
+        allowedSendersList : [Party] -- The list of parties allowed to send messages.
+    deriving (Eq, Show)
+
+data AllowListConfigArgs = AllowListConfigArgs
+    with
+        destChainSelector : Numeric 0       -- The chain selector that this allowlist config applies to.
+        allowListEnabled : Bool             -- True if the allowlist is enabled for the destination chain.
+        addedAllowListedSenders : [Party]   -- List of parties to add to the allowlist for the destination chain.
+        removedAllowListedSenders : [Party] -- List of parties to remove from the allowlist for the destination chain.
+    deriving (Eq, Show)

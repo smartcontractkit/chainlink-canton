@@ -162,7 +162,7 @@ func encodeTokenTransferV1(tt *TokenTransferV1) []byte {
 // Format: versionTag (4 bytes) || signatureLength (2 bytes) || signatures (64 bytes each)
 // Matches EVM: signers sign keccak256(versionTag || messageId) where messageId = keccak256(encodedMessage).
 func GenerateVerifierResults(encodedMessage []byte, privateKeys []*ecdsa.PrivateKey) ([]byte, error) {
-	versionTag, _ := hex.DecodeString("49ff34ed")
+	versionTag, _ := hex.DecodeString("e9a05a20")
 
 	messageId := crypto.Keccak256(encodedMessage)
 	msgHash := crypto.Keccak256(append(versionTag, messageId...))
@@ -260,7 +260,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "49ff34ed"
+	versionTag := "e9a05a20"
 	ccvQualifier := "default"
 
 	reporter := cld_ops.NewMemoryReporter()

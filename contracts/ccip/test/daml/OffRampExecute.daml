@@ -51,7 +51,7 @@ testExecuteWithCCVVerification = script do
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance address
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccvRawAddress = CCIP.RawInstanceAddress.make ccvInstanceId receiver
 
@@ -380,7 +380,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance addresses
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccv1RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv1Owner
     let ccv2RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv2Owner
@@ -558,7 +558,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance addresses
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccv1RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv1Owner
     let ccv2RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv2Owner
@@ -740,7 +740,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     -- Build CCV raw instance addresses
-    let ccvVersionTag = CommitteeVerifier.versionTagV1_7_0
+    let ccvVersionTag = CommitteeVerifier.versionTagV2_0_0
     let ccvInstanceId = "test-ccv-committee"
     let ccv1RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv1Owner
     let ccv2RawAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccv2Owner

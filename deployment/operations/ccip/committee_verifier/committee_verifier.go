@@ -54,12 +54,12 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccvs.CommitteeVerifier]{
 	Prefix:      "committeeverifier",
 })
 
-var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierApplySignatureConfigs]{
+var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.ApplySignatureConfigs]{
 	Name:         "canton/ccip/committee_verifier/apply_signature_configs",
 	Version:      Version,
 	Description:  "Applies new signature configs to a CommitteeVerifier instance by adding/removing configs",
 	ContractType: ContractType,
-	Validate: func(input ccvs.CommitteeVerifierApplySignatureConfigs) error {
+	Validate: func(input ccvs.ApplySignatureConfigs) error {
 		for i, config := range input.SignatureConfigs {
 			// Verify all thresholds
 			if int(config.Threshold) > len(config.SignerKeys) {
@@ -80,25 +80,25 @@ var ApplySignatureConfigs = contract.NewExercise(contract.ExerciseParams[ccvs.Co
 		return nil
 	},
 	Template: ccvs.CommitteeVerifier{},
-	Method:   ccvs.CommitteeVerifier{}.CommitteeVerifierApplySignatureConfigs,
+	Method:   ccvs.CommitteeVerifier{}.ApplySignatureConfigs,
 })
 
-var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierUpdateStorageLocations]{
+var UpdateStorageLocations = contract.NewExercise(contract.ExerciseParams[ccvs.UpdateStorageLocations]{
 	Name:         "canton/ccip/committee_verifier/update_storage_locations",
 	Version:      Version,
 	Description:  "Updates the storage locations of a CommitteeVerifier instance",
 	ContractType: ContractType,
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.CommitteeVerifierUpdateStorageLocations,
+	Method:       ccvs.CommitteeVerifier{}.UpdateStorageLocations,
 })
 
-var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierTransferStorageLocationsAdmin]{
+var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams[ccvs.TransferStorageLocationsAdmin]{
 	Name:         "canton/ccip/committee_verifier/transfer_storage_locations_admin",
 	Version:      Version,
 	Description:  "Initiates the two-step transfer of the storage locations admin role",
 	ContractType: ContractType,
-	Validate: func(input ccvs.CommitteeVerifierTransferStorageLocationsAdmin) error {
+	Validate: func(input ccvs.TransferStorageLocationsAdmin) error {
 		if input.NewAdmin == "" {
 			return errors.New("newAdmin cannot be empty")
 		}
@@ -106,17 +106,17 @@ var TransferStorageLocationsAdmin = contract.NewExercise(contract.ExerciseParams
 		return nil
 	},
 	Template: ccvs.CommitteeVerifier{},
-	Method:   ccvs.CommitteeVerifier{}.CommitteeVerifierTransferStorageLocationsAdmin,
+	Method:   ccvs.CommitteeVerifier{}.TransferStorageLocationsAdmin,
 })
 
-var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExerciseParams[ccvs.CommitteeVerifierAcceptStorageLocationsAdmin]{
+var AcceptStorageLocationsAdminRole = contract.NewExercise(contract.ExerciseParams[ccvs.AcceptStorageLocationsAdmin]{
 	Name:         "canton/ccip/committee_verifier/accept_storage_locations_admin",
 	Version:      Version,
 	Description:  "Accepts a pending transfer of the storage locations admin role",
 	ContractType: ContractType,
 	Validate:     nil,
 	Template:     ccvs.CommitteeVerifier{},
-	Method:       ccvs.CommitteeVerifier{}.CommitteeVerifierAcceptStorageLocationsAdmin,
+	Method:       ccvs.CommitteeVerifier{}.AcceptStorageLocationsAdmin,
 })
 
 var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[ccvs.SetDynamicConfig]{

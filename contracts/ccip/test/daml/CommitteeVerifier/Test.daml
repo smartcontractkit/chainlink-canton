@@ -8,6 +8,7 @@ import DA.Foldable (forA_)
 import DA.List ((!!))
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+
 import qualified CCIP.Context
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
@@ -62,9 +63,10 @@ testCommitteeVerifier = script do
 
     let msg = PayloadBuilder.testMessage1
     let encodedMsg = PayloadBuilder.testMessage1Encoded
+    debug ("encodedMsg: " <> encodedMsg)
     let messageId = keccak256 encodedMsg
     debug ("messageId: " <> messageId)
-    let signedHash = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> messageId)
+    let signedHash = keccak256 (CommitteeVerifier.versionTagV2_0_0 <> messageId)
     debug ("signedHash: " <> signedHash)
 
     let rmnInstanceId = "test-rmn"
@@ -97,7 +99,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = Some owner
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -126,7 +128,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv2"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [] -- test that empty observers list works, we will still observe via the ccvOwners
             storageLocations = ["ipfs://example"]
@@ -154,7 +156,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv3"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -175,7 +177,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv4"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -202,7 +204,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv5"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -229,7 +231,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv6"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -254,7 +256,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv7"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -272,7 +274,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv8"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
@@ -291,7 +293,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv9"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -316,7 +318,7 @@ testCommitteeVerifier = script do
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults =
-                CommitteeVerifier.versionTagV1_7_0 <> -- version tag
+                CommitteeVerifier.versionTagV2_0_0 <> -- version tag
                 "ffff" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
             caller = owner
@@ -326,7 +328,7 @@ testCommitteeVerifier = script do
             extraContext = CCIP.Context.emptyCCIPContext
             executingMessageCid = executingMessageCid
             verifierResults =
-                CommitteeVerifier.versionTagV1_7_0 <> -- version tag
+                CommitteeVerifier.versionTagV2_0_0 <> -- version tag
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
             caller = owner
@@ -342,7 +344,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv10"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -360,12 +362,12 @@ testCommitteeVerifier = script do
             caller = owner
     -- Update signer config to 6, should fail due to threshold > number of signers
     submitMustFail owner do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]]
     -- Update signers to 6 addresses and threshold 6, should pass
     ccv10 <- submit owner do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4, 5]]
     executingMessageCid <- createExecMsg owner rmnOwner
@@ -378,7 +380,7 @@ testCommitteeVerifier = script do
             caller = owner
     -- Remove source chain config, afterward verification should fail
     ccv10 <- submit owner do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = [123.0]
             signatureConfigs = []
     executingMessageCid <- createExecMsg owner rmnOwner
@@ -398,7 +400,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv10b"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -414,7 +416,7 @@ testCommitteeVerifier = script do
             instanceId = "test-ccv10c"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
@@ -424,7 +426,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail owner do
-        exerciseCmd ccv10b CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10b CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0]]
     debug ("===== Passed Test10b =====")
@@ -450,7 +452,7 @@ testCommitteeVerifier_StorageLocations = script do
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
@@ -462,26 +464,26 @@ testCommitteeVerifier_StorageLocations = script do
 
     -- Transfer storage location admin role to another party
     ccv1 <- submit owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_TransferStorageLocationsAdmin with
+        exerciseCmd ccv1 CommitteeVerifier.TransferStorageLocationsAdmin with
             newAdmin = admin
 
     -- Accept admin role from wrong party, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin
+        exerciseCmd ccv1 CommitteeVerifier.AcceptStorageLocationsAdmin
 
     -- Accept admin role
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin
+        exerciseCmd ccv1 CommitteeVerifier.AcceptStorageLocationsAdmin
     let newLocations = ["ipfs://new-location1", "ipfs://new-location2"]
 
     -- Update storage locations with new admin, should succeed
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_UpdateStorageLocations with
+        exerciseCmd ccv1 CommitteeVerifier.UpdateStorageLocations with
             newLocations = newLocations
     
     -- Try updating storage locations with old admin, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_UpdateStorageLocations with
+        exerciseCmd ccv1 CommitteeVerifier.UpdateStorageLocations with
             newLocations = ["ipfs://another-location"]
 
     -- Fetch contract and verify storage locations updated
@@ -504,7 +506,7 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
@@ -604,7 +606,7 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = Some admin
             messageSentObservers = [owner]
             storageLocations = []
@@ -717,7 +719,7 @@ testCommitteeVerifier_SetDynamicConfig = script do
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CommitteeVerifier.versionTagV1_7_0
+            versionTag = CommitteeVerifier.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
