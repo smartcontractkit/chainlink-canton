@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "43d6064d121ed862713e91d9e292934d04f6a3373ea478b14fd25bfb69291a9c"
+	PackageID   = "8b996def5be87b21a682461defa2ec013cc37aaeb3d7f2418eba65c480b7bec8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -51,6 +51,38 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AcceptStorageLocationsAdmin is a Record type
+type AcceptStorageLocationsAdmin struct {
+}
+
+// ToMap converts AcceptStorageLocationsAdmin to a map for DAML arguments
+func (t AcceptStorageLocationsAdmin) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t AcceptStorageLocationsAdmin) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AcceptStorageLocationsAdmin) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AcceptStorageLocationsAdmin to hex string (Canton MCMS format)
+func (t AcceptStorageLocationsAdmin) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AcceptStorageLocationsAdmin from hex string (Canton MCMS format)
+func (t *AcceptStorageLocationsAdmin) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // AllowListConfigArgs is a Record type
@@ -221,6 +253,62 @@ func (t ApplyRemoteChainConfigUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplyRemoteChainConfigUpdates from hex string (Canton MCMS format)
 func (t *ApplyRemoteChainConfigUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplySignatureConfigs is a Record type
+type ApplySignatureConfigs struct {
+	SourceChainSelectorsToRemove []types.NUMERIC   `json:"sourceChainSelectorsToRemove"`
+	SignatureConfigs             []SignatureConfig `json:"signatureConfigs"`
+}
+
+// ToMap converts ApplySignatureConfigs to a map for DAML arguments
+func (t ApplySignatureConfigs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sourceChainSelectorsToRemove"] = func() []any {
+		res := make([]any, 0, len(t.SourceChainSelectorsToRemove))
+		for _, e := range t.SourceChainSelectorsToRemove {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	m["signatureConfigs"] = func() []any {
+		res := make([]any, 0, len(t.SignatureConfigs))
+		for _, e := range t.SignatureConfigs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplySignatureConfigs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplySignatureConfigs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplySignatureConfigs to hex string (Canton MCMS format)
+func (t ApplySignatureConfigs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplySignatureConfigs from hex string (Canton MCMS format)
+func (t *ApplySignatureConfigs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -460,27 +548,6 @@ func (t CommitteeVerifier) CommitteeVerifierVerifyMessageWithPackageID(contractI
 	}
 }
 
-// CommitteeVerifierApplySignatureConfigs exercises the CommitteeVerifier_ApplySignatureConfigs choice on this CommitteeVerifier contract
-// This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigs(contractID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CommitteeVerifierApplySignatureConfigsWithPackageID exercises the CommitteeVerifier_ApplySignatureConfigs choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierApplySignatureConfigsWithPackageID(contractID string, packageID string, args CommitteeVerifierApplySignatureConfigs) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
-		ContractID: contractID,
-		Choice:     "CommitteeVerifier_ApplySignatureConfigs",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // ApplyRemoteChainConfigUpdates exercises the ApplyRemoteChainConfigUpdates choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ApplyRemoteChainConfigUpdates(contractID string, args ApplyRemoteChainConfigUpdates) *model.ExerciseCommand {
@@ -498,6 +565,27 @@ func (t CommitteeVerifier) ApplyRemoteChainConfigUpdatesWithPackageID(contractID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplyRemoteChainConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplySignatureConfigs exercises the ApplySignatureConfigs choice on this CommitteeVerifier contract
+// This method uses the package name in the template ID
+func (t CommitteeVerifier) ApplySignatureConfigs(contractID string, args ApplySignatureConfigs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplySignatureConfigs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplySignatureConfigsWithPackageID exercises the ApplySignatureConfigs choice using the provided package ID instead of package name
+func (t CommitteeVerifier) ApplySignatureConfigsWithPackageID(contractID string, packageID string, args ApplySignatureConfigs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		ContractID: contractID,
+		Choice:     "ApplySignatureConfigs",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -523,23 +611,23 @@ func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string,
 	}
 }
 
-// CommitteeVerifierAcceptStorageLocationsAdmin exercises the CommitteeVerifier_AcceptStorageLocationsAdmin choice on this CommitteeVerifier contract
+// AcceptStorageLocationsAdmin exercises the AcceptStorageLocationsAdmin choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierAcceptStorageLocationsAdmin(contractID string, args CommitteeVerifierAcceptStorageLocationsAdmin) *model.ExerciseCommand {
+func (t CommitteeVerifier) AcceptStorageLocationsAdmin(contractID string, args AcceptStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_AcceptStorageLocationsAdmin",
+		Choice:     "AcceptStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierAcceptStorageLocationsAdminWithPackageID exercises the CommitteeVerifier_AcceptStorageLocationsAdmin choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierAcceptStorageLocationsAdminWithPackageID(contractID string, packageID string, args CommitteeVerifierAcceptStorageLocationsAdmin) *model.ExerciseCommand {
+// AcceptStorageLocationsAdminWithPackageID exercises the AcceptStorageLocationsAdmin choice using the provided package ID instead of package name
+func (t CommitteeVerifier) AcceptStorageLocationsAdminWithPackageID(contractID string, packageID string, args AcceptStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_AcceptStorageLocationsAdmin",
+		Choice:     "AcceptStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -649,44 +737,44 @@ func (t CommitteeVerifier) SetDepsWithPackageID(contractID string, packageID str
 	}
 }
 
-// CommitteeVerifierTransferStorageLocationsAdmin exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice on this CommitteeVerifier contract
+// TransferStorageLocationsAdmin exercises the TransferStorageLocationsAdmin choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdmin(contractID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
+func (t CommitteeVerifier) TransferStorageLocationsAdmin(contractID string, args TransferStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Choice:     "TransferStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierTransferStorageLocationsAdminWithPackageID exercises the CommitteeVerifier_TransferStorageLocationsAdmin choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierTransferStorageLocationsAdminWithPackageID(contractID string, packageID string, args CommitteeVerifierTransferStorageLocationsAdmin) *model.ExerciseCommand {
+// TransferStorageLocationsAdminWithPackageID exercises the TransferStorageLocationsAdmin choice using the provided package ID instead of package name
+func (t CommitteeVerifier) TransferStorageLocationsAdminWithPackageID(contractID string, packageID string, args TransferStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_TransferStorageLocationsAdmin",
+		Choice:     "TransferStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierUpdateStorageLocations exercises the CommitteeVerifier_UpdateStorageLocations choice on this CommitteeVerifier contract
+// UpdateStorageLocations exercises the UpdateStorageLocations choice on this CommitteeVerifier contract
 // This method uses the package name in the template ID
-func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocations(contractID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
+func (t CommitteeVerifier) UpdateStorageLocations(contractID string, args UpdateStorageLocations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_UpdateStorageLocations",
+		Choice:     "UpdateStorageLocations",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// CommitteeVerifierUpdateStorageLocationsWithPackageID exercises the CommitteeVerifier_UpdateStorageLocations choice using the provided package ID instead of package name
-func (t CommitteeVerifier) CommitteeVerifierUpdateStorageLocationsWithPackageID(contractID string, packageID string, args CommitteeVerifierUpdateStorageLocations) *model.ExerciseCommand {
+// UpdateStorageLocationsWithPackageID exercises the UpdateStorageLocations choice using the provided package ID instead of package name
+func (t CommitteeVerifier) UpdateStorageLocationsWithPackageID(contractID string, packageID string, args UpdateStorageLocations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
 		ContractID: contractID,
-		Choice:     "CommitteeVerifier_UpdateStorageLocations",
+		Choice:     "UpdateStorageLocations",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -819,94 +907,6 @@ func (t CommitteeVerifierDeps) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CommitteeVerifierDeps from hex string (Canton MCMS format)
 func (t *CommitteeVerifierDeps) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierAcceptStorageLocationsAdmin is a Record type
-type CommitteeVerifierAcceptStorageLocationsAdmin struct {
-}
-
-// ToMap converts CommitteeVerifierAcceptStorageLocationsAdmin to a map for DAML arguments
-func (t CommitteeVerifierAcceptStorageLocationsAdmin) ToMap() map[string]any {
-	m := make(map[string]any)
-	return m
-}
-
-func (t CommitteeVerifierAcceptStorageLocationsAdmin) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierAcceptStorageLocationsAdmin) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierAcceptStorageLocationsAdmin to hex string (Canton MCMS format)
-func (t CommitteeVerifierAcceptStorageLocationsAdmin) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierAcceptStorageLocationsAdmin from hex string (Canton MCMS format)
-func (t *CommitteeVerifierAcceptStorageLocationsAdmin) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierApplySignatureConfigs is a Record type
-type CommitteeVerifierApplySignatureConfigs struct {
-	SourceChainSelectorsToRemove []types.NUMERIC   `json:"sourceChainSelectorsToRemove"`
-	SignatureConfigs             []SignatureConfig `json:"signatureConfigs"`
-}
-
-// ToMap converts CommitteeVerifierApplySignatureConfigs to a map for DAML arguments
-func (t CommitteeVerifierApplySignatureConfigs) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["sourceChainSelectorsToRemove"] = func() []any {
-		res := make([]any, 0, len(t.SourceChainSelectorsToRemove))
-		for _, e := range t.SourceChainSelectorsToRemove {
-			res = append(res, e)
-		}
-		return res
-	}()
-
-	m["signatureConfigs"] = func() []any {
-		res := make([]any, 0, len(t.SignatureConfigs))
-		for _, e := range t.SignatureConfigs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t CommitteeVerifierApplySignatureConfigs) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierApplySignatureConfigs) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierApplySignatureConfigs to hex string (Canton MCMS format)
-func (t CommitteeVerifierApplySignatureConfigs) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierApplySignatureConfigs from hex string (Canton MCMS format)
-func (t *CommitteeVerifierApplySignatureConfigs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1057,84 +1057,6 @@ func (t CommitteeVerifierForwardToVerifierMCMSParams) MarshalHex() (string, erro
 
 // UnmarshalHex decodes CommitteeVerifierForwardToVerifierMCMSParams from hex string.
 func (t *CommitteeVerifierForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierTransferStorageLocationsAdmin is a Record type
-type CommitteeVerifierTransferStorageLocationsAdmin struct {
-	NewAdmin types.PARTY `json:"newAdmin"`
-}
-
-// ToMap converts CommitteeVerifierTransferStorageLocationsAdmin to a map for DAML arguments
-func (t CommitteeVerifierTransferStorageLocationsAdmin) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newAdmin"] = t.NewAdmin.ToMap()
-
-	return m
-}
-
-func (t CommitteeVerifierTransferStorageLocationsAdmin) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierTransferStorageLocationsAdmin) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierTransferStorageLocationsAdmin to hex string (Canton MCMS format)
-func (t CommitteeVerifierTransferStorageLocationsAdmin) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierTransferStorageLocationsAdmin from hex string (Canton MCMS format)
-func (t *CommitteeVerifierTransferStorageLocationsAdmin) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// CommitteeVerifierUpdateStorageLocations is a Record type
-type CommitteeVerifierUpdateStorageLocations struct {
-	NewLocations []types.TEXT `json:"newLocations"`
-}
-
-// ToMap converts CommitteeVerifierUpdateStorageLocations to a map for DAML arguments
-func (t CommitteeVerifierUpdateStorageLocations) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newLocations"] = func() []any {
-		res := make([]any, 0, len(t.NewLocations))
-		for _, e := range t.NewLocations {
-			res = append(res, string(e))
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t CommitteeVerifierUpdateStorageLocations) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *CommitteeVerifierUpdateStorageLocations) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes CommitteeVerifierUpdateStorageLocations to hex string (Canton MCMS format)
-func (t CommitteeVerifierUpdateStorageLocations) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes CommitteeVerifierUpdateStorageLocations from hex string (Canton MCMS format)
-func (t *CommitteeVerifierUpdateStorageLocations) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1559,25 +1481,103 @@ func (t *SignatureConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TransferStorageLocationsAdmin is a Record type
+type TransferStorageLocationsAdmin struct {
+	NewAdmin types.PARTY `json:"newAdmin"`
+}
+
+// ToMap converts TransferStorageLocationsAdmin to a map for DAML arguments
+func (t TransferStorageLocationsAdmin) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	return m
+}
+
+func (t TransferStorageLocationsAdmin) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TransferStorageLocationsAdmin) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TransferStorageLocationsAdmin to hex string (Canton MCMS format)
+func (t TransferStorageLocationsAdmin) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TransferStorageLocationsAdmin from hex string (Canton MCMS format)
+func (t *TransferStorageLocationsAdmin) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// UpdateStorageLocations is a Record type
+type UpdateStorageLocations struct {
+	NewLocations []types.TEXT `json:"newLocations"`
+}
+
+// ToMap converts UpdateStorageLocations to a map for DAML arguments
+func (t UpdateStorageLocations) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["newLocations"] = func() []any {
+		res := make([]any, 0, len(t.NewLocations))
+		for _, e := range t.NewLocations {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t UpdateStorageLocations) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *UpdateStorageLocations) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes UpdateStorageLocations to hex string (Canton MCMS format)
+func (t UpdateStorageLocations) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes UpdateStorageLocations from hex string (Canton MCMS format)
+func (t *UpdateStorageLocations) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AcceptStorageLocationsAdmin(args AcceptStorageLocationsAdmin) (*bind.EncodedChoice, error)
 	ApplyAllowListUpdates(args ApplyAllowListUpdates) (*bind.EncodedChoice, error)
 	ApplyAllowListUpdatesMCMSParams(args ApplyAllowListUpdatesMCMSParams) (*bind.EncodedChoice, error)
 	ApplyRemoteChainConfigUpdates(args ApplyRemoteChainConfigUpdates) (*bind.EncodedChoice, error)
-	CommitteeVerifierAcceptStorageLocationsAdmin(args CommitteeVerifierAcceptStorageLocationsAdmin) (*bind.EncodedChoice, error)
-	CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error)
+	ApplySignatureConfigs(args ApplySignatureConfigs) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFee(args CommitteeVerifierCalculateFee) (*bind.EncodedChoice, error)
 	CommitteeVerifierCalculateFeeMCMSParams(args CommitteeVerifierCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwardToVerifier) (*bind.EncodedChoice, error)
 	CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error)
-	CommitteeVerifierTransferStorageLocationsAdmin(args CommitteeVerifierTransferStorageLocationsAdmin) (*bind.EncodedChoice, error)
-	CommitteeVerifierUpdateStorageLocations(args CommitteeVerifierUpdateStorageLocations) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessage(args CommitteeVerifierVerifyMessage) (*bind.EncodedChoice, error)
 	CommitteeVerifierVerifyMessageMCMSParams(args CommitteeVerifierVerifyMessageMCMSParams) (*bind.EncodedChoice, error)
 	SetDeps(args SetDeps) (*bind.EncodedChoice, error)
 	SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
+	TransferStorageLocationsAdmin(args TransferStorageLocationsAdmin) (*bind.EncodedChoice, error)
+	UpdateStorageLocations(args UpdateStorageLocations) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1607,6 +1607,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
 }
 
+// AcceptStorageLocationsAdmin encodes parameters for the AcceptStorageLocationsAdmin choice.
+func (e *encoder) AcceptStorageLocationsAdmin(args AcceptStorageLocationsAdmin) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AcceptStorageLocationsAdmin", args)
+}
+
 // ApplyAllowListUpdates encodes parameters for the ApplyAllowListUpdates choice.
 func (e *encoder) ApplyAllowListUpdates(args ApplyAllowListUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyAllowListUpdates", args)
@@ -1622,14 +1627,9 @@ func (e *encoder) ApplyRemoteChainConfigUpdates(args ApplyRemoteChainConfigUpdat
 	return e.EncodeChoiceArgs("ApplyRemoteChainConfigUpdates", args)
 }
 
-// CommitteeVerifierAcceptStorageLocationsAdmin encodes parameters for the CommitteeVerifierAcceptStorageLocationsAdmin choice.
-func (e *encoder) CommitteeVerifierAcceptStorageLocationsAdmin(args CommitteeVerifierAcceptStorageLocationsAdmin) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierAcceptStorageLocationsAdmin", args)
-}
-
-// CommitteeVerifierApplySignatureConfigs encodes parameters for the CommitteeVerifierApplySignatureConfigs choice.
-func (e *encoder) CommitteeVerifierApplySignatureConfigs(args CommitteeVerifierApplySignatureConfigs) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierApplySignatureConfigs", args)
+// ApplySignatureConfigs encodes parameters for the ApplySignatureConfigs choice.
+func (e *encoder) ApplySignatureConfigs(args ApplySignatureConfigs) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplySignatureConfigs", args)
 }
 
 // CommitteeVerifierCalculateFee encodes parameters for the CommitteeVerifierCalculateFee choice.
@@ -1650,16 +1650,6 @@ func (e *encoder) CommitteeVerifierForwardToVerifier(args CommitteeVerifierForwa
 // CommitteeVerifierForwardToVerifierMCMSParams encodes MCMS parameters (without Caller) for the CommitteeVerifierForwardToVerifier choice.
 func (e *encoder) CommitteeVerifierForwardToVerifierMCMSParams(args CommitteeVerifierForwardToVerifierMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CommitteeVerifierForwardToVerifier", args)
-}
-
-// CommitteeVerifierTransferStorageLocationsAdmin encodes parameters for the CommitteeVerifierTransferStorageLocationsAdmin choice.
-func (e *encoder) CommitteeVerifierTransferStorageLocationsAdmin(args CommitteeVerifierTransferStorageLocationsAdmin) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierTransferStorageLocationsAdmin", args)
-}
-
-// CommitteeVerifierUpdateStorageLocations encodes parameters for the CommitteeVerifierUpdateStorageLocations choice.
-func (e *encoder) CommitteeVerifierUpdateStorageLocations(args CommitteeVerifierUpdateStorageLocations) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("CommitteeVerifierUpdateStorageLocations", args)
 }
 
 // CommitteeVerifierVerifyMessage encodes parameters for the CommitteeVerifierVerifyMessage choice.
@@ -1685,6 +1675,16 @@ func (e *encoder) SetDepsParams(args SetDepsParams) (*bind.EncodedChoice, error)
 // SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
 func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
+}
+
+// TransferStorageLocationsAdmin encodes parameters for the TransferStorageLocationsAdmin choice.
+func (e *encoder) TransferStorageLocationsAdmin(args TransferStorageLocationsAdmin) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("TransferStorageLocationsAdmin", args)
+}
+
+// UpdateStorageLocations encodes parameters for the UpdateStorageLocations choice.
+func (e *encoder) UpdateStorageLocations(args UpdateStorageLocations) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("UpdateStorageLocations", args)
 }
 
 // Verify MCMSEncoder interface implementation
