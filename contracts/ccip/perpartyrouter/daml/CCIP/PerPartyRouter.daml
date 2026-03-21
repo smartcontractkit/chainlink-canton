@@ -58,28 +58,24 @@ data SetDepsParams = SetDepsParams
 
 addFeeForParty : Map.Map Party (Numeric 0) -> Party -> Numeric 0 -> Map.Map Party (Numeric 0)
 addFeeForParty allocs recipient amount =
-    case Map.lookup recipient allocs of
-        None -> Map.insert recipient amount allocs
-        Some existing -> Map.insert recipient (existing + amount) allocs
-
-sumFees : [Numeric 0] -> Numeric 0
-sumFees = foldl (+) 0.0
+    let existing = fromOptional 0.0 (Map.lookup recipient allocs)
+    in Map.insert recipient (existing + amount) allocs
 
 sumAllocatedFees : Map.Map Party (Numeric 0) -> Numeric 0
-sumAllocatedFees allocations = sumFees (map snd (Map.toList allocations))
+sumAllocatedFees allocations = foldl (+) 0.0 (map snd (Map.toList allocations))
 
 buildCCVFeeAllocations
     : [CCIP.SendingMessageV1.CCVFee]
     -> [Numeric 0]
     -> Map.Map Party (Numeric 0)
-    -> Map.Map Party (Numeric 0)
-buildCCVFeeAllocations ccvFees ccvAmounts acc =
-    case (ccvFees, ccvAmounts) of
-        ([], []) -> acc
-        (fee :: feesTail, amt :: amtsTail) ->
-            buildCCVFeeAllocations feesTail amtsTail
-                (addFeeForParty acc fee.ccvOwner amt)
-        _ -> error "router: inconsistent CCV fee vectors"
+buildCCVFeeAllocations ccvFees ccvAmounts =
+    if length ccvFees /= length ccvAmounts
+    then error "router: inconsistent CCV fee vectors"
+    else foldl
+        (\allocations (fee, amount) ->
+            addFeeForParty allocations fee.ccvOwner amount)
+        Map.empty
+        (zip ccvFees ccvAmounts)
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
@@ -359,7 +355,6 @@ template PerPartyRouter
                         let verifierFees = buildCCVFeeAllocations
                                 sendingMsg.ccvFees
                                 sendingMsg.ccvFeeTokenAmounts
-                                Map.empty
                         -- Add pool fee (if token send), then compute owner residual.
                         let verifierAndPoolFees = case sendingMsg.tokenSendFee of
                                 None -> verifierFees
