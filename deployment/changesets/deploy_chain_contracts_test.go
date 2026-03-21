@@ -92,7 +92,7 @@ func TestDeployChainContracts(t *testing.T) {
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
 		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
 	}
-	versionTag := "e9a05a20"
+	versionTag := "49ff34ed"
 	_ = ccvSignerPubKeys // The signers are set during lane deployment
 	// ccvID := versionTag + "@" + user.PrimaryParty
 

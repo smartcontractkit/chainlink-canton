@@ -105,7 +105,7 @@ func TestCCIPSend(t *testing.T) {
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "e9a05a20"
+	versionTag := "49ff34ed"
 	ccvQualifier := "default"
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 

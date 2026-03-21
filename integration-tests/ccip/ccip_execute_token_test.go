@@ -197,7 +197,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	t.Logf("Deployed RMNRemote: %s", rmnRemoteCid)
 
 	// Deploy CommitteeVerifier
-	versionTag := "e9a05a20"
+	versionTag := "49ff34ed"
 	ccvId := "test-ccv-receive@" + partyCCIP
 	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{

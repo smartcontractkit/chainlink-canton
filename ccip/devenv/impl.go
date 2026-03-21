@@ -333,7 +333,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 			Template: ccvs.CommitteeVerifier{
 				Owner:                        types.PARTY(participant.PartyID), // TODO: use different ccv owner?
 				CcipOwner:                    types.PARTY(participant.PartyID),
-				VersionTag:                   types.TEXT("e9a05a20"),
+				VersionTag:                   types.TEXT("49ff34ed"),
 				MessageSentObservers:         nil, // no need to specify additional observers, the CCV's owner will be a signatory on CCIPMessageSent
 				StorageLocations:             storageLocations,
 				StorageLocationsAdmin:        types.PARTY(participant.PartyID),

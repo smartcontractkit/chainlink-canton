@@ -211,7 +211,7 @@ template CommitteeVerifier
     with
         owner : Party
         ccipOwner : Party
-        versionTag : BytesHex          -- e.g., "e9a05a20"
+        versionTag : BytesHex          -- e.g., "49ff34ed"
         threshold : Int                -- Minimum signatures required
         signers : [BytesHex]           -- Authorized signer public keys
 ```
@@ -244,7 +244,7 @@ Cross-Chain Verifiers are identified by a `CCVId` combining:
 
 ```
 CCVId = "<versionTag>@<partyId>"
-Example: "e9a05a20@participant1::ccv-owner"
+Example: "49ff34ed@participant1::ccv-owner"
 ```
 
 The version tag is embedded in the first 4 bytes of `verifierBlob`/`ccvData`, preventing CCVs from lying about their

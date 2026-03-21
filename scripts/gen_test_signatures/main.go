@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("Failed to decode encoded message: %v", err)
 	}
 
-	versionTag, _ := hex.DecodeString("e9a05a20")
+	versionTag, _ := hex.DecodeString("49ff34ed")
 
 	// Compute messageId = keccak256(encodedMessage)
 	messageId := crypto.Keccak256(encodedMsgBytes)
