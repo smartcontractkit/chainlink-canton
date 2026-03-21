@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -26,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenadminregistry"
-	PackageID   = "47e3dfc567d0422a1102fd4fed5386a4b3c5878caedd58e342551977bfa7008b"
+	PackageID   = "6f1f4f839e6cc5272e2d1f259ac7340c1f8fde2a8a7cb82624ffdaa82d2c059d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1128,10 +1127,10 @@ func (t *TokenAdminRegistryProposeAdministratorMCMSParams) UnmarshalHex(data str
 
 // TokenAdminRegistrySetInboundPoolCCVs is a Record type
 type TokenAdminRegistrySetInboundPoolCCVs struct {
-	ExecutingMessageCid types.CONTRACT_ID           `json:"executingMessageCid"`
-	PoolInstanceId      types.TEXT                  `json:"poolInstanceId"`
-	PoolCCVs            []common.RawInstanceAddress `json:"poolCCVs"`
-	Caller              types.PARTY                 `json:"caller"`
+	ExecutingMessageCid types.CONTRACT_ID         `json:"executingMessageCid"`
+	PoolInstanceId      types.TEXT                `json:"poolInstanceId"`
+	PoolCCVs            []mcms.RawInstanceAddress `json:"poolCCVs"`
+	Caller              types.PARTY               `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistrySetInboundPoolCCVs to a map for DAML arguments
@@ -1191,9 +1190,9 @@ func (t *TokenAdminRegistrySetInboundPoolCCVs) UnmarshalHex(data string) error {
 // TokenAdminRegistrySetInboundPoolCCVsMCMSParams is TokenAdminRegistrySetInboundPoolCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type TokenAdminRegistrySetInboundPoolCCVsMCMSParams struct {
-	ExecutingMessageCid types.CONTRACT_ID           `json:"executingMessageCid"`
-	PoolInstanceId      types.TEXT                  `json:"poolInstanceId"`
-	PoolCCVs            []common.RawInstanceAddress `json:"poolCCVs"`
+	ExecutingMessageCid types.CONTRACT_ID         `json:"executingMessageCid"`
+	PoolInstanceId      types.TEXT                `json:"poolInstanceId"`
+	PoolCCVs            []mcms.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // MarshalHex encodes TokenAdminRegistrySetInboundPoolCCVsMCMSParams to hex string for MCMS operationData.
@@ -1210,10 +1209,10 @@ func (t *TokenAdminRegistrySetInboundPoolCCVsMCMSParams) UnmarshalHex(data strin
 
 // TokenAdminRegistrySetOutboundPoolCCVs is a Record type
 type TokenAdminRegistrySetOutboundPoolCCVs struct {
-	SendingMessageCid types.CONTRACT_ID           `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT                  `json:"poolInstanceId"`
-	PoolCCVs          []common.RawInstanceAddress `json:"poolCCVs"`
-	Caller            types.PARTY                 `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID         `json:"sendingMessageCid"`
+	PoolInstanceId    types.TEXT                `json:"poolInstanceId"`
+	PoolCCVs          []mcms.RawInstanceAddress `json:"poolCCVs"`
+	Caller            types.PARTY               `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistrySetOutboundPoolCCVs to a map for DAML arguments
@@ -1273,9 +1272,9 @@ func (t *TokenAdminRegistrySetOutboundPoolCCVs) UnmarshalHex(data string) error 
 // TokenAdminRegistrySetOutboundPoolCCVsMCMSParams is TokenAdminRegistrySetOutboundPoolCCVs without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type TokenAdminRegistrySetOutboundPoolCCVsMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID           `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT                  `json:"poolInstanceId"`
-	PoolCCVs          []common.RawInstanceAddress `json:"poolCCVs"`
+	SendingMessageCid types.CONTRACT_ID         `json:"sendingMessageCid"`
+	PoolInstanceId    types.TEXT                `json:"poolInstanceId"`
+	PoolCCVs          []mcms.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // MarshalHex encodes TokenAdminRegistrySetOutboundPoolCCVsMCMSParams to hex string for MCMS operationData.

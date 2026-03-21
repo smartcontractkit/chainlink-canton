@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "c6a79464b4e2bb8507e998783cda81e8f2243fa9ea8cd701d4dbb8b0dc1054fc"
+	PackageID   = "ffdf5cb5bac5fe0b4523a067b3ad6dff4c9ca9b4b37c9c8930c381a9ff3d23af"
 	SDKVersion  = "3.4.10"
 )
 
@@ -224,12 +225,12 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // CantonExtraArgsV1 is a Record type
 type CantonExtraArgsV1 struct {
-	GasLimit           types.INT64                 `json:"gasLimit"`
-	SenderRequiredCCVs []common.RawInstanceAddress `json:"senderRequiredCCVs"`
-	ExecutorCid        *types.CONTRACT_ID          `json:"executorCid" hex:"optional"`
-	ExecutorArgs       *types.TEXT                 `json:"executorArgs" hex:"optional"`
-	TokenReceiver      *types.TEXT                 `json:"tokenReceiver" hex:"optional"`
-	TokenArgs          types.TEXT                  `json:"tokenArgs"`
+	GasLimit           types.INT64               `json:"gasLimit"`
+	SenderRequiredCCVs []mcms.RawInstanceAddress `json:"senderRequiredCCVs"`
+	ExecutorCid        *types.CONTRACT_ID        `json:"executorCid" hex:"optional"`
+	ExecutorArgs       *types.TEXT               `json:"executorArgs" hex:"optional"`
+	TokenReceiver      *types.TEXT               `json:"tokenReceiver" hex:"optional"`
+	TokenArgs          types.TEXT                `json:"tokenArgs"`
 }
 
 // ToMap converts CantonExtraArgsV1 to a map for DAML arguments

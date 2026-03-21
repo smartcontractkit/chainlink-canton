@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "042ba15104e19ab3c5c18eb151cd73a0bc1e0f714841e5bb1ae666b34a079a73"
+	PackageID   = "92b06443af6db15031a2c94061e43ebc8cd7936e83aa03eebaab358aeee22d47"
 	SDKVersion  = "3.4.10"
 )
 
@@ -568,12 +568,12 @@ func (t *DeployCCIPReceiver) UnmarshalHex(data string) error {
 
 // DeployCCIPReceiverParams is a Record type
 type DeployCCIPReceiverParams struct {
-	InstanceId            types.TEXT                  `json:"instanceId"`
-	Owner                 types.PARTY                 `json:"owner"`
-	RequiredCCVs          []common.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []common.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64                 `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64                 `json:"minBlockConfirmations"`
+	InstanceId            types.TEXT                `json:"instanceId"`
+	Owner                 types.PARTY               `json:"owner"`
+	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
+	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
 }
 
 // ToMap converts DeployCCIPReceiverParams to a map for DAML arguments
@@ -764,16 +764,16 @@ func (t *DeployCommitteeVerifier) UnmarshalHex(data string) error {
 
 // DeployCommitteeVerifierParams is a Record type
 type DeployCommitteeVerifierParams struct {
-	InstanceId                   types.TEXT                `json:"instanceId"`
-	Owner                        types.PARTY               `json:"owner"`
-	CcipOwner                    types.PARTY               `json:"ccipOwner"`
-	VersionTag                   types.TEXT                `json:"versionTag"`
-	AllowListAdmin               *types.PARTY              `json:"allowListAdmin" hex:"optional"`
-	MessageSentObservers         []types.PARTY             `json:"messageSentObservers"`
-	RmnRemote                    common.RawInstanceAddress `json:"rmnRemote"`
-	StorageLocations             []types.TEXT              `json:"storageLocations"`
-	StorageLocationsAdmin        types.PARTY               `json:"storageLocationsAdmin"`
-	PendingStorageLocationsAdmin types.PARTY               `json:"pendingStorageLocationsAdmin"`
+	InstanceId                   types.TEXT              `json:"instanceId"`
+	Owner                        types.PARTY             `json:"owner"`
+	CcipOwner                    types.PARTY             `json:"ccipOwner"`
+	VersionTag                   types.TEXT              `json:"versionTag"`
+	AllowListAdmin               *types.PARTY            `json:"allowListAdmin" hex:"optional"`
+	MessageSentObservers         []types.PARTY           `json:"messageSentObservers"`
+	RmnRemote                    mcms.RawInstanceAddress `json:"rmnRemote"`
+	StorageLocations             []types.TEXT            `json:"storageLocations"`
+	StorageLocationsAdmin        types.PARTY             `json:"storageLocationsAdmin"`
+	PendingStorageLocationsAdmin types.PARTY             `json:"pendingStorageLocationsAdmin"`
 }
 
 // ToMap converts DeployCommitteeVerifierParams to a map for DAML arguments
@@ -1070,9 +1070,9 @@ type DeployLockReleaseTokenPoolParams struct {
 	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Decimals           types.INT64                              `json:"decimals"`
 	RateLimitAdmin     *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
-	TokenAdminRegistry common.RawInstanceAddress                `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress                `json:"feeQuoter"`
-	RmnRemote          common.RawInstanceAddress                `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress                  `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress                  `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress                  `json:"rmnRemote"`
 }
 
 // ToMap converts DeployLockReleaseTokenPoolParams to a map for DAML arguments
@@ -1199,10 +1199,10 @@ func (t *DeployOffRamp) UnmarshalHex(data string) error {
 
 // DeployOffRampParams is a Record type
 type DeployOffRampParams struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	InstanceId         types.TEXT              `json:"instanceId"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
 }
 
 // ToMap converts DeployOffRampParams to a map for DAML arguments
@@ -1304,13 +1304,13 @@ func (t *DeployOnRamp) UnmarshalHex(data string) error {
 
 // DeployOnRampParams is a Record type
 type DeployOnRampParams struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
-	MaxUSDCentsPerMsg  types.NUMERIC             `json:"maxUSDCentsPerMsg"`
+	InstanceId         types.TEXT              `json:"instanceId"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        mcms.RawInstanceAddress `json:"ccvRegistry"`
+	MaxUSDCentsPerMsg  types.NUMERIC           `json:"maxUSDCentsPerMsg"`
 }
 
 // ToMap converts DeployOnRampParams to a map for DAML arguments
@@ -1430,13 +1430,13 @@ func (t *DeployPerPartyRouterFactory) UnmarshalHex(data string) error {
 
 // DeployPerPartyRouterFactoryParams is a Record type
 type DeployPerPartyRouterFactoryParams struct {
-	InstanceId         types.TEXT                `json:"instanceId"`
-	OnRamp             common.RawInstanceAddress `json:"onRamp"`
-	OffRamp            common.RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	InstanceId         types.TEXT              `json:"instanceId"`
+	OnRamp             mcms.RawInstanceAddress `json:"onRamp"`
+	OffRamp            mcms.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts DeployPerPartyRouterFactoryParams to a map for DAML arguments
