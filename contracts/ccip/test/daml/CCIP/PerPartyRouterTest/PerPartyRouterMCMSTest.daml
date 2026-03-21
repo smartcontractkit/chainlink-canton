@@ -5,6 +5,7 @@ module CCIP.PerPartyRouterTest.PerPartyRouterMCMSTest where
 import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
+import DA.Set qualified as Set
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
 import CCIP.PerPartyRouter
@@ -36,7 +37,8 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       partyOwner
       deps = initialDeps
       outboundSequenceNumbers = Map.empty
-      executionStates = Map.empty
+      executedMessages = Set.empty
+      archivedExecutionContractIds = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -92,7 +94,8 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       partyOwner
       deps = initialDeps
       outboundSequenceNumbers = Map.empty
-      executionStates = Map.empty
+      executedMessages = Set.empty
+      archivedExecutionContractIds = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -148,7 +151,8 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       partyOwner
       deps
       outboundSequenceNumbers = Map.empty
-      executionStates = Map.empty
+      executedMessages = Set.empty
+      archivedExecutionContractIds = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -182,7 +186,8 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       partyOwner
       deps
       outboundSequenceNumbers = Map.empty
-      executionStates = Map.empty
+      executedMessages = Set.empty
+      archivedExecutionContractIds = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -216,7 +221,8 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       partyOwner
       deps
       outboundSequenceNumbers = Map.empty
-      executionStates = Map.empty
+      executedMessages = Set.empty
+      archivedExecutionContractIds = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 

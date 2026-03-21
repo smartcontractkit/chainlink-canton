@@ -7,6 +7,7 @@ import DA.Assert
 import DA.Crypto.Text (keccak256)
 import DA.Map qualified as Map
 import DA.Optional
+import DA.Set qualified as Set
 import qualified DA.TextMap as TextMap
 import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 
@@ -282,7 +283,8 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
                 feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter-token-only" ccipOwner
                 rmnRemote = rmnRemoteAddr
             outboundSequenceNumbers = Map.empty
-            executionStates = Map.empty
+            executedMessages = Set.empty
+            archivedExecutionContractIds = []
 
     let message = MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector

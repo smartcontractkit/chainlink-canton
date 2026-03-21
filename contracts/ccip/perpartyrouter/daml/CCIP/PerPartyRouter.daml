@@ -3,6 +3,8 @@ module CCIP.PerPartyRouter where
 
 import DA.Action (foldlA)
 import DA.Map qualified as Map
+import DA.Set (Set)
+import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional)
@@ -41,6 +43,13 @@ import qualified Splice.Api.Token.TransferInstructionV1
 -- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
 maxTime : Time
 maxTime = time (date 9999 Dec 31) 23 59 59
+
+maxExecutedMessagesSize : Int
+-- Conservatively sized based on Daml Script test validation. Larger values passed locally
+-- up to 25000, while much larger values caused the script runner to cancel under resource
+-- pressure. TODO: benchmark and tune this against a real Canton participant/synchronizer
+-- setup instead of relying on script-runner limits.
+maxExecutedMessagesSize = 25000
 
 data PerPartyRouterDeps = PerPartyRouterDeps
     with
@@ -82,6 +91,23 @@ buildCCVFeeAllocations ccvFees ccvAmounts =
             addFeeForParty allocations fee.ccvOwner amount)
         Map.empty
         (zip ccvFees ccvAmounts)
+
+lookupExecutedMessage
+    : BytesHex
+    -> Set BytesHex
+    -> [ContractId ArchivedExecutedMessages]
+    -> Update Bool
+lookupExecutedMessage messageHash executedMessages archivedExecutionContractIds =
+    if Set.member messageHash executedMessages then pure True else
+        -- Searches newest-to-oldest as a heuristic because recent messages are
+        -- more likely to be queried or replayed than older messages.
+        foldlA
+            (\found archivedExecutionContractId ->
+                if found then pure True else do
+                    exercise archivedExecutionContractId IsExecuted with messageHash
+            )
+            False
+            (reverse archivedExecutionContractIds)
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
@@ -130,7 +156,7 @@ template PerPartyRouterFactory
             controller partyOwner
             do
                 -- Check party doesn't already have a router.
-                -- Prevents messageId replay since executionStates is per-router.
+                -- Prevents messageId replay since executedMessages is per-router.
                 assertMsg "router already exists for this party"
                     (not (Map.member partyOwner registeredRouters))
 
@@ -143,7 +169,8 @@ template PerPartyRouterFactory
                     instanceId = instanceId
                     deps = deps
                     outboundSequenceNumbers = Map.empty
-                    executionStates = Map.empty
+                    executedMessages = Set.empty
+                    archivedExecutionContractIds = []
 
                 newFactoryCid <- create this with
                     registeredRouters = Map.insert partyOwner instanceId registeredRouters
@@ -188,6 +215,28 @@ data CreateRouterResult = CreateRouterResult
         factory : ContractId PerPartyRouterFactory
     deriving (Eq, Show)
 
+-- | Archived set of executed messages.
+-- This is used as a simple solution to avoid re-creating big maps every time an execution ends.
+-- The expectation is that there won't be many users that go past the maxExecutedMessageSize limit -
+-- we will consider a cleaner sharding or offchain indexing solution if this changes.
+template ArchivedExecutedMessages
+    with
+        ccipOwner : Party
+        partyOwner : Party
+        perPartyRouterInstanceId : Text
+        archiveIndex : Int
+        executedMessages : Set BytesHex
+    where
+        signatory ccipOwner
+        observer partyOwner
+
+        nonconsuming choice IsExecuted : Bool
+            with
+                messageHash : BytesHex
+            controller ccipOwner
+            do
+                pure $ Set.member messageHash executedMessages
+
 -- | Per-party router - state container with delegation to OnRamp/OffRamp.
 -- No stored CIDs; users pass all CIDs via explicit disclosure.
 template PerPartyRouter
@@ -197,7 +246,8 @@ template PerPartyRouter
         partyOwner : Party
         deps : PerPartyRouterDeps
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
-        executionStates : Map.Map BytesHex CCIP.Internal.MessageExecutionState
+        executedMessages : Set BytesHex
+        archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
     where
         signatory ccipOwner
         observer partyOwner
@@ -491,13 +541,11 @@ template PerPartyRouter
 
                 -- Early replay check (informational; Execute is authoritative)
                 let messageId = keccak256 encodedMessage
-                let currentState = fromOptional
-                        CCIP.Internal.UNTOUCHED
-                        (Map.lookup messageId executionStates)
-                case currentState of
-                    CCIP.Internal.SUCCESS -> abort "message already executed successfully"
-                    CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
-                    _ -> pure ()
+                alreadyExecuted <- lookupExecutedMessage
+                    messageId
+                    executedMessages
+                    archivedExecutionContractIds
+                if alreadyExecuted then abort "message already executed successfully" else pure ()
 
                 exercise offRampCid CCIP.OffRamp.PrepareExecute with
                     encodedMessage = encodedMessage
@@ -547,14 +595,12 @@ template PerPartyRouter
                 execMsg <- fetch executingMessageCid
                 let messageId = execMsg.messageId
 
-                let currentState = fromOptional
-                        CCIP.Internal.UNTOUCHED
-                        (Map.lookup messageId executionStates)
+                alreadyExecuted <- lookupExecutedMessage
+                    messageId
+                    executedMessages
+                    archivedExecutionContractIds
 
-                case currentState of
-                    CCIP.Internal.SUCCESS -> abort "message already executed successfully"
-                    CCIP.Internal.IN_PROGRESS -> abort "message execution in progress"
-                    _ -> pure ()
+                if alreadyExecuted then abort "message already executed successfully" else pure ()
 
                 result <- exercise offRampCid CCIP.OffRamp.ExecuteFromRouter with
                     routerPartyOwner = partyOwner
@@ -563,8 +609,21 @@ template PerPartyRouter
                     globalConfigCid = globalConfigCid
                     tokenAdminRegistryCid = tokenAdminRegistryCid
 
-                let newStates = Map.insert result.messageId CCIP.Internal.SUCCESS executionStates
-                routerCid <- create this with executionStates = newStates
+                routerCid <-
+                    if Set.size executedMessages >= maxExecutedMessagesSize then do
+                        archivedExecutionMessagesCid <- create ArchivedExecutedMessages with
+                            ccipOwner = ccipOwner
+                            partyOwner = partyOwner
+                            perPartyRouterInstanceId = instanceId
+                            archiveIndex = length archivedExecutionContractIds
+                            executedMessages = executedMessages
+                        create this with
+                            executedMessages = Set.singleton result.messageId
+                            archivedExecutionContractIds =
+                                archivedExecutionContractIds <> [archivedExecutionMessagesCid]
+                    else
+                        create this with
+                            executedMessages = Set.insert result.messageId executedMessages
 
                 pure ExecuteResult with
                     router = routerCid
@@ -577,9 +636,16 @@ template PerPartyRouter
         nonconsuming choice GetExecutionState : CCIP.Internal.MessageExecutionState
             with
                 messageHash : BytesHex
-            controller partyOwner
+                caller : Party
+            controller caller
             do
-                pure (fromOptional CCIP.Internal.UNTOUCHED (Map.lookup messageHash executionStates))
+                alreadyExecuted <- lookupExecutedMessage
+                    messageHash
+                    executedMessages
+                    archivedExecutionContractIds
+                pure $ if alreadyExecuted
+                    then CCIP.Internal.SUCCESS
+                    else CCIP.Internal.UNTOUCHED
 
         nonconsuming choice GetSequenceNumber : Numeric 0
             with

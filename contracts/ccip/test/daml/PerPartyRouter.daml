@@ -4,9 +4,12 @@ module PerPartyRouter where
 import Daml.Script
 
 import DA.Assert
+import DA.Crypto.Text (BytesHex)
 import DA.Date (datetime, Month(Jan))
 import DA.Map qualified as Map
 import DA.Optional
+import DA.Set qualified as Set
+import qualified DA.Text as Text
 import qualified DA.TextMap as TextMap
 
 import qualified CCIP.Context
@@ -31,6 +34,21 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified TestToken
+
+seedExecutedMessages : Int -> [BytesHex]
+seedExecutedMessages n =
+    [ mkHexMessageId i | i <- [0..(n - 1)] ]
+
+mkHexMessageId : Int -> BytesHex
+mkHexMessageId i =
+    let suffix = show i
+        padding = replicateText (64 - Text.length suffix) "0"
+    in padding <> suffix
+
+replicateText : Int -> Text -> Text
+replicateText n t =
+    if n <= 0 then ""
+    else t <> replicateText (n - 1) t
 
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
@@ -895,6 +913,294 @@ testPrepareSendRejectsOversizedPayload = script do
 
     pure ()
 
+testGetExecutionStateUsesActiveAndArchivedMessages : Script ()
+testGetExecutionStateUsesActiveAndArchivedMessages = script do
+    ccipOwner <- allocateParty "ccip-owner-exec-state"
+    partyOwner <- allocateParty "party-owner-exec-state"
+    arbitraryCaller <- allocateParty "arbitrary-caller-exec-state"
+
+    let activeMessage = mkHexMessageId 100001
+    let olderMessage = mkHexMessageId 100002
+    let newerMessage = mkHexMessageId 100003
+    let missingMessage = mkHexMessageId 100004
+
+    let deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+            onRamp = CCIP.RawInstanceAddress.make "onramp-exec-state" ccipOwner
+            offRamp = CCIP.RawInstanceAddress.make "offramp-exec-state" ccipOwner
+            globalConfig = CCIP.RawInstanceAddress.make "gc-exec-state" ccipOwner
+            tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-exec-state" ccipOwner
+            feeQuoter = CCIP.RawInstanceAddress.make "fq-exec-state" ccipOwner
+            rmnRemote = CCIP.RawInstanceAddress.make "rmn-exec-state" ccipOwner
+
+    olderArchive <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner
+            partyOwner
+            perPartyRouterInstanceId = "router-exec-state"
+            archiveIndex = 0
+            executedMessages = Set.fromList [olderMessage]
+
+    newerArchive <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner
+            partyOwner
+            perPartyRouterInstanceId = "router-exec-state"
+            archiveIndex = 1
+            executedMessages = Set.fromList [newerMessage]
+
+    router <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = "router-exec-state"
+            ccipOwner
+            partyOwner
+            deps
+            outboundSequenceNumbers = Map.empty
+            executedMessages = Set.fromList [activeMessage]
+            archivedExecutionContractIds = [olderArchive, newerArchive]
+
+    disclosedOlderArchive <- fromSome <$> queryDisclosure ccipOwner olderArchive
+    disclosedNewerArchive <- fromSome <$> queryDisclosure ccipOwner newerArchive
+    disclosedRouter <- fromSome <$> queryDisclosure ccipOwner router
+
+    let arbitraryCallerSubmission =
+            actAs arbitraryCaller
+                <> disclose disclosedOlderArchive
+                <> disclose disclosedNewerArchive
+                <> disclose disclosedRouter
+
+    activeState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = activeMessage
+            caller = arbitraryCaller
+    activeState === CCIP.Internal.SUCCESS
+
+    newerArchiveState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = newerMessage
+            caller = arbitraryCaller
+    newerArchiveState === CCIP.Internal.SUCCESS
+
+    olderArchiveState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = olderMessage
+            caller = arbitraryCaller
+    olderArchiveState === CCIP.Internal.SUCCESS
+
+    missingState <- submit arbitraryCallerSubmission do
+        exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = missingMessage
+            caller = arbitraryCaller
+    missingState === CCIP.Internal.UNTOUCHED
+
+    debug "testGetExecutionStateUsesActiveAndArchivedMessages: PASSED"
+
+testExecuteRollsOverExecutedMessages : Script ()
+testExecuteRollsOverExecutedMessages = script do
+    ccipOwner <- allocateParty "ccip-owner-rollover"
+    rmnOwner <- allocateParty "rmn-owner-rollover"
+    ccvOwner <- allocateParty "ccv-owner-rollover"
+    receiver <- allocateParty "receiver-rollover"
+
+    let globalConfigInstanceId = "test-globalconfig-rollover"
+    let offRampInstanceId = "test-offramp-rollover"
+    let rmnInstanceId = "test-rmn-rollover"
+    let tokenAdminRegistryInstanceId = "test-tar-rollover"
+    let ccvInstanceId = "test-ccv-rollover"
+    let sourceChainSelector : Numeric 0 = 3333333333.0
+    let destChainSelector : Numeric 0 = 4444444444.0
+    let routerInstanceId = "test-router-rollover"
+    let olderArchivedMessage = mkHexMessageId 200001
+    let seededMessages = seedExecutedMessages CCIP.PerPartyRouter.maxExecutedMessagesSize
+    let seededMessagesSet = Set.fromList seededMessages
+    let sampleSeededMessage = mkHexMessageId 0
+
+    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccvOwner
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [ccvInstanceAddress])]
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            owner = ccipOwner
+            tokenConfigs = Map.empty
+
+    offRamp <- submit ccipOwner do
+        createCmd CCIP.OffRamp.OffRamp with
+            instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    olderArchive <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
+            ccipOwner
+            partyOwner = receiver
+            perPartyRouterInstanceId = routerInstanceId
+            archiveIndex = 0
+            executedMessages = Set.fromList [olderArchivedMessage]
+
+    router <- submit ccipOwner do
+        createCmd CCIP.PerPartyRouter.PerPartyRouter with
+            instanceId = routerInstanceId
+            ccipOwner
+            partyOwner = receiver
+            deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = CCIP.RawInstanceAddress.make "unused-onramp-rollover" ccipOwner
+                offRamp = CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter-rollover" ccipOwner
+                rmnRemote = rmnRemoteInstanceAddress
+            outboundSequenceNumbers = Map.empty
+            executedMessages = seededMessagesSet
+            archivedExecutionContractIds = [olderArchive]
+
+    let message = CCIP.MessageCodecV1.MessageV1 with
+            sourceChainSelector = sourceChainSelector
+            destChainSelector = destChainSelector
+            sequenceNumber = 7.0
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 100000
+            finality = 2000
+            ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+            onRampAddress = "0000000000000000000000000000000000000001"
+            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner)
+            sender = "0000000000000000000000000000000000000003"
+            receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+            destBlob = ""
+            tokenTransfer = None
+            messageData = "526f6c6c6f7665722054657374"
+
+    let encodedMessage = CCIP.MessageCodecV1.encodeMessageV1 message
+
+    disclosedOffRamp <- fromSome <$> queryDisclosure ccipOwner offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+
+    executingMessageCid <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
+                    ]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            caller = receiver
+
+    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+            ccvInstanceId = ccvInstanceId
+            versionTag = ""
+            caller = ccvOwner
+
+    executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.Execute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
+                    ]
+            executingMessageCid = executingMessageCid
+
+    executeResult.state === CCIP.Internal.SUCCESS
+
+    Some updatedRouter <- queryContractId receiver executeResult.router
+    Set.size updatedRouter.executedMessages === 1
+    assertMsg "newly executed message should be the only active message" $
+        Set.member executeResult.messageId updatedRouter.executedMessages
+
+    length updatedRouter.archivedExecutionContractIds === 2
+    case updatedRouter.archivedExecutionContractIds of
+        [firstArchiveCid, secondArchiveCid] -> do
+            firstArchiveCid === olderArchive
+
+            Some firstArchive <- queryContractId receiver firstArchiveCid
+            Some secondArchive <- queryContractId receiver secondArchiveCid
+
+            firstArchive.archiveIndex === 0
+            secondArchive.archiveIndex === 1
+            firstArchive.perPartyRouterInstanceId === routerInstanceId
+            secondArchive.perPartyRouterInstanceId === routerInstanceId
+
+            assertMsg "older archive should still contain its original message" $
+                Set.member olderArchivedMessage firstArchive.executedMessages
+            Set.size secondArchive.executedMessages === CCIP.PerPartyRouter.maxExecutedMessagesSize
+            assertMsg "new archive should contain the pre-rollover active set" $
+                Set.member sampleSeededMessage secondArchive.executedMessages
+        _ -> assertMsg "expected exactly two archived execution contract ids after rollover" False
+
+    activeState <- submit receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = executeResult.messageId
+            caller = receiver
+    activeState === CCIP.Internal.SUCCESS
+
+    seededState <- submit receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = sampleSeededMessage
+            caller = receiver
+    seededState === CCIP.Internal.SUCCESS
+
+    olderArchiveState <- submit receiver do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
+            messageHash = olderArchivedMessage
+            caller = receiver
+    olderArchiveState === CCIP.Internal.SUCCESS
+
+    submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
+        exerciseCmd executeResult.router CCIP.PerPartyRouter.PrepareExecute with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList
+                    [ (CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
+                    , (CCIP.OffRamp.offRampKey, CCIP.Context.AV_ContractId $ coerceContractId offRamp)
+                    ]
+            encodedMessage = encodedMessage
+            receiverParty = receiver
+            tokenReceiverParty = None
+            receiverRequiredCCVs = []
+            receiverOptionalCCVs = []
+            receiverOptionalThreshold = 0
+            receiverMinBlockConfirmations = 2000
+            caller = receiver
+
+    debug "testExecuteRollsOverExecutedMessages: PASSED"
+
 testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     ccipOwner <- allocateParty "ccip-owner-dup-ccvs"
     rmnOwner <- allocateParty "rmn-owner-dup-ccvs"
@@ -1132,7 +1438,8 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 feeQuoter = feeQuoterInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
             outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
-            executionStates = Map.empty
+            executedMessages = Set.empty
+            archivedExecutionContractIds = []
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig
