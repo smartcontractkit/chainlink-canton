@@ -2,7 +2,6 @@ module CCIP.Factory where
 
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, byteCount)
-import DA.Text qualified as T
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec
   ( decodeTextAt
@@ -23,7 +22,8 @@ import CCIP.Codec
   , decodeInstrumentId
   )
 import qualified CCIP.Context
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.GlobalConfig
@@ -63,7 +63,7 @@ template CCIPFactory
     where
         signatory owner
         observer mcmsParty
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
 
         interface instance MCMSReceiver for CCIPFactory where
           view = MCMSReceiverView with
@@ -438,31 +438,31 @@ data DeployTokenAdminRegistryParams = DeployTokenAdminRegistryParams
 data DeployOnRampParams = DeployOnRampParams
     with
         instanceId : Text
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
-        ccvRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
+        ccvRegistry : RawInstanceAddress.RawInstanceAddress
         maxUSDCentsPerMsg : Numeric 0
     deriving (Eq, Show)
 
 data DeployOffRampParams = DeployOffRampParams
     with
         instanceId : Text
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data DeployPerPartyRouterFactoryParams = DeployPerPartyRouterFactoryParams
     with
         instanceId : Text
-        onRamp : CCIP.RawInstanceAddress.RawInstanceAddress
-        offRamp : CCIP.RawInstanceAddress.RawInstanceAddress
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        onRamp : RawInstanceAddress.RawInstanceAddress
+        offRamp : RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data DeployRMNRemoteParams = DeployRMNRemoteParams
@@ -482,7 +482,7 @@ data DeployCommitteeVerifierParams = DeployCommitteeVerifierParams
         versionTag : BytesHex
         allowListAdmin : Optional Party
         messageSentObservers : [Party]
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
         storageLocations : [Text]
         storageLocationsAdmin : Party
         pendingStorageLocationsAdmin : Party
@@ -496,9 +496,9 @@ data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
         rateLimitAdmin : Optional Party
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data DeployRateLimiterParams = DeployRateLimiterParams
@@ -524,8 +524,8 @@ data DeployCCIPReceiverParams = DeployCCIPReceiverParams
     with
         instanceId : Text
         owner : Party
-        requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-        optionalCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+        optionalCCVs : [RawInstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
         minBlockConfirmations : Int
     deriving (Eq, Show)

@@ -4,7 +4,7 @@ module CCIP.GlobalConfigTypes where
 import DA.Crypto.Text (BytesHex)
 import DA.List qualified as List
 
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 data DestChainConfigArgs = DestChainConfigArgs
     with

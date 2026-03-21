@@ -13,7 +13,7 @@ import DA.Optional (isNone, isSome, fromSome, fromOptional, isSome)
 import qualified CCIP.Events
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
 
 import qualified Splice.Api.Token.HoldingV1
@@ -72,12 +72,12 @@ data ExecutionMode
 
 data SendingMessageDeps = SendingMessageDeps
     with
-        router : CCIP.RawInstanceAddress.RawInstanceAddress
-        onRamp : CCIP.RawInstanceAddress.RawInstanceAddress
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        router : RawInstanceAddress.RawInstanceAddress
+        onRamp : RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data SendingMessageState
@@ -119,30 +119,30 @@ sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
 
 assertCCVInstanceId
     : Text
-    -> [CCIP.RawInstanceAddress.RawInstanceAddress]
-    -> Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Optional [RawInstanceAddress.RawInstanceAddress]
     -> Text
     -> Party
     -> Update ()
 assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
-    let claimed = CCIP.RawInstanceAddress.make ccvInstanceId caller
+    let claimed = RawInstanceAddress.make ccvInstanceId caller
         allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
     in assertMsg msg (claimed `elem` allowedCCVs)
 
 buildMessageArtifacts
     : SendingMessageV1
-    -> ([CCIP.RawInstanceAddress.RawInstanceAddress], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
+    -> ([RawInstanceAddress.RawInstanceAddress], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
 buildMessageArtifacts sm =
     let
         finalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
         executorAddressBytes = case sm.executionMode of
             Some ExecutionMode_Executor ->
-                CCIP.RawInstanceAddress.toInstanceAddress sm.executorAddress
+                RawInstanceAddress.toInstanceAddress sm.executorAddress
             Some ExecutionMode_NoExecutor ->
                 noExecutionAddressBytes
             None ->
                 error "sendingMessage: execution mode not set"
-        ccvAddrs = map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
+        ccvAddrs = map RawInstanceAddress.toInstanceAddress finalCCVs
         finalHash =
             CCIP.MessageCodecV1.computeCCVAndExecutorHash ccvAddrs executorAddressBytes
         tokenTransferV1Opt = case sm.tokenSendData of
@@ -182,8 +182,8 @@ template SendingMessageV1
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
-        requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-        executorAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+        executorAddress : RawInstanceAddress.RawInstanceAddress
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
         senderAddress : BytesHex
@@ -206,7 +206,7 @@ template SendingMessageV1
         -- Expected token instrument for outbound TAR validation
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
-        outboundPoolCCVs : Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
+        outboundPoolCCVs : Optional [RawInstanceAddress.RawInstanceAddress]
         -- Executor arguments, set by AddExecutorFee or SetNoExecutor
         executorArgs : BytesHex
         -- Executor flat fee, set by AddExecutorFee
@@ -301,7 +301,7 @@ template SendingMessageV1
         -- TAR-authorized outbound pool CCV requirements.
         choice SetOutboundPoolCCVs : ContractId SendingMessageV1
             with
-                poolCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                poolCCVs : [RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
@@ -326,7 +326,7 @@ template SendingMessageV1
                 assertMsg "addExecutorFee: already set" (isNone executorFee && isNone executionMode)
                 assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
 
-                let derivedExecutor = CCIP.RawInstanceAddress.make executorInstanceId caller
+                let derivedExecutor = RawInstanceAddress.make executorInstanceId caller
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId

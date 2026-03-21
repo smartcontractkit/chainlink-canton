@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "803677b065a1015a700e164acde19321293a3a0ab767d234d3dab6e6f5b9618d"
+	PackageID   = "f16dd74ae776eab975555bc1ea41491319d324646cf27f35bbb41489d8c77b60"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1453,14 +1453,14 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 
 // DestChainConfig is a Record type
 type DestChainConfig struct {
-	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
-	BaseExecutionGasCost      types.INT64          `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT           `json:"offRampAddress"`
-	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
-	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
-	MessageNetworkFeeUSDCents types.NUMERIC        `json:"messageNetworkFeeUSDCents"`
-	TokenNetworkFeeUSDCents   types.NUMERIC        `json:"tokenNetworkFeeUSDCents"`
+	IsEnabled                 types.BOOL                `json:"isEnabled"`
+	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
+	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
+	OffRampAddress            types.TEXT                `json:"offRampAddress"`
+	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
+	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
+	TokenNetworkFeeUSDCents   types.NUMERIC             `json:"tokenNetworkFeeUSDCents"`
 }
 
 // ToMap converts DestChainConfig to a map for DAML arguments
@@ -1532,15 +1532,15 @@ func (t *DestChainConfig) UnmarshalHex(data string) error {
 
 // DestChainConfigArgs is a Record type
 type DestChainConfigArgs struct {
-	DestChainSelector         types.NUMERIC        `json:"destChainSelector"`
-	IsEnabled                 types.BOOL           `json:"isEnabled"`
-	AddressBytesLength        types.INT64          `json:"addressBytesLength"`
-	BaseExecutionGasCost      types.INT64          `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT           `json:"offRampAddress"`
-	LaneMandatedCCVs          []RawInstanceAddress `json:"laneMandatedCCVs"`
-	DefaultCCVs               []RawInstanceAddress `json:"defaultCCVs"`
-	MessageNetworkFeeUSDCents types.NUMERIC        `json:"messageNetworkFeeUSDCents"`
-	TokenNetworkFeeUSDCents   types.NUMERIC        `json:"tokenNetworkFeeUSDCents"`
+	DestChainSelector         types.NUMERIC             `json:"destChainSelector"`
+	IsEnabled                 types.BOOL                `json:"isEnabled"`
+	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
+	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
+	OffRampAddress            types.TEXT                `json:"offRampAddress"`
+	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
+	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
+	TokenNetworkFeeUSDCents   types.NUMERIC             `json:"tokenNetworkFeeUSDCents"`
 }
 
 // ToMap converts DestChainConfigArgs to a map for DAML arguments
@@ -1614,10 +1614,10 @@ func (t *DestChainConfigArgs) UnmarshalHex(data string) error {
 
 // ExecutingMessageDeps is a Record type
 type ExecutingMessageDeps struct {
-	OffRamp            RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
+	OffRamp            mcms.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
 }
 
 // ToMap converts ExecutingMessageDeps to a map for DAML arguments
@@ -1727,23 +1727,23 @@ var _ types.ENUM = ExecutingMessageState("")
 
 // ExecutingMessageV1 is a Template type
 type ExecutingMessageV1 struct {
-	CcipOwner                     types.PARTY           `json:"ccipOwner"`
-	Message                       MessageV1             `json:"message"`
-	MessageId                     types.TEXT            `json:"messageId"`
-	Receiver                      types.PARTY           `json:"receiver"`
-	TokenReceiver                 *types.PARTY          `json:"tokenReceiver" hex:"optional"`
-	Executor                      types.PARTY           `json:"executor"`
-	ObservingParties              []types.PARTY         `json:"observingParties"`
-	CcvVerifications              []CCVVerification     `json:"ccvVerifications"`
-	CcvOwners                     []types.PARTY         `json:"ccvOwners"`
-	RequiredCCVs                  []RawInstanceAddress  `json:"requiredCCVs"`
-	OptionalCCVs                  []RawInstanceAddress  `json:"optionalCCVs"`
-	OptionalCCVThreshold          types.INT64           `json:"optionalCCVThreshold"`
-	ReceiverMinBlockConfirmations types.INT64           `json:"receiverMinBlockConfirmations"`
-	SourceDefaultCCVs             []RawInstanceAddress  `json:"sourceDefaultCCVs"`
-	InboundPoolCCVs               *[]RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
-	Deps                          ExecutingMessageDeps  `json:"deps"`
-	State                         ExecutingMessageState `json:"state"`
+	CcipOwner                     types.PARTY                `json:"ccipOwner"`
+	Message                       MessageV1                  `json:"message"`
+	MessageId                     types.TEXT                 `json:"messageId"`
+	Receiver                      types.PARTY                `json:"receiver"`
+	TokenReceiver                 *types.PARTY               `json:"tokenReceiver" hex:"optional"`
+	Executor                      types.PARTY                `json:"executor"`
+	ObservingParties              []types.PARTY              `json:"observingParties"`
+	CcvVerifications              []CCVVerification          `json:"ccvVerifications"`
+	CcvOwners                     []types.PARTY              `json:"ccvOwners"`
+	RequiredCCVs                  []mcms.RawInstanceAddress  `json:"requiredCCVs"`
+	OptionalCCVs                  []mcms.RawInstanceAddress  `json:"optionalCCVs"`
+	OptionalCCVThreshold          types.INT64                `json:"optionalCCVThreshold"`
+	ReceiverMinBlockConfirmations types.INT64                `json:"receiverMinBlockConfirmations"`
+	SourceDefaultCCVs             []mcms.RawInstanceAddress  `json:"sourceDefaultCCVs"`
+	InboundPoolCCVs               *[]mcms.RawInstanceAddress `json:"inboundPoolCCVs" hex:"optional"`
+	Deps                          ExecutingMessageDeps       `json:"deps"`
+	State                         ExecutingMessageState      `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -3772,42 +3772,6 @@ func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string,
 	}
 }
 
-// RawInstanceAddress is a Record type
-type RawInstanceAddress struct {
-	Unpack types.TEXT `json:"unpack"`
-}
-
-// ToMap converts RawInstanceAddress to a map for DAML arguments
-func (t RawInstanceAddress) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["unpack"] = string(t.Unpack)
-
-	return m
-}
-
-func (t RawInstanceAddress) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *RawInstanceAddress) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes RawInstanceAddress to hex string (Canton MCMS format)
-func (t RawInstanceAddress) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes RawInstanceAddress from hex string (Canton MCMS format)
-func (t *RawInstanceAddress) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // Receipt is a Record type
 type Receipt struct {
 	IssuerType        IssuerType    `json:"issuerType"`
@@ -3879,12 +3843,12 @@ func (t *Receipt) UnmarshalHex(data string) error {
 
 // SendingMessageDeps is a Record type
 type SendingMessageDeps struct {
-	Router             RawInstanceAddress `json:"router"`
-	OnRamp             RawInstanceAddress `json:"onRamp"`
-	GlobalConfig       RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          RawInstanceAddress `json:"feeQuoter"`
+	Router             mcms.RawInstanceAddress `json:"router"`
+	OnRamp             mcms.RawInstanceAddress `json:"onRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
 }
 
 // ToMap converts SendingMessageDeps to a map for DAML arguments
@@ -4021,8 +3985,8 @@ type SendingMessageV1 struct {
 	Sender                    types.PARTY                               `json:"sender"`
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
-	RequiredCCVs              []RawInstanceAddress                      `json:"requiredCCVs"`
-	ExecutorAddress           RawInstanceAddress                        `json:"executorAddress"`
+	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
+	ExecutorAddress           mcms.RawInstanceAddress                   `json:"executorAddress"`
 	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
 	SenderAddress             types.TEXT                                `json:"senderAddress"`
@@ -4038,7 +4002,7 @@ type SendingMessageV1 struct {
 	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 	NetworkFeeUSDCents        types.NUMERIC                             `json:"networkFeeUSDCents"`
 	ExpectedTokenInstrumentId *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
-	OutboundPoolCCVs          *[]RawInstanceAddress                     `json:"outboundPoolCCVs" hex:"optional"`
+	OutboundPoolCCVs          *[]mcms.RawInstanceAddress                `json:"outboundPoolCCVs" hex:"optional"`
 	ExecutorArgs              types.TEXT                                `json:"executorArgs"`
 	ExecutorFee               *ExecutorFee                              `json:"executorFee" hex:"optional"`
 	ExecutorDestGasLimit      types.INT64                               `json:"executorDestGasLimit"`
@@ -4933,7 +4897,7 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 
 // SetInboundPoolCCVs is a Record type
 type SetInboundPoolCCVs struct {
-	PoolCCVs []RawInstanceAddress `json:"poolCCVs"`
+	PoolCCVs []mcms.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetInboundPoolCCVs to a map for DAML arguments
@@ -5037,7 +5001,7 @@ func (t *SetNoExecutorMCMSParams) UnmarshalHex(data string) error {
 
 // SetOutboundPoolCCVs is a Record type
 type SetOutboundPoolCCVs struct {
-	PoolCCVs []RawInstanceAddress `json:"poolCCVs"`
+	PoolCCVs []mcms.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetOutboundPoolCCVs to a map for DAML arguments
@@ -5084,10 +5048,10 @@ func (t *SetOutboundPoolCCVs) UnmarshalHex(data string) error {
 
 // SourceChainConfig is a Record type
 type SourceChainConfig struct {
-	IsEnabled        types.BOOL           `json:"isEnabled"`
-	OnRampAddresses  []types.TEXT         `json:"onRampAddresses"`
-	DefaultCCVs      []RawInstanceAddress `json:"defaultCCVs"`
-	LaneMandatedCCVs []RawInstanceAddress `json:"laneMandatedCCVs"`
+	IsEnabled        types.BOOL                `json:"isEnabled"`
+	OnRampAddresses  []types.TEXT              `json:"onRampAddresses"`
+	DefaultCCVs      []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	LaneMandatedCCVs []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
 
 // ToMap converts SourceChainConfig to a map for DAML arguments
@@ -5157,11 +5121,11 @@ func (t *SourceChainConfig) UnmarshalHex(data string) error {
 
 // SourceChainConfigArgs is a Record type
 type SourceChainConfigArgs struct {
-	SourceChainSelector types.NUMERIC        `json:"sourceChainSelector"`
-	IsEnabled           types.BOOL           `json:"isEnabled"`
-	OnRampAddresses     []types.TEXT         `json:"onRampAddresses"`
-	DefaultCCVs         []RawInstanceAddress `json:"defaultCCVs"`
-	LaneMandatedCCVs    []RawInstanceAddress `json:"laneMandatedCCVs"`
+	SourceChainSelector types.NUMERIC             `json:"sourceChainSelector"`
+	IsEnabled           types.BOOL                `json:"isEnabled"`
+	OnRampAddresses     []types.TEXT              `json:"onRampAddresses"`
+	DefaultCCVs         []mcms.RawInstanceAddress `json:"defaultCCVs"`
+	LaneMandatedCCVs    []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
 
 // ToMap converts SourceChainConfigArgs to a map for DAML arguments
@@ -5235,7 +5199,7 @@ func (t *SourceChainConfigArgs) UnmarshalHex(data string) error {
 type TokenReceiveTicket struct {
 	CcipOwner                    types.PARTY                              `json:"ccipOwner"`
 	CcvOwners                    []types.PARTY                            `json:"ccvOwners"`
-	VerifiedCCVs                 []RawInstanceAddress                     `json:"verifiedCCVs"`
+	VerifiedCCVs                 []mcms.RawInstanceAddress                `json:"verifiedCCVs"`
 	TokenAdminRegistryInstanceId types.TEXT                               `json:"tokenAdminRegistryInstanceId"`
 	PoolOwner                    types.PARTY                              `json:"poolOwner"`
 	Receiver                     types.PARTY                              `json:"receiver"`

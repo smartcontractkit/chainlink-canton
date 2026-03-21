@@ -5,7 +5,7 @@ import Daml.Script
 import DA.Assert ((===))
 
 import CCIP.OnRamp
-import CCIP.RawInstanceAddress (RawInstanceAddress(..), make)
+import MCMS.RawInstanceAddress (RawInstanceAddress(..), make)
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 -- ===========================================================================

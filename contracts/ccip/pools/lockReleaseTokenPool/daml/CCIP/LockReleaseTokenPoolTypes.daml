@@ -3,7 +3,7 @@ module CCIP.LockReleaseTokenPoolTypes where
 
 import DA.Crypto.Text (BytesHex)
 
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 
 data ChainUpdate = ChainUpdate
     with

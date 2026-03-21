@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "e1adca1c7b92a8171530993c433aa15d75517e7e868a4138fe770ce68f15cedc"
+	PackageID   = "07e53cd278b8389c1f655d0ef4c04ec332be2ba71856238041a3f8987109cea6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -570,11 +570,11 @@ var _ mcms.IMCMSReceiver = (*OnRamp)(nil)
 
 // OnRampDeps is a Record type
 type OnRampDeps struct {
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        mcms.RawInstanceAddress `json:"ccvRegistry"`
 }
 
 // ToMap converts OnRampDeps to a map for DAML arguments
@@ -659,7 +659,7 @@ type PrepareSendFromRouter struct {
 	Payload               types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
 	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
-	SenderRequiredCCVs    []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
+	SenderRequiredCCVs    []mcms.RawInstanceAddress                 `json:"senderRequiredCCVs"`
 	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver         *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
 	TokenArgs             types.TEXT                                `json:"tokenArgs"`
@@ -830,11 +830,11 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	CcvRegistry        *common.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
+	GlobalConfig       *mcms.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *mcms.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *mcms.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	CcvRegistry        *mcms.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments

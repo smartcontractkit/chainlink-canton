@@ -9,8 +9,6 @@ import DA.Foldable (forA_)
 import DA.List (dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote)
-import DA.Text qualified as T
-
 import CCIP.CommitteeVerifierCodec (
     decodeApplySignatureConfigsParams,
     decodeSetDynamicConfigParams,
@@ -33,7 +31,8 @@ import qualified CCIP.Context
 import qualified CCIP.Crypto.DerEncoding
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Interfaces.CrossChainVerifier
@@ -83,7 +82,7 @@ template CommitteeVerifier
 
         -- Ensure signer configs have a positive threshold, enough signers,
         -- and no duplicate signer keys.
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
           && versionTag /= "" && all isValidSignatureConfig (Map.values signerConfigs)
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for CommitteeVerifier where
@@ -290,7 +289,7 @@ template CommitteeVerifier
 
                 -- Validate RMN instance and check source chain curse
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                RawInstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "verifier: executing message rmn mismatch"
                     (execMsg.deps.rmnRemote == deps.rmnRemote)
@@ -371,7 +370,7 @@ template CommitteeVerifier
 
                 -- Validate RMN instance and check destination chain curse
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "verifier: rmn mismatch"
+                RawInstanceAddress.assertEqual "verifier: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "verifier: sending message rmn mismatch"
                     (sendingMsg.deps.rmnRemote == deps.rmnRemote)

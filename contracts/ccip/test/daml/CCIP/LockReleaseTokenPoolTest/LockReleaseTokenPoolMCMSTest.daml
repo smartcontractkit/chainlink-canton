@@ -9,10 +9,11 @@ import DA.Map qualified as Map
 import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.LockReleaseTokenPool
 import CCIP.LockReleaseTokenPoolCodec
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 import qualified CCIP.Context
 
 dummyPoolDeps : Party -> LockReleaseTokenPoolDeps
@@ -50,7 +51,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetDynamicConfig = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = makeInstanceAddress instanceId poolOwner
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Update rate limit admin via mcmsEntrypoint
@@ -100,7 +101,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = makeInstanceAddress instanceId poolOwner
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create remote chain config
@@ -173,7 +174,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
             transferTimeout = RelativeHours 24
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = makeInstanceAddress instanceId poolOwner
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create multiple chain pool configs, one to replace existing
@@ -261,7 +262,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = makeInstanceAddress instanceId poolOwner
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create rate limiter config update for existing chain
@@ -322,7 +323,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = makeInstanceAddress instanceId poolOwner
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
   -- Call with unknown function name - should fail
@@ -358,7 +359,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = makeInstanceAddress instanceId poolOwner
+    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
   -- Call with invalid operationData - should fail

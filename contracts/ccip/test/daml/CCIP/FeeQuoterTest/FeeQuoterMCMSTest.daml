@@ -7,7 +7,8 @@ import DA.Assert ((===))
 import DA.Map qualified as Map
 
 import qualified Splice.Api.Token.HoldingV1
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.Codec (encodePartyList)
 import CCIP.FeeQuoter
 import CCIP.FeeQuoterCodec
@@ -48,7 +49,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
             linkTokenInstrumentId = instrumentId2
             priceUpdaters = []
 
-    let instAddr = makeInstanceAddress instanceId owner
+    let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Encode ApplyFeeTokenUpdates params: remove USDC, add LINK
@@ -99,7 +100,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
             linkTokenInstrumentId = instrumentId2
             priceUpdaters = []
 
-    let instAddr = makeInstanceAddress instanceId owner
+    let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Add multiple fee tokens
@@ -154,7 +155,7 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
             linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
             priceUpdaters = []
 
-    let instAddr = makeInstanceAddress instanceId owner
+    let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Create dest chain config
@@ -213,7 +214,7 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
             linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
             priceUpdaters = []
 
-    let instAddr = makeInstanceAddress instanceId owner
+    let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Create multiple dest chain configs
@@ -274,7 +275,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters = script do
       linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
       priceUpdaters = []
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
   -- Encode AddPriceUpdaters params
@@ -321,7 +322,7 @@ testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters = script do
 
       priceUpdaters = [updater1, updater2]
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
   -- Encode RemovePriceUpdaters params: remove updater1
@@ -366,7 +367,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner = script do
 
       priceUpdaters = []
 
-  let instAddr = makeInstanceAddress instanceId owner
+  let instAddr = RawInstanceAddress.makeText instanceId owner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
   -- Try to add owner and updater1 - owner should be filtered out
@@ -411,7 +412,7 @@ testFeeQuoterMCMSEntrypoint_UnknownFunction = script do
             linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
             priceUpdaters = []
 
-    let instAddr = makeInstanceAddress instanceId owner
+    let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Call with unknown function name - should fail
@@ -442,7 +443,7 @@ testFeeQuoterMCMSEntrypoint_InvalidParams = script do
             linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
             priceUpdaters = []
 
-    let instAddr = makeInstanceAddress instanceId owner
+    let instAddr = RawInstanceAddress.makeText instanceId owner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Call with invalid operationData - should fail

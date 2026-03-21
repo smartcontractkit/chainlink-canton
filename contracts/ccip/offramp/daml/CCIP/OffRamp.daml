@@ -6,15 +6,13 @@ import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
-import DA.Text qualified as T
-
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.GlobalConfig
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
@@ -32,8 +30,8 @@ offRampKey = "off-ramp"
 lookupOffRampCid : CCIP.Context.CCIPContext -> Update (ContractId OffRamp)
 lookupOffRampCid ctx = CCIP.Context.getFromContextU ctx offRampKey
 
-rawInstanceAddress : OffRamp -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress offRamp = CCIP.RawInstanceAddress.make offRamp.instanceId offRamp.ccipOwner
+rawInstanceAddress : OffRamp -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress offRamp = RawInstanceAddress.make offRamp.instanceId offRamp.ccipOwner
 
 data OffRampDeps = OffRampDeps
     with
@@ -52,10 +50,10 @@ data SetDepsParams = SetDepsParams
 resolveReceiverExecutionCCVs
     : CCIP.GlobalConfig.SourceChainConfig
     -> Bool
-    -> [CCIP.RawInstanceAddress.RawInstanceAddress]
-    -> [CCIP.RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
     -> Int
-    -> Update ([CCIP.RawInstanceAddress.RawInstanceAddress], [CCIP.RawInstanceAddress.RawInstanceAddress], Int)
+    -> Update ([RawInstanceAddress.RawInstanceAddress], [RawInstanceAddress.RawInstanceAddress], Int)
 resolveReceiverExecutionCCVs sourceConfig isTokenOnlyTransfer receiverRequiredCCVs receiverOptionalCCVs receiverOptionalThreshold =
     if isTokenOnlyTransfer
     then pure ([], [], 0)
@@ -78,7 +76,7 @@ template OffRamp
         deps : OffRampDeps
     where
         signatory ccipOwner
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
 
         choice SetDeps : ContractId OffRamp
             with
@@ -95,15 +93,15 @@ template OffRamp
         -- Returns lane-mandated + receiver + default CCVs. Pool CCVs are handled
         -- separately via the pool → TAR → ExecutingMessageV1 path.
         -- TODO: this should return lane-mandated and default CCVs separately
-        nonconsuming choice GetRequiredCCVsForExecute : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress.RawInstanceAddress]
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
-                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
                 sourceChainSelector : Numeric 0
             controller ccipOwner
             do
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
+                RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 -- The receiver required CCVs are passed in and cannot contain duplicates
@@ -136,8 +134,8 @@ template OffRamp
                 encodedMessage : BytesHex
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-                receiverOptionalCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+                receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
                 receiverMinBlockConfirmations : Int
                 rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote
@@ -172,7 +170,7 @@ template OffRamp
 
                 -- Validate RMN instance address and check curse
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "prepareExecute: rmn mismatch"
+                RawInstanceAddress.assertEqual "prepareExecute: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
@@ -180,11 +178,11 @@ template OffRamp
                 assertMsg "prepareExecute: source chain is cursed" (not isCursed)
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "prepareExecute: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "prepareExecute: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "prepareExecute: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "prepareExecute: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 sourceConfigOpt <- exercise globalConfigCid
@@ -280,7 +278,7 @@ template OffRamp
                 -- Verify the ExecutingMessageV1 was created by this OffRamp's ccipOwner
                 assertMsg "offramp: executingMessage ccipOwner mismatch"
                     (execMsg.ccipOwner == ccipOwner)
-                CCIP.RawInstanceAddress.assertEqual "offramp: executingMessage offRamp mismatch"
+                RawInstanceAddress.assertEqual "offramp: executingMessage offRamp mismatch"
                     instanceId ccipOwner execMsg.deps.offRamp
                 assertMsg "offramp: executingMessage globalConfig mismatch"
                     (execMsg.deps.globalConfig == deps.globalConfig)
@@ -295,7 +293,7 @@ template OffRamp
 
                 -- Re-check RMN curse (PrepareExecute may not have been atomic with Execute)
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "offramp: rmn mismatch"
+                RawInstanceAddress.assertEqual "offramp: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner execMsg.deps.rmnRemote
                 isCursed <- exercise rmnRemoteCid CCIP.RMNRemote.IsCursedForChain with
                     caller = ccipOwner
@@ -304,7 +302,7 @@ template OffRamp
 
                 -- Validate dependency instance addresses
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
+                RawInstanceAddress.assertEqual "offramp: globalconfig instance address mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner execMsg.deps.globalConfig
                 assertMsg "offramp: invalid destination chain selector"
                     (message.destChainSelector == globalConfig.chainSelector)
@@ -314,7 +312,7 @@ template OffRamp
                     (message.offRampAddress == expectedOffRampAddress)
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "offramp: tokenadminregistry instance address mismatch"
+                RawInstanceAddress.assertEqual "offramp: tokenadminregistry instance address mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner execMsg.deps.tokenAdminRegistry
 
                 sourceConfigOpt <- exercise globalConfigCid
@@ -338,9 +336,9 @@ template OffRamp
                             assertMsg "offramp: pool CCVs cannot contain duplicates" (unique ccvs)
 
                 let requiredCCVAddresses =
-                        map CCIP.RawInstanceAddress.toInstanceAddress execMsg.requiredCCVs
+                        map RawInstanceAddress.toInstanceAddress execMsg.requiredCCVs
                 let optionalCCVAddresses =
-                        map CCIP.RawInstanceAddress.toInstanceAddress execMsg.optionalCCVs
+                        map RawInstanceAddress.toInstanceAddress execMsg.optionalCCVs
 
                 -- every message must be verified by at least on CCV
                 -- this should never happen as GlobalConfig requires at least one default or lane mandated CCV to be set

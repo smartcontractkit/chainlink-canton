@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "cdee3c81bc786a0308190802b1dac5747cc871e2c122635bbef6fe445df2db42"
+	PackageID   = "971118a9357abf26e257a4b03503cbf180c34ef2ab2f0e510d917a5ea8e64ab0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -753,9 +753,9 @@ func (t *GetExecutionStateMCMSParams) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute2 is a Record type
 type GetRequiredCCVsForExecute2 struct {
-	Context              common.CCIPContext          `json:"context"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC               `json:"sourceChainSelector"`
+	Context              common.CCIPContext        `json:"context"`
+	ReceiverRequiredCCVs []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC             `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
@@ -1456,12 +1456,12 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouter)(nil)
 
 // PerPartyRouterDeps is a Record type
 type PerPartyRouterDeps struct {
-	OnRamp             common.RawInstanceAddress `json:"onRamp"`
-	OffRamp            common.RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	OnRamp             mcms.RawInstanceAddress `json:"onRamp"`
+	OffRamp            mcms.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts PerPartyRouterDeps to a map for DAML arguments
@@ -1760,15 +1760,15 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context                       common.CCIPContext          `json:"context"`
-	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
-	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
-	Caller                        types.PARTY                 `json:"caller"`
+	Context                       common.CCIPContext        `json:"context"`
+	EncodedMessage                types.TEXT                `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
+	Caller                        types.PARTY               `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1858,14 +1858,14 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context                       common.CCIPContext          `json:"context"`
-	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
-	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	Context                       common.CCIPContext        `json:"context"`
+	EncodedMessage                types.TEXT                `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
@@ -1887,7 +1887,7 @@ type PrepareSend struct {
 	Receiver            types.TEXT                                `json:"receiver"`
 	Payload             types.TEXT                                `json:"payload"`
 	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
-	SenderRequiredCCVs  []common.RawInstanceAddress               `json:"senderRequiredCCVs"`
+	SenderRequiredCCVs  []mcms.RawInstanceAddress                 `json:"senderRequiredCCVs"`
 	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
 	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
 	TokenArgs           types.TEXT                                `json:"tokenArgs"`
@@ -2070,12 +2070,12 @@ func (t *SetDeps3) UnmarshalHex(data string) error {
 
 // SetDepsParams3 is a Record type
 type SetDepsParams3 struct {
-	OnRamp             *common.RawInstanceAddress `json:"onRamp" hex:"optional"`
-	OffRamp            *common.RawInstanceAddress `json:"offRamp" hex:"optional"`
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	OnRamp             *mcms.RawInstanceAddress `json:"onRamp" hex:"optional"`
+	OffRamp            *mcms.RawInstanceAddress `json:"offRamp" hex:"optional"`
+	GlobalConfig       *mcms.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	TokenAdminRegistry *mcms.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *mcms.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	RmnRemote          *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams3 to a map for DAML arguments

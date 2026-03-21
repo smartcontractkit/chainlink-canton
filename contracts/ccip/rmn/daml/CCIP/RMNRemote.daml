@@ -8,6 +8,7 @@ import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Text qualified as Text
 
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import DA.Crypto.Text (byteCount)
 import CCIP.RMNRemoteCodec
@@ -130,7 +131,7 @@ template RMNRemote
     where
         signatory rmnOwner
         observer ccipOwner, customObservers
-        ensure not (Text.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
 
         nonconsuming choice Get : RMNRemote
             with

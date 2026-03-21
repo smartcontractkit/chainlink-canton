@@ -2,14 +2,13 @@
 module CCIP.PerPartyRouter where
 
 import DA.Action (foldlA)
-import DA.List (dedup)
+import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional)
-import DA.Text qualified as T
 import DA.Time (time, addRelTime, hours)
 
 import qualified CCIP.ExecutingMessageV1
@@ -21,8 +20,8 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
@@ -135,7 +134,7 @@ template PerPartyRouterFactory
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
 
         choice FactorySetDeps : ContractId PerPartyRouterFactory
             with
@@ -255,7 +254,7 @@ template PerPartyRouter
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId && unique customObservers
 
         choice SetDeps : ContractId PerPartyRouter
             with
@@ -311,23 +310,23 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
-                CCIP.RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                RawInstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 let currentSeqNum = fromOptional 0.0
@@ -362,21 +361,21 @@ template PerPartyRouter
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 feeQuoter <- fetch feeQuoterCid
-                CCIP.RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                RawInstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 sendingMsg <- fetch sendingMessageCid
-                CCIP.RawInstanceAddress.assertEqual "router instance mismatch"
+                RawInstanceAddress.assertEqual "router instance mismatch"
                     instanceId partyOwner sendingMsg.deps.router
-                CCIP.RawInstanceAddress.assertEqual "router: onramp sending message mismatch"
+                RawInstanceAddress.assertEqual "router: onramp sending message mismatch"
                     onRamp.instanceId onRamp.ccipOwner sendingMsg.deps.onRamp
                 assertMsg "router: feequoter sending message mismatch"
                     (sendingMsg.deps.feeQuoter == deps.feeQuoter)
@@ -414,19 +413,19 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 sendingMsg <- fetch sendingMessageCid
@@ -533,8 +532,8 @@ template PerPartyRouter
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
-                receiverRequiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
-                receiverOptionalCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
+                receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
                 receiverMinBlockConfirmations : Int
                 caller : Party
@@ -546,19 +545,19 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
+                RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 -- Early replay check (informational; Execute is authoritative)
@@ -599,19 +598,19 @@ template PerPartyRouter
                 rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
+                RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                CCIP.RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                CCIP.RawInstanceAddress.assertEqual "router: rmn mismatch"
+                RawInstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 execMsg <- fetch executingMessageCid
@@ -687,11 +686,11 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
 
                 onRamp <- fetch onRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: onramp mismatch"
+                RawInstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSend with
@@ -710,11 +709,11 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
 
                 offRamp <- fetch offRampCid
-                CCIP.RawInstanceAddress.assertEqual "router: offramp mismatch"
+                RawInstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                CCIP.RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecute with

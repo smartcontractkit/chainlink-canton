@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "mcms"
-	PackageID   = "64ff2874c2dd96af215af395a5215782ab7ef71933da00529f837025c1403538"
+	PackageID   = "2160707da761ce27f6b6f9121d3dfc69a0d9dda0edbdab9ad32d8778c4546ced"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1751,6 +1751,42 @@ func (t Op) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes Op from hex string (Canton MCMS format)
 func (t *Op) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RawInstanceAddress is a Record type
+type RawInstanceAddress struct {
+	Unpack types.TEXT `json:"unpack"`
+}
+
+// ToMap converts RawInstanceAddress to a map for DAML arguments
+func (t RawInstanceAddress) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["unpack"] = string(t.Unpack)
+
+	return m
+}
+
+func (t RawInstanceAddress) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RawInstanceAddress) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RawInstanceAddress to hex string (Canton MCMS format)
+func (t RawInstanceAddress) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RawInstanceAddress from hex string (Canton MCMS format)
+func (t *RawInstanceAddress) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

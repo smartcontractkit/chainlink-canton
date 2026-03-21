@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -81,13 +82,13 @@ var ConfigureChainForLanes = operations.NewSequence(
 			remoteSelectorStr := strconv.FormatUint(remoteSelector, 10)
 
 			// Inbound / OffRamp
-			defaultInboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
+			defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
 			for _, ccv := range remoteConfig.DefaultInboundCCVs {
-				defaultInboundCCVs = append(defaultInboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				defaultInboundCCVs = append(defaultInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
-			laneMandatedInboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
+			laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
-				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
 			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
 			for _, onRamp := range remoteConfig.OnRamps {
@@ -107,13 +108,13 @@ var ConfigureChainForLanes = operations.NewSequence(
 				DefaultCCVs:         defaultInboundCCVs,
 			})
 
-			defaultOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
+			defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
 			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
-				defaultOutboundCCVs = append(defaultOutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				defaultOutboundCCVs = append(defaultOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
-			laneMandatedOutboundCCVs := make([]common.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
+			laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
-				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, common.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
 
 			// Outbound / OnRamp

@@ -5,6 +5,7 @@ import DA.Crypto.Text (BytesHex)
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.SendingMessageV1
 import CCIP.Interfaces.CrossChainVerifier
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 
 -- | Dummy version tag for testing
 dummyVersionTag : BytesHex
@@ -21,6 +22,7 @@ template DummyCommitteeVerifier
         destBytesOverhead : Int
     where
         signatory owner
+        ensure assertValidInstanceId instanceId
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with

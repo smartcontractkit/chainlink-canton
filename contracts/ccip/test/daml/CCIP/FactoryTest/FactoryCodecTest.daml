@@ -27,8 +27,8 @@ import CCIP.Codec
 import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.Factory
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
 
 -- ===========================================================================
@@ -405,9 +405,9 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
         rateLimitAdmin = Some rateLimitAdmin
-        tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" tokenAdmin
-        feeQuoter = CCIP.RawInstanceAddress.make "fq-1" feeOwner
-        rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" rmnOwner
+        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
+        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
   case decodeDeployLockReleaseTokenPoolParams encoded of
