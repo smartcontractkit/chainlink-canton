@@ -1,6 +1,7 @@
 -- | Per-party router for CCIP message sending and receiving.
 module CCIP.PerPartyRouter where
 
+import DA.Action (foldlA)
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Optional (fromOptional)
@@ -54,6 +55,31 @@ data SetDepsParams = SetDepsParams
         feeQuoter : Optional RawInstanceAddress
         rmnRemote : Optional RawInstanceAddress
     deriving (Eq, Show)
+
+addFeeForParty : Map.Map Party (Numeric 0) -> Party -> Numeric 0 -> Map.Map Party (Numeric 0)
+addFeeForParty allocs recipient amount =
+    case Map.lookup recipient allocs of
+        None -> Map.insert recipient amount allocs
+        Some existing -> Map.insert recipient (existing + amount) allocs
+
+sumFees : [Numeric 0] -> Numeric 0
+sumFees = foldl (+) 0.0
+
+sumAllocatedFees : Map.Map Party (Numeric 0) -> Numeric 0
+sumAllocatedFees allocations = sumFees (map snd (Map.toList allocations))
+
+buildCCVFeeAllocations
+    : [CCIP.SendingMessageV1.CCVFee]
+    -> [Numeric 0]
+    -> Map.Map Party (Numeric 0)
+    -> Map.Map Party (Numeric 0)
+buildCCVFeeAllocations ccvFees ccvAmounts acc =
+    case (ccvFees, ccvAmounts) of
+        ([], []) -> acc
+        (fee :: feesTail, amt :: amtsTail) ->
+            buildCCVFeeAllocations feesTail amtsTail
+                (addFeeForParty acc fee.ccvOwner amt)
+        _ -> error "router: inconsistent CCV fee vectors"
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
@@ -329,39 +355,66 @@ template PerPartyRouter
                 -- TODO: move to OnRamp
                 feeChangeCids <- if totalFee > 0.0
                     then do
-                        -- TODO: check executeBefore
-                        now <- getTime
-                        let feeTransfer =
-                                Splice.Api.Token.TransferInstructionV1.Transfer with
-                                    sender = partyOwner
-                                    receiver = ccipOwner
-                                    amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.totalFee" totalFee
-                                    instrumentId = sendingMsg.feeToken
-                                    requestedAt = now
-                                    executeBefore = addRelTime now (hours 1)
-                                    inputHoldingCids = feeTokenHoldingCids
-                                    meta = Splice.Api.Token.MetadataV1.emptyMetadata
-                        feeResult <- exercise
-                            feeTokenInput.transferFactory
-                            Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
-                                expectedAdmin = sendingMsg.feeToken.admin
-                                transfer = feeTransfer
-                                extraArgs = feeTokenInput.extraArgs
-                        case feeResult.output of
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
-                                pure feeResult.senderChangeCids
-                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
-                                acceptResult <- exercise transferInstructionCid
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                        -- Fees owed to verifier owners.
+                        let verifierFees = buildCCVFeeAllocations
+                                sendingMsg.ccvFees
+                                sendingMsg.ccvFeeTokenAmounts
+                                Map.empty
+                        -- Add pool fee (if token send), then compute owner residual.
+                        let verifierAndPoolFees = case sendingMsg.tokenSendFee of
+                                None -> verifierFees
+                                Some poolFee ->
+                                    addFeeForParty verifierFees poolFee.poolOwner sendingMsg.tokenSendFeeTokenAmount
+                        -- Sum of verifier + pool fee allocations; excludes owner residual (ccipOwner).
+                        let allocatedNonOwnerFees = sumAllocatedFees verifierAndPoolFees
+                        let ownerResidual = totalFee - allocatedNonOwnerFees
+                        assertMsg "router: fee allocation exceeds total fee"
+                            (ownerResidual >= 0.0)
+                        -- Add owner residual so map now includes all fee recipients.
+                        let recipientFees = addFeeForParty verifierAndPoolFees ccipOwner ownerResidual
+                        -- Convert to transfer list and skip zero-amount transfers.
+                        let payoutEntries = filter (\entry -> snd entry > 0.0) (Map.toList recipientFees)
+
+                        let executeFeeTransfer inputHoldingCids recipient amount = do
+                                -- TODO: check executeBefore
+                                now <- getTime
+                                let feeTransfer =
+                                        Splice.Api.Token.TransferInstructionV1.Transfer with
+                                            sender = partyOwner
+                                            receiver = recipient
+                                            amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.feeTransfer" amount
+                                            instrumentId = sendingMsg.feeToken
+                                            requestedAt = now
+                                            executeBefore = addRelTime now (hours 1)
+                                            inputHoldingCids = inputHoldingCids
+                                            meta = Splice.Api.Token.MetadataV1.emptyMetadata
+                                feeResult <- exercise
+                                    feeTokenInput.transferFactory
+                                    Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
+                                        expectedAdmin = sendingMsg.feeToken.admin
+                                        transfer = feeTransfer
                                         extraArgs = feeTokenInput.extraArgs
-                                case acceptResult.output of
+                                case feeResult.output of
                                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
                                         pure feeResult.senderChangeCids
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
-                                        abort "fee transfer instruction failed"
-                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
-                                        abort "fee transfer instruction is still pending"
-                            _ -> abort "fee transfer did not complete"
+                                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending transferInstructionCid -> do
+                                        acceptResult <- exercise transferInstructionCid
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                                extraArgs = feeTokenInput.extraArgs
+                                        case acceptResult.output of
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ ->
+                                                pure feeResult.senderChangeCids
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                                                abort "fee transfer instruction failed"
+                                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
+                                                abort "fee transfer instruction is still pending"
+                                    _ -> abort "fee transfer did not complete"
+
+                        foldlA
+                            (\currentHoldingCids entry ->
+                                executeFeeTransfer currentHoldingCids (fst entry) (snd entry))
+                            feeTokenHoldingCids
+                            payoutEntries
                     else pure []
 
                 result <- exercise onRampCid CCIP.OnRamp.CCIPSendFromRouter with

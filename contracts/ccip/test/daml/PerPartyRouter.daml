@@ -20,6 +20,7 @@ import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.RMNRemote
+import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
@@ -36,6 +37,55 @@ mult m = intToNumeric (truncate (m * 100000000.0))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
+
+-- | Test payout split math used by PerPartyRouter.CCIPSend.
+testCCIPSendFeeSplitLogic : Script ()
+testCCIPSendFeeSplitLogic = script do
+    ccvOwnerA <- allocateParty "ccv-owner-a"
+    ccvOwnerB <- allocateParty "ccv-owner-b"
+    poolOwner <- allocateParty "pool-owner"
+    ccipOwner <- allocateParty "ccip-owner-split"
+
+    let ccvFees = [
+            CCIP.SendingMessageV1.CCVFee with
+                ccvInstanceId = "ccv-a-1"
+                ccvOwner = ccvOwnerA
+                feeUSDCents = 0.0
+                destGasLimit = 0
+                destBytesOverhead = 0
+          , CCIP.SendingMessageV1.CCVFee with
+                ccvInstanceId = "ccv-a-2"
+                ccvOwner = ccvOwnerA
+                feeUSDCents = 0.0
+                destGasLimit = 0
+                destBytesOverhead = 0
+          , CCIP.SendingMessageV1.CCVFee with
+                ccvInstanceId = "ccv-b-1"
+                ccvOwner = ccvOwnerB
+                feeUSDCents = 0.0
+                destGasLimit = 0
+                destBytesOverhead = 0
+          ]
+    let ccvAmounts : [Numeric 0] = [10.0, 20.0, 5.0]
+    let verifierFees = CCIP.PerPartyRouter.buildCCVFeeAllocations ccvFees ccvAmounts Map.empty
+    let withPool = CCIP.PerPartyRouter.addFeeForParty verifierFees poolOwner 7.0
+    let ownerResidual = 50.0 - CCIP.PerPartyRouter.sumAllocatedFees withPool
+    let recipientFees = CCIP.PerPartyRouter.addFeeForParty withPool ccipOwner ownerResidual
+
+    case Map.lookup ccvOwnerA recipientFees of
+        Some v -> v === 30.0
+        None -> assertMsg "missing ccvOwnerA payout" False
+    case Map.lookup ccvOwnerB recipientFees of
+        Some v -> v === 5.0
+        None -> assertMsg "missing ccvOwnerB payout" False
+    case Map.lookup poolOwner recipientFees of
+        Some v -> v === 7.0
+        None -> assertMsg "missing poolOwner payout" False
+    case Map.lookup ccipOwner recipientFees of
+        Some v -> v === 8.0
+        None -> assertMsg "missing ccipOwner payout" False
+
+    debug "testCCIPSendFeeSplitLogic: PASSED"
 
 -- | Test CCIP send via PerPartyRouter (message-only, no fees collected).
 testCCIPSend : Script ()

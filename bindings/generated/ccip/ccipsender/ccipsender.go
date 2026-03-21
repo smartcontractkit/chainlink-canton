@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "83109e6d2fb97b5299408be879fef6176cfefbb38fa1cdf91bfd3f0a1d09271c"
+	PackageID   = "dff377089865ab329d8ce518947d6a6a00f2d86db42ee410f24ecafaaeacc9a2"
 	SDKVersion  = "3.4.10"
 )
 
@@ -226,7 +226,7 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 type CantonExtraArgsV1 struct {
 	GasLimit           types.INT64                 `json:"gasLimit"`
 	SenderRequiredCCVs []common.RawInstanceAddress `json:"senderRequiredCCVs"`
-	ExecutorCid        *types.CONTRACT_ID          `json:"executorCid" hex:"optional"`
+	ExecutorCid        types.CONTRACT_ID           `json:"executorCid"`
 	ExecutorArgs       *types.TEXT                 `json:"executorArgs" hex:"optional"`
 	TokenReceiver      *types.TEXT                 `json:"tokenReceiver" hex:"optional"`
 	TokenArgs          types.TEXT                  `json:"tokenArgs"`
@@ -251,16 +251,13 @@ func (t CantonExtraArgsV1) ToMap() map[string]any {
 		return res
 	}()
 
-	if t.ExecutorCid != nil {
-		m["executorCid"] = map[string]any{
-			"_type": "optional",
-			"value": *t.ExecutorCid,
+	m["executorCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorCid).(mapper); ok {
+			return m.toMap()
 		}
-	} else {
-		m["executorCid"] = map[string]any{
-			"_type": "optional",
-		}
-	}
+		return t.ExecutorCid
+	}()
 
 	if t.ExecutorArgs != nil {
 		m["executorArgs"] = map[string]any{

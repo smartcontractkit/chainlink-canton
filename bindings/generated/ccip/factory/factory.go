@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "5c5b1a8e3265473ad3953dca090bfe20ad350ed2980df648cb4c89507352a5cd"
+	PackageID   = "44212304a7ed060c834b85cc66e3b044f9cbbef55a520d9f952ce7779fa2f41f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -891,6 +891,7 @@ func (t *DeployFeeQuoter) UnmarshalHex(data string) error {
 type DeployFeeQuoterParams struct {
 	InstanceId            types.TEXT                               `json:"instanceId"`
 	LinkTokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"linkTokenInstrumentId"`
+	MaxFeeJuelsPerMsg     types.NUMERIC                            `json:"maxFeeJuelsPerMsg"`
 }
 
 // ToMap converts DeployFeeQuoterParams to a map for DAML arguments
@@ -906,6 +907,8 @@ func (t DeployFeeQuoterParams) ToMap() map[string]any {
 		}
 		return t.LinkTokenInstrumentId
 	}()
+
+	m["maxFeeJuelsPerMsg"] = t.MaxFeeJuelsPerMsg
 
 	return m
 }
@@ -1058,11 +1061,10 @@ func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
 // DeployLockReleaseTokenPoolParams is a Record type
 type DeployLockReleaseTokenPoolParams struct {
 	InstanceId         types.TEXT                               `json:"instanceId"`
-	PoolOwner          types.PARTY                              `json:"poolOwner"`
 	CcipOwner          types.PARTY                              `json:"ccipOwner"`
+	PoolOwner          types.PARTY                              `json:"poolOwner"`
 	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Decimals           types.INT64                              `json:"decimals"`
-	RateLimitAdmin     *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
 	TokenAdminRegistry common.RawInstanceAddress                `json:"tokenAdminRegistry"`
 	FeeQuoter          common.RawInstanceAddress                `json:"feeQuoter"`
 	RmnRemote          common.RawInstanceAddress                `json:"rmnRemote"`
@@ -1074,9 +1076,9 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["poolOwner"] = t.PoolOwner.ToMap()
-
 	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["instrumentId"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1087,17 +1089,6 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	}()
 
 	m["decimals"] = int64(t.Decimals)
-
-	if t.RateLimitAdmin != nil {
-		m["rateLimitAdmin"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.RateLimitAdmin).ToMap(),
-		}
-	} else {
-		m["rateLimitAdmin"] = map[string]any{
-			"_type": "optional",
-		}
-	}
 
 	m["tokenAdminRegistry"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1303,7 +1294,6 @@ type DeployOnRampParams struct {
 	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
 	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
 	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
-	MaxUSDCentsPerMsg  types.NUMERIC             `json:"maxUSDCentsPerMsg"`
 }
 
 // ToMap converts DeployOnRampParams to a map for DAML arguments
@@ -1351,8 +1341,6 @@ func (t DeployOnRampParams) ToMap() map[string]any {
 		}
 		return t.CcvRegistry
 	}()
-
-	m["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
 
 	return m
 }
