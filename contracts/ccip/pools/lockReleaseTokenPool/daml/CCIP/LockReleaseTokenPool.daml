@@ -15,6 +15,7 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
+import DA.Text qualified as T
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
 import DA.Time (time, addRelTime, hours)
@@ -180,13 +181,14 @@ template LockReleaseTokenPool
         signatory poolOwner
         observer optional [] pure rateLimitAdmin
 
-        ensure all
-            (\cfg ->
-                cfg.feeBps >= 0.0
-                    && cfg.feeBps < bpsDenominator
-                    && cfg.destBytesOverhead >= 32
-            )
-            (Map.values tokenTransferFeeConfigs)
+        ensure not (T.isInfixOf "@" instanceId)
+            && all
+                (\cfg ->
+                    cfg.feeBps >= 0.0
+                        && cfg.feeBps < bpsDenominator
+                        && cfg.destBytesOverhead >= 32
+                )
+                (Map.values tokenTransferFeeConfigs)
 
         interface instance CCIP.Interfaces.TokenPool.ITokenPool for LockReleaseTokenPool where
             view = CCIP.Interfaces.TokenPool.TokenPoolView with

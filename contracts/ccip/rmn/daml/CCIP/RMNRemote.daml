@@ -130,6 +130,7 @@ template RMNRemote
     where
         signatory rmnOwner
         observer ccipOwner, customObservers
+        ensure not (Text.isInfixOf "@" instanceId)
 
         nonconsuming choice Get : RMNRemote
             with

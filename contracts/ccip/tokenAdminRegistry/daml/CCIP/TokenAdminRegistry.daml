@@ -3,6 +3,7 @@ module CCIP.TokenAdminRegistry where
 import DA.Map qualified as Map
 import DA.Optional (isSome, fromSomeNote)
 import DA.Crypto.Text (BytesHex)
+import DA.Text qualified as T
 
 import qualified Splice.Api.Token.HoldingV1
 
@@ -38,6 +39,7 @@ template TokenAdminRegistry
         tokenConfigs : Map.Map BytesHex TokenConfig
     where
         signatory owner
+        ensure not (T.isInfixOf "@" instanceId)
 
         nonconsuming choice Get : TokenAdminRegistry
             with

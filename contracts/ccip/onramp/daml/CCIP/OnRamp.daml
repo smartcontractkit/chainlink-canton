@@ -6,6 +6,7 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
 import DA.Optional (fromOptional, fromSomeNote, isSome)
+import DA.Text qualified as T
 
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
@@ -93,6 +94,7 @@ template OnRamp
         deps : OnRampDeps
     where
         signatory ccipOwner
+        ensure not (T.isInfixOf "@" instanceId)
 
         choice SetDeps : ContractId OnRamp
             with

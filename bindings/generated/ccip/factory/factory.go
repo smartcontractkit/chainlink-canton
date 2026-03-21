@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "4141bc2f51ee7f2ea571f53cf70ad5e1c32642b444eb86dc10cafa99edfe6c31"
+	PackageID   = "b044fc78cf8418e859185ddb41230c5d4f6a51f8148ea2b9b8e2043a73bba8c7"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1058,11 +1058,10 @@ func (t *DeployLockReleaseTokenPool) UnmarshalHex(data string) error {
 // DeployLockReleaseTokenPoolParams is a Record type
 type DeployLockReleaseTokenPoolParams struct {
 	InstanceId         types.TEXT                               `json:"instanceId"`
-	PoolOwner          types.PARTY                              `json:"poolOwner"`
 	CcipOwner          types.PARTY                              `json:"ccipOwner"`
+	PoolOwner          types.PARTY                              `json:"poolOwner"`
 	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Decimals           types.INT64                              `json:"decimals"`
-	RateLimitAdmin     *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
 	TokenAdminRegistry common.RawInstanceAddress                `json:"tokenAdminRegistry"`
 	FeeQuoter          common.RawInstanceAddress                `json:"feeQuoter"`
 	RmnRemote          common.RawInstanceAddress                `json:"rmnRemote"`
@@ -1074,9 +1073,9 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 
 	m["instanceId"] = string(t.InstanceId)
 
-	m["poolOwner"] = t.PoolOwner.ToMap()
-
 	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["instrumentId"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1087,17 +1086,6 @@ func (t DeployLockReleaseTokenPoolParams) ToMap() map[string]any {
 	}()
 
 	m["decimals"] = int64(t.Decimals)
-
-	if t.RateLimitAdmin != nil {
-		m["rateLimitAdmin"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.RateLimitAdmin).ToMap(),
-		}
-	} else {
-		m["rateLimitAdmin"] = map[string]any{
-			"_type": "optional",
-		}
-	}
 
 	m["tokenAdminRegistry"] = func() any {
 		type mapper interface{ toMap() map[string]any }
