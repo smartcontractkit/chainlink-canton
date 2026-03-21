@@ -129,7 +129,6 @@ var ConfigureChainForLanes = operations.NewSequence(
 			})
 
 			fqConfig := remoteConfig.FeeQuoterDestChainConfig
-			chainFamilyHex := hex.EncodeToString(fqConfig.ChainFamilySelector[:])
 			feeQuoterDestChainConfigArgs = append(feeQuoterDestChainConfigArgs, feequoter.DestChainConfigArgs2{
 				DestChainSelector: types.NUMERIC(remoteSelectorStr),
 				DestChainConfig: feequoter.DestChainConfig2{
@@ -138,7 +137,6 @@ var ConfigureChainForLanes = operations.NewSequence(
 					MaxPerMsgGasLimit:           types.INT64(fqConfig.MaxPerMsgGasLimit),
 					DestGasOverhead:             types.INT64(fqConfig.DestGasOverhead),
 					DestGasPerPayloadByteBase:   types.INT64(fqConfig.DestGasPerPayloadByteBase),
-					ChainFamilySelector:         types.TEXT(chainFamilyHex),
 					DefaultTxGasLimit:           types.INT64(fqConfig.DefaultTxGasLimit),
 					DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(fqConfig.DefaultTokenFeeUSDCents), 10)),
 					DefaultTokenDestGasOverhead: types.INT64(fqConfig.DefaultTokenDestGasOverhead),

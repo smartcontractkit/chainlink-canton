@@ -2074,7 +2074,6 @@ testCalculateFeeFallsBackToFeeQuoter = script do
                 maxPerMsgGasLimit = 5000000
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
-                chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
                 defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
@@ -2237,7 +2236,6 @@ testCalculateFeePrefersPoolOverride = script do
                 maxPerMsgGasLimit = 5000000
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
-                chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
                 defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
@@ -2405,7 +2403,6 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
                 maxPerMsgGasLimit = 5000000
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
-                chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
                 defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
@@ -2569,7 +2566,6 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
                 maxPerMsgGasLimit = 5000000
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
-                chainFamilySelector = "2812d52c"
                 defaultTxGasLimit = 200000
                 defaultTokenFeeUSD = usdToCents 0.75
                 defaultTokenDestGasOverhead = 12345)]
@@ -2580,7 +2576,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
             priceUpdaters = [owner]
 
     (feeUSD, destGasOverhead, destBytesOverhead) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.FeeQuoter_GetTokenTransferFee with
+        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
             destChainSelector = destChainSelector
             token = testInstrumentId
             caller = owner
@@ -2628,12 +2624,12 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
             priceUpdaters = [owner]
 
     (fee1, gas1, bytes1) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.FeeQuoter_GetTokenTransferFee with
+        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
             destChainSelector = destChainSelector1
             token = testInstrumentId
             caller = owner
     (fee2, gas2, bytes2) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.FeeQuoter_GetTokenTransferFee with
+        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
             destChainSelector = destChainSelector2
             token = testInstrumentId
             caller = owner

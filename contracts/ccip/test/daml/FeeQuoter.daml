@@ -34,7 +34,6 @@ testDestChainConfig = DestChainConfig with
     maxPerMsgGasLimit = 1000000
     destGasOverhead = 0
     destGasPerPayloadByteBase = 0
-    chainFamilySelector = "01"
     defaultTxGasLimit = 50000
     defaultTokenFeeUSD = 0.0
     defaultTokenDestGasOverhead = 0
@@ -193,7 +192,6 @@ setup = script do
             destGasPerPayloadByteBase = 12
             defaultTxGasLimit = 500000
             maxPerMsgGasLimit = 2000000
-            chainFamilySelector = "2812d52c"
             defaultTokenFeeUSD = usdToCents 0.50
             defaultTokenDestGasOverhead = 0
     let destChainConfig2 = DestChainConfig with
@@ -203,7 +201,6 @@ setup = script do
             destGasPerPayloadByteBase = 15
             defaultTxGasLimit = 800000
             maxPerMsgGasLimit = 3000000
-            chainFamilySelector = "ac77ffec"
             defaultTokenFeeUSD = usdToCents 0.25
             defaultTokenDestGasOverhead = 0
     fq <- submit owner do
@@ -250,16 +247,6 @@ setup = script do
 
     -- try setting an invalid config (defaultTxGasLimit = 0), should fail
     let invalidDestChainConfig = destChainConfig1 with defaultTxGasLimit = 0
-    submitMustFail owner do
-        exerciseCmd fq ApplyDestChainConfigUpdates with
-            destChainConfigArgs = [
-                    (DestChainConfigArgs with
-                        destChainSelector = destChainSelector1
-                        destChainConfig = invalidDestChainConfig)
-                ]
-
-    -- try setting an invalid config (invalid chainFamilySelector), should fail
-    let invalidDestChainConfig = destChainConfig1 with chainFamilySelector = "12345678"
     submitMustFail owner do
         exerciseCmd fq ApplyDestChainConfigUpdates with
             destChainConfigArgs = [

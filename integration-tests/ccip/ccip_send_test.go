@@ -396,7 +396,6 @@ func TestCCIPSend(t *testing.T) {
 									MaxPerMsgGasLimit:           4000000,
 									DestGasOverhead:             300000,
 									DestGasPerPayloadByteBase:   16,
-									ChainFamilySelector:         "2812d52c",
 									DefaultTxGasLimit:           200000,
 									DefaultTokenFeeUSD:          types.NUMERIC("10"),
 									DefaultTokenDestGasOverhead: 34000,
