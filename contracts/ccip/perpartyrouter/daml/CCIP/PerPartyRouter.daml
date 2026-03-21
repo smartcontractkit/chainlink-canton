@@ -411,8 +411,8 @@ template PerPartyRouter
                                     _ -> abort "fee transfer did not complete"
 
                         foldlA
-                            (\currentHoldingCids entry ->
-                                executeFeeTransfer currentHoldingCids (fst entry) (snd entry))
+                            (\currentHoldingCids (recipient, amount) ->
+                                executeFeeTransfer currentHoldingCids recipient amount)
                             feeTokenHoldingCids
                             payoutEntries
                     else pure []

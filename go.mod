@@ -6,9 +6,6 @@ go 1.25.5
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
 
 replace (
-	github.com/smartcontractkit/chainlink-ccv => /Users/sish/Desktop/chainlink-ccv
-	github.com/smartcontractkit/chainlink-ccv/build/devenv => /Users/sish/Desktop/chainlink-ccv/build/devenv
-	github.com/smartcontractkit/chainlink-ccv/deployments => /Users/sish/Desktop/chainlink-ccv/deployments
 	github.com/smartcontractkit/chainlink-sui => github.com/smartcontractkit/chainlink-sui v0.0.0-20251104205009-00bd79b81471
 	github.com/smartcontractkit/chainlink-sui/deployment => github.com/smartcontractkit/chainlink-sui/deployment v0.0.0-20251104205009-00bd79b81471
 	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
