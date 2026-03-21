@@ -3,13 +3,12 @@ module CCIP.FeeQuoterTest.FeeQuoterCodecTest where
 
 import Daml.Script
 import DA.Assert ((===))
+import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
-import CCIP.FeeQuoterCodec
-import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
 
-usd : Decimal -> Numeric 0
-usd d = intToNumeric (truncate (d * 100000000.0))
+import CCIP.FeeQuoterCodec qualified as FeeQuoterCodec
+import CCIP.FeeQuoterTypes qualified as FeeQuoterTypes
 
 usdToCents : Decimal -> Numeric 0
 usdToCents d = intToNumeric (truncate (d * 100.0))
@@ -17,237 +16,127 @@ usdToCents d = intToNumeric (truncate (d * 100.0))
 mult : Decimal -> Numeric 0
 mult m = intToNumeric (truncate (m * 100000000.0))
 
--- ===========================================================================
--- FEE TOKEN ARGS ENCODING/DECODING TESTS
--- ===========================================================================
+-- ===============================================
+-- |          ApplyPriceUpdatersUpdate           |
+-- ===============================================
 
-testFeeTokenArgsRoundtrip : Script ()
-testFeeTokenArgsRoundtrip = do
-  tokenAdmin <- allocateParty "TokenAdmin"
+testApplyPriceUpdatersUpdateRoundtrip : Script ()
+testApplyPriceUpdatersUpdateRoundtrip = do
+    -- Empty lists
+    let args = ([], [])
+    let encoded = FeeQuoterCodec.encodeApplyPriceUpdatersUpdateParams args
+    fst (fromSome (FeeQuoterCodec.decodeApplyPriceUpdatersUpdateParams encoded)) === args
+    -- Non-empty lists
+    party1 <- allocateParty "party1"
+    party2 <- allocateParty "party2"
+    party3 <- allocateParty "party3"
+    let args = ([party1, party2], [party3])
+    let encoded = FeeQuoterCodec.encodeApplyPriceUpdatersUpdateParams args
+    fst (fromSome (FeeQuoterCodec.decodeApplyPriceUpdatersUpdateParams encoded)) === args
 
-  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      feeTokenArgs = FeeTokenArgs with
-        instrumentId
-        premiumMultiplier = mult 1.5
+-- ===============================================
+-- |                UpdatePrices                 |
+-- ===============================================
 
-      encoded = encodeFeeTokenArgs feeTokenArgs
+testApplyUpdatePricesRoundtrip : Script ()
+testApplyUpdatePricesRoundtrip = do
+    caller <- allocateParty "caller"
+    -- Empty updates
+    let args = (FeeQuoterTypes.PriceUpdates with
+                    tokenPriceUpdates = []
+                    gasPriceUpdates = []
+                , caller
+            )
+    let encoded = FeeQuoterCodec.encodeUpdatePricesParams args
+    fst (fromSome (FeeQuoterCodec.decodeUpdatePricesParams encoded)) === args
 
-  case decodeFeeTokenArgsAt encoded 0 of
-    None -> abort "Failed to decode FeeTokenArgs"
-    Some (decoded, _) -> do
-      decoded.instrumentId === feeTokenArgs.instrumentId
-      decoded.premiumMultiplier === feeTokenArgs.premiumMultiplier
+    -- Non-empty updates
+    issuer1 <- allocateParty "issuer1"
+    issuer2 <- allocateParty "issuer2"
+    let args = (FeeQuoterTypes.PriceUpdates with
+                tokenPriceUpdates = [
+                    FeeQuoterTypes.TokenPriceUpdate with
+                        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
+                        usdPerToken = usdToCents 1.0
+                    , FeeQuoterTypes.TokenPriceUpdate with  
+                        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
+                        usdPerToken = usdToCents 25.0
+                    ]
+                gasPriceUpdates = [
+                    FeeQuoterTypes.GasPriceUpdate with
+                        destChainSelector = 1.0
+                        usdPerUnitGas = usdToCents 0.00000002
+                    , FeeQuoterTypes.GasPriceUpdate with
+                        destChainSelector = 18446744073709551615.0 -- max uint64
+                        usdPerUnitGas = usdToCents 0.00000003
+                    ]
+            ,caller
+            )
+    let encoded = FeeQuoterCodec.encodeUpdatePricesParams args
+    fst (fromSome (FeeQuoterCodec.decodeUpdatePricesParams encoded)) === args
 
-  pure ()
+-- ===============================================
+-- |            ApplyFeeTokenUpdates             |
+-- ===============================================
 
--- ===========================================================================
--- APPLY FEE TOKEN UPDATES PARAMS TESTS
--- ===========================================================================
+testApplyFeeTokenUpdatesRoundtrip : Script ()
+testApplyFeeTokenUpdatesRoundtrip = do
+    -- Empty lists
+    let args = ([], [])
+    let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
+    fst (fromSome (FeeQuoterCodec.decodeApplyFeeTokenUpdatesParams encoded)) === args
+    -- Non-empty lists
+    issuer1 <- allocateParty "issuer1"
+    issuer2 <- allocateParty "issuer2"
+    let args = (
+            [
+                Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC",
+                Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
+            ],
+            [
+                FeeQuoterTypes.FeeTokenArgs with
+                    instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
+                    premiumMultiplier = mult 1.5
+                , FeeQuoterTypes.FeeTokenArgs with
+                    instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
+                    premiumMultiplier = mult 2.0
+            ]
+            )
+    let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
+    fst (fromSome (FeeQuoterCodec.decodeApplyFeeTokenUpdatesParams encoded)) === args
 
-testApplyFeeTokenUpdatesParamsRoundtrip : Script ()
-testApplyFeeTokenUpdatesParamsRoundtrip = do
-  tokenAdmin <- allocateParty "TokenAdmin"
+-- ===============================================
+-- |         ApplyDestChainConfigUpdates         |
+-- ===============================================
 
-  let instrumentId1 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      instrumentId2 = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-
-      feeTokensToRemove = [instrumentId1]
-      feeTokensToAdd = [
-        FeeTokenArgs instrumentId2 (mult 1.25),
-        FeeTokenArgs instrumentId1 (mult 2.0)
-        ]
-
-      encoded = encodeApplyFeeTokenUpdatesParams feeTokensToRemove feeTokensToAdd
-
-  case decodeApplyFeeTokenUpdatesParams encoded of
-    None -> abort "Failed to decode ApplyFeeTokenUpdates params"
-    Some (decodedToRemove, decodedToAdd) -> do
-      length decodedToRemove === length feeTokensToRemove
-      length decodedToAdd === length feeTokensToAdd
-
-      -- Verify first token to remove
-      case (decodedToRemove, feeTokensToRemove) of
-        ([r1], [e1]) -> r1 === e1
-        _ -> abort "Mismatch in toRemove list"
-
-      -- Verify tokens to add
-      case decodedToAdd of
-        [a1, a2] -> do
-          a1.instrumentId === instrumentId2
-          a1.premiumMultiplier === mult 1.25
-          a2.instrumentId === instrumentId1
-          a2.premiumMultiplier === mult 2.0
-        _ -> abort "Expected 2 tokens to add"
-
-  pure ()
-
-testApplyFeeTokenUpdatesEmptyLists : Script ()
-testApplyFeeTokenUpdatesEmptyLists = do
-  let encoded = encodeApplyFeeTokenUpdatesParams [] []
-
-  case decodeApplyFeeTokenUpdatesParams encoded of
-    None -> abort "Failed to decode empty ApplyFeeTokenUpdates params"
-    Some (decodedToRemove, decodedToAdd) -> do
-      decodedToRemove === []
-      decodedToAdd === []
-
-  pure ()
-
--- ===========================================================================
--- DEST CHAIN CONFIG ENCODING/DECODING TESTS
--- ===========================================================================
-
-testDestChainConfigArgsRoundtrip : Script ()
-testDestChainConfigArgsRoundtrip = do
-  let destChainConfig = DestChainConfig with
-        isEnabled = True
-        maxDataBytes = 65535
-        maxPerMsgGasLimit = 3000000
-        destGasOverhead = 100000
-        destGasPerPayloadByteBase = 16
-        chainFamilySelector = "2812d52c"  -- EVM family selector
-        defaultTxGasLimit = 200000
-        defaultTokenFeeUSD = usdToCents 0.5
-        defaultTokenDestGasOverhead = 50000
-
-      destChainConfigArgs = DestChainConfigArgs with
-        destChainSelector = 1.0  -- Numeric 0
-        destChainConfig
-
-      encoded = encodeDestChainConfigArgs destChainConfigArgs
-
-  case decodeDestChainConfigArgsAt encoded 0 of
-    None -> abort "Failed to decode DestChainConfigArgs"
-    Some (decoded, _) -> do
-      decoded.destChainSelector === destChainConfigArgs.destChainSelector
-      decoded.destChainConfig.isEnabled === True
-      decoded.destChainConfig.maxDataBytes === 65535
-      decoded.destChainConfig.maxPerMsgGasLimit === 3000000
-      decoded.destChainConfig.destGasOverhead === 100000
-      decoded.destChainConfig.destGasPerPayloadByteBase === 16
-      decoded.destChainConfig.chainFamilySelector === "2812d52c"
-      decoded.destChainConfig.defaultTxGasLimit === 200000
-      decoded.destChainConfig.defaultTokenFeeUSD === usdToCents 0.5
-      decoded.destChainConfig.defaultTokenDestGasOverhead === 50000
-
-  pure ()
-
-testApplyDestChainConfigUpdatesParamsRoundtrip : Script ()
-testApplyDestChainConfigUpdatesParamsRoundtrip = do
-  let config1 = DestChainConfig with
-        isEnabled = True
-        maxDataBytes = 65535
-        maxPerMsgGasLimit = 3000000
-        destGasOverhead = 100000
-        destGasPerPayloadByteBase = 16
-        chainFamilySelector = "2812d52c"
-        defaultTxGasLimit = 200000
-        defaultTokenFeeUSD = usdToCents 0.5
-        defaultTokenDestGasOverhead = 50000
-
-      config2 = DestChainConfig with
-        isEnabled = False
-        maxDataBytes = 32768
-        maxPerMsgGasLimit = 1500000
-        destGasOverhead = 50000
-        destGasPerPayloadByteBase = 8
-        chainFamilySelector = "00000001"
-        defaultTxGasLimit = 100000
-        defaultTokenFeeUSD = usdToCents 1.0
-        defaultTokenDestGasOverhead = 25000
-
-      configArgs = [
-        DestChainConfigArgs 1.0 config1,
-        DestChainConfigArgs 137.0 config2
-        ]
-
-      encoded = encodeApplyDestChainConfigUpdatesParams configArgs
-
-  case decodeApplyDestChainConfigUpdatesParams encoded of
-    None -> abort "Failed to decode ApplyDestChainConfigUpdates params"
-    Some decodedConfigs -> do
-      length decodedConfigs === 2
-
-      case decodedConfigs of
-        [d1, d2] -> do
-          d1.destChainSelector === 1.0
-          d1.destChainConfig.isEnabled === True
-          d1.destChainConfig.maxDataBytes === 65535
-
-          d2.destChainSelector === 137.0
-          d2.destChainConfig.isEnabled === False
-          d2.destChainConfig.maxDataBytes === 32768
-        _ -> abort "Expected 2 config args"
-
-  pure ()
-
-testApplyDestChainConfigUpdatesEmptyList : Script ()
-testApplyDestChainConfigUpdatesEmptyList = do
-  let encoded = encodeApplyDestChainConfigUpdatesParams []
-
-  case decodeApplyDestChainConfigUpdatesParams encoded of
-    None -> abort "Failed to decode empty ApplyDestChainConfigUpdates params"
-    Some decodedConfigs ->
-      decodedConfigs === []
-
-  pure ()
-
--- ===========================================================================
--- LARGE CHAIN SELECTOR TESTS
--- ===========================================================================
-
-testDestChainConfigArgsLargeSelector : Script ()
-testDestChainConfigArgsLargeSelector = do
-  -- Test with CCIP-style large chain selector (exceeds Int64 max)
-  let largeSelector : Numeric 0 = 16015286601757825753.0  -- Avalanche Fuji testnet
-
-      destChainConfig = DestChainConfig with
-        isEnabled = True
-        maxDataBytes = 65535
-        maxPerMsgGasLimit = 3000000
-        destGasOverhead = 100000
-        destGasPerPayloadByteBase = 16
-        chainFamilySelector = "2812d52c"
-        defaultTxGasLimit = 200000
-        defaultTokenFeeUSD = usdToCents 0.5
-        defaultTokenDestGasOverhead = 50000
-
-      destChainConfigArgs = DestChainConfigArgs largeSelector destChainConfig
-      encoded = encodeDestChainConfigArgs destChainConfigArgs
-
-  case decodeDestChainConfigArgsAt encoded 0 of
-    None -> abort "Failed to decode DestChainConfigArgs with large selector"
-    Some (decoded, _) -> do
-      decoded.destChainSelector === largeSelector
-      decoded.destChainConfig.isEnabled === True
-
-  pure ()
-
-testDestChainConfigArgsEdgeCases : Script ()
-testDestChainConfigArgsEdgeCases = do
-  let mkConfig selector = DestChainConfigArgs selector (DestChainConfig True 1000 1000 1000 16 "00000000" 1000 (usdToCents 0.01) 1000)
-
-  -- Test zero selector
-  let zeroEncoded = encodeDestChainConfigArgs (mkConfig 0.0)
-  case decodeDestChainConfigArgsAt zeroEncoded 0 of
-    None -> abort "Failed to decode zero selector"
-    Some (decoded, _) -> decoded.destChainSelector === 0.0
-
-  -- Test max Int64 boundary (9223372036854775807)
-  let maxInt64 : Numeric 0 = 9223372036854775807.0
-      maxInt64Encoded = encodeDestChainConfigArgs (mkConfig maxInt64)
-  case decodeDestChainConfigArgsAt maxInt64Encoded 0 of
-    None -> abort "Failed to decode max Int64 selector"
-    Some (decoded, _) -> decoded.destChainSelector === maxInt64
-
-  -- Test max uint64 (18446744073709551615)
-  let maxUint64 : Numeric 0 = 18446744073709551615.0
-      maxUint64Encoded = encodeDestChainConfigArgs (mkConfig maxUint64)
-  case decodeDestChainConfigArgsAt maxUint64Encoded 0 of
-    None -> abort "Failed to decode max uint64 selector"
-    Some (decoded, _) -> decoded.destChainSelector === maxUint64
-
-  pure ()
+testApplyDestChainConfigUpdatesRoundtrip : Script ()
+testApplyDestChainConfigUpdatesRoundtrip = do
+    let args = ([
+            FeeQuoterTypes.DestChainConfigArgs with
+                destChainSelector = 1.0
+                destChainConfig = FeeQuoterTypes.DestChainConfig with
+                    isEnabled = True
+                    maxDataBytes = 1024
+                    maxPerMsgGasLimit = 500000
+                    destGasOverhead = 21000
+                    destGasPerPayloadByteBase = 16
+                    defaultTxGasLimit = 300000
+                    defaultTokenFeeUSD = usdToCents 0.50
+                    defaultTokenDestGasOverhead = 25000
+            , FeeQuoterTypes.DestChainConfigArgs with
+                destChainSelector = 18446744073709551615.0 -- max uint64
+                destChainConfig = FeeQuoterTypes.DestChainConfig with
+                    isEnabled = False
+                    maxDataBytes = 2048
+                    maxPerMsgGasLimit = 1000000
+                    destGasOverhead = 30000
+                    destGasPerPayloadByteBase = 32
+                    defaultTxGasLimit = 500000
+                    defaultTokenFeeUSD = usdToCents 1.00
+                    defaultTokenDestGasOverhead = 35000
+            ])
+    let encoded = FeeQuoterCodec.encodeApplyDestChainConfigUpdatesParams args
+    fst (fromSome (FeeQuoterCodec.decodeApplyDestChainConfigUpdatesParams encoded)) === args
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -256,13 +145,13 @@ testDestChainConfigArgsEdgeCases = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case decodeApplyFeeTokenUpdatesParams "" of
-    None -> pure ()  -- Expected
-    Some _ -> abort "Expected decodeApplyFeeTokenUpdatesParams to fail on empty data"
+    case FeeQuoterCodec.decodeApplyFeeTokenUpdatesParams "" of
+        None -> pure ()  -- Expected
+        Some _ -> abort "Expected decodeApplyFeeTokenUpdatesParams to fail on empty data"
 
   -- Truncated data should fail
-  case decodeApplyDestChainConfigUpdatesParams "00" of
-    None -> pure ()  -- Expected - count says 0 items but might be truncated
-    Some configs -> configs === []  -- Also valid - 0 items
+    case FeeQuoterCodec.decodeApplyDestChainConfigUpdatesParams "00" of
+        None -> pure ()  -- Expected - count says 0 items but might be truncated
+        Some ((configs), _) -> configs === []  -- Also valid - 0 items
 
-  pure ()
+    pure ()

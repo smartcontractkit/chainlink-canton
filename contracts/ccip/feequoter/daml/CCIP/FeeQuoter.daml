@@ -1,23 +1,35 @@
-module CCIP.FeeQuoter
-  ( module CCIP.FeeQuoter
-  , module CCIP.FeeQuoterTypes
-  ) where
+module CCIP.FeeQuoter(
+    module CCIP.FeeQuoter,
+    module CCIP.FeeQuoterTypes
+    ) where
 
 import DA.Crypto.Text (byteCount)
 import DA.Foldable qualified as Foldable
+import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
 import DA.Text qualified as T
 
 import Splice.Api.Token.HoldingV1
 
-import CCIP.Common qualified as Common
 import qualified CCIP.Context
 import qualified CCIP.RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.FeeQuoterCodec (decodeApplyFeeTokenUpdatesParamsWithOffset, decodeApplyDestChainConfigUpdatesParamsWithOffset)
-import CCIP.FeeQuoterTypes (FeeTokenArgs(..), DestChainConfigArgs(..), DestChainConfig(..))
+import CCIP.FeeQuoterCodec (
+    decodeApplyPriceUpdatersUpdateParams,
+    decodeUpdatePricesParams,
+    decodeApplyFeeTokenUpdatesParams,
+    decodeApplyDestChainConfigUpdatesParams,
+    )
+import CCIP.FeeQuoterTypes (
+    FeeTokenArgs(..),
+    DestChainConfigArgs(..),
+    DestChainConfig(..),
+    PriceUpdates(..),
+    TokenPriceUpdate(..),
+    GasPriceUpdate(..),
+    )
 
 feeQuoterKey : Text
 feeQuoterKey = "fee-quoter"
@@ -32,7 +44,6 @@ gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
     CCIP.SendingMessageV1.gasCostUsdCents usdPerUnitGas gasUnits
 
--- TODO: double check and readd fee/price quoting
 template FeeQuoter
     with
         instanceId : Text
@@ -54,7 +65,7 @@ template FeeQuoter
     where
         signatory owner
         observer priceUpdaters
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure not (T.isInfixOf "@" instanceId) && unique priceUpdaters
 
         nonconsuming choice Get : FeeQuoter
             with
@@ -84,6 +95,30 @@ template FeeQuoter
             do
                 return (fromSomeNote ("No gas price found for " <> show destChainSelector) (Map.lookup destChainSelector usdPerUnitGasByDestChainSelector))
 
+        -- Applies updates to the list of authorized price updaters.
+        -- Parties are removed from the list first, then added, so a party that is both removed and added will remain in the list.
+        --
+        -- Params:
+        -- addedPriceUpdaters: list of parties to add to the list of authorized price updaters
+        -- removedPriceUpdaters: list of parties to remove from the list of authorized price updaters
+        --
+        -- Only callable by the owner.
+        choice ApplyPriceUpdatersUpdate : ContractId FeeQuoter
+            with
+                addedPriceUpdaters : [Party]
+                removedPriceUpdaters : [Party]
+            controller owner
+            do
+                let newPriceUpdaters = dedup ((priceUpdaters \\ removedPriceUpdaters) ++ addedPriceUpdaters)
+                create this with priceUpdaters = newPriceUpdaters
+
+        -- Update the price for given tokens and gas prices for given chains.
+        --
+        -- Params:
+        -- priceUpdates: The price updates to apply.
+        -- caller: The party calling this function, must be in the priceUpdaters list.
+        --
+        -- Only callable by parties in the priceUpdaters list.
         choice UpdatePrices : ContractId FeeQuoter
             with
                 priceUpdates : PriceUpdates
@@ -102,7 +137,7 @@ template FeeQuoter
         -- │                         Fee Quoting                          │
         -- ================================================================
 
-        nonconsuming choice FeeQuoter_GetTokenTransferFee : (Numeric 0, Int, Int)
+        nonconsuming choice GetTokenTransferFee : (Numeric 0, Int, Int)
             with
                 destChainSelector : Numeric 0
                 token : Splice.Api.Token.HoldingV1.InstrumentId
@@ -127,6 +162,16 @@ template FeeQuoter
                                 (Map.lookup destChainSelector destChainConfigs)
                         return (defaultConfig.defaultTokenFeeUSD, defaultConfig.defaultTokenDestGasOverhead, 32)
 
+        -- Quotes the total gas and gas cost in USD cents.
+        --
+        -- Params:
+        -- destChainSelector: The destination chain selector.
+        -- nonCalldataGas: The non-calldata gas to be used for the message.
+        -- calldataSize: The size of the calldata in bytes.
+        -- feeToken: The fee token the message will be paid for with.
+        -- caller: The party calling this function.
+        --
+        -- Callable by any party.
         nonconsuming choice QuoteGasForExec : QuoteGasForExecResult
             with
                 destChainSelector : Numeric 0
@@ -215,53 +260,63 @@ template FeeQuoter
             do
                 -- destChainSelector must be greater than zero
                 -- defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
-                -- chainFamilySelector must be known
                 Foldable.mapA_ (\dcca -> do
                         assertMsg ("destChainSelector must be greater than zero: " <> show dcca.destChainSelector) (dcca.destChainSelector > 0.0)
                         assertMsg ("defaultTxGasLimit must be set (> 0) for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit > 0)
                         assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
-                        assertMsg ("unknown chainFamilySelector for destChainSelector: " <> show dcca.destChainSelector) (Common.isKnownChainFamilySelector dcca.destChainConfig.chainFamilySelector)
                     ) destChainConfigArgs
 
                 let newDestChainConfigs = foldl (\acc dcca -> Map.insert dcca.destChainSelector dcca.destChainConfig acc) destChainConfigs destChainConfigArgs
                 create this with destChainConfigs = newDestChainConfigs
 
         interface instance MCMSReceiver for FeeQuoter where
-          view = MCMSReceiverView with
-            mcmsController = owner
-            instanceId
+            view = MCMSReceiverView with
+                mcmsController = owner
+                instanceId
 
-          mcmsEntrypoint functionName operationData contractIds = do
-            let instAddr = instanceId <> "@" <> partyToText owner
-            selfCid <- case Map.lookup instAddr contractIds of
-              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
-              Some cid -> pure (coerceContractId cid : ContractId FeeQuoter)
+            mcmsEntrypoint functionName operationData contractIds = do
+                let instAddr = instanceId <> "@" <> partyToText owner
+                selfCid <- case Map.lookup instAddr contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+                    Some cid -> pure (coerceContractId cid : ContractId FeeQuoter)
 
-            case functionName of
-              "ApplyFeeTokenUpdates" -> do
-                case decodeApplyFeeTokenUpdatesParamsWithOffset operationData of
-                  None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
-                  Some ((feeTokensToRemove, feeTokensToAdd), finalOffset) -> do
-                    assertMsg "E_TRAILING_BYTES: ApplyFeeTokenUpdates" $
-                      finalOffset == byteCount operationData
-                    newCid <- exercise selfCid ApplyFeeTokenUpdates with
-                      feeTokensToRemove
-                      feeTokensToAdd
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              "ApplyDestChainConfigUpdates" -> do
-                case decodeApplyDestChainConfigUpdatesParamsWithOffset operationData of
-                  None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                  Some (destChainConfigArgs, finalOffset) -> do
-                    assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" $
-                      finalOffset == byteCount operationData
-                    newCid <- exercise selfCid ApplyDestChainConfigUpdates with
-                      destChainConfigArgs
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
-
--- DestChainConfigArgs and DestChainConfig are imported from CCIP.FeeQuoterTypes
+                case functionName of
+                    "ApplyPriceUpdatersUpdate" -> do
+                        case decodeApplyPriceUpdatersUpdateParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplyPriceUpdatersUpdate"
+                            Some ((addedPriceUpdaters, removedPriceUpdaters), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplyPriceUpdatersUpdate" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplyPriceUpdatersUpdate with
+                                    addedPriceUpdaters
+                                    removedPriceUpdaters
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "UpdatePrices" -> do
+                        case decodeUpdatePricesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: UpdatePrices"
+                            Some ((priceUpdates, caller), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: UpdatePrices" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid UpdatePrices with
+                                    priceUpdates
+                                    caller
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "ApplyFeeTokenUpdates" -> do
+                        case decodeApplyFeeTokenUpdatesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplyFeeTokenUpdates"
+                            Some ((feeTokensToRemove, feeTokensToAdd), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplyFeeTokenUpdates" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplyFeeTokenUpdates with
+                                    feeTokensToRemove
+                                    feeTokensToAdd
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "ApplyDestChainConfigUpdates" -> do
+                        case decodeApplyDestChainConfigUpdatesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
+                            Some ((destChainConfigArgs), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplyDestChainConfigUpdates with
+                                    destChainConfigArgs
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 data TokenTransferFeeConfig = TokenTransferFeeConfig
     with
@@ -279,26 +334,6 @@ data TimestampedPrice = TimestampedPrice
         timestamp : Time
     deriving (Eq, Show)
 
-data PriceUpdates = PriceUpdates
-    with
-        tokenPriceUpdates : [TokenPriceUpdate]
-        gasPriceUpdates : [GasPriceUpdate]
-    deriving (Eq, Show)
-
-data TokenPriceUpdate = TokenPriceUpdate
-    with
-        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId -- SourceToken
-        -- 8-decimal USD price for 1e8 smallest token units.
-        usdPerToken : Numeric 0
-    deriving (Eq, Show)
-
-data GasPriceUpdate = GasPriceUpdate
-    with
-        destChainSelector : Numeric 0
-        -- 8-decimal USD price per gas unit.
-        usdPerUnitGas : Numeric 0
-    deriving (Eq, Show)
-
 data QuoteGasForExecResult = QuoteGasForExecResult
     with
         totalGas : Int
@@ -306,5 +341,3 @@ data QuoteGasForExecResult = QuoteGasForExecResult
         feeTokenPrice : Numeric 0
         premiumMultiplier : Numeric 0
     deriving (Eq, Show)
-
--- FeeTokenArgs is imported from CCIP.FeeQuoterTypes

@@ -34,7 +34,6 @@ testDestChainConfig = DestChainConfig with
     maxPerMsgGasLimit = 1000000
     destGasOverhead = 0
     destGasPerPayloadByteBase = 0
-    chainFamilySelector = "01"
     defaultTxGasLimit = 50000
     defaultTokenFeeUSD = 0.0
     defaultTokenDestGasOverhead = 0
@@ -193,7 +192,6 @@ setup = script do
             destGasPerPayloadByteBase = 12
             defaultTxGasLimit = 500000
             maxPerMsgGasLimit = 2000000
-            chainFamilySelector = "2812d52c"
             defaultTokenFeeUSD = usdToCents 0.50
             defaultTokenDestGasOverhead = 0
     let destChainConfig2 = DestChainConfig with
@@ -203,7 +201,6 @@ setup = script do
             destGasPerPayloadByteBase = 15
             defaultTxGasLimit = 800000
             maxPerMsgGasLimit = 3000000
-            chainFamilySelector = "ac77ffec"
             defaultTokenFeeUSD = usdToCents 0.25
             defaultTokenDestGasOverhead = 0
     fq <- submit owner do
@@ -258,17 +255,114 @@ setup = script do
                         destChainConfig = invalidDestChainConfig)
                 ]
 
-    -- try setting an invalid config (invalid chainFamilySelector), should fail
-    let invalidDestChainConfig = destChainConfig1 with chainFamilySelector = "12345678"
-    submitMustFail owner do
-        exerciseCmd fq ApplyDestChainConfigUpdates with
-            destChainConfigArgs = [
-                    (DestChainConfigArgs with
-                        destChainSelector = destChainSelector1
-                        destChainConfig = invalidDestChainConfig)
-                ]
-
     pure()
+
+testFeeQuoter_ApplyPriceUpdatersUpdate : Script ()
+testFeeQuoter_ApplyPriceUpdatersUpdate = script do
+    owner <- allocateParty "owner"
+    priceUpdater <- allocateParty "price-updater"
+
+    let instrumentIdLINK = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = owner
+            id = "LINK"
+
+    fq <- submit owner do
+        createCmd CCIP.FeeQuoter.FeeQuoter with
+            owner = owner
+            instanceId = "test-feequoter"
+            feeTokens = Map.empty
+            destChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            usdPerUnitGasByDestChainSelector = Map.empty
+            usdPerToken = Map.empty
+            linkTokenInstrumentId = instrumentIdLINK
+            priceUpdaters = []
+
+    -- try updating prices as the owner, without being a price updater, should fail
+    submitMustFail owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = owner
+    -- try updating prices as the price updater, should fail since not added yet
+    submitMustFail owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = priceUpdater
+
+    -- add price updater
+    fq <- submit owner do
+        exerciseCmd fq ApplyPriceUpdatersUpdate with
+            addedPriceUpdaters = [priceUpdater]
+            removedPriceUpdaters = []
+    
+    -- try updating prices as the price updater, should succeed now
+    fq <- submit priceUpdater do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = priceUpdater
+
+    -- add owner as price updater
+    fq <- submit owner do
+        exerciseCmd fq ApplyPriceUpdatersUpdate with
+            addedPriceUpdaters = [owner]
+            removedPriceUpdaters = []
+
+    -- test that both owner and priceUpdater can update prices now
+    fq <- submit owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = owner
+    fq <- submit priceUpdater do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = priceUpdater
+
+    -- remove price updater
+    fq <- submit owner do
+        exerciseCmd fq ApplyPriceUpdatersUpdate with
+            addedPriceUpdaters = []
+            removedPriceUpdaters = [priceUpdater]
+    -- try updating prices as the removed price updater, should fail now
+    submitMustFail priceUpdater do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = priceUpdater
+    -- owner should still be able to update prices
+    fq <- submit owner do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = owner
+
+    -- test that removing and adding a price updater in the same update works
+    fq <- submit owner do
+        exerciseCmd fq ApplyPriceUpdatersUpdate with
+            addedPriceUpdaters = [priceUpdater]
+            removedPriceUpdaters = [priceUpdater, owner] -- also remove owner to test that removing a non-existing price updater is a no-op
+
+    -- priceUpdater should be able to update prices again since re-added
+    fq <- submit priceUpdater do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = priceUpdater
+
+    pure ()
+
 
 testFinalizeFeeUsesEVMScaledPrices = script do
     owner <- allocateParty "owner-finalize-fee"

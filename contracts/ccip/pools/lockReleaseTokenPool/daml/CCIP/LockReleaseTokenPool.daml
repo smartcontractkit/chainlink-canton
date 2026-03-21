@@ -654,7 +654,7 @@ template LockReleaseTokenPool
                             , feeConfig.destBytesOverhead
                             )
                     _ ->
-                        exercise feeQuoterCid CCIP.FeeQuoter.FeeQuoter_GetTokenTransferFee with
+                        exercise feeQuoterCid CCIP.FeeQuoter.GetTokenTransferFee with
                             destChainSelector = sendingMsg.destChainSelector
                             token = tokenInstrumentId
                             caller = poolOwner

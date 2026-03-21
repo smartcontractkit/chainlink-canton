@@ -31,6 +31,16 @@ var Deploy = contract.NewDeploy(contract.DeployParams[feequoter.FeeQuoter]{
 	Prefix:      "feequoter",
 })
 
+var ApplyPriceUpdatersUpdate = contract.NewExercise(contract.ExerciseParams[feequoter.ApplyPriceUpdatersUpdate]{
+	Name:         "canton/ccip/fee_quoter/apply_price_updates",
+	Version:      Version,
+	Description:  "Adds and removed prices updaters on a Canton FeeQuoter",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     feequoter.FeeQuoter{},
+	Method:       feequoter.FeeQuoter{}.ApplyPriceUpdatersUpdate,
+})
+
 var UpdatePrices = contract.NewExercise(contract.ExerciseParams[feequoter.UpdatePrices]{
 	Name:         "canton/ccip/fee_quoter/update_prices",
 	Version:      Version,
