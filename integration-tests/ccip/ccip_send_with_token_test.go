@@ -991,10 +991,15 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
 	senderDelta := senderBalanceBefore - senderBalanceAfter
+	// Derived from the fee breakdown above and converted to local token units.
+	// In this test 1 token == 100,000,000 local units, so 1 US cent == 1,000,000 units.
+	// - CCV fee: 7 cents => 7,000,000
+	// - Pool flat fee: 10 cents => 10,000,000
+	// - Owner residual: 55 total cents - 7 CCV - 10 pool = 38 cents => 38,000,000
 	const (
 		ccvFeeLocalUnits         = int64(7_000_000)
-		poolFeeLocalUnits        = int64(11_000_000) // $0.10 flat + $0.01 gas-overhead
-		ownerResidualLocalUnits  = int64(19_000_000) // $0.10 token-network + $0.09 executor
+		poolFeeLocalUnits        = int64(10_000_000)
+		ownerResidualLocalUnits  = int64(38_000_000)
 	)
 	expectedCCIPOwnerDelta := ccvFeeLocalUnits + ownerResidualLocalUnits
 	expectedSenderDelta := expectedCCIPOwnerDelta
@@ -1021,10 +1026,10 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	// With payout splitting:
 	// - verifier fee (CCV owner): $0.07 => 7,000,000 local units
-	// - owner residual (network + executor): $0.19 => 19,000,000 local units
-	// => ccipOwner total in this test = 26,000,000 local units.
+	// - owner residual (network + executor): $0.38 => 38,000,000 local units
+	// => ccipOwner total in this test = 45,000,000 local units.
 	require.Equal(t, expectedCCIPOwnerDelta, ccipOwnerDelta, "ccipOwner should receive verifier fee + owner residual")
-	require.Equal(t, int64(37_000_000), ccipOwnerDelta+poolFeeLocalUnits, "fee-token payment should split as owner share + pool share")
+	require.Equal(t, int64(55_000_000), ccipOwnerDelta+poolFeeLocalUnits, "fee-token payment should split as owner share + pool share")
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", returnedMessageId)
