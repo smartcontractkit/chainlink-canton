@@ -8,6 +8,7 @@ import DA.Map qualified as Map
 
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.Codec (encodePartyList)
 import CCIP.FeeQuoter
 import CCIP.FeeQuoterCodec
 
@@ -246,6 +247,146 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
         _ -> abort "Expected exactly one FeeQuoter contract"
 
     pure ()
+
+-- ===========================================================================
+-- MCMS ENTRYPOINT TESTS - ADD/REMOVE PRICE UPDATERS
+-- ===========================================================================
+
+-- | Test MCMSReceiver entrypoint for AddPriceUpdaters function
+testFeeQuoterMCMSEntrypoint_AddPriceUpdaters : Script ()
+testFeeQuoterMCMSEntrypoint_AddPriceUpdaters = script do
+  owner <- allocateParty "ccip_owner"
+  updater1 <- allocateParty "updater1"
+  updater2 <- allocateParty "updater2"
+
+  let instanceId = "feequoter-add-updaters-test"
+
+  -- Create FeeQuoter with no price updaters
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Encode AddPriceUpdaters params
+  let encoded = encodePartyList [updater1, updater2]
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "AddPriceUpdaters"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  -- Verify updaters were added
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      length fq.priceUpdaters === 2
+      assertMsg "updater1 should be in priceUpdaters" (updater1 `elem` fq.priceUpdaters)
+      assertMsg "updater2 should be in priceUpdaters" (updater2 `elem` fq.priceUpdaters)
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
+
+-- | Test MCMSReceiver entrypoint for RemovePriceUpdaters function
+testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters : Script ()
+testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters = script do
+  owner <- allocateParty "ccip_owner"
+  updater1 <- allocateParty "updater1"
+  updater2 <- allocateParty "updater2"
+
+  let instanceId = "feequoter-remove-updaters-test"
+
+  -- Create FeeQuoter with two price updaters
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+
+      priceUpdaters = [updater1, updater2]
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Encode RemovePriceUpdaters params: remove updater1
+  let encoded = encodePartyList [updater1]
+
+  -- Call mcmsEntrypoint
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "RemovePriceUpdaters"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  -- Verify updater1 was removed
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      length fq.priceUpdaters === 1
+      assertMsg "updater1 should not be in priceUpdaters" (updater1 `notElem` fq.priceUpdaters)
+      assertMsg "updater2 should still be in priceUpdaters" (updater2 `elem` fq.priceUpdaters)
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
+
+-- | Test that owner is filtered out when added as price updater via MCMS
+testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner : Script ()
+testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner = script do
+  owner <- allocateParty "ccip_owner"
+  updater1 <- allocateParty "updater1"
+
+  let instanceId = "feequoter-filter-owner-test"
+
+  fqCid <- submit owner do
+    createCmd FeeQuoter with
+      instanceId
+      owner
+      feeTokens = Map.empty
+      destChainConfigs = Map.empty
+      tokenTransferFeeConfigs = Map.empty
+      usdPerUnitGasByDestChainSelector = Map.empty
+      usdPerToken = Map.empty
+      linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+
+      priceUpdaters = []
+
+  let instAddr = makeInstanceAddress instanceId owner
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
+
+  -- Try to add owner and updater1 - owner should be filtered out
+  let encoded = encodePartyList [owner, updater1]
+
+  newContractIds <- submit owner do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "AddPriceUpdaters"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
+
+  contracts <- query @FeeQuoter owner
+  case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
+    [(_, fq)] -> do
+      length fq.priceUpdaters === 1
+      assertMsg "owner should not be in priceUpdaters" (owner `notElem` fq.priceUpdaters)
+      assertMsg "updater1 should be in priceUpdaters" (updater1 `elem` fq.priceUpdaters)
+    _ -> abort "Expected exactly one FeeQuoter contract"
+
+  pure ()
 
 -- ===========================================================================
 -- ERROR CASE TESTS

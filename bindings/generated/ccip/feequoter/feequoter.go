@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "b07cbca3e356eb2293a333ba62358d4dfafd999503087b3f8cb363bc5b69e3ce"
+	PackageID   = "2e96a315a8a16db97c61ea0be49adc695b6fb29bdbefb5357000cb6d652e149a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -51,6 +51,48 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddPriceUpdaters is a Record type
+type AddPriceUpdaters struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddPriceUpdaters to a map for DAML arguments
+func (t AddPriceUpdaters) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddPriceUpdaters) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddPriceUpdaters) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddPriceUpdaters to hex string (Canton MCMS format)
+func (t AddPriceUpdaters) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddPriceUpdaters from hex string (Canton MCMS format)
+func (t *AddPriceUpdaters) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ApplyDestChainConfigUpdates2 is a Record type
@@ -757,6 +799,48 @@ func (t FeeQuoter) ApplyPriceUpdatersUpdateWithPackageID(contractID string, pack
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "ApplyPriceUpdatersUpdate",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPriceUpdaters exercises the AddPriceUpdaters choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) AddPriceUpdaters(contractID string, args AddPriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "AddPriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddPriceUpdatersWithPackageID exercises the AddPriceUpdaters choice using the provided package ID instead of package name
+func (t FeeQuoter) AddPriceUpdatersWithPackageID(contractID string, packageID string, args AddPriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "AddPriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePriceUpdaters exercises the RemovePriceUpdaters choice on this FeeQuoter contract
+// This method uses the package name in the template ID
+func (t FeeQuoter) RemovePriceUpdaters(contractID string, args RemovePriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "RemovePriceUpdaters",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemovePriceUpdatersWithPackageID exercises the RemovePriceUpdaters choice using the provided package ID instead of package name
+func (t FeeQuoter) RemovePriceUpdatersWithPackageID(contractID string, packageID string, args RemovePriceUpdaters) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
+		ContractID: contractID,
+		Choice:     "RemovePriceUpdaters",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1485,6 +1569,48 @@ func (t *QuoteGasForExecResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemovePriceUpdaters is a Record type
+type RemovePriceUpdaters struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemovePriceUpdaters to a map for DAML arguments
+func (t RemovePriceUpdaters) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemovePriceUpdaters) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemovePriceUpdaters) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemovePriceUpdaters to hex string (Canton MCMS format)
+func (t RemovePriceUpdaters) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemovePriceUpdaters from hex string (Canton MCMS format)
+func (t *RemovePriceUpdaters) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TimestampedPrice is a Record type
 type TimestampedPrice struct {
 	Price     types.NUMERIC   `json:"price"`
@@ -1680,6 +1806,7 @@ func (t *UpdatePricesMCMSParams) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates2(args ApplyDestChainConfigUpdates2) (*bind.EncodedChoice, error)
 	ApplyFeeTokenUpdates(args ApplyFeeTokenUpdates) (*bind.EncodedChoice, error)
 	ApplyPriceUpdatersUpdate(args ApplyPriceUpdatersUpdate) (*bind.EncodedChoice, error)
@@ -1699,6 +1826,7 @@ type MCMSEncoder interface {
 	GetTokenTransferFeeMCMSParams(args GetTokenTransferFeeMCMSParams) (*bind.EncodedChoice, error)
 	QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, error)
 	QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error)
+	RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error)
 	UpdatePrices(args UpdatePrices) (*bind.EncodedChoice, error)
 	UpdatePricesMCMSParams(args UpdatePricesMCMSParams) (*bind.EncodedChoice, error)
 }
@@ -1728,6 +1856,11 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// AddPriceUpdaters encodes parameters for the AddPriceUpdaters choice.
+func (e *encoder) AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddPriceUpdaters", args)
 }
 
 // ApplyDestChainConfigUpdates2 encodes parameters for the ApplyDestChainConfigUpdates2 choice.
@@ -1823,6 +1956,11 @@ func (e *encoder) QuoteGasForExec(args QuoteGasForExec) (*bind.EncodedChoice, er
 // QuoteGasForExecMCMSParams encodes MCMS parameters (without Caller) for the QuoteGasForExec choice.
 func (e *encoder) QuoteGasForExecMCMSParams(args QuoteGasForExecMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("QuoteGasForExec", args)
+}
+
+// RemovePriceUpdaters encodes parameters for the RemovePriceUpdaters choice.
+func (e *encoder) RemovePriceUpdaters(args RemovePriceUpdaters) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemovePriceUpdaters", args)
 }
 
 // UpdatePrices encodes parameters for the UpdatePrices choice.
