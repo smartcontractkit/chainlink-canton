@@ -285,6 +285,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.empty
             archivedExecutionContractIds = []
+            customObservers = []
 
     let message = MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector

@@ -954,6 +954,7 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.fromList [activeMessage]
             archivedExecutionContractIds = [olderArchive, newerArchive]
+            customObservers = []
 
     disclosedOlderArchive <- fromSome <$> queryDisclosure ccipOwner olderArchive
     disclosedNewerArchive <- fromSome <$> queryDisclosure ccipOwner newerArchive
@@ -1074,6 +1075,7 @@ testExecuteRollsOverExecutedMessages = script do
             outboundSequenceNumbers = Map.empty
             executedMessages = seededMessagesSet
             archivedExecutionContractIds = [olderArchive]
+            customObservers = []
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
@@ -1436,6 +1438,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
             executedMessages = Set.empty
             archivedExecutionContractIds = []
+            customObservers = []
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig

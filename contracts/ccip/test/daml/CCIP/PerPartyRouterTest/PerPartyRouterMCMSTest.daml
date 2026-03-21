@@ -39,6 +39,7 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -96,6 +97,7 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -153,6 +155,7 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -188,6 +191,7 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
   let instAddr = makeInstanceAddress instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
@@ -223,6 +227,7 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 
