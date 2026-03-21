@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "a775e2ed2c5ded9a01f0fb4aa5a3628ec79377b4b81b7fba636b48c292a2286f"
+	PackageID   = "5df3d9334efb3318db65c6c8bc5d8dfa80aeb7eb4588cf6f1c41df5ac6be56cc"
 	SDKVersion  = "3.4.10"
 )
 
@@ -870,6 +870,27 @@ func (t *PerPartyRouter) UnmarshalHex(data string) error {
 
 // Choice methods for PerPartyRouter
 
+// CCIPSend exercises the CCIPSend choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) CCIPSend(contractID string, args CCIPSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "CCIPSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CCIPSendWithPackageID exercises the CCIPSend choice using the provided package ID instead of package name
+func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID string, args CCIPSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "CCIPSend",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // SetDeps exercises the SetDeps choice on this PerPartyRouter contract
 // This method uses the package name in the template ID
 func (t PerPartyRouter) SetDeps(contractID string, args SetDeps3) *model.ExerciseCommand {
@@ -929,27 +950,6 @@ func (t PerPartyRouter) FinalizeFeeWithPackageID(contractID string, packageID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "FinalizeFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CCIPSend exercises the CCIPSend choice on this PerPartyRouter contract
-// This method uses the package name in the template ID
-func (t PerPartyRouter) CCIPSend(contractID string, args CCIPSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "CCIPSend",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CCIPSendWithPackageID exercises the CCIPSend choice using the provided package ID instead of package name
-func (t PerPartyRouter) CCIPSendWithPackageID(contractID string, packageID string, args CCIPSend) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
-		ContractID: contractID,
-		Choice:     "CCIPSend",
 		Arguments:  argsToMap(args),
 	}
 }
