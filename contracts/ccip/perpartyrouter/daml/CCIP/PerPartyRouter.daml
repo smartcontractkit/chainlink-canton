@@ -4,9 +4,10 @@ module CCIP.PerPartyRouter where
 import DA.Action (foldlA)
 import DA.Map qualified as Map
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
+import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional)
 import DA.Text qualified as T
-import DA.Time (addRelTime, hours)
+import DA.Time (time, addRelTime, hours)
 
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
@@ -35,6 +36,11 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
+
+-- | Far-future time used as "never expires" for pending transfers.
+-- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
+maxTime : Time
+maxTime = time (date 9999 Dec 31) 23 59 59
 
 data PerPartyRouterDeps = PerPartyRouterDeps
     with
@@ -371,7 +377,6 @@ template PerPartyRouter
                         let payoutEntries = filter (\entry -> snd entry > 0.0) (Map.toList recipientFees)
 
                         let executeFeeTransfer inputHoldingCids recipient amount = do
-                                -- TODO: check executeBefore
                                 now <- getTime
                                 let feeTransfer =
                                         Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -380,7 +385,7 @@ template PerPartyRouter
                                             amount = CCIP.Math.numeric0ToDecimalChecked "PerPartyRouter.feeTransfer" amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
-                                            executeBefore = addRelTime now (hours 1)
+                                            executeBefore = maxTime
                                             inputHoldingCids = inputHoldingCids
                                             meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                 feeResult <- exercise
