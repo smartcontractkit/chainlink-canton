@@ -183,7 +183,7 @@ template ExecutingMessageV1
                             instrumentId = instrumentId
                             amount = amount
                             sourcePoolData
-                            messageHash = messageId
+                            messageId = messageId
                             sourceChainSelector = message.sourceChainSelector
                             finality = message.finality
                         pure (Some ticketCid)

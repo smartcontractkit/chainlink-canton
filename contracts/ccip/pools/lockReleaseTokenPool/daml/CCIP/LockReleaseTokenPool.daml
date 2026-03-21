@@ -30,6 +30,7 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
+import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
@@ -618,15 +619,57 @@ template LockReleaseTokenPool
                 case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
                         assertMsg "ReleaseFromTicket: transfer completed with no receiver holdings" (not (null receiverCids))
-                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
-                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
+                        let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                                 receiverHoldingCids = receiverCids
-                            poolChangeCids = transferResult.senderChangeCids
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid ->
+                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
+                                receiverHoldingCids = receiverCids
+                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                            ccipOwner = ticket.ccipOwner
+                            ccvOwners = ticket.ccvOwners
+                            poolOwner = ticket.poolOwner
+                            receiver = ticket.receiver
+                            tokenReceiver = ticket.tokenReceiver
+                            tokenReceiveTicketCid
+                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                                verifiedCCVs = ticket.verifiedCCVs
+                                tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                instrumentId = ticket.instrumentId
+                                amount = ticket.amount
+                                sourcePoolData = ticket.sourcePoolData
+                                messageId = ticket.messageId
+                                sourceChainSelector = ticket.sourceChainSelector
+                                finality = ticket.finality
+                                output = claimedOutput
                         pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
-                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
-                                transferInstructionCid = instrCid
+                            output
                             poolChangeCids = transferResult.senderChangeCids
+                            claimedEventCid
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
+                                transferInstructionCid = instrCid
+                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Pending with
+                                transferInstructionCid = instrCid
+                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                            ccipOwner = ticket.ccipOwner
+                            ccvOwners = ticket.ccvOwners
+                            poolOwner = ticket.poolOwner
+                            receiver = ticket.receiver
+                            tokenReceiver = ticket.tokenReceiver
+                            tokenReceiveTicketCid
+                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                                verifiedCCVs = ticket.verifiedCCVs
+                                tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                instrumentId = ticket.instrumentId
+                                amount = ticket.amount
+                                sourcePoolData = ticket.sourcePoolData
+                                messageId = ticket.messageId
+                                sourceChainSelector = ticket.sourceChainSelector
+                                finality = ticket.finality
+                                output = claimedOutput
+                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                            output
+                            poolChangeCids = transferResult.senderChangeCids
+                            claimedEventCid
                     _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
         -- Calculate fee for outbound token transfer (USD cents only).
