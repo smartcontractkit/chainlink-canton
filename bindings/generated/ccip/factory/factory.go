@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "f42618093b623196ee218e80831175261dcfbf818a7f6815702fc8ff3202b673"
+	PackageID   = "b1db87b81634cb6ec8f9135f72df3a8b8e96d634b3b6c3c9676777a8fde1ab05"
 	SDKVersion  = "3.4.10"
 )
 
@@ -66,11 +66,12 @@ func argsToMap(args any) map[string]any {
 
 // CCIPFactory is a Template type
 type CCIPFactory struct {
-	InstanceId        types.TEXT   `json:"instanceId"`
-	Owner             types.PARTY  `json:"owner"`
-	McmsParty         types.PARTY  `json:"mcmsParty"`
-	UsedInstanceIds   types.GENMAP `json:"usedInstanceIds"`
-	DeployedContracts types.GENMAP `json:"deployedContracts"`
+	InstanceId                    types.TEXT   `json:"instanceId"`
+	Owner                         types.PARTY  `json:"owner"`
+	McmsParty                     types.PARTY  `json:"mcmsParty"`
+	UsedInstanceIds               types.GENMAP `json:"usedInstanceIds"`
+	DeployedContracts             types.GENMAP `json:"deployedContracts"`
+	PerPartyRouterFactoryDeployed types.BOOL   `json:"perPartyRouterFactoryDeployed"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -112,6 +113,9 @@ func (t CCIPFactory) CreateCommand() *model.CreateCommand {
 		return map[string]any{"_type": "genmap", "value": t.DeployedContracts}
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["perPartyRouterFactoryDeployed"] = bool(t.PerPartyRouterFactoryDeployed)
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -146,6 +150,9 @@ func (t CCIPFactory) CreateCommandWithPackageID(packageID string) *model.CreateC
 		}
 		return map[string]any{"_type": "genmap", "value": t.DeployedContracts}
 	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["perPartyRouterFactoryDeployed"] = bool(t.PerPartyRouterFactoryDeployed)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -1858,11 +1865,12 @@ func (t *DeployTokenAdminRegistryParams) UnmarshalHex(data string) error {
 
 // FactoryState is a Record type
 type FactoryState struct {
-	InstanceId        types.TEXT   `json:"instanceId"`
-	Owner             types.PARTY  `json:"owner"`
-	McmsParty         types.PARTY  `json:"mcmsParty"`
-	UsedInstanceIds   types.GENMAP `json:"usedInstanceIds"`
-	DeployedContracts types.GENMAP `json:"deployedContracts"`
+	InstanceId                    types.TEXT   `json:"instanceId"`
+	Owner                         types.PARTY  `json:"owner"`
+	McmsParty                     types.PARTY  `json:"mcmsParty"`
+	UsedInstanceIds               types.GENMAP `json:"usedInstanceIds"`
+	DeployedContracts             types.GENMAP `json:"deployedContracts"`
+	PerPartyRouterFactoryDeployed types.BOOL   `json:"perPartyRouterFactoryDeployed"`
 }
 
 // ToMap converts FactoryState to a map for DAML arguments
@@ -1888,6 +1896,8 @@ func (t FactoryState) ToMap() map[string]any {
 		}
 		return map[string]any{"_type": "genmap", "value": t.DeployedContracts}
 	}()
+
+	m["perPartyRouterFactoryDeployed"] = bool(t.PerPartyRouterFactoryDeployed)
 
 	return m
 }
