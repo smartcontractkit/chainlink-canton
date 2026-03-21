@@ -13,9 +13,6 @@ import CCIP.FeeQuoterTypes qualified as FeeQuoterTypes
 usdToCents : Decimal -> Numeric 0
 usdToCents d = intToNumeric (truncate (d * 100.0))
 
-mult : Decimal -> Numeric 0
-mult m = intToNumeric (truncate (m * 100000000.0))
-
 -- ===============================================
 -- |          ApplyPriceUpdatersUpdate           |
 -- ===============================================
@@ -96,10 +93,8 @@ testApplyFeeTokenUpdatesRoundtrip = do
             [
                 FeeQuoterTypes.FeeTokenArgs with
                     instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
-                    premiumMultiplier = mult 1.5
                 , FeeQuoterTypes.FeeTokenArgs with
                     instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
-                    premiumMultiplier = mult 2.0
             ]
             )
     let encoded = FeeQuoterCodec.encodeApplyFeeTokenUpdatesParams args
@@ -121,6 +116,7 @@ testApplyDestChainConfigUpdatesRoundtrip = do
                     destGasOverhead = 21000
                     destGasPerPayloadByteBase = 16
                     defaultTxGasLimit = 300000
+                    linkFeeMultiplierPercent = 90.0
                     defaultTokenFeeUSD = usdToCents 0.50
                     defaultTokenDestGasOverhead = 25000
             , FeeQuoterTypes.DestChainConfigArgs with
@@ -132,6 +128,7 @@ testApplyDestChainConfigUpdatesRoundtrip = do
                     destGasOverhead = 30000
                     destGasPerPayloadByteBase = 32
                     defaultTxGasLimit = 500000
+                    linkFeeMultiplierPercent = 100.0
                     defaultTokenFeeUSD = usdToCents 1.00
                     defaultTokenDestGasOverhead = 35000
             ])

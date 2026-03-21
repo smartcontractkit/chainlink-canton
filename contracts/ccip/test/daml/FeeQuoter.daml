@@ -7,6 +7,7 @@ import DA.Crypto.Text (byteCount)
 import DA.Date (Month(Jan), date)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+import DA.Set qualified as Set
 import DA.Time (time)
 
 import CCIP.FeeQuoter
@@ -35,6 +36,7 @@ testDestChainConfig = DestChainConfig with
     destGasOverhead = 0
     destGasPerPayloadByteBase = 0
     defaultTxGasLimit = 50000
+    linkFeeMultiplierPercent = 100.0
     defaultTokenFeeUSD = 0.0
     defaultTokenDestGasOverhead = 0
 
@@ -93,7 +95,7 @@ setup = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter"
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
@@ -191,6 +193,7 @@ setup = script do
             destGasOverhead = 30000
             destGasPerPayloadByteBase = 12
             defaultTxGasLimit = 500000
+            linkFeeMultiplierPercent = 100.0
             maxPerMsgGasLimit = 2000000
             defaultTokenFeeUSD = usdToCents 0.50
             defaultTokenDestGasOverhead = 0
@@ -200,6 +203,7 @@ setup = script do
             destGasOverhead = 40000
             destGasPerPayloadByteBase = 15
             defaultTxGasLimit = 800000
+            linkFeeMultiplierPercent = 100.0
             maxPerMsgGasLimit = 3000000
             defaultTokenFeeUSD = usdToCents 0.25
             defaultTokenDestGasOverhead = 0
@@ -352,7 +356,7 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter"
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -460,7 +464,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-finalize"
-            feeTokens = Map.fromList [(feeToken, 100000000.0)]
+            feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
@@ -619,14 +623,14 @@ testFinalizeFee_PremiumAndExecutor = script do
             admin = owner
             id = "LINK"
 
-    -- premiumMultiplier = mult 0.9 means 90% (10% LINK discount) in the E8 scale
+    -- linkFeeMultiplierPercent = 90 means 10% LINK discount.
     -- feeTokenPrice = usd 20.0 (20 USD per LINK in the usd8 format)
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-premium"
-            feeTokens = Map.fromList [(feeToken, 90000000.0)]
-            destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
+            feeTokens = Set.fromList [feeToken]
+            destChainConfigs = Map.fromList [(456.0, testDestChainConfig with linkFeeMultiplierPercent = 90.0)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
                 [(456.0, TimestampedPrice 0.0 (time (date 2026 Jan 1) 0 0 0))]
@@ -737,12 +741,12 @@ testFinalizeFee_SmallFee = script do
             admin = owner
             id = "LINK"
 
-    -- feeTokenPrice = usd 20.0, premiumMultiplier = mult 1.0 (100%)
+    -- feeTokenPrice = usd 20.0, non-LINK uses the implicit 100% multiplier.
     feeQuoter <- submit owner do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-small"
-            feeTokens = Map.fromList [(feeToken, 100000000.0)]
+            feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
@@ -842,7 +846,7 @@ testFinalizeFee_LinkCapAfterConversion = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-cap"
-            feeTokens = Map.fromList [(feeToken, 100000000.0)]
+            feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
@@ -927,7 +931,7 @@ testFinalizeFee_LinkCapDirect = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-direct-cap"
-            feeTokens = Map.fromList [(linkToken, 100000000.0)]
+            feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
@@ -1011,7 +1015,7 @@ testFinalizeFee_LinkCapMixedFees = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-link-mixed-cap"
-            feeTokens = Map.fromList [(linkToken, 100000000.0)]
+            feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
