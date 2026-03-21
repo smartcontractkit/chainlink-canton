@@ -2,6 +2,7 @@
 module CCIP.LockReleaseTokenPoolTypes where
 
 import DA.Crypto.Text (BytesHex)
+
 import CCIP.RawInstanceAddress (RawInstanceAddress)
 
 data ChainUpdate = ChainUpdate
@@ -29,6 +30,16 @@ data RemoteChainConfig = RemoteChainConfig
         outboundRateLimiter : RawInstanceAddress                        -- Required rate limiter for outgoing transfers
     deriving (Eq, Show)
 
+data TokenTransferFeeConfigArgs = TokenTransferFeeConfigArgs
+    with
+        destChainSelector : Numeric 0 -- Chain selector for this config update
+        isEnabled : Bool              -- Whether this config is enabled
+        destGasOverhead : Int         -- Gas charged to execute the token transfer on the destination chain.
+        destBytesOverhead : Int       -- Data availability bytes.
+        feeUSDCents : Numeric 0       -- Fee to charge for token transfers, multiples of 0.01 USD.
+        feeBps : Numeric 0            -- Proportional token fee in bps, applied by the pool during LockOrBurn.
+    deriving (Eq, Show)
+
 data TokenTransferFeeConfig = TokenTransferFeeConfig
     with
         isEnabled : Bool        -- Whether this config is enabled
@@ -38,7 +49,7 @@ data TokenTransferFeeConfig = TokenTransferFeeConfig
         feeBps : Numeric 0      -- Proportional token fee in bps, applied by the pool during LockOrBurn.
     deriving (Eq, Show)
 
-data RateLimiterConfigArgs = RateLimiterConfigArgs
+data RateLimitConfigArgs = RateLimitConfigArgs
     with
         remoteChainSelector : Numeric 0
         inboundRateLimiter : RawInstanceAddress

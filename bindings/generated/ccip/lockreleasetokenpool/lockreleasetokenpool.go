@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "e6161d31c44629a6a3d5f0a29e7b1118815d8276a97d9078f65cdb7573798b43"
+	PackageID   = "595d1701a92ccd93739fe4e717a71fe05fe16e029c2d7dd6d87bdd67155d3b4a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -107,6 +107,62 @@ func (t ApplyChainUpdates) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ApplyChainUpdates from hex string (Canton MCMS format)
 func (t *ApplyChainUpdates) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ApplyTokenTransferFeeConfigUpdates is a Record type
+type ApplyTokenTransferFeeConfigUpdates struct {
+	TokenTransferFeeConfigArgs        []TokenTransferFeeConfigArgs `json:"tokenTransferFeeConfigArgs"`
+	DisableTokenTransferFeeConfigArgs []types.NUMERIC              `json:"disableTokenTransferFeeConfigArgs"`
+}
+
+// ToMap converts ApplyTokenTransferFeeConfigUpdates to a map for DAML arguments
+func (t ApplyTokenTransferFeeConfigUpdates) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenTransferFeeConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.TokenTransferFeeConfigArgs))
+		for _, e := range t.TokenTransferFeeConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["disableTokenTransferFeeConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.DisableTokenTransferFeeConfigArgs))
+		for _, e := range t.DisableTokenTransferFeeConfigArgs {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t ApplyTokenTransferFeeConfigUpdates) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ApplyTokenTransferFeeConfigUpdates) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ApplyTokenTransferFeeConfigUpdates to hex string (Canton MCMS format)
+func (t ApplyTokenTransferFeeConfigUpdates) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ApplyTokenTransferFeeConfigUpdates from hex string (Canton MCMS format)
+func (t *ApplyTokenTransferFeeConfigUpdates) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -220,10 +276,11 @@ func (t *ChainUpdate) UnmarshalHex(data string) error {
 // LockReleaseTokenPool is a Template type
 type LockReleaseTokenPool struct {
 	InstanceId              types.TEXT                               `json:"instanceId"`
-	CcipOwner               types.PARTY                              `json:"ccipOwner"`
 	PoolOwner               types.PARTY                              `json:"poolOwner"`
+	CcipOwner               types.PARTY                              `json:"ccipOwner"`
 	InstrumentId            splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Decimals                types.INT64                              `json:"decimals"`
+	RateLimitAdmin          *types.PARTY                             `json:"rateLimitAdmin" hex:"optional"`
 	RemoteChainConfigs      types.GENMAP                             `json:"remoteChainConfigs"`
 	TokenTransferFeeConfigs types.GENMAP                             `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      common.CCIPContext                       `json:"poolReceiveContext"`
@@ -249,10 +306,10 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccipOwner"] = t.CcipOwner.ToMap()
+	args["poolOwner"] = t.PoolOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolOwner"] = t.PoolOwner.ToMap()
+	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instrumentId"] = func() any {
@@ -265,6 +322,17 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["decimals"] = int64(t.Decimals)
+
+	if t.RateLimitAdmin != nil {
+		args["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
+		}
+	} else {
+		args["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["remoteChainConfigs"] = func() any {
@@ -323,10 +391,10 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["ccipOwner"] = t.CcipOwner.ToMap()
+	args["poolOwner"] = t.PoolOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolOwner"] = t.PoolOwner.ToMap()
+	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["instrumentId"] = func() any {
@@ -339,6 +407,17 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["decimals"] = int64(t.Decimals)
+
+	if t.RateLimitAdmin != nil {
+		args["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
+		}
+	} else {
+		args["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["remoteChainConfigs"] = func() any {
@@ -455,6 +534,27 @@ func (t LockReleaseTokenPool) LockReleaseTokenPoolLockOrBurnWithPackageID(contra
 	}
 }
 
+// ApplyTokenTransferFeeConfigUpdates exercises the ApplyTokenTransferFeeConfigUpdates choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) ApplyTokenTransferFeeConfigUpdates(contractID string, args ApplyTokenTransferFeeConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "ApplyTokenTransferFeeConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ApplyTokenTransferFeeConfigUpdatesWithPackageID exercises the ApplyTokenTransferFeeConfigUpdates choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) ApplyTokenTransferFeeConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyTokenTransferFeeConfigUpdates) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "ApplyTokenTransferFeeConfigUpdates",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ApplyChainUpdates exercises the ApplyChainUpdates choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) ApplyChainUpdates(contractID string, args ApplyChainUpdates) *model.ExerciseCommand {
@@ -476,23 +576,23 @@ func (t LockReleaseTokenPool) ApplyChainUpdatesWithPackageID(contractID string, 
 	}
 }
 
-// UpdateRateLimiters exercises the UpdateRateLimiters choice on this LockReleaseTokenPool contract
+// SetRateLimitConfig exercises the SetRateLimitConfig choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
-func (t LockReleaseTokenPool) UpdateRateLimiters(contractID string, args UpdateRateLimiters) *model.ExerciseCommand {
+func (t LockReleaseTokenPool) SetRateLimitConfig(contractID string, args SetRateLimitConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "UpdateRateLimiters",
+		Choice:     "SetRateLimitConfig",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// UpdateRateLimitersWithPackageID exercises the UpdateRateLimiters choice using the provided package ID instead of package name
-func (t LockReleaseTokenPool) UpdateRateLimitersWithPackageID(contractID string, packageID string, args UpdateRateLimiters) *model.ExerciseCommand {
+// SetRateLimitConfigWithPackageID exercises the SetRateLimitConfig choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) SetRateLimitConfigWithPackageID(contractID string, packageID string, args SetRateLimitConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
 		ContractID: contractID,
-		Choice:     "UpdateRateLimiters",
+		Choice:     "SetRateLimitConfig",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -599,6 +699,27 @@ func (t LockReleaseTokenPool) ArchiveWithPackageID(contractID string, packageID 
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
+	}
+}
+
+// SetDynamicConfig exercises the SetDynamicConfig choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetDynamicConfig",
+		Arguments:  argsToMap(args),
 	}
 }
 
@@ -1377,16 +1498,16 @@ func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data str
 	return hexCodec.Unmarshal(data, t)
 }
 
-// RateLimiterConfigArgs is a Record type
-type RateLimiterConfigArgs struct {
+// RateLimitConfigArgs is a Record type
+type RateLimitConfigArgs struct {
 	RemoteChainSelector                        types.NUMERIC             `json:"remoteChainSelector"`
 	InboundRateLimiter                         common.RawInstanceAddress `json:"inboundRateLimiter"`
 	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress `json:"inboundCustomBlockConfirmationsRateLimiter"`
 	OutboundRateLimiter                        common.RawInstanceAddress `json:"outboundRateLimiter"`
 }
 
-// ToMap converts RateLimiterConfigArgs to a map for DAML arguments
-func (t RateLimiterConfigArgs) ToMap() map[string]any {
+// ToMap converts RateLimitConfigArgs to a map for DAML arguments
+func (t RateLimitConfigArgs) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["remoteChainSelector"] = t.RemoteChainSelector
@@ -1418,24 +1539,24 @@ func (t RateLimiterConfigArgs) ToMap() map[string]any {
 	return m
 }
 
-func (t RateLimiterConfigArgs) MarshalJSON() ([]byte, error) {
+func (t RateLimitConfigArgs) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *RateLimiterConfigArgs) UnmarshalJSON(data []byte) error {
+func (t *RateLimitConfigArgs) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes RateLimiterConfigArgs to hex string (Canton MCMS format)
-func (t RateLimiterConfigArgs) MarshalHex() (string, error) {
+// MarshalHex encodes RateLimitConfigArgs to hex string (Canton MCMS format)
+func (t RateLimitConfigArgs) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes RateLimiterConfigArgs from hex string (Canton MCMS format)
-func (t *RateLimiterConfigArgs) UnmarshalHex(data string) error {
+// UnmarshalHex decodes RateLimitConfigArgs from hex string (Canton MCMS format)
+func (t *RateLimitConfigArgs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1543,6 +1664,119 @@ func (t *RemoteChainConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetDynamicConfig is a Record type
+type SetDynamicConfig struct {
+	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
+}
+
+// ToMap converts SetDynamicConfig to a map for DAML arguments
+func (t SetDynamicConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.RateLimitAdmin != nil {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
+		}
+	} else {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t SetDynamicConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetDynamicConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetDynamicConfig to hex string (Canton MCMS format)
+func (t SetDynamicConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetDynamicConfig from hex string (Canton MCMS format)
+func (t *SetDynamicConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetRateLimitConfig is a Record type
+type SetRateLimitConfig struct {
+	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
+	Caller              types.PARTY           `json:"caller"`
+}
+
+// ToMap converts SetRateLimitConfig to a map for DAML arguments
+func (t SetRateLimitConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["rateLimitConfigArgs"] = func() []any {
+		res := make([]any, 0, len(t.RateLimitConfigArgs))
+		for _, e := range t.RateLimitConfigArgs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t SetRateLimitConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetRateLimitConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetRateLimitConfig to hex string (Canton MCMS format)
+func (t SetRateLimitConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetRateLimitConfig from hex string (Canton MCMS format)
+func (t *SetRateLimitConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetRateLimitConfigMCMSParams is SetRateLimitConfig without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type SetRateLimitConfigMCMSParams struct {
+	RateLimitConfigArgs []RateLimitConfigArgs `json:"rateLimitConfigArgs"`
+}
+
+// MarshalHex encodes SetRateLimitConfigMCMSParams to hex string for MCMS operationData.
+func (t SetRateLimitConfigMCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetRateLimitConfigMCMSParams from hex string.
+func (t *SetRateLimitConfigMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenTransferFeeConfig2 is a Record type
 type TokenTransferFeeConfig2 struct {
 	IsEnabled         types.BOOL    `json:"isEnabled"`
@@ -1587,6 +1821,57 @@ func (t TokenTransferFeeConfig2) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes TokenTransferFeeConfig2 from hex string (Canton MCMS format)
 func (t *TokenTransferFeeConfig2) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenTransferFeeConfigArgs is a Record type
+type TokenTransferFeeConfigArgs struct {
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	IsEnabled         types.BOOL    `json:"isEnabled"`
+	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
+	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
+	FeeBps            types.NUMERIC `json:"feeBps"`
+}
+
+// ToMap converts TokenTransferFeeConfigArgs to a map for DAML arguments
+func (t TokenTransferFeeConfigArgs) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["destGasOverhead"] = int64(t.DestGasOverhead)
+
+	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
+
+	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["feeBps"] = t.FeeBps
+
+	return m
+}
+
+func (t TokenTransferFeeConfigArgs) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenTransferFeeConfigArgs) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenTransferFeeConfigArgs to hex string (Canton MCMS format)
+func (t TokenTransferFeeConfigArgs) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenTransferFeeConfigArgs from hex string (Canton MCMS format)
+func (t *TokenTransferFeeConfigArgs) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1651,57 +1936,11 @@ func (v TransferTimeout) GetVariantValue() any {
 
 var _ types.VARIANT = (*TransferTimeout)(nil)
 
-// UpdateRateLimiters is a Record type
-type UpdateRateLimiters struct {
-	RateLimiterConfigArgs []RateLimiterConfigArgs `json:"rateLimiterConfigArgs"`
-}
-
-// ToMap converts UpdateRateLimiters to a map for DAML arguments
-func (t UpdateRateLimiters) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["rateLimiterConfigArgs"] = func() []any {
-		res := make([]any, 0, len(t.RateLimiterConfigArgs))
-		for _, e := range t.RateLimiterConfigArgs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	return m
-}
-
-func (t UpdateRateLimiters) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *UpdateRateLimiters) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes UpdateRateLimiters to hex string (Canton MCMS format)
-func (t UpdateRateLimiters) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes UpdateRateLimiters from hex string (Canton MCMS format)
-func (t *UpdateRateLimiters) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error)
+	ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolCalculateFee(args LockReleaseTokenPoolCalculateFee) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolCalculateFeeMCMSParams(args LockReleaseTokenPoolCalculateFeeMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolGetRequiredCCVs(args LockReleaseTokenPoolGetRequiredCCVs) (*bind.EncodedChoice, error)
@@ -1714,7 +1953,9 @@ type MCMSEncoder interface {
 	LockReleaseTokenPoolVerifyInboundMessageMCMSParams(args LockReleaseTokenPoolVerifyInboundMessageMCMSParams) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVs(args LockReleaseTokenPoolVerifyOutboundCCVs) (*bind.EncodedChoice, error)
 	LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) (*bind.EncodedChoice, error)
-	UpdateRateLimiters(args UpdateRateLimiters) (*bind.EncodedChoice, error)
+	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
+	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
+	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -1747,6 +1988,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 // ApplyChainUpdates encodes parameters for the ApplyChainUpdates choice.
 func (e *encoder) ApplyChainUpdates(args ApplyChainUpdates) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ApplyChainUpdates", args)
+}
+
+// ApplyTokenTransferFeeConfigUpdates encodes parameters for the ApplyTokenTransferFeeConfigUpdates choice.
+func (e *encoder) ApplyTokenTransferFeeConfigUpdates(args ApplyTokenTransferFeeConfigUpdates) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("ApplyTokenTransferFeeConfigUpdates", args)
 }
 
 // LockReleaseTokenPoolCalculateFee encodes parameters for the LockReleaseTokenPoolCalculateFee choice.
@@ -1809,9 +2055,19 @@ func (e *encoder) LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams(args LockRele
 	return e.EncodeChoiceArgs("LockReleaseTokenPoolVerifyOutboundCCVs", args)
 }
 
-// UpdateRateLimiters encodes parameters for the UpdateRateLimiters choice.
-func (e *encoder) UpdateRateLimiters(args UpdateRateLimiters) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("UpdateRateLimiters", args)
+// SetDynamicConfig encodes parameters for the SetDynamicConfig choice.
+func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetDynamicConfig", args)
+}
+
+// SetRateLimitConfig encodes parameters for the SetRateLimitConfig choice.
+func (e *encoder) SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
+}
+
+// SetRateLimitConfigMCMSParams encodes MCMS parameters (without Caller) for the SetRateLimitConfig choice.
+func (e *encoder) SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetRateLimitConfig", args)
 }
 
 // Verify MCMSEncoder interface implementation

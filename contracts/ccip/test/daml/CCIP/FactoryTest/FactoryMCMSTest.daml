@@ -539,6 +539,7 @@ testDeployCommitteeVerifier_MCMS = script do
 testDeployLockReleaseTokenPool_MCMS : Script ()
 testDeployLockReleaseTokenPool_MCMS = script do
   mcmsParty <- allocateParty "mcms_party"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
 
   let factoryInstanceId = "factory-lrtp"
 
@@ -555,10 +556,11 @@ testDeployLockReleaseTokenPool_MCMS = script do
   -- Use mcmsParty as poolOwner so authorization works within single party
   let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
-        ccipOwner = mcmsParty
         poolOwner = mcmsParty
+        ccipOwner = mcmsParty
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "USDC"
         decimals = 6
+        rateLimitAdmin = Some rateLimitAdmin
         tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" mcmsParty
         feeQuoter = CCIP.RawInstanceAddress.make "fq-1" mcmsParty
         rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" mcmsParty

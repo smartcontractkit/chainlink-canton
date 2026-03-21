@@ -41,6 +41,16 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 	Prefix:      "lockreleasetokenpool",
 })
 
+var SetDynamicConfig = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetDynamicConfig]{
+	Name:         "canton/ccip/lock_release_token_pool/set_dynamic_config",
+	Version:      Version,
+	Description:  "Sets the Dynamic Config",
+	ContractType: ContractType,
+	Validate:     nil,
+	Template:     lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:       lockreleasetokenpool.LockReleaseTokenPool{}.SetDynamicConfig,
+})
+
 var ApplyChainUpdates = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.ApplyChainUpdates]{
 	Name:         "canton/ccip/lock_release_token_pool/apply_chain_updates",
 	Version:      Version,
@@ -52,4 +62,33 @@ var ApplyChainUpdates = contract.NewExercise(contract.ExerciseParams[lockrelease
 	},
 	Template: lockreleasetokenpool.LockReleaseTokenPool{},
 	Method:   lockreleasetokenpool.LockReleaseTokenPool{}.ApplyChainUpdates,
+})
+
+var ApplyTokenTransferFeeConfigUpdates = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.ApplyTokenTransferFeeConfigUpdates]{
+	Name:         "canton/ccip/lock_release_token_pool/apply_token_transfer_fee_config_updates",
+	Version:      Version,
+	Description:  "Applies token transfer fee config updates to a Canton LockReleaseTokenPool",
+	ContractType: ContractType,
+	Validate: func(input lockreleasetokenpool.ApplyTokenTransferFeeConfigUpdates) error {
+
+		return nil
+	},
+	Template: lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:   lockreleasetokenpool.LockReleaseTokenPool{}.ApplyTokenTransferFeeConfigUpdates,
+})
+
+var SetRateLimitConfig = contract.NewExercise(contract.ExerciseParams[lockreleasetokenpool.SetRateLimitConfig]{
+	Name:         "canton/ccip/lock_release_token_pool/set_rate_limit_config",
+	Version:      Version,
+	Description:  "Sets rate limit configs for a Canton LockReleaseTokenPool",
+	ContractType: ContractType,
+	Validate: func(input lockreleasetokenpool.SetRateLimitConfig) error {
+		if input.Caller == "" {
+			return errors.New("caller is required")
+		}
+
+		return nil
+	},
+	Template: lockreleasetokenpool.LockReleaseTokenPool{},
+	Method:   lockreleasetokenpool.LockReleaseTokenPool{}.SetRateLimitConfig,
 })

@@ -22,9 +22,58 @@ dummyPoolDeps ccipOwner =
     rmnRemote = RawInstanceAddress ("dummy-rmn@" <> partyToText ccipOwner)
     feeQuoter = RawInstanceAddress ("dummy-fq@" <> partyToText ccipOwner)
 
--- ===========================================================================
--- MCMS ENTRYPOINT TESTS - ApplyChainUpdates
--- ===========================================================================
+-- ========================================================
+-- |          MCMS Entrypoint - SetDynamicConfig          |
+-- ========================================================
+
+testLockReleaseTokenPoolMCMSEntrypoint_SetDynamicConfig : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_SetDynamicConfig = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instanceId = "pool-dynamic-config-test"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
+
+    -- Create LockReleaseTokenPool with no rate limit admin
+    poolCid <- submit poolOwner do
+        createCmd LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 6
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    let instAddr = makeInstanceAddress instanceId poolOwner
+    let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+    -- Update rate limit admin via mcmsEntrypoint
+    rateLimitAdmin <- allocateParty "rate_limit_admin"
+    let newRateLimitAdmin = Some rateLimitAdmin
+    let encodedParams = encodeSetDynamicConfigParams (newRateLimitAdmin)
+
+    newContractIds <- submit poolOwner do
+        exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+            functionName = "SetDynamicConfig"
+            operationData = encodedParams
+            contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
+
+    -- Verify rate limit admin was updated
+    contracts <- query @LockReleaseTokenPool poolOwner
+    case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
+        [(_, pool)] -> do
+            assertMsg ("rateLimitAdmin mismatch, got: " <> show pool.rateLimitAdmin <> ", expected: " <> show newRateLimitAdmin) (pool.rateLimitAdmin == newRateLimitAdmin)
+        _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+-- ========================================================
+-- |         MCMS Entrypoint - ApplyChainUpdates          |
+-- ========================================================
 
 -- | Test MCMSReceiver entrypoint for ApplyChainUpdates function
 testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates : Script ()
@@ -40,10 +89,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
-            ccipOwner
             poolOwner
+            ccipOwner
             instrumentId
             decimals = 6
+            rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
@@ -112,10 +162,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
-            ccipOwner
             poolOwner
+            ccipOwner
             instrumentId
             decimals = 18
+            rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
@@ -173,12 +224,12 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
 
     pure ()
 
--- ===========================================================================
--- MCMS ENTRYPOINT TESTS - UpdateRateLimiters
--- ===========================================================================
+-- ========================================================
+-- |        MCMS Entrypoint - SetRateLimitConfig          |
+-- ========================================================
 
-testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters : Script ()
-testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
     ccipOwner <- allocateParty "ccip_owner"
     poolOwner <- allocateParty "pool_owner"
     tokenAdmin <- allocateParty "token_admin"
@@ -199,10 +250,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
-            ccipOwner
             poolOwner
+            ccipOwner
             instrumentId
             decimals = 18
+            rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
@@ -214,19 +266,19 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
 
     -- Create rate limiter config update for existing chain
     let args = [
-            RateLimiterConfigArgs with
+            RateLimitConfigArgs with
                 remoteChainSelector = 123.0
                 inboundRateLimiter = RawInstanceAddress "rate-limiter-in-updated@owner"
                 inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-updated@owner"
                 outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
-        encoded = encodeUpdateRateLimitersParams args
+        encoded = encodeSetRateLimitConfigParams (args, poolOwner)
 
     -- Call mcmsEntrypoint
     newContractIds <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
-            functionName = "UpdateRateLimiters"
+            functionName = "SetRateLimitConfig"
             operationData = encoded
             contractIds = Map.fromList [(instAddr, toAnyContractId poolCid)]
 
@@ -237,7 +289,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateRateLimiters = script do
             case Map.lookup 123.0 pool.remoteChainConfigs of
                 None -> abort "Expected config for chain 123"
                 Some got -> do
-                    assertRateLimiterConfigArgsEqual got (head args)
+                    assertRateLimitConfigArgsEqual got (head args)
         _ -> abort "Expected exactly one LockReleaseTokenPool contract"
 
     pure ()
@@ -259,10 +311,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
-            ccipOwner
             poolOwner
+            ccipOwner
             instrumentId
             decimals = 18
+            rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
@@ -294,10 +347,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
-            ccipOwner
             poolOwner
+            ccipOwner
             instrumentId
             decimals = 18
+            rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
@@ -329,10 +383,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
             instanceId
-            ccipOwner
             poolOwner
+            ccipOwner
             instrumentId
             decimals = 18
+            rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             poolReceiveContext = CCIP.Context.CCIPContext (TextMap.empty)
@@ -381,7 +436,15 @@ assertChainUpdateEqual got expected = do
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
 
-assertRateLimiterConfigArgsEqual : RemoteChainConfig -> RateLimiterConfigArgs -> Script ()
-assertRateLimiterConfigArgsEqual got expected = do
+assertTokenTransferFeeConfigEqual : TokenTransferFeeConfig -> TokenTransferFeeConfigArgs -> Script ()
+assertTokenTransferFeeConfigEqual got expected = do
+    assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
+    assertMsg ("destGasOverhead mismatch, got: " <> show got.destGasOverhead <> ", expected: " <> show expected.destGasOverhead) (got.destGasOverhead == expected.destGasOverhead)
+    assertMsg ("destBytesOverhead mismatch, got: " <> show got.destBytesOverhead <> ", expected: " <> show expected.destBytesOverhead) (got.destBytesOverhead == expected.destBytesOverhead)
+    assertMsg ("feeUSDCents mismatch, got: " <> show got.feeUSDCents <> ", expected: " <> show expected.feeUSDCents) (got.feeUSDCents == expected.feeUSDCents)
+    assertMsg ("feeBps mismatch, got: " <> show got.feeBps <> ", expected: " <> show expected.feeBps) (got.feeBps == expected.feeBps)
+
+assertRateLimitConfigArgsEqual : RemoteChainConfig -> RateLimitConfigArgs -> Script ()
+assertRateLimitConfigArgsEqual got expected = do
     assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
     assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)

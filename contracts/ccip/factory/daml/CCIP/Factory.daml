@@ -484,10 +484,11 @@ data DeployCommitteeVerifierParams = DeployCommitteeVerifierParams
 data DeployLockReleaseTokenPoolParams = DeployLockReleaseTokenPoolParams
     with
         instanceId : Text
-        ccipOwner : Party
         poolOwner : Party
+        ccipOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         decimals : Int
+        rateLimitAdmin : Optional Party
         tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
         feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
         rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
@@ -615,10 +616,11 @@ mkCommitteeVerifierContract params = CCIP.CommitteeVerifier.CommitteeVerifier wi
 mkLockReleaseTokenPoolContract : DeployLockReleaseTokenPoolParams -> CCIP.LockReleaseTokenPool.LockReleaseTokenPool
 mkLockReleaseTokenPoolContract params = CCIP.LockReleaseTokenPool.LockReleaseTokenPool with
     instanceId = params.instanceId
-    ccipOwner = params.ccipOwner
     poolOwner = params.poolOwner
+    ccipOwner = params.ccipOwner
     instrumentId = params.instrumentId
     decimals = params.decimals
+    rateLimitAdmin = params.rateLimitAdmin
     remoteChainConfigs = Map.empty
     tokenTransferFeeConfigs = Map.empty
     poolReceiveContext = CCIP.Context.emptyCCIPContext
@@ -781,20 +783,22 @@ decodeDeployCommitteeVerifierParams encoded = do
 decodeDeployLockReleaseTokenPoolParams : BytesHex -> Optional DeployLockReleaseTokenPoolParams
 decodeDeployLockReleaseTokenPoolParams encoded = do
     (instanceId, offset1) <- decodeTextAt encoded 0
-    (ccipOwner, offset2) <- decodePartyAt encoded offset1
-    (poolOwner, offset3) <- decodePartyAt encoded offset2
+    (poolOwner, offset2) <- decodePartyAt encoded offset1
+    (ccipOwner, offset3) <- decodePartyAt encoded offset2
     (instrumentId, offset4) <- decodeInstrumentId encoded offset3
     (decimals, offset5) <- decodeInt64At encoded offset4
-    (tokenAdminRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
-    (feeQuoter, offset7) <- decodeRawInstanceAddressAt encoded offset6
-    (rmnRemote, finalOffset) <- decodeRawInstanceAddressAt encoded offset7
+    (rateLimitAdmin, offset6) <- decodeOptional encoded offset5 decodePartyAt
+    (tokenAdminRegistry, offset7) <- decodeRawInstanceAddressAt encoded offset6
+    (feeQuoter, offset8) <- decodeRawInstanceAddressAt encoded offset7
+    (rmnRemote, finalOffset) <- decodeRawInstanceAddressAt encoded offset8
     assertOffset finalOffset (byteCount encoded)
     Some DeployLockReleaseTokenPoolParams with
         instanceId
-        ccipOwner
         poolOwner
+        ccipOwner
         instrumentId
         decimals
+        rateLimitAdmin
         tokenAdminRegistry
         feeQuoter
         rmnRemote
