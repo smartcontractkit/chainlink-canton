@@ -15,7 +15,6 @@ import DA.Foldable qualified as Foldable
 import DA.List (dedup)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
-import DA.Text qualified as T
 import qualified DA.TextMap as TextMap
 import DA.Date (date, Month(Dec))
 import DA.Time (time, addRelTime, hours)
@@ -36,8 +35,8 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.RateLimiter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
@@ -125,11 +124,11 @@ assertRateLimiter
     -> Numeric 0
     -> CCIP.RateLimiter.RateLimitDirection
     -> CCIP.RateLimiter.RateLimitMode
-    -> CCIP.RawInstanceAddress.RawInstanceAddress
+    -> RawInstanceAddress.RawInstanceAddress
     -> CCIP.RateLimiter.RateLimiter
     -> Update ()
 assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expected limiter = do
-    CCIP.RawInstanceAddress.assertEqual (prefix <> ": instance address mismatch")
+    RawInstanceAddress.assertEqual (prefix <> ": instance address mismatch")
         limiter.instanceId
         limiter.poolOwner
         expected
@@ -181,7 +180,7 @@ template LockReleaseTokenPool
         signatory poolOwner
         observer optional [] pure rateLimitAdmin
 
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
             && all
                 (\cfg ->
                     cfg.feeBps >= 0.0
@@ -300,7 +299,7 @@ template LockReleaseTokenPool
                     -- If the chain already exists, the update should first remove it.
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     -- Validate rate limiters
-                    assertMsg "ApplyChainUpdates: rate limiters cannot be empty" (inboundRateLimiter /= CCIP.RawInstanceAddress.empty && inboundCustomBlockConfirmationsRateLimiter /= CCIP.RawInstanceAddress.empty && outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
+                    assertMsg "ApplyChainUpdates: rate limiters cannot be empty" (inboundRateLimiter /= RawInstanceAddress.empty && inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty && outboundRateLimiter /= RawInstanceAddress.empty)
                     assertMsg "ApplyChainUpdates: rate limiters cannot be the same for inbound and outbound" (inboundRateLimiter /= outboundRateLimiter)
                     -- Validate remote pools
                     assertMsg "ApplyChainUpdates: remotePools cannot contain empty address" ("" `notElem` remotePools)
@@ -383,7 +382,7 @@ template LockReleaseTokenPool
                 -- Validate
                 forA_ rateLimitConfigArgs $ \arg -> do
                     assertMsg "SetRateLimitConfig: invalid chain selector" (arg.remoteChainSelector > 0.0)
-                    assertMsg "SetRateLimitConfig: rate limiters cannot be empty" (arg.inboundRateLimiter /= CCIP.RawInstanceAddress.empty && arg.inboundCustomBlockConfirmationsRateLimiter /= CCIP.RawInstanceAddress.empty && arg.outboundRateLimiter /= CCIP.RawInstanceAddress.empty)
+                    assertMsg "SetRateLimitConfig: rate limiters cannot be empty" (arg.inboundRateLimiter /= RawInstanceAddress.empty && arg.inboundCustomBlockConfirmationsRateLimiter /= RawInstanceAddress.empty && arg.outboundRateLimiter /= RawInstanceAddress.empty)
                     assertMsg "SetRateLimitConfig: rate limiters cannot be the same for inbound and outbound" (arg.inboundRateLimiter /= arg.outboundRateLimiter)
                     assertMsg ("SetRateLimitConfig: unsupported chain selector: " <> show arg.remoteChainSelector) (Map.member arg.remoteChainSelector remoteChainConfigs)
 
@@ -433,7 +432,7 @@ template LockReleaseTokenPool
             do
                 execMsg <- fetch executingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: executing message tokenAdminRegistry mismatch"
                     (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
@@ -484,7 +483,7 @@ template LockReleaseTokenPool
 
                 sm <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: sending message ccipOwner mismatch"
                     (sm.ccipOwner == tokenAdminRegistry.owner)
@@ -518,14 +517,14 @@ template LockReleaseTokenPool
             do
                 ticket <- fetch tokenReceiveTicketCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
+                RawInstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
                     (ticket.ccipOwner == tokenAdminRegistry.owner)
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
+                RawInstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "ReleaseFromTicket: ticket instrument must match pool instrument"
                     (ticket.instrumentId == instrumentId)
@@ -635,7 +634,7 @@ template LockReleaseTokenPool
             do
                 sendingMsg <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
+                RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "pool: sending message ccipOwner mismatch"
                     (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
@@ -644,7 +643,7 @@ template LockReleaseTokenPool
                 assertMsg "pool: tokenInstrumentId mismatch"
                     (tokenInstrumentId == instrumentId)
                 feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
+                RawInstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
                 assertMsg "pool: sending message feeQuoter mismatch"
                     (sendingMsg.deps.feeQuoter == deps.feeQuoter)
@@ -691,14 +690,14 @@ template LockReleaseTokenPool
 
                 sendingMsg <- fetch sendingMessageCid
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
+                RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
                     (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
                     (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
-                CCIP.RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
+                RawInstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
                 assertMsg "LockOrBurn: sending message rmn mismatch"
                     (sendingMsg.deps.rmnRemote == deps.rmnRemote)

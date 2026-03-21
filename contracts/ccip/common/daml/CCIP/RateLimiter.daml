@@ -3,7 +3,8 @@ module CCIP.RateLimiter where
 import DA.Time (convertRelTimeToMicroseconds, subTime)
 
 import qualified CCIP.Context
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 
 rateLimiterKey : Text
 rateLimiterKey = "rate-limiter"
@@ -24,8 +25,8 @@ lookupInboundRateLimiterCid mode ctx = CCIP.Context.getFromContextU ctx key
         RateLimitMode_DefaultFinality -> inboundRateLimiterKey
         RateLimitMode_CustomFinality -> inboundCustomBlockConfirmationsRateLimiterKey
 
-rawInstanceAddress : RateLimiter -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress rl = CCIP.RawInstanceAddress.make rl.instanceId rl.poolOwner
+rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress rl = RawInstanceAddress.make rl.instanceId rl.poolOwner
 
 data RateLimitDirection
     = RateLimitDirection_Outbound
@@ -72,6 +73,7 @@ template RateLimiter
         lastUpdated : Time
     where
         signatory poolOwner
+        ensure assertValidInstanceId instanceId
 
         choice SetConfig : ContractId RateLimiter
             with

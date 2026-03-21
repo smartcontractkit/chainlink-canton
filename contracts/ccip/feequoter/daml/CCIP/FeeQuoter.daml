@@ -8,12 +8,11 @@ import DA.Foldable qualified as Foldable
 import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
-import DA.Text qualified as T
-
 import Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec (decodePartyList)
@@ -38,8 +37,8 @@ feeQuoterKey = "fee-quoter"
 lookupFeeQuoterCid : CCIP.Context.CCIPContext -> Update (ContractId FeeQuoter)
 lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 
-rawInstanceAddress : FeeQuoter -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress feeQuoter = CCIP.RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
+rawInstanceAddress : FeeQuoter -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress feeQuoter = RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
 
 gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
@@ -66,7 +65,7 @@ template FeeQuoter
     where
         signatory owner
         observer priceUpdaters
-        ensure not (T.isInfixOf "@" instanceId) && unique priceUpdaters
+        ensure assertValidInstanceId instanceId && unique priceUpdaters
 
         nonconsuming choice Get : FeeQuoter
             with

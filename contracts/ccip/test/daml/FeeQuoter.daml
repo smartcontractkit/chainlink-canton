@@ -10,7 +10,7 @@ import DA.Optional (fromSome)
 import DA.Time (time)
 
 import CCIP.FeeQuoter
-import CCIP.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 import Splice.Api.Token.HoldingV1

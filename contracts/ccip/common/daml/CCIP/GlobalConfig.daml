@@ -8,8 +8,6 @@ module CCIP.GlobalConfig
 import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
-import DA.Text qualified as T
-
 import qualified CCIP.Context
 import CCIP.GlobalConfigTypes (
     DestChainConfig(..),
@@ -19,7 +17,7 @@ import CCIP.GlobalConfigTypes (
     validateDefaultAndMandatedCCVs,
     )
 import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..), assertValidInstanceId)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex)
@@ -39,7 +37,7 @@ template GlobalConfig
     where
         signatory ccipOwner
 
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
             && chainSelector > 0.0 -- Local chain selector must be greater than zero
             && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
             && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector

@@ -7,7 +7,7 @@ import DA.Optional (fromSome)
 
 import CCIP.LockReleaseTokenPoolCodec qualified as LockReleaseTokenPoolCodec
 import CCIP.LockReleaseTokenPoolTypes qualified as LockReleaseTokenPoolTypes
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 -- ===============================================
 -- |              SetDynamicConfig               |
@@ -39,12 +39,12 @@ testApplyChainUpdatesParamsRoundtrip = do
                     remoteChainSelector = 1.0
                     remotePools = ["1234567890abcdef", "fedcba0987654321"]
                     remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-                    inboundCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv-inbound@party1", CCIP.RawInstanceAddress.RawInstanceAddress "ccv-inbound2@party2"]
-                    outboundCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv-outbound@party1"]
+                    inboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress.RawInstanceAddress "ccv-inbound2@party2"]
+                    outboundCCVs = [RawInstanceAddress.RawInstanceAddress "ccv-outbound@party1"]
                     minBlockConfirmations = 0
-                    inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
                 ,LockReleaseTokenPoolTypes.ChainUpdate with
                     remoteChainSelector = 18446744073709551615.0 -- max uint64
                     remotePools = []
@@ -52,9 +52,9 @@ testApplyChainUpdatesParamsRoundtrip = do
                     inboundCCVs = []
                     outboundCCVs = []
                     minBlockConfirmations = 7
-                    inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
                 ,LockReleaseTokenPoolTypes.ChainUpdate with
                     remoteChainSelector = 0.0
                     remotePools = []
@@ -62,9 +62,9 @@ testApplyChainUpdatesParamsRoundtrip = do
                     inboundCCVs = []
                     outboundCCVs = []
                     minBlockConfirmations = 3
-                    inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+                    inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
             ]
             )
     let encoded = LockReleaseTokenPoolCodec.encodeApplyChainUpdatesParams args
@@ -107,19 +107,19 @@ testSetRateLimitConfigParamsRoundtrip = do
     let args = ([
             LockReleaseTokenPoolTypes.RateLimitConfigArgs with
                 remoteChainSelector = 1.0
-                inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
-                inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
-                outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
             ,LockReleaseTokenPoolTypes.RateLimitConfigArgs with
                 remoteChainSelector = 18446744073709551615.0 -- max uint64
-                inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party2"
-                inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party2"
-                outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party2"
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party2"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party2"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party2"
             ,LockReleaseTokenPoolTypes.RateLimitConfigArgs with
                 remoteChainSelector = 0.0
-                inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party3"
-                inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
-                outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party3"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
             ], caller)
     let encoded = LockReleaseTokenPoolCodec.encodeSetRateLimitConfigParams args
     fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParams encoded)) === args

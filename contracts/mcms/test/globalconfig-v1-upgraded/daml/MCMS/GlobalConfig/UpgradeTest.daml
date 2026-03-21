@@ -8,7 +8,8 @@ module MCMS.GlobalConfig.UpgradeTest where
 
 import DA.Map qualified as Map
 import Daml.Script
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiverView(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.GlobalConfig.Types
 import MCMS.GlobalConfig.V1
 import MCMS.GlobalConfig.V2
@@ -18,7 +19,7 @@ testV1DirectOperations = script do
     ccipOwner <- allocateParty "ccip_owner"
 
     let configInstId = "globalconfig"
-    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
+    let configInstanceAddr = RawInstanceAddress.makeText configInstId ccipOwner
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with
@@ -55,7 +56,7 @@ testV1ViaMcmsReceiver = script do
     ccipOwner <- allocateParty "ccip_owner"
 
     let configInstId = "globalconfig"
-    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
+    let configInstanceAddr = RawInstanceAddress.makeText configInstId ccipOwner
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with
@@ -97,7 +98,7 @@ testNonConsumingMigrateV1ToV2 = script do
     ccipOwner <- allocateParty "ccip_owner"
 
     let configInstId = "globalconfig"
-    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
+    let configInstanceAddr = RawInstanceAddress.makeText configInstId ccipOwner
 
     let destConfig = DestChainConfig with
             isEnabled = True
@@ -185,7 +186,7 @@ testArchiveV1AfterMigration = script do
     ccipOwner <- allocateParty "ccip_owner"
 
     let configInstId = "globalconfig"
-    let configInstanceAddr = makeInstanceAddress configInstId ccipOwner
+    let configInstanceAddr = RawInstanceAddress.makeText configInstId ccipOwner
 
     v1Cid <- submit ccipOwner do
         createCmd GlobalConfigV1 with

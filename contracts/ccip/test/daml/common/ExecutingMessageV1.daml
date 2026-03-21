@@ -6,7 +6,7 @@ import DA.Assert
 
 import CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
-import CCIP.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 testAddCCVVerification : Script ()
 testAddCCVVerification = do

@@ -9,7 +9,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets

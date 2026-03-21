@@ -6,7 +6,7 @@ import DA.Optional (fromSome)
 
 import CCIP.CommitteeVerifierCodec qualified as CommitteeVerifierCodec
 import CCIP.CommitteeVerifierTypes qualified as CommitteeVerifierTypes
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 -- ===============================================
 -- |           ApplySignatureConfigs             |
@@ -148,6 +148,6 @@ testSetDepsParamsRoundtrip = do
         encoded = CommitteeVerifierCodec.encodeSetDepsParams args
     fst (fromSome (CommitteeVerifierCodec.decodeSetDepsParams encoded)) === args
     -- non-empty args
-    let args = (CommitteeVerifierTypes.SetDepsParams with rmnRemote = Some (CCIP.RawInstanceAddress.RawInstanceAddress "0x1234567890abcdef"))
+    let args = (CommitteeVerifierTypes.SetDepsParams with rmnRemote = Some (RawInstanceAddress.RawInstanceAddress "0x1234567890abcdef"))
         encoded = CommitteeVerifierCodec.encodeSetDepsParams args
     fst (fromSome (CommitteeVerifierCodec.decodeSetDepsParams encoded)) === args

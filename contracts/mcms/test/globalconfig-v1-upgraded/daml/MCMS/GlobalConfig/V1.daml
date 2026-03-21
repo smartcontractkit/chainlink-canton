@@ -10,6 +10,8 @@ import DA.Crypto.Text (BytesHex)
 import MCMS.MCMSReceiver
 import MCMS.GlobalConfig.Types
 import MCMS.GlobalConfig.V2 (GlobalConfigV2(..))
+import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 template GlobalConfigV1
     with
@@ -21,6 +23,7 @@ template GlobalConfigV1
         sourceChainConfigs : Map.Map Int SourceChainConfig
     where
         signatory ccipOwner
+        ensure assertValidInstanceId instanceId
 
         interface instance MCMSReceiver for GlobalConfigV1 where
             view = MCMSReceiverView with
@@ -29,7 +32,7 @@ template GlobalConfigV1
 
             mcmsEntrypoint functionName operationData contractIds = do
                 -- Calculate full instanceAddress for map lookup
-                let instanceAddress = makeInstanceAddress instanceId ccipOwner
+                let instanceAddress = RawInstanceAddress.makeText instanceId ccipOwner
                 selfCid <- case Map.lookup instanceAddress contractIds of
                     None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instanceAddress
                     Some cid -> pure (coerceContractId cid : ContractId GlobalConfigV1)
@@ -94,7 +97,7 @@ template GlobalConfigV1
             with
                 viewer : Party
             controller viewer
-            do pure (makeInstanceAddress instanceId ccipOwner)
+            do pure (RawInstanceAddress.makeText instanceId ccipOwner)
 
         choice UpdateDestChainConfigV1 : ContractId GlobalConfigV1
             with

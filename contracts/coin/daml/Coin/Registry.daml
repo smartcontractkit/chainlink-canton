@@ -7,6 +7,7 @@ import Coin.Transfer
 import DA.Assert
 import DA.List
 import DA.Optional
+import DA.Text qualified as T
 
 import Splice.Api.Token.BurnMintV1
 import Splice.Api.Token.HoldingV1
@@ -21,6 +22,7 @@ template CoinRegistry
         meta : Metadata
     where
         signatory issuer
+        ensure instanceId /= "" && not (T.isInfixOf "@" instanceId)
 
         interface instance BurnMintFactory for CoinRegistry where
             view = BurnMintFactoryView with

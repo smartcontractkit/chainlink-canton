@@ -16,7 +16,7 @@ import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import qualified CCIP.TokenAdminRegistry
 
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
@@ -54,7 +54,7 @@ template CCIPReceiver
     where
         signatory owner
         -- Ensure that requiredCCVs are unique
-        ensure unique requiredCCVs
+        ensure assertValidInstanceId instanceId && unique requiredCCVs
 
         -- | Query the receiver's CCV requirements. Off-chain code calls this
         -- to discover which CCVs need verification inputs before calling

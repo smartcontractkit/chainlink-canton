@@ -13,7 +13,7 @@ import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
@@ -56,6 +56,7 @@ template CCIPSender
         owner : Party
     where
         signatory owner
+        ensure assertValidInstanceId instanceId
 
         -- | Sends an outbound CCIP message end-to-end.
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult

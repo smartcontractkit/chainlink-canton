@@ -4,7 +4,7 @@ module CCIP.Tickets where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
-import CCIP.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified Splice.Api.Token.HoldingV1
 
 -- | Issuer type for receipts.

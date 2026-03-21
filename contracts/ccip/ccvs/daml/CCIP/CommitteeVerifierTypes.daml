@@ -2,17 +2,17 @@ module CCIP.CommitteeVerifierTypes where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 data CommitteeVerifierDeps = CommitteeVerifierDeps
     with
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 -- | Parameters for SetDeps - optional fields for selective updates
 data SetDepsParams = SetDepsParams
     with
-        rmnRemote : Optional CCIP.RawInstanceAddress.RawInstanceAddress
+        rmnRemote : Optional RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data DynamicConfig = DynamicConfig

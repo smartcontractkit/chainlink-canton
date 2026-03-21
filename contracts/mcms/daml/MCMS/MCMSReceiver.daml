@@ -3,7 +3,6 @@
 module MCMS.MCMSReceiver where
 
 import DA.Map qualified as Map
-import DA.Text qualified as T
 import DA.Crypto.Text (BytesHex)
 
 -- ===========================================================================
@@ -28,13 +27,13 @@ data ArgValue
 -- instanceId: A unique, immutable identifier for the contract (e.g., "onramp-mainnet-v1")
 --             This NEVER changes, even when the contract is updated or signatory changes.
 --
--- instanceAddress: CALCULATED as "instanceId@partyId" (follows CCIP.RawInstanceAddress pattern)
---   - Created using: makeInstanceAddress instanceId owner
+-- instanceAddress: CALCULATED as "instanceId@partyId" (follows MCMS.RawInstanceAddress pattern)
+--   - Created using: RawInstanceAddress.makeText instanceId owner
 --   - The caller can calculate the full instanceAddress using the view's instanceId and owner
 --
 -- IMPORTANT: Implementers of MCMSReceiver MUST:
 --   1. Store instanceId (stable identifier) in the template, NOT the full instanceAddress
---   2. Calculate instanceAddress = makeInstanceAddress instanceId owner when needed
+--   2. Calculate instanceAddress = RawInstanceAddress.makeText instanceId owner when needed
 --   3. Look up their own ContractId from the contractIds map using the calculated instanceAddress
 --   4. After exercising any consuming choice, insert the NEW ContractId into the map
 --      under the instanceAddress key before returning
@@ -42,7 +41,7 @@ data ArgValue
 --
 -- Example implementation pattern:
 --   mcmsEntrypoint functionName operationData contractIds = do
---     let instanceAddress = makeInstanceAddress instanceId owner
+--     let instanceAddress = RawInstanceAddress.makeText instanceId owner
 --     selfCid <- case Map.lookup instanceAddress contractIds of
 --       None -> abort "E_SELF_CID_NOT_IN_MAP"
 --       Some cid -> pure (coerceContractId cid)
@@ -62,7 +61,7 @@ data MCMSReceiverView = MCMSReceiverView
 --
 -- Key design:
 --   - instanceId: Stable identifier stored in template (does NOT contain @partyId)
---   - instanceAddress: CALCULATED as makeInstanceAddress instanceId owner
+--   - instanceAddress: CALCULATED as RawInstanceAddress.makeText instanceId owner
 --   - MCMS parses instanceId from call.targetInstanceAddress (merkle leaf)
 --   - MCMS validates instanceId matches targetView.instanceId
 --   - MCMS validates the signatory matches the partyId parsed from call.targetInstanceAddress
@@ -98,32 +97,4 @@ interface MCMSReceiver where
     do
       (((this `mcmsEntrypoint` functionName) operationData) contractIds)
 
--- ===========================================================================
--- HELPER FUNCTIONS
--- ===========================================================================
-
--- | Create instanceAddress from instanceId and owner party
--- Format: "instanceId@partyId"
--- Following CCIP's RawInstanceAddress pattern
-makeInstanceAddress : Text -> Party -> Text
-makeInstanceAddress instId owner =
-    if T.isInfixOf "@" instId
-    then error "instanceId cannot contain '@'"
-    else instId <> "@" <> partyToText owner
-
--- | Parse instanceId from instanceAddress format "instanceId@partyId"
--- Returns the instanceId text before the @ separator
-parseInstanceIdText : Text -> Optional Text
-parseInstanceIdText instanceAddress =
-  case T.splitOn "@" instanceAddress of
-    [instId, _partyId] -> Some instId
-    _ -> None
-
--- | Parse partyId from instanceAddress format "instanceId@partyId"
--- Returns the partyId text after the @ separator
-parsePartyIdText : Text -> Optional Text
-parsePartyIdText instanceAddress =
-  case T.splitOn "@" instanceAddress of
-    [_instanceId, partyId] -> Some partyId
-    _ -> None
 

@@ -28,7 +28,7 @@ import MCMS.Codec
 import DA.Crypto.Text (BytesHex, toHex, fromHex, byteCount)
 import DA.Optional (fromSome)
 import qualified Splice.Api.Token.HoldingV1
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- INSTRUMENT ID ENCODING/DECODING (Splice-specific)

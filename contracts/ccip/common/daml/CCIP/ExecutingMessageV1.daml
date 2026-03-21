@@ -12,8 +12,8 @@ import qualified CCIP.Events
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
 import qualified Splice.Api.Token.HoldingV1
 
@@ -56,7 +56,7 @@ assertCCVInstanceId
     -> Party
     -> Update ()
 assertCCVInstanceId msg requiredCCVs optionalCCVs ccvInstanceId caller =
-    let claimed = CCIP.RawInstanceAddress.make ccvInstanceId caller
+    let claimed = RawInstanceAddress.make ccvInstanceId caller
         allowedCCVs = dedup (requiredCCVs ++ optionalCCVs)
     in assertMsg msg (claimed `elem` allowedCCVs)
 
@@ -210,7 +210,7 @@ template ExecutingMessageV1
                             ccipOwner = ccipOwner
                             ccvOwners = ccvOwners
                             verifiedCCVs = dedup (map
-                                (\verification -> CCIP.RawInstanceAddress.make verification.ccvInstanceId verification.ccvOwner)
+                                (\verification -> RawInstanceAddress.make verification.ccvInstanceId verification.ccvOwner)
                                 ccvVerifications)
                             tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
                             poolOwner = poolOwner
