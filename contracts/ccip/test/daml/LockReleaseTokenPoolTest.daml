@@ -2935,6 +2935,7 @@ testLockReleaseTokenPool_SetRateLimitConfig : Script ()
 testLockReleaseTokenPool_SetRateLimitConfig = script do
     owner <- allocateParty "owner"
     ccipOwner <- allocateParty "ccip-owner"
+    rateLimitAdmin <- allocateParty "rate-limit-admin"
     let instanceId = "lnr-tp-1"
 
     -- | Create LockReleaseTokenPool without existing remote chain config
@@ -2947,7 +2948,7 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
                 admin = ccipOwner
                 id = "LINK"
             decimals = 8
-            rateLimitAdmin = None
+            rateLimitAdmin = Some rateLimitAdmin
             remoteChainConfigs = Map.fromList [
                 (123.0, LockReleaseTokenPool.RemoteChainConfig with
                     remotePools = []
@@ -3026,8 +3027,32 @@ testLockReleaseTokenPool_SetRateLimitConfig = script do
     case Map.lookup 456.0 tokenPool.remoteChainConfigs of
         None -> assertMsg "Missing chain config for selector 456.0" False
         Some config -> assertRateLimitConfigArgsEqual config (rateLimitConfigArgs1 !! 1) -- unchanged from Test 1
-    
+
     -- | ========= Test 3 ========
+    -- | Update a rate limit using the rateLimitAdmin (instead of pool owner)
+    -- | ========================
+    let rateLimitConfigArgs3 = [
+            LockReleaseTokenPool.RateLimitConfigArgs with
+                remoteChainSelector = 456.0
+                inboundRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-updated-again-3@owner"
+                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress.RawInstanceAddress "inbound-rl-custom-updated-again-3@owner"
+                outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "outbound-rl-updated-3@owner" -- unchanged
+            ]
+    tokenPoolCid <- submit rateLimitAdmin do
+        exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimitConfig with
+            rateLimitConfigArgs = rateLimitConfigArgs3
+            caller = rateLimitAdmin
+    -- Fetch the updated TokenPool and verify the rate limiters were updated correctly
+    tokenPool <- fromSome <$> queryContractId owner tokenPoolCid
+    assertMsg "Expected 2 remote chain configs" (Map.size tokenPool.remoteChainConfigs == 2)
+    case Map.lookup 123.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 123.0" False
+        Some config -> assertRateLimitConfigArgsEqual config (head rateLimitConfigArgs2) -- unchanged from Test 2
+    case Map.lookup 456.0 tokenPool.remoteChainConfigs of
+        None -> assertMsg "Missing chain config for selector 456.0" False
+        Some config -> assertRateLimitConfigArgsEqual config (head rateLimitConfigArgs3)
+    
+    -- | ========= Test 4 ========
     -- | Invalid updates
     -- | ========================
     -- Attempt to update rate limiters for a non-existent chain config
