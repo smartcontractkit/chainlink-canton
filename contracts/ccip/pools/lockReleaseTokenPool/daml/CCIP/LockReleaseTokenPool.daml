@@ -486,6 +486,8 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: sending message ccipOwner mismatch"
+                    (sm.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
                     (sm.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
 
@@ -635,6 +637,8 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "pool: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
                     (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: tokenInstrumentId mismatch"
@@ -689,6 +693,8 @@ template LockReleaseTokenPool
                 tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
                 CCIP.RawInstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                assertMsg "LockOrBurn: sending message ccipOwner mismatch"
+                    (sendingMsg.ccipOwner == tokenAdminRegistry.owner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
                     (sendingMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
                 rmnRemote <- exercise rmnRemoteCid CCIP.RMNRemote.Get with caller
