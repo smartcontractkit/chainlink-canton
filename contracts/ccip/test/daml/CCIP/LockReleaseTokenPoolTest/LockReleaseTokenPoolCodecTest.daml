@@ -3,11 +3,11 @@ module CCIP.LockReleaseTokenPoolTest.LockReleaseTokenPoolCodecTest where
 
 import Daml.Script
 import DA.Assert ((===))
-import DA.Foldable
+import DA.Optional (fromSome)
 
-import CCIP.LockReleaseTokenPoolCodec
-import CCIP.LockReleaseTokenPoolTypes (ChainUpdate(..), RateLimitConfigArgs(..), TokenTransferFeeConfigArgs(..))
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import CCIP.LockReleaseTokenPoolCodec qualified as LockReleaseTokenPoolCodec
+import CCIP.LockReleaseTokenPoolTypes qualified as LockReleaseTokenPoolTypes
+import qualified CCIP.RawInstanceAddress
 
 -- ===============================================
 -- |              SetDynamicConfig               |
@@ -18,18 +18,12 @@ testSetDynamicConfigParamsRoundtrip = do
     -- Test with rateLimitAdmin set
     rateLimitAdmin <- allocateParty "admin"
     let args = (Some rateLimitAdmin)
-    let encoded = encodeSetDynamicConfigParams args
-    case decodeSetDynamicConfigParams encoded of
-        None -> abort "Failed to decode SetDynamicConfig params"
-        Some (rateLimitAdmin) -> do
-            rateLimitAdmin === args
+        encoded = LockReleaseTokenPoolCodec.encodeSetDynamicConfigParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetDynamicConfigParams encoded)) === args
     -- Test with rateLimitAdmin not set
     let argsNone = (None)
-    let encodedNone = encodeSetDynamicConfigParams argsNone
-    case decodeSetDynamicConfigParams encodedNone of
-        None -> abort "Failed to decode SetDynamicConfig params"
-        Some (rateLimitAdminNone) -> do
-            rateLimitAdminNone === argsNone
+        encodedNone = LockReleaseTokenPoolCodec.encodeSetDynamicConfigParams argsNone
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetDynamicConfigParams encodedNone)) === argsNone
 
 
 -- ===============================================
@@ -41,46 +35,40 @@ testApplyChainUpdatesParamsRoundtrip = do
     let args = (
             [2.0, 3.0],  -- remoteChainSelectorsToRemove
             [ 
-                ChainUpdate with
+                LockReleaseTokenPoolTypes.ChainUpdate with
                     remoteChainSelector = 1.0
                     remotePools = ["1234567890abcdef", "fedcba0987654321"]
                     remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
-                    inboundCCVs = [RawInstanceAddress "ccv-inbound@party1", RawInstanceAddress "ccv-inbound2@party2"]
-                    outboundCCVs = [RawInstanceAddress "ccv-outbound@party1"]
+                    inboundCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv-inbound@party1", CCIP.RawInstanceAddress.RawInstanceAddress "ccv-inbound2@party2"]
+                    outboundCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv-outbound@party1"]
                     minBlockConfirmations = 0
-                    inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
-                ,ChainUpdate with
+                    inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+                ,LockReleaseTokenPoolTypes.ChainUpdate with
                     remoteChainSelector = 18446744073709551615.0 -- max uint64
                     remotePools = []
                     remoteTokenAddress = ""
                     inboundCCVs = []
                     outboundCCVs = []
                     minBlockConfirmations = 7
-                    inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
-                ,ChainUpdate with
+                    inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+                ,LockReleaseTokenPoolTypes.ChainUpdate with
                     remoteChainSelector = 0.0
                     remotePools = []
                     remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
                     inboundCCVs = []
                     outboundCCVs = []
                     minBlockConfirmations = 3
-                    inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
-                    inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
-                    outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
+                    inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                    inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                    outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
             ]
             )
-  
-    let encoded = encodeApplyChainUpdatesParams args
-
-    case decodeApplyChainUpdatesParams encoded of
-        None -> abort "Failed to decode ApplyChainUpdates params"
-        Some (decodedSelectorsToRemove, decodedChainUpdates) -> do
-            decodedSelectorsToRemove === fst args
-            forA_ (zip decodedChainUpdates (snd args)) $ uncurry assertChainUpdateEqual
+    let encoded = LockReleaseTokenPoolCodec.encodeApplyChainUpdatesParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParams encoded)) === args
 
 -- ===============================================
 -- |     ApplyTokenTransferFeeConfigUpdates      |
@@ -89,14 +77,14 @@ testApplyChainUpdatesParamsRoundtrip = do
 testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip : Script ()
 testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
     let args = (
-            [TokenTransferFeeConfigArgs with
+            [LockReleaseTokenPoolTypes.TokenTransferFeeConfigArgs with
                 destChainSelector = 1.0
                 isEnabled = True
                 destGasOverhead = 21000
                 destBytesOverhead = 100
                 feeUSDCents = 50.0
                 feeBps = 25.0
-            ,TokenTransferFeeConfigArgs with
+            ,LockReleaseTokenPoolTypes.TokenTransferFeeConfigArgs with
                 destChainSelector = 18446744073709551615.0 -- max uint64
                 isEnabled = False
                 destGasOverhead = 30000
@@ -106,14 +94,8 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
             ]
             , [2.0, 3.0] -- disableTokenTransferFeeConfigArgs
             )
-
-    let encoded = encodeApplyTokenTransferFeeConfigUpdatesParams args
-
-    case decodeApplyTokenTransferFeeConfigUpdatesParams encoded of
-        None -> abort "Failed to decode ApplyTokenTransferFeeConfigUpdates params"
-        Some (decodedConfigArgs, decodedDisableArgs) -> do
-            forA_ (zip decodedConfigArgs (fst args)) $ uncurry assertTokenTransferFeeConfigArgsEqual
-            decodedDisableArgs === snd args
+    let encoded = LockReleaseTokenPoolCodec.encodeApplyTokenTransferFeeConfigUpdatesParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeApplyTokenTransferFeeConfigUpdatesParams encoded)) === args
 
 -- ===============================================
 -- |             SetRateLimitConfig              |
@@ -121,32 +103,27 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
 
 testSetRateLimitConfigParamsRoundtrip : Script ()
 testSetRateLimitConfigParamsRoundtrip = do
-    let args = [
-            RateLimitConfigArgs with
-                remoteChainSelector = 1.0
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party1"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party1"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party1"
-            ,RateLimitConfigArgs with
-                remoteChainSelector = 18446744073709551615.0 -- max uint64
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party2"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party2"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party2"
-            ,RateLimitConfigArgs with
-                remoteChainSelector = 0.0
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in@party3"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@party3"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out@party3"
-            ]
-    
     caller <- allocateParty "caller"
-    let encoded = encodeSetRateLimitConfigParams (args, caller)
-
-    case decodeSetRateLimitConfigParams encoded of
-        None -> abort "Failed to decode SetRateLimitConfigParams list"
-        Some (decodedArgs, decodedCaller) -> do
-            forA_ (zip decodedArgs args) $ uncurry assertRateLimitConfigArgsEqual
-            decodedCaller === caller
+    let args = ([
+            LockReleaseTokenPoolTypes.RateLimitConfigArgs with
+                remoteChainSelector = 1.0
+                inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
+                inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
+                outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
+            ,LockReleaseTokenPoolTypes.RateLimitConfigArgs with
+                remoteChainSelector = 18446744073709551615.0 -- max uint64
+                inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party2"
+                inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party2"
+                outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party2"
+            ,LockReleaseTokenPoolTypes.RateLimitConfigArgs with
+                remoteChainSelector = 0.0
+                inboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in@party3"
+                inboundCustomBlockConfirmationsRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
+                outboundRateLimiter = CCIP.RawInstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
+            ], caller)
+    let encoded = LockReleaseTokenPoolCodec.encodeSetRateLimitConfigParams args
+    fst (fromSome (LockReleaseTokenPoolCodec.decodeSetRateLimitConfigParams encoded)) === args
+    pure ()
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -155,37 +132,9 @@ testSetRateLimitConfigParamsRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case decodeApplyChainUpdatesParams "" of
+  case LockReleaseTokenPoolCodec.decodeApplyChainUpdatesParams "" of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeApplyChainUpdatesParams to fail on empty data"
 
   pure ()
 
--- Assertion helpers
-assertChainUpdateEqual : ChainUpdate -> ChainUpdate -> Script ()
-assertChainUpdateEqual got expected = do
-    assertMsg ("remoteChainSelector mismatch, got: " <> show got.remoteChainSelector <> ", expected: " <> show expected.remoteChainSelector) (got.remoteChainSelector == expected.remoteChainSelector)
-    assertMsg ("remotePools mismatch, got: " <> show got.remotePools <> ", expected: " <> show expected.remotePools) (got.remotePools == expected.remotePools)
-    assertMsg ("remoteTokenAddress mismatch, got: " <> show got.remoteTokenAddress <> ", expected: " <> show expected.remoteTokenAddress) (got.remoteTokenAddress == expected.remoteTokenAddress) 
-    assertMsg ("inboundCCVs mismatch, got: " <> show got.inboundCCVs <> ", expected: " <> show expected.inboundCCVs) (got.inboundCCVs == expected.inboundCCVs)
-    assertMsg ("outboundCCVs mismatch, got: " <> show got.outboundCCVs <> ", expected: " <> show expected.outboundCCVs) (got.outboundCCVs == expected.outboundCCVs)
-    assertMsg ("minBlockConfirmations mismatch, got: " <> show got.minBlockConfirmations <> ", expected: " <> show expected.minBlockConfirmations) (got.minBlockConfirmations == expected.minBlockConfirmations)
-    assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
-    assertMsg ("inboundCustomBlockConfirmationsRateLimiter mismatch, got: " <> show got.inboundCustomBlockConfirmationsRateLimiter <> ", expected: " <> show expected.inboundCustomBlockConfirmationsRateLimiter) (got.inboundCustomBlockConfirmationsRateLimiter == expected.inboundCustomBlockConfirmationsRateLimiter)
-    assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
-
-assertTokenTransferFeeConfigArgsEqual : TokenTransferFeeConfigArgs -> TokenTransferFeeConfigArgs -> Script ()
-assertTokenTransferFeeConfigArgsEqual got expected = do
-    assertMsg ("destChainSelector mismatch, got: " <> show got.destChainSelector <> ", expected: " <> show expected.destChainSelector) (got.destChainSelector == expected.destChainSelector)
-    assertMsg ("isEnabled mismatch, got: " <> show got.isEnabled <> ", expected: " <> show expected.isEnabled) (got.isEnabled == expected.isEnabled)
-    assertMsg ("destGasOverhead mismatch, got: " <> show got.destGasOverhead <> ", expected: " <> show expected.destGasOverhead) (got.destGasOverhead == expected.destGasOverhead)
-    assertMsg ("destBytesOverhead mismatch, got: " <> show got.destBytesOverhead <> ", expected: " <> show expected.destBytesOverhead) (got.destBytesOverhead == expected.destBytesOverhead)
-    assertMsg ("feeUSDCents mismatch, got: " <> show got.feeUSDCents <> ", expected: " <> show expected.feeUSDCents) (got.feeUSDCents == expected.feeUSDCents)
-    assertMsg ("feeBps mismatch, got: " <> show got.feeBps <> ", expected: " <> show expected.feeBps) (got.feeBps == expected.feeBps)
-
-assertRateLimitConfigArgsEqual : RateLimitConfigArgs -> RateLimitConfigArgs -> Script ()
-assertRateLimitConfigArgsEqual got expected = do
-    assertMsg ("remoteChainSelector mismatch, got: " <> show got.remoteChainSelector <> ", expected: " <> show expected.remoteChainSelector) (got.remoteChainSelector == expected.remoteChainSelector)
-    assertMsg ("inboundRateLimiter mismatch, got: " <> show got.inboundRateLimiter <> ", expected: " <> show expected.inboundRateLimiter) (got.inboundRateLimiter == expected.inboundRateLimiter)
-    assertMsg ("inboundCustomBlockConfirmationsRateLimiter mismatch, got: " <> show got.inboundCustomBlockConfirmationsRateLimiter <> ", expected: " <> show expected.inboundCustomBlockConfirmationsRateLimiter) (got.inboundCustomBlockConfirmationsRateLimiter == expected.inboundCustomBlockConfirmationsRateLimiter)
-    assertMsg ("outboundRateLimiter mismatch, got: " <> show got.outboundRateLimiter <> ", expected: " <> show expected.outboundRateLimiter) (got.outboundRateLimiter == expected.outboundRateLimiter)
