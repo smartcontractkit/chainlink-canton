@@ -57,6 +57,9 @@ template CCIPFactory
         mcmsParty : Party
         usedInstanceIds : Map.Map Text Bool
         deployedContracts : Map.Map Text (ContractId ())
+        -- | See PerPartyRouterFactory comment for why this singleton constraint
+        -- is critical to replay protection.
+        perPartyRouterFactoryDeployed : Bool
     where
         signatory owner
         observer mcmsParty
@@ -174,6 +177,7 @@ template CCIPFactory
                     mcmsParty
                     usedInstanceIds
                     deployedContracts
+                    perPartyRouterFactoryDeployed
 
         choice DeployGlobalConfig : DeployResult
             with
@@ -271,6 +275,7 @@ template CCIPFactory
             controller owner
             do
                 assertFactoryIsMCMSControlled this
+                assertMsg "E_PER_PARTY_ROUTER_FACTORY_ALREADY_DEPLOYED" (not perPartyRouterFactoryDeployed)
                 assertSingletonNotDeployed "per-party-router-factory" deployedContracts
                 assertInstanceIdUnused contract.instanceId usedInstanceIds
 
@@ -278,6 +283,7 @@ template CCIPFactory
                 newFactoryCid <- create this with
                     usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
                     deployedContracts = Map.insert "per-party-router-factory" (coerceContractId deployedCid) deployedContracts
+                    perPartyRouterFactoryDeployed = True
 
                 pure DeployResult with
                     factoryCid = newFactoryCid
@@ -409,6 +415,7 @@ data FactoryState = FactoryState
         mcmsParty : Party
         usedInstanceIds : Map.Map Text Bool
         deployedContracts : Map.Map Text (ContractId ())
+        perPartyRouterFactoryDeployed : Bool
     deriving (Eq, Show)
 
 data DeployGlobalConfigParams = DeployGlobalConfigParams

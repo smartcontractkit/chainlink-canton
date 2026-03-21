@@ -85,6 +85,20 @@ buildCCVFeeAllocations ccvFees ccvAmounts =
 
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
+--
+-- IMPORTANT: There must only ever be a single PerPartyRouterFactory per CCIP
+-- deployment, and only a single CCIP deployment per ccipOwner party. OnRamp
+-- and OffRamp do not carry a PerPartyRouterFactory dep and do not verify
+-- which router is calling — they rely solely on ccipOwner authority as the
+-- gatekeeper. If a second factory existed (whether from a duplicate within
+-- the same deployment or from a separate CCIP deployment sharing the same
+-- ccipOwner), it could create duplicate routers for the same party, each with
+-- independent executionStates maps, breaking messageId replay protection on
+-- the execution path.
+-- The single-factory-per-deployment constraint is enforced by
+-- CCIPFactory.perPartyRouterFactoryDeployed. The single-deployment-per-party
+-- constraint is an operational invariant: a ccipOwner must not be reused
+-- across independent CCIP deployments.
 template PerPartyRouterFactory
     with
         instanceId : Text
