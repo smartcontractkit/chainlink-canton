@@ -22,7 +22,7 @@ import DA.Time (time, addRelTime, hours)
 import DA.Foldable (forA_)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParamsWithOffset, decodeApplyChainUpdatesParamsWithOffset, decodeApplyTokenTransferFeeConfigUpdatesParamsWithOffset, decodeSetRateLimitConfigParamsWithOffset)
+import CCIP.LockReleaseTokenPoolCodec (decodeSetDynamicConfigParams, decodeApplyChainUpdatesParams, decodeApplyTokenTransferFeeConfigUpdatesParams, decodeSetRateLimitConfigParams)
 import CCIP.LockReleaseTokenPoolTypes (TokenTransferFeeConfig(..), RemoteChainConfig(..), ChainUpdate(..), TokenTransferFeeConfigArgs(..), RateLimitConfigArgs(..))
 
 import qualified Splice.Api.Token.HoldingV1
@@ -789,7 +789,7 @@ template LockReleaseTokenPool
 
             case functionName of
                 "SetDynamicConfig" -> do
-                    case decodeSetDynamicConfigParamsWithOffset operationData of
+                    case decodeSetDynamicConfigParams operationData of
                         None -> abort "E_INVALID_PARAMS: SetDynamicConfig"
                         Some ((rateLimitAdmin), finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
@@ -797,7 +797,7 @@ template LockReleaseTokenPool
                                 rateLimitAdmin
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "ApplyChainUpdates" -> do
-                    case decodeApplyChainUpdatesParamsWithOffset operationData of
+                    case decodeApplyChainUpdatesParams operationData of
                         None -> abort "E_INVALID_PARAMS: ApplyChainUpdates"
                         Some ((remoteChainSelectorsToRemove, chainsToAdd), finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: ApplyChainUpdates" (finalOffset == byteCount operationData)
@@ -806,7 +806,7 @@ template LockReleaseTokenPool
                                 chainsToAdd
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "ApplyTokenTransferFeeConfigUpdates" -> do
-                    case decodeApplyTokenTransferFeeConfigUpdatesParamsWithOffset operationData of
+                    case decodeApplyTokenTransferFeeConfigUpdatesParams operationData of
                         None -> abort "E_INVALID_PARAMS: ApplyTokenTransferFeeConfigUpdates"
                         Some ((tokenTransferFeeConfigArgs, disableTokenTransferFeeConfigArgs), finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: ApplyTokenTransferFeeConfigUpdates" (finalOffset == byteCount operationData)
@@ -815,7 +815,7 @@ template LockReleaseTokenPool
                                 disableTokenTransferFeeConfigArgs
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "SetRateLimitConfig" -> do
-                  case decodeSetRateLimitConfigParamsWithOffset operationData of
+                  case decodeSetRateLimitConfigParams operationData of
                     None -> abort "E_INVALID_PARAMS: SetRateLimitConfig"
                     Some ((rateLimitConfigArgs, caller), finalOffset) -> do
                         assertMsg "E_TRAILING_BYTES: SetRateLimitConfig" (finalOffset == byteCount operationData)
@@ -823,5 +823,4 @@ template LockReleaseTokenPool
                             rateLimitConfigArgs
                             caller
                         pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

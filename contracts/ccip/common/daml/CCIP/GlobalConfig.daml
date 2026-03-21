@@ -5,17 +5,24 @@ module CCIP.GlobalConfig
   , useDefaultCCVs
   ) where
 
-import DA.Map qualified as Map
 import DA.Crypto.Text (byteCount)
-import DA.Text qualified as T
 import DA.Foldable (forA_)
+import DA.Map qualified as Map
+import DA.Text qualified as T
 
 import qualified CCIP.Context
+import CCIP.GlobalConfigTypes (
+    DestChainConfig(..),
+    DestChainConfigArgs(..),
+    SourceChainConfig(..),
+    SourceChainConfigArgs(..),
+    validateDefaultAndMandatedCCVs,
+    )
+import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
+import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex)
-import CCIP.GlobalConfigTypes (DestChainConfig(..), DestChainConfigArgs(..), SourceChainConfig(..), SourceChainConfigArgs(..), validateDefaultAndMandatedCCVs)
-import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParamsWithOffset, decodeApplySourceChainConfigUpdatesParamsWithOffset)
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
 
 useDefaultCCVs : RawInstanceAddress
 useDefaultCCVs = RawInstanceAddress "default-ccvs"
@@ -33,43 +40,9 @@ template GlobalConfig
         signatory ccipOwner
 
         ensure not (T.isInfixOf "@" instanceId)
-          && chainSelector > 0.0 -- Local chain selector must be greater than zero
-          && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
-          && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
-
-        interface instance MCMSReceiver for GlobalConfig where
-          view = MCMSReceiverView with
-            mcmsController = ccipOwner
-            instanceId
-
-          mcmsEntrypoint functionName operationData contractIds = do
-            let instAddr = instanceId <> "@" <> partyToText ccipOwner
-            selfCid <- case Map.lookup instAddr contractIds of
-              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
-              Some cid -> pure (coerceContractId cid : ContractId GlobalConfig)
-
-            case functionName of
-              "ApplyDestChainConfigUpdates" -> do
-                case decodeApplyDestChainConfigUpdatesParamsWithOffset operationData of
-                  None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
-                  Some (destChainConfigUpdates, finalOffset) -> do
-                    assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" $
-                      finalOffset == byteCount operationData
-                    newCid <- exercise selfCid ApplyDestChainConfigUpdates with
-                      destChainConfigUpdates
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              "ApplySourceChainConfigUpdates" -> do
-                case decodeApplySourceChainConfigUpdatesParamsWithOffset operationData of
-                  None -> abort "E_INVALID_PARAMS: ApplySourceChainConfigUpdates"
-                  Some (sourceChainConfigUpdates, finalOffset) -> do
-                    assertMsg "E_TRAILING_BYTES: ApplySourceChainConfigUpdates" $
-                      finalOffset == byteCount operationData
-                    newCid <- exercise selfCid ApplySourceChainConfigUpdates with
-                      sourceChainConfigUpdates
-                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-
-              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+            && chainSelector > 0.0 -- Local chain selector must be greater than zero
+            && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
+            && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
 
         nonconsuming choice GetDestChainConfig : Optional DestChainConfig
             with
@@ -90,43 +63,77 @@ template GlobalConfig
               destChainConfigUpdates : [DestChainConfigArgs]
             controller ccipOwner
             do
-              -- Validate
-              forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, baseExecutionGasCost, offRampAddress, defaultCCVs, laneMandatedCCVs} -> do
-                assertMsg "InvalidChainSelector: destination chain selector must be greater than zero" (destChainSelector > 0.0)
-                assertMsg "InvalidChainSelector: destination chain selector must not be the same as the local chain selector" (destChainSelector /= chainSelector)
-                assertMsg "InvalidAddressByteLength: address byte length must be greater than zero" (addressBytesLength > 0)
-                assertMsg "InvalidBaseExecutionGasCost: base execution gas cost must be non-negative" (baseExecutionGasCost >= 0)
-                assertValidHex "offRampAddress" offRampAddress
-                assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
-                validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+                -- Validate
+                forA_ destChainConfigUpdates $ \DestChainConfigArgs{destChainSelector, addressBytesLength, baseExecutionGasCost, offRampAddress, defaultCCVs, laneMandatedCCVs} -> do
+                    assertMsg "InvalidChainSelector: destination chain selector must be greater than zero" (destChainSelector > 0.0)
+                    assertMsg "InvalidChainSelector: destination chain selector must not be the same as the local chain selector" (destChainSelector /= chainSelector)
+                    assertMsg "InvalidAddressByteLength: address byte length must be greater than zero" (addressBytesLength > 0)
+                    assertMsg "InvalidBaseExecutionGasCost: base execution gas cost must be non-negative" (baseExecutionGasCost >= 0)
+                    assertValidHex "offRampAddress" offRampAddress
+                    assertMsg ("InvalidDestChainAddress: addressByteLength is " <> show addressBytesLength <> " but offRampAddress has byte length " <> show (byteCount offRampAddress) <> " for destination chain selector " <> show destChainSelector) (byteCount offRampAddress == addressBytesLength)
+                    validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
-              -- Update
-              let newConfigs = foldl
-                    (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
-                      Map.insert destChainSelector DestChainConfig{isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
-                    destChainConfigs
-                    destChainConfigUpdates
-              create this with destChainConfigs = newConfigs
+                -- Update
+                let newConfigs = foldl
+                        (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
+                            Map.insert destChainSelector DestChainConfig{isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
+                        destChainConfigs
+                        destChainConfigUpdates
+                create this with destChainConfigs = newConfigs
 
         choice ApplySourceChainConfigUpdates : ContractId GlobalConfig
             with
               sourceChainConfigUpdates : [SourceChainConfigArgs]
             controller ccipOwner
             do
-              -- Validate
-              forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
-                assertMsg "InvalidChainSelector: source chain selector must be greater than zero" (sourceChainSelector > 0.0)
-                assertMsg "InvalidChainSelector: source chain selector must not be the same as the local chain selector" (sourceChainSelector /= chainSelector)
-                forA_ onRampAddresses $ \addr -> assertValidHex "onRampAddress" addr
-                validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+                -- Validate
+                forA_ sourceChainConfigUpdates $ \SourceChainConfigArgs{sourceChainSelector, onRampAddresses, defaultCCVs, laneMandatedCCVs} -> do
+                    assertMsg "InvalidChainSelector: source chain selector must be greater than zero" (sourceChainSelector > 0.0)
+                    assertMsg "InvalidChainSelector: source chain selector must not be the same as the local chain selector" (sourceChainSelector /= chainSelector)
+                    forA_ onRampAddresses $ \addr -> assertValidHex "onRampAddress" addr
+                    validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
-              -- Update
-              let newConfigs = foldl
-                    (\configs SourceChainConfigArgs{sourceChainSelector, isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} ->
-                      Map.insert sourceChainSelector SourceChainConfig{isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} configs)
-                    sourceChainConfigs
-                    sourceChainConfigUpdates
-              create this with sourceChainConfigs = newConfigs
+                -- Update
+                let newConfigs = foldl
+                        (\configs SourceChainConfigArgs{sourceChainSelector, isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} ->
+                            Map.insert sourceChainSelector SourceChainConfig{isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} configs)
+                        sourceChainConfigs
+                        sourceChainConfigUpdates
+                create this with sourceChainConfigs = newConfigs
+
+        -- ==========================================
+        -- |         MCMSReceiver Interface         |
+        -- ==========================================
+
+        interface instance MCMSReceiver for GlobalConfig where
+            view = MCMSReceiverView with
+                mcmsController = ccipOwner
+                instanceId
+
+            mcmsEntrypoint functionName operationData contractIds = do
+                let instAddr = instanceId <> "@" <> partyToText ccipOwner
+                selfCid <- case Map.lookup instAddr contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+                    Some cid -> pure (coerceContractId cid : ContractId GlobalConfig)
+
+                case functionName of
+                    "ApplyDestChainConfigUpdates" -> do
+                        case decodeApplyDestChainConfigUpdatesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplyDestChainConfigUpdates"
+                            Some ((destChainConfigUpdates), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplyDestChainConfigUpdates with
+                                    destChainConfigUpdates = destChainConfigUpdates
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "ApplySourceChainConfigUpdates" -> do
+                        case decodeApplySourceChainConfigUpdatesParams operationData of
+                            None -> abort "E_INVALID_PARAMS: ApplySourceChainConfigUpdates"
+                            Some ((sourceChainConfigUpdates), finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: ApplySourceChainConfigUpdates" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid ApplySourceChainConfigUpdates with
+                                    sourceChainConfigUpdates = sourceChainConfigUpdates
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 globalConfigKey : Text
 globalConfigKey = "global-config"
