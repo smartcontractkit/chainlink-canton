@@ -9,7 +9,6 @@ import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome)
 
 import qualified CCIP.Events
-import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress (RawInstanceAddress)
@@ -47,44 +46,6 @@ buildObservingParties receiver tokenReceiver executor =
         ++ case tokenReceiver of
             Some p -> [p]
             None -> []
-
-assertCCVInstanceId
-    : Text
-    -> [RawInstanceAddress]
-    -> [RawInstanceAddress]
-    -> Text
-    -> Party
-    -> Update ()
-assertCCVInstanceId msg requiredCCVs optionalCCVs ccvInstanceId caller =
-    let claimed = RawInstanceAddress.make ccvInstanceId caller
-        allowedCCVs = dedup (requiredCCVs ++ optionalCCVs)
-    in assertMsg msg (claimed `elem` allowedCCVs)
-
-resolveDefaultCCVs : [RawInstanceAddress] -> [RawInstanceAddress] -> [RawInstanceAddress]
-resolveDefaultCCVs defaultCCVs ccvs =
-    foldl (\acc ccv ->
-        if ccv == CCIP.GlobalConfig.useDefaultCCVs
-        then acc ++ defaultCCVs
-        else acc ++ [ccv]
-    ) [] ccvs
-
-resolveOptionalCCVs
-    : [RawInstanceAddress]
-    -> [RawInstanceAddress]
-    -> Int
-    -> ([RawInstanceAddress], Int)
-resolveOptionalCCVs requiredCCVs optionalCCVs optionalThreshold =
-    foldl
-        (\(remainingOptional, remainingThreshold) requiredCCV ->
-            if requiredCCV `elem` remainingOptional
-            then
-                ( filter (/= requiredCCV) remainingOptional
-                , if remainingThreshold > 0 then remainingThreshold - 1 else 0
-                )
-            else (remainingOptional, remainingThreshold)
-        )
-        (optionalCCVs, optionalThreshold)
-        requiredCCVs
 
 template ExecutingMessageV1
     with
@@ -138,10 +99,10 @@ template ExecutingMessageV1
             do
                 assertMsg "executingMessage: AddCCVVerification only allowed in Prepared"
                     (state == ExecutingMessageState_Prepared)
-                assertCCVInstanceId
+                CCIP.Internal.assertCCVInstanceId
                     "executingMessage: caller is not an allowed CCV"
                     requiredCCVs
-                    optionalCCVs
+                    (Some optionalCCVs)
                     ccvInstanceId
                     caller
                 assertMsg "executingMessage: duplicate CCV verification"
@@ -170,10 +131,13 @@ template ExecutingMessageV1
                 assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
                 let resolvedPoolCCVs = case poolCCVs of
                         [] -> sourceDefaultCCVs
-                        _ -> resolveDefaultCCVs sourceDefaultCCVs poolCCVs
+                        _ -> CCIP.Internal.resolveDefaultCCVs
+                            sourceDefaultCCVs
+                            CCIP.Internal.useDefaultCCVs
+                            poolCCVs
                 let mergedRequiredCCVs = dedup (requiredCCVs ++ resolvedPoolCCVs)
                 let (mergedOptionalCCVs, mergedOptionalCCVThreshold) =
-                        resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
+                        CCIP.Internal.resolveOptionalCCVs resolvedPoolCCVs optionalCCVs optionalCCVThreshold
                 create this with
                     requiredCCVs = mergedRequiredCCVs
                     optionalCCVs = mergedOptionalCCVs

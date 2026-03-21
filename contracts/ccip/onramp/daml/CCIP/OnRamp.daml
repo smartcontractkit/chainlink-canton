@@ -9,6 +9,7 @@ import DA.Optional (fromOptional, fromSomeNote, isSome)
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
+import qualified CCIP.Internal
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
@@ -84,6 +85,22 @@ data SetDepsParams = SetDepsParams
         feeQuoter : Optional RawInstanceAddress.RawInstanceAddress
         ccvRegistry : Optional RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
+
+resolveSenderRequiredCCVs
+    : [RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Bool
+    -> [RawInstanceAddress.RawInstanceAddress]
+resolveSenderRequiredCCVs defaultCCVs senderRequiredCCVs isTokenOnlyTransfer =
+    case senderRequiredCCVs of
+        [] ->
+            if isTokenOnlyTransfer
+            then []
+            else defaultCCVs
+        _ -> CCIP.Internal.resolveDefaultCCVs
+            defaultCCVs
+            CCIP.Internal.useDefaultCCVs
+            senderRequiredCCVs
 
 template OnRamp
     with
@@ -208,11 +225,10 @@ template OnRamp
                         && payload == ""
                         && ccipReceiveGasLimit == 0
                 let resolvedCCVs = dedup (
-                        (if null senderRequiredCCVs
-                            then if isTokenOnlyTransfer
-                                then []
-                                else destConfig.defaultCCVs
-                            else senderRequiredCCVs)
+                        resolveSenderRequiredCCVs
+                            destConfig.defaultCCVs
+                            senderRequiredCCVs
+                            isTokenOnlyTransfer
                         ++ destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0

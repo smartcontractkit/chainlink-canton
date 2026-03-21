@@ -11,6 +11,7 @@ import DA.List (dedup)
 import DA.Optional (isNone, isSome, fromSome, fromOptional, isSome)
 
 import qualified CCIP.Events
+import qualified CCIP.Internal
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
@@ -116,18 +117,6 @@ sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
             None -> 0
     in
         ccvGasLimit + poolGasLimit + executorDestGasLimit
-
-assertCCVInstanceId
-    : Text
-    -> [RawInstanceAddress.RawInstanceAddress]
-    -> Optional [RawInstanceAddress.RawInstanceAddress]
-    -> Text
-    -> Party
-    -> Update ()
-assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
-    let claimed = RawInstanceAddress.make ccvInstanceId caller
-        allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
-    in assertMsg msg (claimed `elem` allowedCCVs)
 
 buildMessageArtifacts
     : SendingMessageV1
@@ -265,7 +254,7 @@ template SendingMessageV1
             controller caller
             do
                 assertMsg "sendingMessage: AddCCVFee only allowed in Prepared" (state == SendingMessageState_Prepared)
-                assertCCVInstanceId
+                CCIP.Internal.assertCCVInstanceId
                     "sendingMessage: caller is not an allowed CCV"
                     requiredCCVs
                     outboundPoolCCVs
@@ -433,7 +422,7 @@ template SendingMessageV1
             controller caller
             do
                 assertMsg "sendingMessage: AddVerifierData only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
-                assertCCVInstanceId
+                CCIP.Internal.assertCCVInstanceId
                     "sendingMessage: caller is not an allowed CCV"
                     requiredCCVs
                     outboundPoolCCVs
