@@ -100,10 +100,11 @@ encodeDeployCommitteeVerifierParams params =
 encodeDeployLockReleaseTokenPoolParams : DeployLockReleaseTokenPoolParams -> BytesHex
 encodeDeployLockReleaseTokenPoolParams params =
   encodeText params.instanceId
-  <> encodeParty params.ccipOwner
   <> encodeParty params.poolOwner
+  <> encodeParty params.ccipOwner
   <> encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
+  <> encodeOptional params.rateLimitAdmin encodeParty
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
   <> encodeRawInstanceAddress params.rmnRemote
@@ -390,18 +391,20 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
 
 testDecodeDeployLockReleaseTokenPoolParams : Script ()
 testDecodeDeployLockReleaseTokenPoolParams = script do
-  ccipOwner <- allocateParty "ccip_owner"
   poolOwner <- allocateParty "pool_owner"
+  ccipOwner <- allocateParty "ccip_owner"
   tokenAdmin <- allocateParty "token_admin"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
   feeOwner <- allocateParty "fee_owner"
   rmnOwner <- allocateParty "rmn_owner"
 
   let params = DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
-        ccipOwner
         poolOwner
+        ccipOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
+        rateLimitAdmin = Some rateLimitAdmin
         tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-1" tokenAdmin
         feeQuoter = CCIP.RawInstanceAddress.make "fq-1" feeOwner
         rmnRemote = CCIP.RawInstanceAddress.make "rmn-1" rmnOwner
@@ -411,13 +414,14 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
-      decoded.ccipOwner === params.ccipOwner
       decoded.poolOwner === params.poolOwner
+      decoded.ccipOwner === params.ccipOwner
       decoded.instrumentId === params.instrumentId
+      decoded.decimals === params.decimals
+      decoded.rateLimitAdmin === params.rateLimitAdmin
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
       decoded.rmnRemote === params.rmnRemote
-      decoded.decimals === params.decimals
 
   pure ()
 
