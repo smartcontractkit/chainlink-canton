@@ -2,6 +2,7 @@
 module CCIP.PerPartyRouter where
 
 import DA.Action (foldlA)
+import DA.List (dedup)
 import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
@@ -33,6 +34,7 @@ import CCIP.Codec
   , encodeOptionalRawInstanceAddress
   , decodeOptionalRawInstanceAddressAt
   )
+import MCMS.Codec (decodePartyList, encodePartyList)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified Splice.Api.Token.HoldingV1
@@ -171,6 +173,7 @@ template PerPartyRouterFactory
                     outboundSequenceNumbers = Map.empty
                     executedMessages = Set.empty
                     archivedExecutionContractIds = []
+                    customObservers = []
 
                 newFactoryCid <- create this with
                     registeredRouters = Map.insert partyOwner instanceId registeredRouters
@@ -248,9 +251,10 @@ template PerPartyRouter
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executedMessages : Set BytesHex
         archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
+        customObservers : [Party]
     where
         signatory ccipOwner
-        observer partyOwner
+        observer partyOwner :: customObservers
         ensure not (T.isInfixOf "@" instanceId)
 
         choice SetDeps : ContractId PerPartyRouter
@@ -266,6 +270,24 @@ template PerPartyRouter
                         feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
                         rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
                 create this with deps = mergedDeps
+
+        choice AddCustomObservers : ContractId PerPartyRouter
+            with
+                parties : [Party]
+            controller ccipOwner
+            do
+                create this with
+                    customObservers =
+                        filter (\p -> p /= ccipOwner && p /= partyOwner)
+                            (dedup (customObservers ++ parties))
+
+        choice RemoveCustomObservers : ContractId PerPartyRouter
+            with
+                parties : [Party]
+            controller ccipOwner
+            do
+                create this with
+                    customObservers = filter (`notElem` parties) customObservers
 
         -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
@@ -721,6 +743,24 @@ template PerPartyRouter
                     newCid <- exercise selfCid SetDeps with newDeps
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
+              "AddCustomObservers" -> do
+                case decodePartyList operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: AddCustomObservers"
+                  Some (parties, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: AddCustomObservers" $
+                      finalOffset == byteCount operationData
+                    newCid <- exercise selfCid AddCustomObservers with parties
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+              "RemoveCustomObservers" -> do
+                case decodePartyList operationData 0 of
+                  None -> abort "E_INVALID_PARAMS: RemoveCustomObservers"
+                  Some (parties, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: RemoveCustomObservers" $
+                      finalOffset == byteCount operationData
+                    newCid <- exercise selfCid RemoveCustomObservers with parties
+                    pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 data CCIPSendResult = CCIPSendResult
@@ -784,6 +824,12 @@ decodePerPartyRouterDepsAt encoded offset = do
   (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
   (rmnRemote, offset6) <- decodeRawInstanceAddressAt encoded offset5
   Some (PerPartyRouterDeps onRamp offRamp globalConfig tokenAdminRegistry feeQuoter rmnRemote, offset6)
+
+encodeAddCustomObserversParams : [Party] -> BytesHex
+encodeAddCustomObserversParams = encodePartyList
+
+encodeRemoveCustomObserversParams : [Party] -> BytesHex
+encodeRemoveCustomObserversParams = encodePartyList
 
 -- | Encode PerPartyRouterDeps (full, non-optional)
 encodePerPartyRouterDeps : PerPartyRouterDeps -> BytesHex
