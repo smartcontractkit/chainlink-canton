@@ -8,6 +8,7 @@ import DA.Foldable (forA_)
 import DA.List ((!!))
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+
 import qualified CCIP.Context
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
@@ -62,6 +63,7 @@ testCommitteeVerifier = script do
 
     let msg = PayloadBuilder.testMessage1
     let encodedMsg = PayloadBuilder.testMessage1Encoded
+    debug ("encodedMsg: " <> encodedMsg)
     let messageId = keccak256 encodedMsg
     debug ("messageId: " <> messageId)
     let signedHash = keccak256 (CommitteeVerifier.versionTagV1_7_0 <> messageId)
@@ -360,12 +362,12 @@ testCommitteeVerifier = script do
             caller = owner
     -- Update signer config to 6, should fail due to threshold > number of signers
     submitMustFail owner do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]]
     -- Update signers to 6 addresses and threshold 6, should pass
     ccv10 <- submit owner do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4, 5]]
     executingMessageCid <- createExecMsg owner rmnOwner
@@ -378,7 +380,7 @@ testCommitteeVerifier = script do
             caller = owner
     -- Remove source chain config, afterward verification should fail
     ccv10 <- submit owner do
-        exerciseCmd ccv10 CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10 CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = [123.0]
             signatureConfigs = []
     executingMessageCid <- createExecMsg owner rmnOwner
@@ -424,7 +426,7 @@ testCommitteeVerifier = script do
             signerConfigs = Map.fromList [(123.0, CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [PayloadBuilder.pubkeys !! 0])]
             deps = CommitteeVerifier.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail owner do
-        exerciseCmd ccv10b CommitteeVerifier.CommitteeVerifier_ApplySignatureConfigs with
+        exerciseCmd ccv10b CommitteeVerifier.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
             signatureConfigs = [CommitteeVerifier.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [PayloadBuilder.pubkeys !! 0, PayloadBuilder.pubkeys !! 0]]
     debug ("===== Passed Test10b =====")
@@ -462,26 +464,26 @@ testCommitteeVerifier_StorageLocations = script do
 
     -- Transfer storage location admin role to another party
     ccv1 <- submit owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_TransferStorageLocationsAdmin with
+        exerciseCmd ccv1 CommitteeVerifier.TransferStorageLocationsAdmin with
             newAdmin = admin
 
     -- Accept admin role from wrong party, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin
+        exerciseCmd ccv1 CommitteeVerifier.AcceptStorageLocationsAdmin
 
     -- Accept admin role
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_AcceptStorageLocationsAdmin
+        exerciseCmd ccv1 CommitteeVerifier.AcceptStorageLocationsAdmin
     let newLocations = ["ipfs://new-location1", "ipfs://new-location2"]
 
     -- Update storage locations with new admin, should succeed
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_UpdateStorageLocations with
+        exerciseCmd ccv1 CommitteeVerifier.UpdateStorageLocations with
             newLocations = newLocations
     
     -- Try updating storage locations with old admin, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CommitteeVerifier.CommitteeVerifier_UpdateStorageLocations with
+        exerciseCmd ccv1 CommitteeVerifier.UpdateStorageLocations with
             newLocations = ["ipfs://another-location"]
 
     -- Fetch contract and verify storage locations updated

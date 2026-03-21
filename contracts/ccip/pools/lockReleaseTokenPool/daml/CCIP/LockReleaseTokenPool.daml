@@ -5,9 +5,9 @@
 -- uses "transfer-preapproval" key). The pool stores a poolReceiveContext that gets
 -- merged into extraArgs for inbound transfers, enabling direct transfers without
 -- pending state when the pool has preapproval.
-module CCIP.LockReleaseTokenPool
-  ( module CCIP.LockReleaseTokenPool
-  , module CCIP.LockReleaseTokenPoolTypes
+module CCIP.LockReleaseTokenPool (
+    module CCIP.LockReleaseTokenPool
+    , module CCIP.LockReleaseTokenPoolTypes
   ) where
 
 import DA.Crypto.Text (BytesHex, byteCount)

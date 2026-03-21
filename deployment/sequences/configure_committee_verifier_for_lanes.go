@@ -78,11 +78,11 @@ var ConfigureCommitteeVerifierForLanes = operations.NewSequence(
 		}
 
 		for _, address := range input.CommitteeVerifier {
-			_, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, deps, contract.ChoiceInput[ccvs.CommitteeVerifierApplySignatureConfigs]{
+			_, err := operations.ExecuteOperation(b, committee_verifier.ApplySignatureConfigs, deps, contract.ChoiceInput[ccvs.ApplySignatureConfigs]{
 				ChainSelector:   deps.Chain.Selector,
 				InstanceAddress: address,
 				ActAs:           []string{deps.Chain.Participants[deps.Participant].PartyID},
-				Args: ccvs.CommitteeVerifierApplySignatureConfigs{
+				Args: ccvs.ApplySignatureConfigs{
 					SourceChainSelectorsToRemove: nil, // This doesn't support removing chains
 					SignatureConfigs:             signatureConfigs,
 				},
