@@ -373,33 +373,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	require.NoError(t, err, "failed to update prices")
 	t.Logf("Updated prices: FeeToken=$%s, LINK=$%s, destUsdPerUnitGas=%s", usdPerToken, "1500000000", destUsdPerUnitGas)
 
-	// Configure FeeQuoter dest chain config (fallback for token transfer fees)
-	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.ApplyDestChainConfigUpdates, ccipDeps, contractops.ChoiceInput[feequoter.ApplyDestChainConfigUpdates2]{
-		ChainSelector:   env.Chain.ChainSelector(),
-		InstanceAddress: feeQuoterInstanceAddress,
-		ActAs:           []string{partyCCIP},
-		Args: feequoter.ApplyDestChainConfigUpdates2{
-			DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
-				{
-					DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-					DestChainConfig: feequoter.DestChainConfig2{
-						IsEnabled:                   true,
-						MaxDataBytes:                50000,
-						MaxPerMsgGasLimit:           4000000,
-						DestGasOverhead:             300000,
-						DestGasPerPayloadByteBase:   16,
-						ChainFamilySelector:         "2812d52c",
-						DefaultTxGasLimit:           200000,
-						DefaultTokenFeeUSD:          types.NUMERIC("10"),
-						DefaultTokenDestGasOverhead: 34000,
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err, "failed to apply FeeQuoter dest chain config")
-	t.Log("Applied FeeQuoter dest chain config")
-
 	// Setup token pool for outbound token transfer in Send.
 	tokenAdminRegistryRawAddr, err := contracts.RawInstanceAddressFromString(tokenAdminRegistry.Labels.List()[0])
 	require.NoError(t, err, "failed to parse TokenAdminRegistry raw address")
@@ -437,7 +410,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	remotePoolAddress := hexutil.MustDecode("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3")
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
-	const poolDestGasOverhead = int64(25_000)
 	out, err = changesets.DeployTokenPool{}.Apply(cldfEnv, changesets.CantonCSDeps[changesets.DeployTokenPoolConfig]{
 		ChainSelector: env.Chain.ChainSelector(),
 		Participant:   1,
@@ -463,7 +435,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			TokenTransferFeeConfigs: types.GENMAP{
 				strconv.FormatUint(remoteSelector, 10): map[string]any{
 					"isEnabled":         true,
-					"destGasOverhead":   poolDestGasOverhead,
+					"destGasOverhead":   int64(25_000), // for the pool destGasOverhead
 					"destBytesOverhead": int64(32),
 					"feeUSDCents":       types.NUMERIC("10"),
 					"feeBps":            types.NUMERIC("500"),
@@ -868,20 +840,17 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	tokenTransferAmount := int64(10000)
 	outboundRateLimiterContractID := types.CONTRACT_ID(disclosedOutboundRateLimiter.ContractId)
 
-	// Fees deducted in this test:
-	// - Fee token (Amulet) payment (premiumMultiplier = 1.0x):
-	//   1) networkPremiumUSDCents = tokenNetworkFeeUSDCents = 10
-	//   2) poolPremiumUSDCents = pool flat fee = 10
-	//   3) ccvPremiumUSDCents = CCV fee = 7
-	//   4) executorFlatUSDCents = executor fee = 9
-	//   5) executionCostUSDCents = gasCostUSDCents from QuoteGasForExec:
-	//      totalGas = (300000 + 50000 + 25000 + 100000) + 886*16 = 489176
-	//      gasCostUSDCents = ceil(489176 * 38 / 1000000) = 19
-	// - Token amount cut:
-	//   6) pool proportional fee (feeBps = 500 = 5%) at LockOrBurn
-	// Total fee-token payment: $0.55
-	//   (10 + 10 + 7 + 9 + 19 = 55 cents at $1/token)
-	// Token amount cut: 500 Amulet (5% of 10,000), so bridged amount is 9,500.
+	// Expected fee-token charges (Amulet), mapped to configured fields:
+	// - network premium: 10 cents from FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents
+	// - pool premium: 10 cents from TokenTransferFeeConfigs[remoteSelector].feeUSDCents
+	// - verifier premium: 7 cents from CommitteeVerifierRemoteChainConfig.FeeUSDCents
+	// - executor flat fee: 9 cents from Executor.remoteChainConfigs[remoteSelector].feeUSDCents
+	// - execution gas fee: 19 cents from QuoteGasForExec, priced with
+	//   UpdatePrices.GasPriceUpdates[remoteSelector].UsdPerUnitGas = 38
+	// Total fee-token payment = 10 + 10 + 7 + 9 + 19 = 55 cents.
+	// Separately, pool takes a token amount cut at LockOrBurn:
+	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
+	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
 	sendArgs := ccipsender.Send{
 		Context:           sendContext,
 		RouterCid:         types.CONTRACT_ID(routerCid),
@@ -889,7 +858,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		Receiver:          types.TEXT(receiverHex),
 		Payload:           types.TEXT(testPayloadHex),
 		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(100000),
+			GasLimit:           types.INT64(100000), // executorDestGasLimit
 			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
 			ExecutorCid:        func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 			ExecutorArgs:       nil,
@@ -991,15 +960,15 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	senderBalanceAfter := getHoldingsBalanceNumeric0(t, t.Context(), senderParticipant)
 	senderDelta := senderBalanceBefore - senderBalanceAfter
-	// Derived from the fee breakdown above and converted to local token units.
+	// Derived from config fields above and converted to local token units.
 	// In this test 1 token == 100,000,000 local units, so 1 US cent == 1,000,000 units.
-	// - CCV fee: 7 cents => 7,000,000
-	// - Pool flat fee: 10 cents => 10,000,000
+	// - CCV fee: CommitteeVerifierRemoteChainConfig.FeeUSDCents = 7 => 7,000,000
+	// - Pool fee: TokenTransferFeeConfigs[remoteSelector].feeUSDCents = 10 => 10,000,000
 	// - Owner residual: 55 total cents - 7 CCV - 10 pool = 38 cents => 38,000,000
 	const (
-		ccvFeeLocalUnits         = int64(7_000_000)
-		poolFeeLocalUnits        = int64(10_000_000)
-		ownerResidualLocalUnits  = int64(38_000_000)
+		ccvFeeLocalUnits        = int64(7_000_000)
+		poolFeeLocalUnits       = int64(10_000_000)
+		ownerResidualLocalUnits = int64(38_000_000)
 	)
 	expectedCCIPOwnerDelta := ccvFeeLocalUnits + ownerResidualLocalUnits
 	expectedSenderDelta := expectedCCIPOwnerDelta
@@ -1027,7 +996,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// With payout splitting:
 	// - verifier fee (CCV owner): $0.07 => 7,000,000 local units
 	// - owner residual (network + executor): $0.38 => 38,000,000 local units
-	// => ccipOwner total in this test = 45,000,000 local units.
+	// => ccipOwner total in this test = 45,000,000 local units. (ccipOwner is the same as ccvOwner here so it's not 38)
 	require.Equal(t, expectedCCIPOwnerDelta, ccipOwnerDelta, "ccipOwner should receive verifier fee + owner residual")
 	require.Equal(t, int64(55_000_000), ccipOwnerDelta+poolFeeLocalUnits, "fee-token payment should split as owner share + pool share")
 
