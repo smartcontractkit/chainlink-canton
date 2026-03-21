@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "0efebaf2cb5e9ac8eedb88a373bbf79d1e2876f94078c279a151e024955377d0"
+	PackageID   = "507fce3f228b4970bd81b7ec1c8c7359a5de1c765f010f37e2be54fa87b6104c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -53,6 +53,48 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddCustomObservers is a Record type
+type AddCustomObservers struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddCustomObservers to a map for DAML arguments
+func (t AddCustomObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddCustomObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddCustomObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCustomObservers to hex string (Canton MCMS format)
+func (t AddCustomObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCustomObservers from hex string (Canton MCMS format)
+func (t *AddCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ArchivedExecutedMessages is a Template type
@@ -951,6 +993,7 @@ type PerPartyRouter struct {
 	OutboundSequenceNumbers      types.GENMAP        `json:"outboundSequenceNumbers"`
 	ExecutedMessages             types.SET           `json:"executedMessages"`
 	ArchivedExecutionContractIds []types.CONTRACT_ID `json:"archivedExecutionContractIds"`
+	CustomObservers              []types.PARTY       `json:"customObservers"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1011,6 +1054,15 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["customObservers"] = func() []any {
+		res := make([]any, 0, len(t.CustomObservers))
+		for _, e := range t.CustomObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -1061,6 +1113,15 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 		res := make([]any, 0, len(t.ArchivedExecutionContractIds))
 		for _, e := range t.ArchivedExecutionContractIds {
 			res = append(res, e)
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["customObservers"] = func() []any {
+		res := make([]any, 0, len(t.CustomObservers))
+		for _, e := range t.CustomObservers {
+			res = append(res, e.ToMap())
 		}
 		return res
 	}()
@@ -1322,6 +1383,48 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
 		Choice:     "GetSequenceNumber",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddCustomObservers exercises the AddCustomObservers choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) AddCustomObservers(contractID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddCustomObserversWithPackageID exercises the AddCustomObservers choice using the provided package ID instead of package name
+func (t PerPartyRouter) AddCustomObserversWithPackageID(contractID string, packageID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObservers exercises the RemoveCustomObservers choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) RemoveCustomObservers(contractID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObserversWithPackageID exercises the RemoveCustomObservers choice using the provided package ID instead of package name
+func (t PerPartyRouter) RemoveCustomObserversWithPackageID(contractID string, packageID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1881,6 +1984,48 @@ func (t *PrepareSend) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// RemoveCustomObservers is a Record type
+type RemoveCustomObservers struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemoveCustomObservers to a map for DAML arguments
+func (t RemoveCustomObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveCustomObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveCustomObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveCustomObservers to hex string (Canton MCMS format)
+func (t RemoveCustomObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveCustomObservers from hex string (Canton MCMS format)
+func (t *RemoveCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetDeps3 is a Record type
 type SetDeps3 struct {
 	NewDeps SetDepsParams3 `json:"newDeps"`
@@ -2031,6 +2176,7 @@ func (t *SetDepsParams3) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error)
 	CCIPSend(args CCIPSend) (*bind.EncodedChoice, error)
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
 	Execute(args Execute) (*bind.EncodedChoice, error)
@@ -2047,6 +2193,7 @@ type MCMSEncoder interface {
 	PrepareExecute2(args PrepareExecute2) (*bind.EncodedChoice, error)
 	PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
 	PrepareSend(args PrepareSend) (*bind.EncodedChoice, error)
+	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
 	SetDeps3(args SetDeps3) (*bind.EncodedChoice, error)
 }
 
@@ -2075,6 +2222,11 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// AddCustomObservers encodes parameters for the AddCustomObservers choice.
+func (e *encoder) AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCustomObservers", args)
 }
 
 // CCIPSend encodes parameters for the CCIPSend choice.
@@ -2155,6 +2307,11 @@ func (e *encoder) PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bi
 // PrepareSend encodes parameters for the PrepareSend choice.
 func (e *encoder) PrepareSend(args PrepareSend) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareSend", args)
+}
+
+// RemoveCustomObservers encodes parameters for the RemoveCustomObservers choice.
+func (e *encoder) RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 
 // SetDeps3 encodes parameters for the SetDeps3 choice.
