@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -191,7 +192,7 @@ var DeployChainContracts = operations.NewSequence(
 					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
 					FeeQuoter:          feeQuoterRawInstanceAddress.Binding(),
-					CcvRegistry:        common.RawInstanceAddress{},
+					CcvRegistry:        mcms.RawInstanceAddress{},
 				},
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
