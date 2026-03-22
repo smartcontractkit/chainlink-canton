@@ -1,6 +1,7 @@
 module CCIP.Factory where
 
 import DA.Map qualified as Map
+import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, byteCount)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec
@@ -548,7 +549,7 @@ mkFeeQuoterContract : Party -> DeployFeeQuoterParams -> CCIP.FeeQuoter.FeeQuoter
 mkFeeQuoterContract owner params = CCIP.FeeQuoter.FeeQuoter with
     instanceId = params.instanceId
     owner
-    feeTokens = Map.empty
+    feeTokens = Set.empty
     destChainConfigs = Map.empty
     tokenTransferFeeConfigs = Map.empty
     usdPerUnitGasByDestChainSelector = Map.empty

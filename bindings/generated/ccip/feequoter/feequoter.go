@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-feequoter"
-	PackageID   = "5a1561486050fe5234aecc54f57c40aafbf728660a7d88f77322d4d50e2808e9"
+	PackageID   = "d09ecca7a0f63b8ad6e33d42b3408782d9998b888cf93b1f5a23f5cfd74a3cc9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -262,6 +262,7 @@ type DestChainConfig2 struct {
 	DestGasOverhead             types.INT64   `json:"destGasOverhead"`
 	DestGasPerPayloadByteBase   types.INT64   `json:"destGasPerPayloadByteBase"`
 	DefaultTxGasLimit           types.INT64   `json:"defaultTxGasLimit"`
+	LinkFeeMultiplierPercent    types.NUMERIC `json:"linkFeeMultiplierPercent"`
 	DefaultTokenFeeUSD          types.NUMERIC `json:"defaultTokenFeeUSD"`
 	DefaultTokenDestGasOverhead types.INT64   `json:"defaultTokenDestGasOverhead"`
 }
@@ -281,6 +282,8 @@ func (t DestChainConfig2) ToMap() map[string]any {
 	m["destGasPerPayloadByteBase"] = int64(t.DestGasPerPayloadByteBase)
 
 	m["defaultTxGasLimit"] = int64(t.DefaultTxGasLimit)
+
+	m["linkFeeMultiplierPercent"] = t.LinkFeeMultiplierPercent
 
 	m["defaultTokenFeeUSD"] = t.DefaultTokenFeeUSD
 
@@ -360,7 +363,7 @@ func (t *DestChainConfigArgs2) UnmarshalHex(data string) error {
 type FeeQuoter struct {
 	InstanceId                       types.TEXT                               `json:"instanceId"`
 	Owner                            types.PARTY                              `json:"owner"`
-	FeeTokens                        types.GENMAP                             `json:"feeTokens"`
+	FeeTokens                        types.SET                                `json:"feeTokens"`
 	DestChainConfigs                 types.GENMAP                             `json:"destChainConfigs"`
 	TokenTransferFeeConfigs          types.GENMAP                             `json:"tokenTransferFeeConfigs"`
 	UsdPerUnitGasByDestChainSelector types.GENMAP                             `json:"usdPerUnitGasByDestChainSelector"`
@@ -391,10 +394,11 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() any {
-		if t.FeeTokens == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeTokens).(mapper); ok {
+			return m.toMap()
 		}
-		return map[string]any{"_type": "genmap", "value": t.FeeTokens}
+		return t.FeeTokens
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -465,10 +469,11 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = func() any {
-		if t.FeeTokens == nil {
-			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeTokens).(mapper); ok {
+			return m.toMap()
 		}
-		return map[string]any{"_type": "genmap", "value": t.FeeTokens}
+		return t.FeeTokens
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -652,27 +657,6 @@ func (t FeeQuoter) GetTokenTransferFeeWithPackageID(contractID string, packageID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetTokenTransferFee",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetPremiumMultiplierWeiPerEth exercises the GetPremiumMultiplierWeiPerEth choice on this FeeQuoter contract
-// This method uses the package name in the template ID
-func (t FeeQuoter) GetPremiumMultiplierWeiPerEth(contractID string, args GetPremiumMultiplierWeiPerEth) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetPremiumMultiplierWeiPerEth",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// GetPremiumMultiplierWeiPerEthWithPackageID exercises the GetPremiumMultiplierWeiPerEth choice using the provided package ID instead of package name
-func (t FeeQuoter) GetPremiumMultiplierWeiPerEthWithPackageID(contractID string, packageID string, args GetPremiumMultiplierWeiPerEth) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeQuoter", "FeeQuoter"),
-		ContractID: contractID,
-		Choice:     "GetPremiumMultiplierWeiPerEth",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -893,8 +877,7 @@ var _ mcms.IMCMSReceiver = (*FeeQuoter)(nil)
 
 // FeeTokenArgs is a Record type
 type FeeTokenArgs struct {
-	InstrumentId      splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	PremiumMultiplier types.NUMERIC                            `json:"premiumMultiplier"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 }
 
 // ToMap converts FeeTokenArgs to a map for DAML arguments
@@ -908,8 +891,6 @@ func (t FeeTokenArgs) ToMap() map[string]any {
 		}
 		return t.InstrumentId
 	}()
-
-	m["premiumMultiplier"] = t.PremiumMultiplier
 
 	return m
 }
@@ -1191,69 +1172,6 @@ func (t GetFeeTokensMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetFeeTokensMCMSParams from hex string.
 func (t *GetFeeTokensMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetPremiumMultiplierWeiPerEth is a Record type
-type GetPremiumMultiplierWeiPerEth struct {
-	Token  splice_api_token_holding_v1.InstrumentId `json:"token"`
-	Caller types.PARTY                              `json:"caller"`
-}
-
-// ToMap converts GetPremiumMultiplierWeiPerEth to a map for DAML arguments
-func (t GetPremiumMultiplierWeiPerEth) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["token"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Token).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Token
-	}()
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t GetPremiumMultiplierWeiPerEth) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GetPremiumMultiplierWeiPerEth) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GetPremiumMultiplierWeiPerEth to hex string (Canton MCMS format)
-func (t GetPremiumMultiplierWeiPerEth) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetPremiumMultiplierWeiPerEth from hex string (Canton MCMS format)
-func (t *GetPremiumMultiplierWeiPerEth) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GetPremiumMultiplierWeiPerEthMCMSParams is GetPremiumMultiplierWeiPerEth without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
-type GetPremiumMultiplierWeiPerEthMCMSParams struct {
-	Token splice_api_token_holding_v1.InstrumentId `json:"token"`
-}
-
-// MarshalHex encodes GetPremiumMultiplierWeiPerEthMCMSParams to hex string for MCMS operationData.
-func (t GetPremiumMultiplierWeiPerEthMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GetPremiumMultiplierWeiPerEthMCMSParams from hex string.
-func (t *GetPremiumMultiplierWeiPerEthMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1818,8 +1736,6 @@ type MCMSEncoder interface {
 	GetDestinationChainGasPriceMCMSParams(args GetDestinationChainGasPriceMCMSParams) (*bind.EncodedChoice, error)
 	GetFeeTokens(args GetFeeTokens) (*bind.EncodedChoice, error)
 	GetFeeTokensMCMSParams(args GetFeeTokensMCMSParams) (*bind.EncodedChoice, error)
-	GetPremiumMultiplierWeiPerEth(args GetPremiumMultiplierWeiPerEth) (*bind.EncodedChoice, error)
-	GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error)
 	GetTokenPrice(args GetTokenPrice) (*bind.EncodedChoice, error)
 	GetTokenPriceMCMSParams(args GetTokenPriceMCMSParams) (*bind.EncodedChoice, error)
 	GetTokenTransferFee(args GetTokenTransferFee) (*bind.EncodedChoice, error)
@@ -1916,16 +1832,6 @@ func (e *encoder) GetFeeTokens(args GetFeeTokens) (*bind.EncodedChoice, error) {
 // GetFeeTokensMCMSParams encodes MCMS parameters (without Caller) for the GetFeeTokens choice.
 func (e *encoder) GetFeeTokensMCMSParams(args GetFeeTokensMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetFeeTokens", args)
-}
-
-// GetPremiumMultiplierWeiPerEth encodes parameters for the GetPremiumMultiplierWeiPerEth choice.
-func (e *encoder) GetPremiumMultiplierWeiPerEth(args GetPremiumMultiplierWeiPerEth) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetPremiumMultiplierWeiPerEth", args)
-}
-
-// GetPremiumMultiplierWeiPerEthMCMSParams encodes MCMS parameters (without Caller) for the GetPremiumMultiplierWeiPerEth choice.
-func (e *encoder) GetPremiumMultiplierWeiPerEthMCMSParams(args GetPremiumMultiplierWeiPerEthMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("GetPremiumMultiplierWeiPerEth", args)
 }
 
 // GetTokenPrice encodes parameters for the GetTokenPrice choice.

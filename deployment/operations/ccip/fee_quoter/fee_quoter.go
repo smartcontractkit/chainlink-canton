@@ -2,6 +2,7 @@ package fee_quoter
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -73,7 +74,12 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[f
 	Description:  "Applies destination chain configuration updates to the FeeQuoter",
 	ContractType: ContractType,
 	Validate: func(input feequoter.ApplyDestChainConfigUpdates2) error {
-		// TODO add validation
+		for _, cfg := range input.DestChainConfigArgs {
+			if cfg.DestChainConfig.LinkFeeMultiplierPercent == "" {
+				return fmt.Errorf("linkFeeMultiplierPercent cannot be empty for dest chain %s", cfg.DestChainSelector)
+			}
+		}
+
 		return nil
 	},
 	Template: feequoter.FeeQuoter{},

@@ -139,6 +139,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 					DestGasOverhead:             types.INT64(fqConfig.DestGasOverhead),
 					DestGasPerPayloadByteBase:   types.INT64(fqConfig.DestGasPerPayloadByteBase),
 					DefaultTxGasLimit:           types.INT64(fqConfig.DefaultTxGasLimit),
+					LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(fqConfig.LinkFeeMultiplierPercent), 10)),
 					DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(fqConfig.DefaultTokenFeeUSDCents), 10)),
 					DefaultTokenDestGasOverhead: types.INT64(fqConfig.DefaultTokenDestGasOverhead),
 				},
