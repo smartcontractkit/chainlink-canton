@@ -1,0 +1,102 @@
+-- | Direct choice tests for RMNRemote
+module CCIP.RMNTest.RMNRemoteTest where
+
+import Daml.Script
+import DA.Assert ((===))
+
+import CCIP.RMNRemote
+
+-- ===========================================================================
+-- UNCURSE MULTIPLE VALIDATION TESTS
+-- ===========================================================================
+
+-- | UncurseMultiple rejects duplicate subjects in the input list
+testRMNRemote_UncurseMultipleRejectsDuplicateSubjects : Script ()
+testRMNRemote_UncurseMultipleRejectsDuplicateSubjects = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let subject = "01000000000000000000000000000001"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-uncurse-dup-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [subject]
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid UncurseMultiple with
+      subjects = [subject, subject]
+
+  pure ()
+
+-- | UncurseMultiple rejects subjects that are not currently cursed
+testRMNRemote_UncurseMultipleRejectsNotCursedSubject : Script ()
+testRMNRemote_UncurseMultipleRejectsNotCursedSubject = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let cursedSubject = "01000000000000000000000000000001"
+      notCursedSubject = "00000000000000000000000000000089"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-uncurse-not-cursed-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [cursedSubject]
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid UncurseMultiple with
+      subjects = [cursedSubject, notCursedSubject]
+
+  pure ()
+
+-- | UncurseMultiple succeeds with valid, currently-cursed subjects
+testRMNRemote_UncurseMultipleSucceeds : Script ()
+testRMNRemote_UncurseMultipleSucceeds = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  let subject1 = "01000000000000000000000000000001"
+      subject2 = "00000000000000000000000000000089"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-uncurse-success-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = [subject1, subject2]
+
+  rmnCid' <- submit rmnOwner do
+    exerciseCmd rmnCid UncurseMultiple with
+      subjects = [subject1, subject2]
+
+  rmn <- queryContractId rmnOwner rmnCid'
+  case rmn of
+    None -> abort "Contract not found"
+    Some r -> r.cursedSubjects === []
+
+-- | UncurseMultiple rejects empty-looking valid call when subject not cursed
+testRMNRemote_UncurseMultipleRejectsAllNotCursed : Script ()
+testRMNRemote_UncurseMultipleRejectsAllNotCursed = script do
+  rmnOwner <- allocateParty "rmn_owner"
+  ccipOwner <- allocateParty "ccip_owner"
+
+  rmnCid <- submit rmnOwner do
+    createCmd RMNRemote with
+      instanceId = "rmn-uncurse-none-cursed-test"
+      rmnOwner
+      ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  submitMustFail rmnOwner do
+    exerciseCmd rmnCid UncurseMultiple with
+      subjects = ["01000000000000000000000000000001"]
+
+  pure ()
