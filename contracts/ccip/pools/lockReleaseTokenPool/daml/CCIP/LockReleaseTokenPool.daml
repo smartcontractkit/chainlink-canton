@@ -10,6 +10,7 @@ module CCIP.LockReleaseTokenPool (
     , module CCIP.LockReleaseTokenPoolTypes
   ) where
 
+import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
@@ -29,6 +30,7 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Context
+import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
@@ -117,6 +119,14 @@ toSpliceAnyValue (CCIP.Context.AV_Map m) = Splice.Api.Token.MetadataV1.AV_Map (T
 toSpliceChoiceContext : CCIP.Context.CCIPContext -> Splice.Api.Token.MetadataV1.ChoiceContext
 toSpliceChoiceContext ctx = Splice.Api.Token.MetadataV1.ChoiceContext with
     values = TextMap.fromList (map (\(k, v) -> (k, toSpliceAnyValue v)) (TextMap.toList ctx.values))
+
+sumHoldingAmounts : [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
+sumHoldingAmounts =
+    foldlA
+        (\acc cid -> do
+            holding <- fetch cid
+            pure (acc + (view holding).amount))
+        0.0
 
 assertRateLimiter
     : Text
@@ -607,16 +617,59 @@ template LockReleaseTokenPool
                         extraArgs = tokenInput.extraArgs
 
                 case transferResult.output of
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids ->
-                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
-                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
+                        assertMsg "ReleaseFromTicket: transfer completed with no receiver holdings" (not (null receiverCids))
+                        let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                                 receiverHoldingCids = receiverCids
-                            poolChangeCids = transferResult.senderChangeCids
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid ->
+                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
+                                receiverHoldingCids = receiverCids
+                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                            ccipOwner = ticket.ccipOwner
+                            ccvOwners = ticket.ccvOwners
+                            poolOwner = ticket.poolOwner
+                            receiver = ticket.receiver
+                            tokenReceiver = ticket.tokenReceiver
+                            tokenReceiveTicketCid
+                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                                verifiedCCVs = ticket.verifiedCCVs
+                                tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                instrumentId = ticket.instrumentId
+                                amount = ticket.amount
+                                sourcePoolData = ticket.sourcePoolData
+                                messageId = ticket.messageId
+                                sourceChainSelector = ticket.sourceChainSelector
+                                finality = ticket.finality
+                                output = claimedOutput
                         pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
-                            output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
-                                transferInstructionCid = instrCid
+                            output
                             poolChangeCids = transferResult.senderChangeCids
+                            claimedEventCid
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
+                                transferInstructionCid = instrCid
+                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Pending with
+                                transferInstructionCid = instrCid
+                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                            ccipOwner = ticket.ccipOwner
+                            ccvOwners = ticket.ccvOwners
+                            poolOwner = ticket.poolOwner
+                            receiver = ticket.receiver
+                            tokenReceiver = ticket.tokenReceiver
+                            tokenReceiveTicketCid
+                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                                verifiedCCVs = ticket.verifiedCCVs
+                                tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
+                                instrumentId = ticket.instrumentId
+                                amount = ticket.amount
+                                sourcePoolData = ticket.sourcePoolData
+                                messageId = ticket.messageId
+                                sourceChainSelector = ticket.sourceChainSelector
+                                finality = ticket.finality
+                                output = claimedOutput
+                        pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
+                            output
+                            poolChangeCids = transferResult.senderChangeCids
+                            claimedEventCid
                     _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
         -- Calculate fee for outbound token transfer (USD cents only).
@@ -757,6 +810,15 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
+                receiverCids <- case transferResult.output of
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
+                            completedReceiverCids -> do
+                        receivedAmount <- sumHoldingAmounts completedReceiverCids
+                        assertMsg "LockOrBurn: receiver holdings amount mismatch"
+                            (receivedAmount == amountDecimal)
+                        pure completedReceiverCids
+                    _ -> abort "LockOrBurn: transfer did not complete directly"
+
                 let tokenFeeBps = case Map.lookup sendingMsg.destChainSelector tokenTransferFeeConfigs of
                         Some feeCfg | feeCfg.isEnabled -> feeCfg.feeBps
                         _ -> 0.0
@@ -772,14 +834,10 @@ template LockReleaseTokenPool
                         extraData = extraData
                         caller = poolOwner
 
-                case transferResult.output of
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
-                            receiverCids ->
-                        pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
-                            poolChangeCids = receiverCids ++ tokenInput.tokenPoolHoldings
-                            senderChangeCids = transferResult.senderChangeCids
-                            sendingMessageCid = newSendingMessageCid
-                    _ -> abort "LockOrBurn: transfer did not complete directly"
+                pure CCIP.Interfaces.TokenPool.LockOrBurnResult with
+                    poolChangeCids = receiverCids ++ tokenInput.tokenPoolHoldings
+                    senderChangeCids = transferResult.senderChangeCids
+                    sendingMessageCid = newSendingMessageCid
 
         interface instance MCMSReceiver for LockReleaseTokenPool where
           view = MCMSReceiverView with

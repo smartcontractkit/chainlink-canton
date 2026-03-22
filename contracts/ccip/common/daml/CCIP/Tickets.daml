@@ -48,7 +48,7 @@ template TokenReceiveTicket
         amount : Numeric 0
         sourcePoolData : BytesHex
 
-        messageHash : BytesHex
+        messageId : BytesHex
         sourceChainSelector : Numeric 0
         finality : Int
     where

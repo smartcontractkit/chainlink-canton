@@ -461,6 +461,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							DestGasPerPayloadByteBase:   16,
 							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
 							DefaultTxGasLimit:           200000,
+							LinkFeeMultiplierPercent:    90,
 							DefaultTokenFeeUSDCents:     0,
 							DefaultTokenDestGasOverhead: 34000,
 							NetworkFeeUSDCents:          0,

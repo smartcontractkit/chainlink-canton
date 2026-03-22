@@ -1,8 +1,54 @@
 module CCIP.Internal where
 
+import DA.List (dedup)
+import DA.Optional (fromOptional)
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+
 data MessageExecutionState
   = UNTOUCHED
   | IN_PROGRESS
   | SUCCESS
   | FAILURE
   deriving (Eq, Show)
+
+useDefaultCCVs : RawInstanceAddress
+useDefaultCCVs = RawInstanceAddress "default-ccvs"
+
+assertCCVInstanceId
+    : Text
+    -> [RawInstanceAddress]
+    -> Optional [RawInstanceAddress]
+    -> Text
+    -> Party
+    -> Update ()
+assertCCVInstanceId msg requiredCCVs extraAllowedCCVs ccvInstanceId caller =
+    let claimed = RawInstanceAddress.make ccvInstanceId caller
+        allowedCCVs = dedup (requiredCCVs ++ fromOptional [] extraAllowedCCVs)
+    in assertMsg msg (claimed `elem` allowedCCVs)
+
+resolveDefaultCCVs : [RawInstanceAddress] -> RawInstanceAddress -> [RawInstanceAddress] -> [RawInstanceAddress]
+resolveDefaultCCVs defaultCCVs useDefaultCCVs ccvs =
+    foldl (\acc ccv ->
+        if ccv == useDefaultCCVs
+        then acc ++ defaultCCVs
+        else acc ++ [ccv]
+    ) [] ccvs
+
+resolveOptionalCCVs
+    : [RawInstanceAddress]
+    -> [RawInstanceAddress]
+    -> Int
+    -> ([RawInstanceAddress], Int)
+resolveOptionalCCVs requiredCCVs optionalCCVs optionalThreshold =
+    foldl
+        (\(remainingOptional, remainingThreshold) requiredCCV ->
+            if requiredCCV `elem` remainingOptional
+            then
+                ( filter (/= requiredCCV) remainingOptional
+                , if remainingThreshold > 0 then remainingThreshold - 1 else 0
+                )
+            else (remainingOptional, remainingThreshold)
+        )
+        (optionalCCVs, optionalThreshold)
+        requiredCCVs

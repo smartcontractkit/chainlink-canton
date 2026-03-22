@@ -5,6 +5,7 @@ module CCIP.FeeQuoterTest.FeeQuoterMCMSTest where
 import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
+import DA.Set qualified as Set
 
 import qualified Splice.Api.Token.HoldingV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
@@ -41,7 +42,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.fromList [(instrumentId1, mult 1.0)]
+            feeTokens = Set.fromList [instrumentId1]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -54,7 +55,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
 
     -- Encode ApplyFeeTokenUpdates params: remove USDC, add LINK
     let feeTokensToRemove = [instrumentId1]
-        feeTokensToAdd = [FeeTokenArgs instrumentId2 (mult 1.5)]
+        feeTokensToAdd = [FeeTokenArgs instrumentId2]
         encoded = encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd)
 
     -- Call mcmsEntrypoint
@@ -69,9 +70,8 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates = script do
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
             -- USDC should be removed
-            Map.lookup instrumentId1 fq.feeTokens === None
-            -- LINK should be added
-            Map.lookup instrumentId2 fq.feeTokens === Some (mult 1.5)
+            Set.member instrumentId1 fq.feeTokens === False
+            Set.member instrumentId2 fq.feeTokens === True
         _ -> abort "Expected exactly one FeeQuoter contract"
 
     pure ()
@@ -92,7 +92,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -106,9 +106,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
     -- Add multiple fee tokens
     let feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId] = []
         feeTokensToAdd = [
-            FeeTokenArgs instrumentId1 (mult 1.0),
-            FeeTokenArgs instrumentId2 (mult 1.25),
-            FeeTokenArgs instrumentId3 (mult 0.9)
+            FeeTokenArgs instrumentId1,
+            FeeTokenArgs instrumentId2,
+            FeeTokenArgs instrumentId3
             ]
         encoded = encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd)
 
@@ -123,10 +123,10 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeTokenUpdates_Multiple = script do
     contracts <- query @FeeQuoter owner
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
-            Map.size fq.feeTokens === 3
-            Map.lookup instrumentId1 fq.feeTokens === Some (mult 1.0)
-            Map.lookup instrumentId2 fq.feeTokens === Some (mult 1.25)
-            Map.lookup instrumentId3 fq.feeTokens === Some (mult 0.9)
+            Set.size fq.feeTokens === 3
+            Set.member instrumentId1 fq.feeTokens === True
+            Set.member instrumentId2 fq.feeTokens === True
+            Set.member instrumentId3 fq.feeTokens === True
         _ -> abort "Expected exactly one FeeQuoter contract"
 
     pure ()
@@ -147,7 +147,7 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -166,6 +166,7 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
             destGasOverhead = 100000
             destGasPerPayloadByteBase = 16
             defaultTxGasLimit = 200000
+            linkFeeMultiplierPercent = 90.0
             defaultTokenFeeUSD = usdToCents 0.5
             defaultTokenDestGasOverhead = 50000
 
@@ -206,7 +207,7 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -218,8 +219,8 @@ testFeeQuoterMCMSEntrypoint_ApplyDestChainConfigUpdates_Multiple = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Create multiple dest chain configs
-    let config1 = DestChainConfig True 65535 3000000 100000 16 200000 (usdToCents 0.5) 50000
-        config2 = DestChainConfig True 32768 1500000 50000 8 100000 (usdToCents 1.0) 25000
+    let config1 = DestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000
+        config2 = DestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000
 
         configArgs = [
             DestChainConfigArgs 1.0 config1,
@@ -267,7 +268,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters = script do
     createCmd FeeQuoter with
       instanceId
       owner
-      feeTokens = Map.empty
+      feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
@@ -313,7 +314,7 @@ testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters = script do
     createCmd FeeQuoter with
       instanceId
       owner
-      feeTokens = Map.empty
+      feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
@@ -358,7 +359,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner = script do
     createCmd FeeQuoter with
       instanceId
       owner
-      feeTokens = Map.empty
+      feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
       usdPerUnitGasByDestChainSelector = Map.empty
@@ -404,7 +405,7 @@ testFeeQuoterMCMSEntrypoint_UnknownFunction = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -435,7 +436,7 @@ testFeeQuoterMCMSEntrypoint_InvalidParams = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -466,7 +467,7 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
         createCmd FeeQuoter with
             instanceId
             owner
-            feeTokens = Map.empty
+            feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty

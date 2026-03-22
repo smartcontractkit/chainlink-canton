@@ -534,6 +534,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				DestGasPerPayloadByteBase:   16,
 				ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
 				DefaultTxGasLimit:           200000,
+				LinkFeeMultiplierPercent:    90,
 				DefaultTokenFeeUSDCents:     0,
 				DefaultTokenDestGasOverhead: 34000,
 				NetworkFeeUSDCents:          0,
@@ -1052,8 +1053,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 						FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
 						FeeTokensToAdd: []feequoter.FeeTokenArgs{
 							{
-								InstrumentId:      feeTokenInstrument,
-								PremiumMultiplier: types.NUMERIC("100000000"),
+								InstrumentId: feeTokenInstrument,
 							},
 						},
 					}),

@@ -215,6 +215,7 @@ func TestConfigureChainForLanes(t *testing.T) {
 							DefaultTokenFeeUSDCents:     0,
 							DefaultTokenDestGasOverhead: 34000,
 							NetworkFeeUSDCents:          0,
+							LinkFeeMultiplierPercent:    90,
 						},
 						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
 						AddressBytesLength:      20,

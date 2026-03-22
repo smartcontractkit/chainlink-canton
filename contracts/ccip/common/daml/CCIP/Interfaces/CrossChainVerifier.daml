@@ -4,8 +4,11 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
+import qualified CCIP.Internal
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
+
+useDefaultCCVs = CCIP.Internal.useDefaultCCVs
 
 interface ICrossChainVerifier where
     viewtype CrossChainVerifierView
