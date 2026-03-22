@@ -4,7 +4,9 @@
 module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
-import DA.Optional (fromSome, fromSomeNote, isSome)
+import DA.Crypto.Text (BytesHex)
+import DA.Map qualified as Map
+import DA.Optional (fromSome, fromOptional, fromSomeNote, isSome)
 
 import qualified CCIP.Client
 import qualified CCIP.Context
@@ -13,7 +15,6 @@ import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
-import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import MCMS.RawInstanceAddress (assertValidInstanceId)
@@ -64,7 +65,8 @@ template CCIPSender
                 tokenTransfer : Optional TokenTransferInput
 
                 -- CCVs
-                ccvSendInputs : [CCVSendInput]
+                -- Map of CCV inputs, keyed by CCV address
+                ccvSendInputs : Map.Map BytesHex CCVSendInput
 
                 -- Executor
                 executorCid : Optional (ContractId CCIP.Interfaces.Executor.IExecutor)
@@ -82,12 +84,9 @@ template CCIPSender
                         assertMsg "tokenTransfer must be provided if tokenAmount is specified" (isSome tokenTransfer)
 
                 -- Decode and validate extraArgs
-                -- TODO: parse with defaults
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                     _ -> abort "sender: unsupported extraArgs version"
-                -- TODO: Validate that ccvs are passed in in the correct order
-                -- TODO: Validate that the executor that's been passed in matches the executor specified in extraArgs (if any)
 
                 let tokenInstrumentId = case message.tokenAmount of
                         Some tt -> Some tt.token
@@ -116,7 +115,7 @@ template CCIPSender
                         ICCV.CrossChainVerifier_CalculateFee with
                             sendingMessageCid = cid
                             caller = owner
-                    ) smCid ccvSendInputs
+                    ) smCid (Map.values ccvSendInputs)
 
                 smCid <- case tokenTransfer of
                     None -> pure smCid
@@ -133,7 +132,7 @@ template CCIPSender
                 smCid <- case extraArgs.executor of
                     addr | addr == CCIP.Client.noExecutionTag -> pure smCid -- no-exec tag, don't call Executor
                     _ -> do -- executor specified (or zero=default)
-                        exercise (fromSomeNote "executorCid required when executor is specified in extraArgs" executorCid) CCIP.Interfaces.Executor.Executor_CalculateFee with
+                        exercise (fromSomeNote "executorCid required if not set to no-exec" executorCid) CCIP.Interfaces.Executor.Executor_CalculateFee with
                             sendingMessageCid = smCid
                             executorArgs = extraArgs.executorArgs
                             caller = owner
@@ -159,7 +158,11 @@ template CCIPSender
                         pure lockResult.sendingMessageCid
 
                 -- ForwardToVerifier (verifiers see committed token state)
-                smCid <- foldlA (\cid (input, args) ->
+                let ccvArgsMap = Map.fromList (zip extraArgs.ccvs extraArgs.ccvArgs)
+                smCid <- foldlA (\cid (ccvAddress, input) -> do
+                    -- check if CCV's address has been provided as part of the extraArgs
+                    -- if yes, get the corresponding ccvArgs, if not, default to empty args
+                    let args = fromOptional "" (Map.lookup ccvAddress ccvArgsMap)
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_ForwardToVerifier with
                             rmnRemoteCid = rmnRemoteCid
@@ -167,7 +170,7 @@ template CCIPSender
                             sendingMessageCid = cid
                             verifierArgs = args
                             caller = owner
-                    ) smCid (zip ccvSendInputs extraArgs.ccvArgs)
+                    ) smCid (zip (Map.keys ccvSendInputs) (Map.values ccvSendInputs))
 
                 -- CCIPSend (collects total fee from sender)
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with

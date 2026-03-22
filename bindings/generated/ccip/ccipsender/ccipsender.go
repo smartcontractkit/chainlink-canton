@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "3e992be3154c16e0f322d7f3aae73f565dae498ae3dd28bcf6e36264a90fb4ad"
+	PackageID   = "0bf87bcaba9af8a980de7811823ecc62e4ceaa58529a3c87de97d3d1a3aed3c6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -227,7 +227,7 @@ type Send struct {
 	FeeTokenInput            interfaces.TokenInput    `json:"feeTokenInput"`
 	FeeTokenHoldingCids      []types.CONTRACT_ID      `json:"feeTokenHoldingCids"`
 	TokenTransfer            *TokenTransferInput      `json:"tokenTransfer" hex:"optional"`
-	CcvSendInputs            []CCVSendInput           `json:"ccvSendInputs"`
+	CcvSendInputs            types.GENMAP             `json:"ccvSendInputs"`
 	ExecutorCid              *types.CONTRACT_ID       `json:"executorCid" hex:"optional"`
 }
 
@@ -288,17 +288,11 @@ func (t Send) ToMap() map[string]any {
 		}
 	}
 
-	m["ccvSendInputs"] = func() []any {
-		res := make([]any, 0, len(t.CcvSendInputs))
-		for _, e := range t.CcvSendInputs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+	m["ccvSendInputs"] = func() any {
+		if t.CcvSendInputs == nil {
+			return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
 		}
-		return res
+		return map[string]any{"_type": "genmap", "value": t.CcvSendInputs}
 	}()
 
 	if t.ExecutorCid != nil {

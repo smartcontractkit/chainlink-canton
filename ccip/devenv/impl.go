@@ -1132,7 +1132,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 
 	senderRequiredCCVs := make([]types.TEXT, 0, len(opts.CCVs))
 	ccvArgs := make([]types.TEXT, 0, len(opts.CCVs))
-	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
+	ccvSendInputs := make(types.GENMAP, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1178,10 +1178,10 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 		senderRequiredCCVs = append(senderRequiredCCVs, types.TEXT(hex.EncodeToString(rawAddr.InstanceAddress().Bytes())))
 		ccvArgs = append(ccvArgs, types.TEXT(hex.EncodeToString(ccvItem.Args)))
-		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+		ccvSendInputs[hex.EncodeToString(verifierAddress.Bytes())] = ccipsender.CCVSendInput{
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
 			CcvExtraContext: common.CCIPContext{},
-		})
+		}
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
 		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
 		if len(fallbackVerifierDestAddress) == 0 {

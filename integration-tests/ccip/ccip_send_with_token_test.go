@@ -889,10 +889,12 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				},
 			},
 		},
-		CcvSendInputs: []ccipsender.CCVSendInput{{
-			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-			CcvExtraContext: common.CCIPContext{},
-		}},
+		CcvSendInputs: types.GENMAP(map[string]any{
+			hex.EncodeToString(committeeVerifierRawAddr.InstanceAddress().Bytes()): ccipsender.CCVSendInput{
+				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+				CcvExtraContext: common.CCIPContext{},
+			},
+		}),
 		ExecutorCid: func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 	}
 
