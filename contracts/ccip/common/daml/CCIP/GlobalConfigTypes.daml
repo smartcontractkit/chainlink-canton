@@ -6,6 +6,10 @@ import DA.List qualified as List
 
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
+-- set the DestChainConfig to this value to disable the default executor.
+noExecutionExecutorRawInstanceAddress : RawInstanceAddress
+noExecutionExecutorRawInstanceAddress = RawInstanceAddress "no-execution-executor"
+
 data DestChainConfigArgs = DestChainConfigArgs
     with
         destChainSelector : Numeric 0           -- Destination chain selector of the config to update.

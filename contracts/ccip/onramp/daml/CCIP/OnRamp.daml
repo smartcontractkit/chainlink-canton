@@ -246,9 +246,20 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
-                let resolvedExecutorAddress = if extraArgs.executor /= ""
-                        then extraArgs.executor
-                        else RawInstanceAddress.toInstanceAddress destConfig.defaultExecutor
+                let resolvedExecutorAddress
+                        -- if executor is specified in extraArgs, always use it
+                        | (extraArgs.executor) /= ""
+                        = (extraArgs.executor)
+                        -- if the destChainConfig defaultExecutor is set to the noExecutionExecutorRawInstanceAddress sentinel value, use the noExecutionTag as the executor address
+                        | (destConfig.defaultExecutor) == CCIP.GlobalConfig.noExecutionExecutorRawInstanceAddress
+                        = CCIP.Client.noExecutionTag
+                        -- otherwise, use the default executor from the destChainConfig, encoded as an address
+                        | otherwise
+                        = RawInstanceAddress.toInstanceAddress destConfig.defaultExecutor
+                -- if no-execution executor is specified, set execution mode to NoExecutor, this will prevent any executor from adding a fee to the sending message
+                let executionMode = case resolvedExecutorAddress of
+                        addr | addr == CCIP.Client.noExecutionTag -> Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor
+                        _ -> None
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -282,8 +293,8 @@ template OnRamp
                     expectedTokenInstrumentId = tokenInstrumentId
                     outboundPoolCCVs = None
                     executorAddress = resolvedExecutorAddress
-                    executionMode = None
-                    executorArgs = ""
+                    executionMode = executionMode
+                    executorArgs = extraArgs.executorArgs
                     executorFee = None
                     executorDestGasLimit = 0
                     executorDestBytesOverhead = 0

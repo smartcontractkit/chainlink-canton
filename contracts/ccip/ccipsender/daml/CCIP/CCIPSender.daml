@@ -131,11 +131,8 @@ template CCIPSender
                 -- Executor contributes its flat fee, or the message is marked as
                 -- explicitly no-exec.
                 smCid <- case extraArgs.executor of
-                    "eba517d2" -> exercise smCid -- no-exec tag
-                        CCIP.SendingMessageV1.SetNoExecutor with
-                            executorArgs = extraArgs.executorArgs
-                            caller = owner
-                    executorInstanceAddress -> do -- executor specified
+                    addr | addr == CCIP.Client.noExecutionTag -> pure smCid -- no-exec tag, don't call Executor
+                    _ -> do -- executor specified (or zero=default)
                         exercise (fromSomeNote "executorCid required when executor is specified in extraArgs" executorCid) CCIP.Interfaces.Executor.Executor_CalculateFee with
                             sendingMessageCid = smCid
                             executorArgs = extraArgs.executorArgs

@@ -328,6 +328,7 @@ template SendingMessageV1
                 assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
 
                 let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
+                assertMsg "sendingMessage: caller is not the executor" (derivedExecutor == executorAddress)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId
@@ -338,20 +339,6 @@ template SendingMessageV1
                     executionMode = Some ExecutionMode_Executor
                     executorArgs = executorArgs
                     executorFee = Some ef
-
-        choice SetNoExecutor : ContractId SendingMessageV1
-            with
-                executorArgs : BytesHex
-                caller : Party
-            controller caller
-            do
-                assertMsg "sendingMessage: invalid state for SetNoExecutor" (state == SendingMessageState_Prepared)
-                assertMsg "setNoExecutor: already set" (isNone executorFee && isNone executionMode)
-                assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
-
-                create this with
-                    executionMode = Some ExecutionMode_NoExecutor
-                    executorArgs = executorArgs
 
         -- Finalize the execution receipt metadata. This happens before the
         -- outbound message is constructed.
