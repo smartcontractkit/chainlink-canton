@@ -702,7 +702,6 @@ func TestCCIPSend(t *testing.T) {
 		TokenTransfer:       nil,
 		CcvSendInputs: []ccipsender.CCVSendInput{{
 			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-			VerifierArgs:    types.TEXT(""),
 			CcvExtraContext: common.CCIPContext{},
 		}},
 	}

@@ -19,6 +19,8 @@ import qualified CCIP.PerPartyRouter
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
+import MCMS.RawInstanceAddress (assertValidInstanceId)
+
 import qualified Splice.Api.Token.HoldingV1
 
 -- | Per-CCV send input. Pairs a verifier contract (via interface)

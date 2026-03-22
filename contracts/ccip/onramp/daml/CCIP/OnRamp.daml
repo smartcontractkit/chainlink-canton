@@ -219,9 +219,9 @@ template OnRamp
                         (if null resolvedExtraArgs.ccvs
                             then if isTokenOnlyTransfer
                                 then []
-                                else map CCIP.RawInstanceAddress.toInstanceAddress destConfig.defaultCCVs
+                                else map RawInstanceAddress.toInstanceAddress destConfig.defaultCCVs
                             else resolvedExtraArgs.ccvs)
-                        ++ map CCIP.RawInstanceAddress.toInstanceAddress destConfig.laneMandatedCCVs)
+                        ++ map RawInstanceAddress.toInstanceAddress destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"

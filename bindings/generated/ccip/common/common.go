@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "f16dd74ae776eab975555bc1ea41491319d324646cf27f35bbb41489d8c77b60"
+	PackageID   = "2734143b89eb82253cb1666313200d6b755ef02644c57678b131d367f6193c6c"
 	SDKVersion  = "3.4.10"
 )
 
@@ -450,6 +450,63 @@ func (t AddVerifierDataMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddVerifierDataMCMSParams from hex string.
 func (t *AddVerifierDataMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Any2CantonMessage is a Record type
+type Any2CantonMessage struct {
+	MessageId           types.TEXT    `json:"messageId"`
+	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
+	Sender              types.TEXT    `json:"sender"`
+	Payload             types.TEXT    `json:"payload"`
+	DestTokenAmount     *TokenAmount  `json:"destTokenAmount" hex:"optional"`
+}
+
+// ToMap converts Any2CantonMessage to a map for DAML arguments
+func (t Any2CantonMessage) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["messageId"] = string(t.MessageId)
+
+	m["sourceChainSelector"] = t.SourceChainSelector
+
+	m["sender"] = string(t.Sender)
+
+	m["payload"] = string(t.Payload)
+
+	if t.DestTokenAmount != nil {
+		m["destTokenAmount"] = map[string]any{
+			"_type": "optional",
+			"value": *t.DestTokenAmount,
+		}
+	} else {
+		m["destTokenAmount"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return m
+}
+
+func (t Any2CantonMessage) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Any2CantonMessage) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Any2CantonMessage to hex string (Canton MCMS format)
+func (t Any2CantonMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Any2CantonMessage from hex string (Canton MCMS format)
+func (t *Any2CantonMessage) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1141,6 +1198,69 @@ func (t CancelExecuteMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes CancelExecuteMCMSParams from hex string.
 func (t *CancelExecuteMCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Canton2AnyMessage is a Record type
+type Canton2AnyMessage struct {
+	Receiver    types.TEXT                               `json:"receiver"`
+	Payload     types.TEXT                               `json:"payload"`
+	TokenAmount *TokenAmount                             `json:"tokenAmount" hex:"optional"`
+	FeeToken    splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	ExtraArgs   types.TEXT                               `json:"extraArgs"`
+}
+
+// ToMap converts Canton2AnyMessage to a map for DAML arguments
+func (t Canton2AnyMessage) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	if t.TokenAmount != nil {
+		m["tokenAmount"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenAmount,
+		}
+	} else {
+		m["tokenAmount"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
+
+	m["extraArgs"] = string(t.ExtraArgs)
+
+	return m
+}
+
+func (t Canton2AnyMessage) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *Canton2AnyMessage) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes Canton2AnyMessage to hex string (Canton MCMS format)
+func (t Canton2AnyMessage) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes Canton2AnyMessage from hex string (Canton MCMS format)
+func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2911,6 +3031,75 @@ func (t *FinalizeSendResult) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GenericExtraArgsV3 is a Record type
+type GenericExtraArgsV3 struct {
+	GasLimit           types.INT64  `json:"gasLimit"`
+	BlockConfirmations types.INT64  `json:"blockConfirmations"`
+	Ccvs               []types.TEXT `json:"ccvs"`
+	CcvArgs            []types.TEXT `json:"ccvArgs"`
+	Executor           types.TEXT   `json:"executor"`
+	ExecutorArgs       types.TEXT   `json:"executorArgs"`
+	TokenReceiver      types.TEXT   `json:"tokenReceiver"`
+	TokenArgs          types.TEXT   `json:"tokenArgs"`
+}
+
+// ToMap converts GenericExtraArgsV3 to a map for DAML arguments
+func (t GenericExtraArgsV3) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["gasLimit"] = int64(t.GasLimit)
+
+	m["blockConfirmations"] = int64(t.BlockConfirmations)
+
+	m["ccvs"] = func() []any {
+		res := make([]any, 0, len(t.Ccvs))
+		for _, e := range t.Ccvs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["ccvArgs"] = func() []any {
+		res := make([]any, 0, len(t.CcvArgs))
+		for _, e := range t.CcvArgs {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["executor"] = string(t.Executor)
+
+	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["tokenReceiver"] = string(t.TokenReceiver)
+
+	m["tokenArgs"] = string(t.TokenArgs)
+
+	return m
+}
+
+func (t GenericExtraArgsV3) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GenericExtraArgsV3) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GenericExtraArgsV3 to hex string (Canton MCMS format)
+func (t GenericExtraArgsV3) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GenericExtraArgsV3 from hex string (Canton MCMS format)
+func (t *GenericExtraArgsV3) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GetDestChainConfig is a Record type
 type GetDestChainConfig struct {
 	DestChainSelector types.NUMERIC `json:"destChainSelector"`
@@ -3985,7 +4174,7 @@ type SendingMessageV1 struct {
 	Sender                    types.PARTY                               `json:"sender"`
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
-	RequiredCCVs              []mcms.RawInstanceAddress                 `json:"requiredCCVs"`
+	RequiredCCVs              []types.TEXT                              `json:"requiredCCVs"`
 	ExecutorAddress           mcms.RawInstanceAddress                   `json:"executorAddress"`
 	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
@@ -4002,7 +4191,7 @@ type SendingMessageV1 struct {
 	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 	NetworkFeeUSDCents        types.NUMERIC                             `json:"networkFeeUSDCents"`
 	ExpectedTokenInstrumentId *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
-	OutboundPoolCCVs          *[]mcms.RawInstanceAddress                `json:"outboundPoolCCVs" hex:"optional"`
+	OutboundPoolCCVs          *[]types.TEXT                             `json:"outboundPoolCCVs" hex:"optional"`
 	ExecutorArgs              types.TEXT                                `json:"executorArgs"`
 	ExecutorFee               *ExecutorFee                              `json:"executorFee" hex:"optional"`
 	ExecutorDestGasLimit      types.INT64                               `json:"executorDestGasLimit"`
@@ -4064,12 +4253,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	args["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, string(e))
 		}
 		return res
 	}()
@@ -4336,12 +4520,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	args["requiredCCVs"] = func() []any {
 		res := make([]any, 0, len(t.RequiredCCVs))
 		for _, e := range t.RequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
+			res = append(res, string(e))
 		}
 		return res
 	}()
@@ -5191,6 +5370,60 @@ func (t SourceChainConfigArgs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SourceChainConfigArgs from hex string (Canton MCMS format)
 func (t *SourceChainConfigArgs) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenAmount is a Record type
+type TokenAmount struct {
+	Token           splice_api_token_holding_v1.InstrumentId `json:"token"`
+	Amount          types.NUMERIC                            `json:"amount"`
+	SenderInputCids []types.CONTRACT_ID                      `json:"senderInputCids"`
+}
+
+// ToMap converts TokenAmount to a map for DAML arguments
+func (t TokenAmount) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["token"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Token).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Token
+	}()
+
+	m["amount"] = t.Amount
+
+	m["senderInputCids"] = func() []any {
+		res := make([]any, 0, len(t.SenderInputCids))
+		for _, e := range t.SenderInputCids {
+			res = append(res, e)
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t TokenAmount) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAmount) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAmount to hex string (Canton MCMS format)
+func (t TokenAmount) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAmount from hex string (Canton MCMS format)
+func (t *TokenAmount) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }

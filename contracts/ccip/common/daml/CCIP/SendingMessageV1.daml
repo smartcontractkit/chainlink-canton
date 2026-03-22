@@ -125,7 +125,7 @@ assertCCVInstanceId
     -> Party
     -> Update ()
 assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
-    let claimed = RawInstanceAddress.toInstanceAddress(CCIP.RawInstanceAddress.make ccvInstanceId caller)
+    let claimed = RawInstanceAddress.toInstanceAddress(RawInstanceAddress.make ccvInstanceId caller)
         allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
     in assertMsg msg (claimed `elem` allowedCCVs)
 
