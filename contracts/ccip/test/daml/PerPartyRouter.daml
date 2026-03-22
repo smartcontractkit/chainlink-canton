@@ -27,6 +27,7 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
+import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
 
@@ -169,7 +170,7 @@ testCCIPSend = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
+            feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -177,6 +178,7 @@ testCCIPSend = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
                 defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
@@ -598,7 +600,7 @@ testPrepareSendExtraArgs = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
             owner = ccipOwner
-            feeTokens = Map.fromList [(feeTokenId, mult 1.0)]
+            feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -606,6 +608,7 @@ testPrepareSendExtraArgs = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
                 defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
@@ -659,6 +662,7 @@ testPrepareSendExtraArgs = script do
 
     -- Message-only send still defers message construction to the executor.
     let receiver = "b8a3d7a9c797b5bd47f8c5efd96dadecf15ddd3c" -- 20 bytes
+    let customCCV = RawInstanceAddress.make "custom-ccv" user
     smCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
@@ -680,6 +684,28 @@ testPrepareSendExtraArgs = script do
     Some sm <- user `queryContractId` smCid
     sm.message === None
     sm.ccipReceiveGasLimit === 123
+
+    -- Explicitly requesting the sentinel expands default CCVs on the send path.
+    smWithDefaultSentinelCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destChainSelector = destChainSelector
+            receiver = receiver
+            payload = "02"
+            ccipReceiveGasLimit = 123
+            senderRequiredCCVs = [CCIP.Interfaces.CrossChainVerifier.useDefaultCCVs, customCCV]
+            tokenInstrumentId = None
+            tokenReceiver = None
+            tokenArgs = ""
+            feeToken = feeTokenId
+
+    Some smWithDefaultSentinel <- user `queryContractId` smWithDefaultSentinelCid
+    smWithDefaultSentinel.requiredCCVs === [defaultCCV, customCCV]
 
     -- Token-only send (payload empty, gas 0): skip default CCVs.
     smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
@@ -704,6 +730,30 @@ testPrepareSendExtraArgs = script do
     smTokenOnly.requiredCCVs === []
     smTokenOnly.tokenArgs === "aabbccdd"
     smTokenOnly.tokenReceiver === receiver
+
+    -- Token-only sends still honor an explicit default sentinel.
+    smTokenOnlyWithDefaultSentinelCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destChainSelector = destChainSelector
+            receiver = receiver
+            payload = ""
+            ccipReceiveGasLimit = 0
+            senderRequiredCCVs = [CCIP.Interfaces.CrossChainVerifier.useDefaultCCVs, customCCV]
+            tokenInstrumentId = Some tokenInstrumentId
+            tokenReceiver = None
+            tokenArgs = "ddccbbaa"
+            feeToken = feeTokenId
+
+    Some smTokenOnlyWithDefaultSentinel <- user `queryContractId` smTokenOnlyWithDefaultSentinelCid
+    smTokenOnlyWithDefaultSentinel.requiredCCVs === [defaultCCV, customCCV]
+    smTokenOnlyWithDefaultSentinel.tokenArgs === "ddccbbaa"
+    smTokenOnlyWithDefaultSentinel.tokenReceiver === receiver
 
     -- Token-only send with separate receiver and tokenReceiver
     let tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89" -- 20 bytes
@@ -828,7 +878,7 @@ testPrepareSendRejectsOversizedPayload = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
+            feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 4
@@ -836,6 +886,7 @@ testPrepareSendRejectsOversizedPayload = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
                 defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty
@@ -1259,7 +1310,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
+            feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.empty
@@ -1389,7 +1440,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
         createCmd CCIP.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
             owner = ccipOwner
-            feeTokens = Map.fromList [(testFeeTokenId, mult 1.0)]
+            feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -1397,6 +1448,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 1
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = 0.0
                 defaultTokenDestGasOverhead = 0)]
             tokenTransferFeeConfigs = Map.empty

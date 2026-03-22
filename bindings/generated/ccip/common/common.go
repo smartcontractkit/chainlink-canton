@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "f16dd74ae776eab975555bc1ea41491319d324646cf27f35bbb41489d8c77b60"
+	PackageID   = "39467efd05a2fa008be7d752d0840a163e8f32686760ebfd8d4d89c6fea84aba"
 	SDKVersion  = "3.4.10"
 )
 
@@ -2084,6 +2084,27 @@ func (t *ExecutingMessageV1) UnmarshalHex(data string) error {
 
 // Choice methods for ExecutingMessageV1
 
+// CancelExecute exercises the CancelExecute choice on this ExecutingMessageV1 contract
+// This method uses the package name in the template ID
+func (t ExecutingMessageV1) CancelExecute(contractID string, args CancelExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
+		ContractID: contractID,
+		Choice:     "CancelExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CancelExecuteWithPackageID exercises the CancelExecute choice using the provided package ID instead of package name
+func (t ExecutingMessageV1) CancelExecuteWithPackageID(contractID string, packageID string, args CancelExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
+		ContractID: contractID,
+		Choice:     "CancelExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // AddCCVVerification exercises the AddCCVVerification choice on this ExecutingMessageV1 contract
 // This method uses the package name in the template ID
 func (t ExecutingMessageV1) AddCCVVerification(contractID string, args AddCCVVerification) *model.ExerciseCommand {
@@ -2122,27 +2143,6 @@ func (t ExecutingMessageV1) SetInboundPoolCCVsWithPackageID(contractID string, p
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CancelExecute exercises the CancelExecute choice on this ExecutingMessageV1 contract
-// This method uses the package name in the template ID
-func (t ExecutingMessageV1) CancelExecute(contractID string, args CancelExecute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
-		ContractID: contractID,
-		Choice:     "CancelExecute",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// CancelExecuteWithPackageID exercises the CancelExecute choice using the provided package ID instead of package name
-func (t ExecutingMessageV1) CancelExecuteWithPackageID(contractID string, packageID string, args CancelExecute) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.ExecutingMessageV1", "ExecutingMessageV1"),
-		ContractID: contractID,
-		Choice:     "CancelExecute",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -4664,27 +4664,6 @@ func (t SendingMessageV1) BuildMessageWithPackageID(contractID string, packageID
 	}
 }
 
-// AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
-// This method uses the package name in the template ID
-func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddVerifierData",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// AddVerifierDataWithPackageID exercises the AddVerifierData choice using the provided package ID instead of package name
-func (t SendingMessageV1) AddVerifierDataWithPackageID(contractID string, packageID string, args AddVerifierData) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
-		ContractID: contractID,
-		Choice:     "AddVerifierData",
-		Arguments:  argsToMap(args),
-	}
-}
-
 // AddCCVFee exercises the AddCCVFee choice on this SendingMessageV1 contract
 // This method uses the package name in the template ID
 func (t SendingMessageV1) AddCCVFee(contractID string, args AddCCVFee) *model.ExerciseCommand {
@@ -4786,6 +4765,27 @@ func (t SendingMessageV1) SetNoExecutorWithPackageID(contractID string, packageI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
 		ContractID: contractID,
 		Choice:     "SetNoExecutor",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddVerifierData exercises the AddVerifierData choice on this SendingMessageV1 contract
+// This method uses the package name in the template ID
+func (t SendingMessageV1) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddVerifierData",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddVerifierDataWithPackageID exercises the AddVerifierData choice using the provided package ID instead of package name
+func (t SendingMessageV1) AddVerifierDataWithPackageID(contractID string, packageID string, args AddVerifierData) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.SendingMessageV1", "SendingMessageV1"),
+		ContractID: contractID,
+		Choice:     "AddVerifierData",
 		Arguments:  argsToMap(args),
 	}
 }

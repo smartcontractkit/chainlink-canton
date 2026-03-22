@@ -256,6 +256,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 							DestGasPerPayloadByteBase:   16,
 							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
 							DefaultTxGasLimit:           200000,
+							LinkFeeMultiplierPercent:    90,
 							DefaultTokenFeeUSDCents:     10,
 							DefaultTokenDestGasOverhead: 34000,
 							NetworkFeeUSDCents:          25,
@@ -312,8 +313,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	// Configure FeeToken: Add FeeToken to FeeQuoter
 
-	// ApplyFeeTokenUpdates: Add the fee token with Canton E8 premium multiplier (1.0x)
-	premiumMultiplier := "100000000"
 	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.ApplyFeeTokenUpdates, ccipDeps, contractops.ChoiceInput[feequoter.ApplyFeeTokenUpdates]{
 		ChainSelector:   env.Chain.ChainSelector(),
 		InstanceAddress: feeQuoterInstanceAddress,
@@ -322,8 +321,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
 			FeeTokensToAdd: []feequoter.FeeTokenArgs{
 				{
-					InstrumentId:      feeTokenInstrumentId,
-					PremiumMultiplier: types.NUMERIC(premiumMultiplier),
+					InstrumentId: feeTokenInstrumentId,
 				},
 			},
 		},

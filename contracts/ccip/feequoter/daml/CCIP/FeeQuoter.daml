@@ -8,6 +8,7 @@ import DA.Foldable qualified as Foldable
 import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
+import DA.Set qualified as Set
 import Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
@@ -49,9 +50,8 @@ template FeeQuoter
         instanceId : Text
         owner : Party
 
-        -- | Set of fee tokens that can be used to pay for fees. Values are
-        -- | 1e8-scaled premium multipliers, so 1e8 = 1.0x.
-        feeTokens : Map.Map Splice.Api.Token.HoldingV1.InstrumentId (Numeric 0)
+        -- | Set of fee tokens that can be used to pay for fees.
+        feeTokens : Set.Set Splice.Api.Token.HoldingV1.InstrumentId
         destChainConfigs : Map.Map (Numeric 0) DestChainConfig
         tokenTransferFeeConfigs : Map.Map (Numeric 0) (Map.Map Splice.Api.Token.HoldingV1.InstrumentId TokenTransferFeeConfig)
 
@@ -210,6 +210,8 @@ template FeeQuoter
                     (totalGas <= destChainConfig.maxPerMsgGasLimit)
                 assertMsg "feequoter: message too large"
                     (calldataSize <= destChainConfig.maxDataBytes)
+                assertMsg ("Fee token not configured: " <> feeToken.id)
+                    (Set.member feeToken feeTokens)
 
                 gasPrice <- exercise self GetDestinationChainGasPrice with
                     destChainSelector
@@ -217,9 +219,10 @@ template FeeQuoter
                 feeTokenPrice <- exercise self GetTokenPrice with
                     instrumentId = feeToken
                     caller
-                let premiumMultiplier = fromSomeNote
-                        ("Fee token not configured: " <> feeToken.id)
-                        (Map.lookup feeToken feeTokens)
+                let premiumMultiplier =
+                        if feeToken == linkTokenInstrumentId
+                        then destChainConfig.linkFeeMultiplierPercent * 1000000.0
+                        else 100000000.0
                 let gasCostUSDCents =
                         -- Convert usd8 price-per-gas into integer USD cents, rounding up.
                         gasCostUsdCents gasPrice.price totalGas
@@ -239,16 +242,7 @@ template FeeQuoter
                 caller : Party
             controller caller
             do
-                return (Map.keys feeTokens)
-
-        -- | Get the premium multiplier for a given fee token.
-        nonconsuming choice GetPremiumMultiplierWeiPerEth : Numeric 0
-            with
-                token : Splice.Api.Token.HoldingV1.InstrumentId
-                caller : Party
-            controller caller
-            do
-                return (fromSomeNote ("Fee token not configured: " <> token.id) (Map.lookup token feeTokens))
+                return (Set.toList feeTokens)
 
         choice ApplyFeeTokenUpdates : ContractId FeeQuoter
             with
@@ -256,7 +250,11 @@ template FeeQuoter
                 feeTokensToAdd : [FeeTokenArgs]
             controller owner
             do
-                let newFeeTokens = foldl (\acc ft -> Map.insert ft.instrumentId ft.premiumMultiplier acc) (foldl (\acc tk -> Map.delete tk acc) feeTokens feeTokensToRemove) feeTokensToAdd
+                let newFeeTokens =
+                        foldl
+                            (\acc ft -> Set.insert ft.instrumentId acc)
+                            (foldl (\acc tk -> Set.delete tk acc) feeTokens feeTokensToRemove)
+                            feeTokensToAdd
                 create this with feeTokens = newFeeTokens
 
         -- ================================================================
@@ -282,6 +280,7 @@ template FeeQuoter
                         assertMsg ("destChainSelector must be greater than zero: " <> show dcca.destChainSelector) (dcca.destChainSelector > 0.0)
                         assertMsg ("defaultTxGasLimit must be set (> 0) for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit > 0)
                         assertMsg ("defaultTxGasLimit must be less than maxPerMsgGasLimit for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.defaultTxGasLimit < dcca.destChainConfig.maxPerMsgGasLimit)
+                        assertMsg ("linkFeeMultiplierPercent must be positive for destChainSelector: " <> show dcca.destChainSelector) (dcca.destChainConfig.linkFeeMultiplierPercent > 0.0)
                     ) destChainConfigArgs
 
                 let newDestChainConfigs = foldl (\acc dcca -> Map.insert dcca.destChainSelector dcca.destChainConfig acc) destChainConfigs destChainConfigArgs

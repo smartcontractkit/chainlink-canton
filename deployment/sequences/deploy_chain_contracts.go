@@ -138,7 +138,7 @@ var DeployChainContracts = operations.NewSequence(
 			ActAs:         []string{party},
 			Template: feequoter.FeeQuoter{
 				Owner:                            types.PARTY(input.CCIPOwnerParty),
-				FeeTokens:                        nil,
+				FeeTokens:                        types.SET{},
 				DestChainConfigs:                 nil,
 				TokenTransferFeeConfigs:          nil,
 				UsdPerUnitGasByDestChainSelector: nil,

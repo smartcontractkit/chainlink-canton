@@ -131,8 +131,7 @@ encodeApplyFeeTokenUpdatesParams (feeTokensToRemove, feeTokensToAdd) =
 
 encodeFeeTokenArgs : FeeTokenArgs -> BytesHex
 encodeFeeTokenArgs fta =
-    encodeInstrumentId fta.instrumentId <>
-    encodeNumeric0 fta.premiumMultiplier
+    encodeInstrumentId fta.instrumentId
 
 -- Decode
 decodeApplyFeeTokenUpdatesParams : BytesHex -> Optional (([Splice.Api.Token.HoldingV1.InstrumentId], [FeeTokenArgs]), Int)
@@ -143,11 +142,9 @@ decodeApplyFeeTokenUpdatesParams encoded = do
 
 decodeFeeTokenArgsAt : BytesHex -> Int -> Optional (FeeTokenArgs, Int)
 decodeFeeTokenArgsAt encoded offset = do
-    (instrumentId, offset1) <- decodeInstrumentId encoded offset
-    (premiumMultiplier, finalOffset) <- decodeNumeric0At encoded offset1
+    (instrumentId, finalOffset) <- decodeInstrumentId encoded offset
     Some (FeeTokenArgs with
             instrumentId
-            premiumMultiplier
         , finalOffset)
 
 -- ===============================================
@@ -172,6 +169,7 @@ encodeDestChainConfig dcc =
     fromSome (encodeInt64 dcc.destGasOverhead) <>
     fromSome (encodeInt64 dcc.destGasPerPayloadByteBase) <>
     fromSome (encodeInt64 dcc.defaultTxGasLimit) <>
+    encodeNumeric0 dcc.linkFeeMultiplierPercent <>
     encodeNumeric0 dcc.defaultTokenFeeUSD <>
     fromSome (encodeInt64 dcc.defaultTokenDestGasOverhead)
 
@@ -198,8 +196,9 @@ decodeDestChainConfigAt encoded offset = do
   (destGasOverhead, offset4) <- decodeInt64At encoded offset3
   (destGasPerPayloadByteBase, offset5) <- decodeInt64At encoded offset4
   (defaultTxGasLimit, offset6) <- decodeInt64At encoded offset5
-  (defaultTokenFeeUSD, offset7) <- decodeNumeric0At encoded offset6
-  (defaultTokenDestGasOverhead, finalOffset) <- decodeInt64At encoded offset7
+  (linkFeeMultiplierPercent, offset7) <- decodeNumeric0At encoded offset6
+  (defaultTokenFeeUSD, offset8) <- decodeNumeric0At encoded offset7
+  (defaultTokenDestGasOverhead, finalOffset) <- decodeInt64At encoded offset8
   Some (DestChainConfig with 
             isEnabled
             maxDataBytes
@@ -207,7 +206,7 @@ decodeDestChainConfigAt encoded offset = do
             destGasOverhead
             destGasPerPayloadByteBase
             defaultTxGasLimit
+            linkFeeMultiplierPercent
             defaultTokenFeeUSD
             defaultTokenDestGasOverhead
         , finalOffset)
-

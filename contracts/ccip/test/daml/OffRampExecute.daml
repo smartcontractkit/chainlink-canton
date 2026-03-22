@@ -16,6 +16,7 @@ import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import CCIP.GlobalConfig qualified as GlobalConfig
 import CCIP.Internal qualified as Internal
+import CCIP.Interfaces.CrossChainVerifier qualified as CrossChainVerifier
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OffRamp qualified as OffRamp
 import CCIP.PerPartyRouter qualified as PerPartyRouter
@@ -662,7 +663,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
-            receiverRequiredCCVs = [ccv1RawAddress, GlobalConfig.useDefaultCCVs, ccv3RawAddress]
+            receiverRequiredCCVs = [ccv1RawAddress, CrossChainVerifier.useDefaultCCVs, ccv3RawAddress]
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
             receiverMinBlockConfirmations = 2000

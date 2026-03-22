@@ -9,6 +9,7 @@ import DA.Date (date, Month(..))
 import DA.List (head, (!!))
 import DA.Map qualified as Map
 import DA.Optional
+import DA.Set qualified as Set
 import DA.TextMap qualified as TextMap
 import DA.Time (time)
 import qualified CCIP.Context
@@ -2067,7 +2068,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = ccipOwner
             instanceId = feeQuoterInstanceId
-            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
+            feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -2075,6 +2076,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 200000
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
             tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
@@ -2229,7 +2231,7 @@ testCalculateFeePrefersPoolOverride = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = ccipOwner
             instanceId = "test-feequoter-pool-override"
-            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
+            feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -2237,6 +2239,7 @@ testCalculateFeePrefersPoolOverride = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 200000
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
             tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
@@ -2396,7 +2399,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = ccipOwner
             instanceId = "test-feequoter-pool-disabled"
-            feeTokens = Map.fromList [(feeTokenId, 100000000.0)]
+            feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -2404,6 +2407,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 200000
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = usdToCents 0.5
                 defaultTokenDestGasOverhead = 11111)]
             tokenTransferFeeConfigs = Map.fromList [(destChainSelector, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
@@ -2559,7 +2563,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-defaults"
-            feeTokens = Map.fromList [(linkToken, 100000000.0)]
+            feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.fromList [(destChainSelector, FeeQuoter.DestChainConfig with
                 isEnabled = True
                 maxDataBytes = 100000
@@ -2567,6 +2571,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
                 destGasOverhead = 0
                 destGasPerPayloadByteBase = 0
                 defaultTxGasLimit = 200000
+                linkFeeMultiplierPercent = 100.0
                 defaultTokenFeeUSD = usdToCents 0.75
                 defaultTokenDestGasOverhead = 12345)]
             tokenTransferFeeConfigs = Map.empty
@@ -2604,7 +2609,7 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
         createCmd FeeQuoter.FeeQuoter with
             owner = owner
             instanceId = "test-feequoter-per-dest"
-            feeTokens = Map.fromList [(linkToken, 100000000.0)]
+            feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.fromList
                 [ (destChainSelector1, Map.fromList [(testInstrumentId, FeeQuoter.TokenTransferFeeConfig with
