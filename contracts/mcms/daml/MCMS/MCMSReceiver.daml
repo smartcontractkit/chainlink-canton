@@ -74,7 +74,7 @@ interface MCMSReceiver where
   --
   -- Parameters:
   --   functionName: The function to call (e.g., "Increment", "SetConfig")
-  --   operationData: Serialized parameters (BytesHex) - contract decodes this (uint16 length prefix)
+  --   operationData: Serialized parameters (BytesHex) - raw bytes for receiver to decode
   --   contractIds: Map of instanceAddress → contractId for any contracts the implementer might need
   --                Receiving contract uses coerceContractId to cast to specific types
   --                IMPORTANT: This map includes the receiver's own CID under its calculated instanceAddress
@@ -91,7 +91,7 @@ interface MCMSReceiver where
   nonconsuming choice MCMSReceiver_Entrypoint : Map.Map Text (ContractId ())
     with
       functionName : Text                         -- Function to execute
-      operationData : BytesHex                    -- Serialized parameters (hex) - uint16 length prefix
+      operationData : BytesHex                    -- Serialized parameters (hex) - raw bytes for receiver
       contractIds : Map.Map Text (ContractId ())  -- Map of instanceAddress → contractId for target to use
     controller (view this).mcmsController
     do

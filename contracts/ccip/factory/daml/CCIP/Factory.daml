@@ -87,74 +87,98 @@ template CCIPFactory
                 params <- requireDecoded "DeployGlobalConfig" (decodeDeployGlobalConfigParams operationData)
                 deployResult <- exercise selfCid DeployGlobalConfig with
                   contract = mkGlobalConfigContract owner params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployFeeQuoter" -> do
                 params <- requireDecoded "DeployFeeQuoter" (decodeDeployFeeQuoterParams operationData)
                 deployResult <- exercise selfCid DeployFeeQuoter with
                   contract = mkFeeQuoterContract owner params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployTokenAdminRegistry" -> do
                 params <- requireDecoded "DeployTokenAdminRegistry" (decodeDeployTokenAdminRegistryParams operationData)
                 deployResult <- exercise selfCid DeployTokenAdminRegistry with
                   contract = mkTokenAdminRegistryContract owner params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployOnRamp" -> do
                 params <- requireDecoded "DeployOnRamp" (decodeDeployOnRampParams operationData)
                 deployResult <- exercise selfCid DeployOnRamp with
                   contract = mkOnRampContract owner params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployOffRamp" -> do
                 params <- requireDecoded "DeployOffRamp" (decodeDeployOffRampParams operationData)
                 deployResult <- exercise selfCid DeployOffRamp with
                   contract = mkOffRampContract owner params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployPerPartyRouterFactory" -> do
                 params <- requireDecoded "DeployPerPartyRouterFactory" (decodeDeployPerPartyRouterFactoryParams operationData)
                 deployResult <- exercise selfCid DeployPerPartyRouterFactory with
                   contract = mkPerPartyRouterFactoryContract owner params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployRMNRemote" -> do
                 params <- requireDecoded "DeployRMNRemote" (decodeDeployRMNRemoteParams operationData)
                 deployResult <- exercise selfCid DeployRMNRemote with
                   contract = mkRMNRemoteContract params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployCommitteeVerifier" -> do
                 params <- requireDecoded "DeployCommitteeVerifier" (decodeDeployCommitteeVerifierParams operationData)
                 deployResult <- exercise selfCid DeployCommitteeVerifier with
                   contract = mkCommitteeVerifierContract params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployLockReleaseTokenPool" -> do
                 params <- requireDecoded "DeployLockReleaseTokenPool" (decodeDeployLockReleaseTokenPoolParams operationData)
                 deployResult <- exercise selfCid DeployLockReleaseTokenPool with
                   contract = mkLockReleaseTokenPoolContract params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployRateLimiter" -> do
                 params <- requireDecoded "DeployRateLimiter" (decodeDeployRateLimiterParams operationData)
                 rateLimiterContract <- mkRateLimiterContract params
                 deployResult <- exercise selfCid DeployRateLimiter with
                   contract = rateLimiterContract
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployCCIPSender" -> do
                 params <- requireDecoded "DeployCCIPSender" (decodeDeployCCIPSenderParams operationData)
                 deployResult <- exercise selfCid DeployCCIPSender with
                   contract = mkCCIPSenderContract params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               "DeployCCIPReceiver" -> do
                 params <- requireDecoded "DeployCCIPReceiver" (decodeDeployCCIPReceiverParams operationData)
                 deployResult <- exercise selfCid DeployCCIPReceiver with
                   contract = mkCCIPReceiverContract params
-                pure (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds)
+                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
