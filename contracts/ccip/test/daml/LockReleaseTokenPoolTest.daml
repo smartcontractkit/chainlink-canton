@@ -131,7 +131,6 @@ testLockOrBurn = script do
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "TestToken"
-    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
 
     -- Deploy RMNRemote
     rmnRemote <- submit rmnOwner do
@@ -378,7 +377,6 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
 
     let rmnInstanceId = "test-rmn-existing-pool"
     let feeQuoterInstanceId = "test-feequoter-existing-pool"
-    let ccvInstanceId = "test-ccv-existing-pool"
     let tokenAdminRegistryInstanceId = "test-tar-existing-pool"
     let tokenPoolInstanceId = "test-lock-release-pool-existing-pool"
 
@@ -391,8 +389,6 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
     let testInstrumentId = HoldingV1.InstrumentId with
             admin = ccipOwner
             id = "TestToken"
-    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
-
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
             instanceId = rmnInstanceId
@@ -539,7 +535,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
             tokenSendFeeTokenAmount = 0.0
             networkFeeTokenAmount = 0.0
             verifierData = []
-            ccvOwners = [ccvInstanceAddress]
+            ccvOwners = []
             tokenSendData = None
             observingParties = [sender]
             state = SendingMessageV1.SendingMessageState_FeeFinalized
