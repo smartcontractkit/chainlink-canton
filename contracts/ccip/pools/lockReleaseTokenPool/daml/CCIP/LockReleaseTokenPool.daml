@@ -607,7 +607,8 @@ template LockReleaseTokenPool
                         extraArgs = tokenInput.extraArgs
 
                 case transferResult.output of
-                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids ->
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed receiverCids -> do
+                        assertMsg "ReleaseFromTicket: transfer completed with no receiver holdings" (not (null receiverCids))
                         pure CCIP.Interfaces.TokenPool.ReleaseOrMintResult with
                             output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                                 receiverHoldingCids = receiverCids
