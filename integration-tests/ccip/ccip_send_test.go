@@ -25,8 +25,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -672,18 +670,6 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
-	sendExtraArgs := &devenv.GenericExtraArgsV3{
-		GasLimit:           100_000,
-		BlockConfirmations: 0,
-		CCVs:               [][]byte{committeeVerifierRawAddr.InstanceAddress().Bytes()},
-		CCVArgs:            [][]byte{[]byte("")},
-		Executor:           executorAddress.InstanceAddress().Bytes(),
-		ExecutorArgs:       []byte(""),
-		TokenReceiver:      []byte(""),
-		TokenArgs:          []byte(""),
-	}
-	encodedExtraArgs, err := devenv.EncodeGenericExtraArgsV3(sendExtraArgs)
-	require.NoError(t, err)
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -693,7 +679,18 @@ func TestCCIPSend(t *testing.T) {
 			Payload:     types.TEXT(testPayloadHex),
 			TokenAmount: nil,
 			FeeToken:    feeTokenInstrumentId,
-			ExtraArgs:   types.TEXT(hex.EncodeToString(encodedExtraArgs)),
+			ExtraArgs: common.ExtraArgs{
+				V3: &common.GenericExtraArgsV3{
+					GasLimit:           100_000,
+					BlockConfirmations: 0,
+					Ccvs:               []types.TEXT{types.TEXT(hex.EncodeToString(committeeVerifierRawAddr.InstanceAddress().Bytes()))},
+					CcvArgs:            []types.TEXT{types.TEXT("")},
+					Executor:           types.TEXT(hex.EncodeToString(executorAddress.InstanceAddress().Bytes())),
+					ExecutorArgs:       types.TEXT(""),
+					TokenReceiver:      types.TEXT(""),
+					TokenArgs:          types.TEXT(""),
+				},
+			},
 		},
 		ExecutorCid:         func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 		FeeTokenInput:       feeTokenInput,

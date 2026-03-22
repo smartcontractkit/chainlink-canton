@@ -26,6 +26,7 @@ data DestChainConfig = DestChainConfig
         addressBytesLength : Int                -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
         baseExecutionGasCost : Int              -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
+        -- TODO: Add default executor
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
         messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.

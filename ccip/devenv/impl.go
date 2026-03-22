@@ -1130,8 +1130,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	senderRequiredCCVs := make([][]byte, 0, len(opts.CCVs))
-	ccvArgs := make([][]byte, 0, len(opts.CCVs))
+	senderRequiredCCVs := make([]types.TEXT, 0, len(opts.CCVs))
+	ccvArgs := make([]types.TEXT, 0, len(opts.CCVs))
 	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
@@ -1176,8 +1176,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		senderRequiredCCVs = append(senderRequiredCCVs, rawAddr.InstanceAddress().Bytes())
-		ccvArgs = append(ccvArgs, ccvItem.Args)
+		senderRequiredCCVs = append(senderRequiredCCVs, types.TEXT(hex.EncodeToString(rawAddr.InstanceAddress().Bytes())))
+		ccvArgs = append(ccvArgs, types.TEXT(hex.EncodeToString(ccvItem.Args)))
 		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
 			CcvExtraContext: common.CCIPContext{},
@@ -1208,20 +1208,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			"rmn-remote":           common.AnyValue{AVContractId: &rmnRemoteCID},
 		},
 	}
-	sendExtraArgs := &GenericExtraArgsV3{
-		GasLimit:           opts.ExecutionGasLimit,
-		BlockConfirmations: 0,
-		CCVs:               senderRequiredCCVs,
-		CCVArgs:            ccvArgs,
-		Executor:           executorInstanceAddress.Bytes(),
-		ExecutorArgs:       []byte(""),
-		TokenReceiver:      []byte(""),
-		TokenArgs:          []byte(""),
-	}
-	encodedExtraArgs, err := EncodeGenericExtraArgsV3(sendExtraArgs)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to encode extraArgs: %w", err)
-	}
+
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                routerCID,
@@ -1231,7 +1218,18 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			Payload:     types.TEXT(hex.EncodeToString(fields.Data)),
 			TokenAmount: nil,
 			FeeToken:    feeTokenInstrument,
-			ExtraArgs:   types.TEXT(hex.EncodeToString(encodedExtraArgs)),
+			ExtraArgs: common.ExtraArgs{
+				V3: &common.GenericExtraArgsV3{
+					GasLimit:           types.INT64(opts.ExecutionGasLimit),
+					BlockConfirmations: 0,
+					Ccvs:               senderRequiredCCVs,
+					CcvArgs:            ccvArgs,
+					Executor:           types.TEXT(hex.EncodeToString(executorInstanceAddress.Bytes())),
+					ExecutorArgs:       types.TEXT(""),
+					TokenReceiver:      types.TEXT(""),
+					TokenArgs:          types.TEXT(""),
+				},
+			},
 		},
 		FeeTokenInput: interfaces.TokenInput{
 			// TODO: replace with a real Splice TransferFactory CID from the

@@ -10,7 +10,6 @@ import DA.Text qualified as T
 
 import qualified CCIP.Client
 import qualified CCIP.Events
-import qualified CCIP.ExtraArgsCodec
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Math
@@ -189,15 +188,17 @@ template OnRamp
 
                 -- Parse extraArgs and validate fields
                 -- TODO: parse with defaults
-                let resolvedExtraArgs = fromSomeNote "onramp: invalid extraArgs format" (CCIP.ExtraArgsCodec.decodeGenericExtraArgsV3 message.extraArgs)
-                assertMsg "onramp: gas limit exceeds uint32" (resolvedExtraArgs.gasLimit <= 4294967295)
-                assertMsg "onramp: block confirmations not allowed from Canton" (resolvedExtraArgs.blockConfirmations == 0)
-                assertValidHex "executor" resolvedExtraArgs.executor
-                assertValidHex "executorArgs" resolvedExtraArgs.executorArgs
-                assertValidHex "tokenReceiver" resolvedExtraArgs.tokenReceiver
-                assertValidHex "tokenArgs" resolvedExtraArgs.tokenArgs
-                assertMsg "onramp: CCVs cannot contain duplicates" (unique resolvedExtraArgs.ccvs)
-                assertMsg "onramp: CCVs and CCV args length mismatch" (length resolvedExtraArgs.ccvs == length resolvedExtraArgs.ccvArgs)
+                extraArgs <- case message.extraArgs of
+                        CCIP.Client.V3 v3 -> pure v3
+                        _ -> abort "onramp: unsupported extraArgs version"
+                assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
+                assertMsg "onramp: block confirmations not allowed from Canton" (extraArgs.blockConfirmations == 0)
+                assertValidHex "executor" extraArgs.executor
+                assertValidHex "executorArgs" extraArgs.executorArgs
+                assertValidHex "tokenReceiver" extraArgs.tokenReceiver
+                assertValidHex "tokenArgs" extraArgs.tokenArgs
+                assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
+                assertMsg "onramp: CCVs and CCV args length mismatch" (length extraArgs.ccvs == length extraArgs.ccvArgs)
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
                     Some feeDestConfig ->
@@ -212,15 +213,26 @@ template OnRamp
                 let (hasTokenTransfer, tokenInstrumentId, tokenAmount) = case message.tokenAmount of
                         None -> (False, None, None)
                         Some ta -> (True, Some ta.token, Some ta.amount)
+                -- A pure token transfer is defined as:
+                -- - receiver callback gas limit is 0
+                -- - message payload is empty
+                -- - the message sends a token
                 let isTokenOnlyTransfer = hasTokenTransfer
                         && message.payload == ""
-                        && resolvedExtraArgs.gasLimit == 0
+                        && extraArgs.gasLimit == 0
+                
                 let resolvedCCVs = dedup (
-                        (if null resolvedExtraArgs.ccvs
+                        (if null extraArgs.ccvs
                             then if isTokenOnlyTransfer
+                                -- If the user has not specified any CCVs and this is a token-only transfer, CCVs are skipped as only the Token Pool CCVs apply.
                                 then []
+                                -- If the user has not specified any CCVs and this is not a token-only transfer, use the default CCVs from the config. This allows users to not have to specify CCVs for every message if they just want to use the defaults.
                                 else map RawInstanceAddress.toInstanceAddress destConfig.defaultCCVs
-                            else resolvedExtraArgs.ccvs)
+                            else do
+                                -- Replace all placeholders ("") in extraArgs.ccvs with the default CCVs from the config. This allows the sender to specify some CCVs and have the rest be filled in by the onramp based on the destination chain's defaults.
+                                concatMap (\ccv -> if ccv == "" then map RawInstanceAddress.toInstanceAddress destConfig.defaultCCVs else [ccv]) extraArgs.ccvs
+                                )
+                        -- Always add the lane mandated CCVs, these cannot be skipped.
                         ++ map RawInstanceAddress.toInstanceAddress destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
@@ -229,7 +241,7 @@ template OnRamp
                 let onRampAddr = CCIP.MessageCodecV1.encodeInstanceAddress instanceId ccipOwner
                 let senderAddr = CCIP.MessageCodecV1.encodePartyAddress routerPartyOwner
                 let resolvedTokenReceiver = if hasTokenTransfer
-                        then validateDestChainAddress (if resolvedExtraArgs.tokenReceiver /= "" then resolvedExtraArgs.tokenReceiver else message.receiver) destConfig.addressBytesLength
+                        then validateDestChainAddress (if extraArgs.tokenReceiver /= "" then extraArgs.tokenReceiver else message.receiver) destConfig.addressBytesLength
                         else ""
                 let networkFeeUSD = if hasTokenTransfer
                         then destConfig.tokenNetworkFeeUSDCents
@@ -256,12 +268,12 @@ template OnRamp
                     receiver = validateDestChainAddress message.receiver destConfig.addressBytesLength
                     payload = message.payload
                     executionGasLimit = 0
-                    ccipReceiveGasLimit = resolvedExtraArgs.gasLimit -- TODO: does this default to default gas limit if 0?
+                    ccipReceiveGasLimit = extraArgs.gasLimit -- TODO: does this default to default gas limit if 0?
                     ccvAndExecutorHash = ""
                     onRampAddress = onRampAddr
                     offRampAddress = destConfig.offRampAddress
                     tokenReceiver = resolvedTokenReceiver
-                    tokenArgs = resolvedExtraArgs.tokenArgs
+                    tokenArgs = extraArgs.tokenArgs
                     message = None
                     encodedMessage = ""
                     messageId = ""

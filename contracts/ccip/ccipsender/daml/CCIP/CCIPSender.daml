@@ -10,7 +10,6 @@ import DA.Optional (fromSome, fromSomeNote, isSome)
 
 import qualified CCIP.Client
 import qualified CCIP.Context
-import qualified CCIP.ExtraArgsCodec
 import qualified CCIP.FeeQuoter
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
@@ -86,7 +85,9 @@ template CCIPSender
 
                 -- Decode and validate extraArgs
                 -- TODO: parse with defaults
-                let resolvedExtraArgs = fromSomeNote "onramp: invalid extraArgs format" (CCIP.ExtraArgsCodec.decodeGenericExtraArgsV3 message.extraArgs)
+                extraArgs <- case message.extraArgs of
+                    CCIP.Client.V3 v3 -> pure v3
+                    _ -> abort "sender: unsupported extraArgs version"
                 -- TODO: Validate that ccvs are passed in in the correct order
                 -- TODO: Validate that the executor that's been passed in matches the executor specified in extraArgs (if any)
 
@@ -131,15 +132,15 @@ template CCIPSender
 
                 -- Executor contributes its flat fee, or the message is marked as
                 -- explicitly no-exec.
-                smCid <- case resolvedExtraArgs.executor of
+                smCid <- case extraArgs.executor of
                     "eba517d2" -> exercise smCid -- no-exec tag
                         CCIP.SendingMessageV1.SetNoExecutor with
-                            executorArgs = resolvedExtraArgs.executorArgs
+                            executorArgs = extraArgs.executorArgs
                             caller = owner
                     executorInstanceAddress -> do -- executor specified
                         exercise (fromSomeNote "executorCid required when executor is specified in extraArgs" executorCid) CCIP.Interfaces.Executor.Executor_CalculateFee with
                             sendingMessageCid = smCid
-                            executorArgs = resolvedExtraArgs.executorArgs
+                            executorArgs = extraArgs.executorArgs
                             caller = owner
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with
@@ -171,7 +172,7 @@ template CCIPSender
                             sendingMessageCid = cid
                             verifierArgs = args
                             caller = owner
-                    ) smCid (zip ccvSendInputs resolvedExtraArgs.ccvArgs)
+                    ) smCid (zip ccvSendInputs extraArgs.ccvArgs)
 
                 -- CCIPSend (collects total fee from sender)
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with

@@ -28,8 +28,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -854,18 +852,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Separately, pool takes a token amount cut at LockOrBurn:
 	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
 	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
-	sendExtraArgs := &devenv.GenericExtraArgsV3{
-		GasLimit:           100_000,
-		BlockConfirmations: 0,
-		CCVs:               [][]byte{committeeVerifierRawAddr.InstanceAddress().Bytes()},
-		CCVArgs:            [][]byte{[]byte("")},
-		Executor:           executorAddress.InstanceAddress().Bytes(),
-		ExecutorArgs:       []byte(""),
-		TokenReceiver:      []byte(""),
-		TokenArgs:          []byte(""),
-	}
-	encodedExtraArgs, err := devenv.EncodeGenericExtraArgsV3(sendExtraArgs)
-	require.NoError(t, err)
 	sendArgs := ccipsender.Send{
 		Context:                  sendContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -878,8 +864,19 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				Amount:          types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
 				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
 			},
-			FeeToken:  feeTokenInstrumentId,
-			ExtraArgs: types.TEXT(hex.EncodeToString(encodedExtraArgs)),
+			FeeToken: feeTokenInstrumentId,
+			ExtraArgs: common.ExtraArgs{
+				V3: &common.GenericExtraArgsV3{
+					GasLimit:           100_000,
+					BlockConfirmations: 0,
+					Ccvs:               []types.TEXT{types.TEXT(hex.EncodeToString(committeeVerifierRawAddr.InstanceAddress().Bytes()))},
+					CcvArgs:            []types.TEXT{types.TEXT("")},
+					Executor:           types.TEXT(hex.EncodeToString(executorAddress.InstanceAddress().Bytes())),
+					ExecutorArgs:       types.TEXT(""),
+					TokenReceiver:      types.TEXT(""),
+					TokenArgs:          types.TEXT(""),
+				},
+			},
 		},
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},

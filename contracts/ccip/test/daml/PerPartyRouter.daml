@@ -15,7 +15,6 @@ import qualified DA.TextMap as TextMap
 import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.ExtraArgsCodec
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Internal
@@ -271,7 +270,7 @@ testCCIPSend = script do
                 payload = "48656c6c6f20576f726c64"
                 tokenAmount = None
                 feeToken = testFeeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.getBasicEncodedExtraArgs 100000
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     -- Executor fee and message finalization
     disclosedExecutor <- fromSome <$> queryDisclosure ccipOwner executor
@@ -345,7 +344,7 @@ testCCIPSend = script do
                 payload = "48656c6c6f20576f726c6432"
                 tokenAmount = None
                 feeToken = testFeeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.getBasicEncodedExtraArgs 100000
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     -- Executor fee and message finalization for second message
     sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedExecutor) do
@@ -677,7 +676,7 @@ testPrepareSendExtraArgs = script do
                 payload = "01"
                 tokenAmount = None
                 feeToken = feeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.getBasicEncodedExtraArgs 123
+                extraArgs = CCIP.Client.getBasicExtraArgs 123
 
     Some sm <- user `queryContractId` smCid
     sm.message === None
@@ -692,18 +691,16 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "02"
-            ccipReceiveGasLimit = 123
-            senderRequiredCCVs = [CCIP.Interfaces.CrossChainVerifier.useDefaultCCVs, customCCV]
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "02"
+                feeToken = feeTokenId
+                tokenAmount = None
+                extraArgs = CCIP.Client.getBasicExtraArgsWithCCVs 123 ["", RawInstanceAddress.toInstanceAddress customCCV] ["", ""]
 
     Some smWithDefaultSentinel <- user `queryContractId` smWithDefaultSentinelCid
-    smWithDefaultSentinel.requiredCCVs === [defaultCCV, customCCV]
+    smWithDefaultSentinel.requiredCCVs === [RawInstanceAddress.toInstanceAddress defaultCCV, RawInstanceAddress.toInstanceAddress customCCV]
 
     -- Token-only send (payload empty, gas 0): skip default CCVs.
     smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
@@ -723,15 +720,15 @@ testPrepareSendExtraArgs = script do
                     amount = 1000.0
                     senderInputCids = []
                 feeToken = feeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.encodeGenericExtraArgsV3 CCIP.ExtraArgsCodec.GenericExtraArgsV3 with
-                        gasLimit = 0
-                        blockConfirmations = 0
-                        ccvs = []
-                        ccvArgs = []
-                        executor = ""
-                        executorArgs = ""
-                        tokenReceiver = ""
-                        tokenArgs = "aabbccdd"
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs = []
+                    ccvArgs = []
+                    executor = ""
+                    executorArgs = ""
+                    tokenReceiver = ""
+                    tokenArgs = "aabbccdd"
 
     Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
     smTokenOnly.requiredCCVs === []
@@ -747,18 +744,27 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            senderRequiredCCVs = [CCIP.Interfaces.CrossChainVerifier.useDefaultCCVs, customCCV]
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = None
-            tokenArgs = "ddccbbaa"
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs = ["", RawInstanceAddress.toInstanceAddress customCCV]
+                    ccvArgs = ["", ""]
+                    executor = ""
+                    executorArgs = ""
+                    tokenReceiver = ""
+                    tokenArgs = "ddccbbaa"
 
     Some smTokenOnlyWithDefaultSentinel <- user `queryContractId` smTokenOnlyWithDefaultSentinelCid
-    smTokenOnlyWithDefaultSentinel.requiredCCVs === [defaultCCV, customCCV]
+    smTokenOnlyWithDefaultSentinel.requiredCCVs === [RawInstanceAddress.toInstanceAddress defaultCCV, RawInstanceAddress.toInstanceAddress customCCV]
     smTokenOnlyWithDefaultSentinel.tokenArgs === "ddccbbaa"
     smTokenOnlyWithDefaultSentinel.tokenReceiver === receiver
 
@@ -781,7 +787,7 @@ testPrepareSendExtraArgs = script do
                     amount = 1000.0
                     senderInputCids = []
                 feeToken = feeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.encodeGenericExtraArgsV3 CCIP.ExtraArgsCodec.GenericExtraArgsV3 with
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                         gasLimit = 0
                         blockConfirmations = 0
                         ccvs = []
@@ -812,7 +818,7 @@ testPrepareSendExtraArgs = script do
                 payload = ""
                 tokenAmount = None
                 feeToken = feeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.getBasicEncodedExtraArgs 0
+                extraArgs = CCIP.Client.getBasicExtraArgs 0
 
     submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -831,7 +837,7 @@ testPrepareSendExtraArgs = script do
                     amount = 1000.0
                     senderInputCids = []
                 feeToken = feeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.encodeGenericExtraArgsV3 CCIP.ExtraArgsCodec.GenericExtraArgsV3 with
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                         gasLimit = 0
                         blockConfirmations = 0
                         ccvs = []
@@ -979,7 +985,7 @@ testPrepareSendRejectsOversizedPayload = script do
                 payload = "0011223344"
                 tokenAmount = None
                 feeToken = testFeeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.getBasicEncodedExtraArgs 100000
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     pure ()
 
@@ -1398,7 +1404,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                 payload = "abcd"
                 feeToken = testFeeTokenId
                 tokenAmount = None
-                extraArgs = CCIP.ExtraArgsCodec.encodeGenericExtraArgsV3 CCIP.ExtraArgsCodec.GenericExtraArgsV3 with
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 0
                     blockConfirmations = 0
                     ccvs = [RawInstanceAddress.toInstanceAddress duplicateCCV, RawInstanceAddress.toInstanceAddress duplicateCCV] -- Duplicate CCVs should be rejected
@@ -1544,6 +1550,6 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 payload = "abcd"
                 tokenAmount = None
                 feeToken = testFeeTokenId
-                extraArgs = CCIP.ExtraArgsCodec.getBasicEncodedExtraArgs 100000
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     pure ()
