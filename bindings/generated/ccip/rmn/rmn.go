@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rmn"
-	PackageID   = "9a075710766c0ba7992cde3f1630d13484e58bba1e3c2339a171957eaed4da10"
+	PackageID   = "2b65931df357046abf39ddf7b4b294de1dd227e1c49b3148bb6d563254203a01"
 	SDKVersion  = "3.4.10"
 )
 
@@ -741,6 +741,27 @@ func (t RMNRemote) CurseMultipleWithPackageID(contractID string, packageID strin
 	}
 }
 
+// UncurseMultiple exercises the UncurseMultiple choice on this RMNRemote contract
+// This method uses the package name in the template ID
+func (t RMNRemote) UncurseMultiple(contractID string, args UncurseMultiple) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "UncurseMultiple",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// UncurseMultipleWithPackageID exercises the UncurseMultiple choice using the provided package ID instead of package name
+func (t RMNRemote) UncurseMultipleWithPackageID(contractID string, packageID string, args UncurseMultiple) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
+		ContractID: contractID,
+		Choice:     "UncurseMultiple",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // IsCursed exercises the IsCursed choice on this RMNRemote contract
 // This method uses the package name in the template ID
 func (t RMNRemote) IsCursed(contractID string, args IsCursed) *model.ExerciseCommand {
@@ -821,27 +842,6 @@ func (t RMNRemote) GetCursedSubjectsWithPackageID(contractID string, packageID s
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "GetCursedSubjects",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UncurseMultiple exercises the UncurseMultiple choice on this RMNRemote contract
-// This method uses the package name in the template ID
-func (t RMNRemote) UncurseMultiple(contractID string, args UncurseMultiple) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "UncurseMultiple",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// UncurseMultipleWithPackageID exercises the UncurseMultiple choice using the provided package ID instead of package name
-func (t RMNRemote) UncurseMultipleWithPackageID(contractID string, packageID string, args UncurseMultiple) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RMNRemote", "RMNRemote"),
-		ContractID: contractID,
-		Choice:     "UncurseMultiple",
 		Arguments:  argsToMap(args),
 	}
 }

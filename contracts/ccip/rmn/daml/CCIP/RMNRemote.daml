@@ -234,6 +234,10 @@ template RMNRemote
                 subjects : [BytesHex]
             controller rmnOwner
             do
+                assertMsg "rmn: duplicate subjects in uncurse request"
+                    (length subjects == length (dedup subjects))
+                Foldable.forA_ subjects (\subject ->
+                    assertMsg "rmn: subject not cursed" (subject `elem` cursedSubjects))
                 create this with cursedSubjects = filter (`notElem` subjects) cursedSubjects
 
         -- Add additional observer parties managed by rmnOwner.
