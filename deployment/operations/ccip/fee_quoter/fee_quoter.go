@@ -79,6 +79,7 @@ var ApplyDestChainConfigUpdates = contract.NewExercise(contract.ExerciseParams[f
 				return fmt.Errorf("linkFeeMultiplierPercent cannot be empty for dest chain %s", cfg.DestChainSelector)
 			}
 		}
+
 		return nil
 	},
 	Template: feequoter.FeeQuoter{},
