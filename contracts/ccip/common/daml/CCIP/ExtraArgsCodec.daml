@@ -1,0 +1,184 @@
+module CCIP.ExtraArgsCodec where
+
+import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Optional (fromSome)
+
+import CCIP.MessageCodecV1(
+    encodeUint8,
+    encodeUint16,
+    encodeUint32,
+
+    extractBytes,
+    decodeUint8,
+    decodeUint16,
+    decodeUint32,
+    )
+
+genericExtraArgsV3Tag : BytesHex
+genericExtraArgsV3Tag = "a69dd4aa"
+
+data GenericExtraArgsV3 = GenericExtraArgsV3
+    with
+        -- | Gas limit for the callback on the destination chain. 
+        -- | If the gas limit is zero and the message data length is also zero, no callback
+        -- | will be performed, even if a receiver is specified. A gas limit of zero is useful
+        -- | when only token transfers are desired, or when the receiver is an EOA account
+        -- | instead of a contract. Besides this gasLimit check, there are other checks on the
+        -- | destination chain that may prevent the callback from being executed, depending on
+        -- | the destination chain family.
+        -- | The sender is billed for the gas specified, not the gas actually used. Any unspent
+        -- | gas is not refunded. There are various ways to estimate the gas required for a
+        -- | callback on the destination chain, depending on the chain family. Please refer to
+        -- | the documentation for each chain for more details.
+        gasLimit : Int
+        -- | The number of block confirmations to wait for.
+        -- | 0 means the default finality that the CCV considers final. Any non-zero value means
+        -- | a block depth. CCVs, Pools and the executor may all reject this value by reverting
+        -- | the transaction on the source chain if they do not want to take on the risk of the
+        -- | block confirmations specified.
+        -- | May be zero to indicate waiting for finality is desired.
+        blockConfirmations : Int
+        -- | An array of CCV addresses representing the cross-chain verifiers to be used for
+        -- | the message.
+        -- | May be empty to specify the default verifier(s) should be used.
+        ccvs : [BytesHex]
+        -- | Optional arguments that are passed into the CCV without modification or inspection.
+        -- | CCIP itself does not interpret these arguments: they are encoded in whatever format
+        -- | the CCV has decided.
+        -- | Must be the same length as the `ccvs` array. May have empty bytes as arguments.
+        ccvArgs : [BytesHex]
+        -- | Address of the executor contract on the source chain.
+        -- | The executor is responsible for executing the message on the destination chains once
+        -- | a quorum of CCVs have verified the message.
+        -- | May be empty to indicate the default executor should be used.
+        executor : BytesHex
+        -- | Destination chain family specific arguments for the executor.
+        -- | This field is passed to the destination chain as part of the message itself and these
+        -- | args are therefore fully protected through the message ID. The format of this field
+        -- | is specific to each chain family and is not interpreted by CCIP itself, only by the
+        -- | executor. Things that may be included here are Solana accounts or Sui object IDs,
+        -- | which must be secured through the message ID as passing in incorrect values can lead
+        -- | to loss of funds. 
+        -- | May be empty depending on the destination chain.
+        executorArgs : BytesHex
+        -- | Address of the token receiver on the destination chain, in bytes format. If an empty
+        -- | bytes array is provided, the receiver address from the message itself is used for
+        -- | token transfers. This field allows for scenarios where the token receiver is
+        -- | different from the message receiver.
+        -- | May be empty, the behavior differs depending on if there is a token transfer or not:
+        -- | - If there is a token transfer, the receiver from the message is used.
+        -- | - If there is no token transfer, this field should be empty.
+        tokenReceiver : BytesHex
+        -- | Additional arguments for token transfers.
+        -- | This field is passed into the token pool on the source chain and is not inspected by
+        -- | CCIP itself. The format of this field is therefore specific to the token pool being
+        -- | used and may vary between different pools.
+        -- | May be empty depending on the token pool.
+        tokenArgs : BytesHex
+    deriving (Eq, Show)
+
+encodeGenericExtraArgsV3 : GenericExtraArgsV3 -> BytesHex
+encodeGenericExtraArgsV3 args =
+    let
+        -- Static length section - 10 bytes
+        staticSection =
+            genericExtraArgsV3Tag -- 4 bytes
+            <> fromSome (encodeUint32 args.gasLimit) -- uint32, 4 bytes
+            <> fromSome (encodeUint16 args.blockConfirmations) -- uint16, 2 bytes
+
+        -- CCVs and their args
+        ccvSection =
+            fromSome (encodeUint8 (length args.ccvs)) -- uint8, number of CCVs, 1 byte
+            <> mconcat (zipWith encodeCcvAndArgs args.ccvs args.ccvArgs) -- for each CCV, encode the address and args with length prefixes.
+
+        executorSection = 
+            fromSome (encodeUint8 (byteCount args.executor)) -- uint8 length prefix for executor address
+            <> args.executor -- executor address, variable length depending on chain (20 bytes for EVM
+            <> fromSome (encodeUint16 (byteCount args.executorArgs)) -- uint16 length prefix
+            <> args.executorArgs -- variable length, executor args
+
+        tokenSection = 
+            fromSome (encodeUint8 (byteCount args.tokenReceiver)) -- uint8 length prefix for token receiver
+            <> args.tokenReceiver -- token receiver address, variable length depending on chain
+            <> fromSome (encodeUint16 (byteCount args.tokenArgs)) -- uint16 length prefix
+            <> args.tokenArgs -- variable length, token args
+
+    in
+    staticSection <> ccvSection <> executorSection <> tokenSection
+
+encodeCcvAndArgs : BytesHex -> BytesHex -> BytesHex
+encodeCcvAndArgs ccv ccvArg =
+    fromSome (encodeUint8 (byteCount ccv)) -- uint8, length of CCV address in bytes, should be 20 for EVM chains but may differ for other chains
+    <> ccv 
+    <> fromSome (encodeUint16 (byteCount ccvArg)) -- uint16, length of ccvArg in bytes, allows for variable length ccvArgs
+    <> ccvArg
+
+
+decodeGenericExtraArgsV3 : BytesHex -> Optional GenericExtraArgsV3
+decodeGenericExtraArgsV3 encoded =
+    do
+        -- Check if length is at least the minimum size
+        let minSize = 4 + 4 + 2 + 1 + 1 + 2 -- tag + gasLimit + blockConfirmations + numCCVs + executor length prefix + tokenReceiver length prefix
+        if byteCount encoded < minSize then None else do
+            -- Tag (4 bytes, offset 0)
+            tag <- extractBytes encoded 0 4
+            if tag /= genericExtraArgsV3Tag then None else do
+                -- Gas limit (4 bytes, offset 4)
+                gasLimit <- decodeUint32 (fromSome (extractBytes encoded 4 4))
+                -- Block confirmations (2 bytes, offset 8)
+                blockConfirmations <- decodeUint16 (fromSome (extractBytes encoded 8 2))
+
+                -- Number of CCVs (1 byte, offset 10)
+                numCcvs <- decodeUint8 (fromSome (extractBytes encoded 10 1))
+                -- CCVs and their args (variable length, starting at offset 11)
+                (ccvs, ccvArgs, executorOffset) <- decodeCcvsAndArgs encoded 11 numCcvs
+
+                -- Executor section
+                executorLen <- decodeUint8 (fromSome (extractBytes encoded executorOffset 1))
+                executor <- extractBytes encoded (executorOffset + 1) executorLen
+                executorArgsLen <- decodeUint16 (fromSome (extractBytes encoded (executorOffset + 1 + executorLen) 2))
+                executorArgs <- extractBytes encoded (executorOffset + 1 + executorLen + 2) executorArgsLen
+                let tokenOffset = executorOffset + 1 + executorLen + 2 + executorArgsLen
+
+                -- Token section
+                tokenReceiverLen <- decodeUint8 (fromSome (extractBytes encoded tokenOffset 1))
+                tokenReceiver <- extractBytes encoded (tokenOffset + 1) tokenReceiverLen
+                tokenArgsLen <- decodeUint16 (fromSome (extractBytes encoded (tokenOffset + 1 + tokenReceiverLen) 2))
+                tokenArgs <- extractBytes encoded (tokenOffset + 1 + tokenReceiverLen + 2) tokenArgsLen
+
+                return GenericExtraArgsV3 with
+                    gasLimit
+                    blockConfirmations
+                    ccvs
+                    ccvArgs
+                    executor
+                    executorArgs
+                    tokenReceiver
+                    tokenArgs
+
+decodeCcvsAndArgs : BytesHex -> Int -> Int -> Optional ([BytesHex], [BytesHex], Int)
+decodeCcvsAndArgs _encoded offset 0 = Some ([], [], offset)
+decodeCcvsAndArgs encoded offset n = do
+    ccvLen <- decodeUint8 (fromSome (extractBytes encoded offset 1))
+    ccv <- extractBytes encoded (offset + 1) ccvLen
+    ccvArgLen <- decodeUint16 (fromSome (extractBytes encoded (offset + 1 + ccvLen) 2))
+    ccvArg <- extractBytes encoded (offset + 1 + ccvLen + 2) ccvArgLen
+    let nextOffset = offset + 1 + ccvLen + 2 + ccvArgLen
+    (ccvs, ccvArgs, finalOffset) <- decodeCcvsAndArgs encoded nextOffset (n - 1)
+    return (ccv :: ccvs, ccvArg :: ccvArgs, finalOffset)
+
+-- Creates a basic encoded GenericExtraArgsV3 with only the gasLimit set.
+--
+-- Params:
+-- gasLimit: The gas limit for the callback on the destination chain.
+getBasicEncodedExtraArgs : Int -> BytesHex
+getBasicEncodedExtraArgs gasLimit =
+    encodeGenericExtraArgsV3 GenericExtraArgsV3 with
+        gasLimit = gasLimit
+        blockConfirmations = 0
+        ccvs = []
+        ccvArgs = []
+        executor = ""
+        executorArgs = ""
+        tokenReceiver = ""
+        tokenArgs = ""

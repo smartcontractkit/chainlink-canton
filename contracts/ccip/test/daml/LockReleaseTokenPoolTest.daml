@@ -1225,8 +1225,8 @@ testExecutionGasLimitAggregation = script do
             destChainSelector = 456.0
             sequenceNumber = 1.0
             requiredCCVs =
-                [ RawInstanceAddress.make "ccv-1" ccvOwner1
-                , RawInstanceAddress.make "ccv-2" ccvOwner2
+                [ (RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "ccv-1" ccvOwner1))
+                , (RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "ccv-2" ccvOwner2))
                 ]
             executorAddress = RawInstanceAddress.make "default-executor-gas" ccipOwner
             executionMode = None
@@ -1449,7 +1449,7 @@ testExecutionGasLimitWithTokenSendFee = script do
                 feeQuoter = RawInstanceAddress.make "test-feequoter-gas-pool" ccipOwner
             destChainSelector = 456.0
             sequenceNumber = 1.0
-            requiredCCVs = [RawInstanceAddress.make "ccv-pool" ccvOwner]
+            requiredCCVs = [(RawInstanceAddress.toInstanceAddress(RawInstanceAddress.make "ccv-pool" ccvOwner))]
             executorAddress = RawInstanceAddress.make "default-executor-gas-pool" ccipOwner
             executionMode = None
             sourceChainSelector = 123.0

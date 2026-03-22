@@ -28,6 +28,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -635,6 +637,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	})
 	require.NoError(t, err)
 	executorCid := extractCreatedContractId(res)
+	executorAddress := contracts.InstanceID("test-executor").RawInstanceAddress(types.PARTY(partyCCIP))
 	t.Logf("Deployed Executor: %s", executorCid)
 
 	// Get disclosures for CCIPSender.Send
@@ -851,29 +854,38 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// Separately, pool takes a token amount cut at LockOrBurn:
 	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
 	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
+	sendExtraArgs := &devenv.GenericExtraArgsV3{
+		GasLimit:           100_000,
+		BlockConfirmations: 0,
+		CCVs:               [][]byte{committeeVerifierRawAddr.InstanceAddress().Bytes()},
+		CCVArgs:            [][]byte{[]byte("")},
+		Executor:           executorAddress.InstanceAddress().Bytes(),
+		ExecutorArgs:       []byte(""),
+		TokenReceiver:      []byte(""),
+		TokenArgs:          []byte(""),
+	}
+	encodedExtraArgs, err := devenv.EncodeGenericExtraArgsV3(sendExtraArgs)
+	require.NoError(t, err)
 	sendArgs := ccipsender.Send{
-		Context:           sendContext,
-		RouterCid:         types.CONTRACT_ID(routerCid),
-		DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:          types.TEXT(receiverHex),
-		Payload:           types.TEXT(testPayloadHex),
-		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(100000), // executorDestGasLimit
-			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
-			ExecutorArgs:       nil,
-			TokenReceiver:      nil,
-			TokenArgs:          types.TEXT(""),
+		Context:                  sendContext,
+		RouterCid:                types.CONTRACT_ID(routerCid),
+		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Message: common.Canton2AnyMessage{
+			Receiver: types.TEXT(receiverHex),
+			Payload:  types.TEXT(testPayloadHex),
+			TokenAmount: &common.TokenAmount{
+				Token:           feeTokenInstrumentId,
+				Amount:          types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
+				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			},
+			FeeToken:  feeTokenInstrumentId,
+			ExtraArgs: types.TEXT(hex.EncodeToString(encodedExtraArgs)),
 		},
-		FeeToken:            feeTokenInstrumentId,
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer: &ccipsender.TokenTransferInput{
-			TokenPoolCid:      types.CONTRACT_ID(disclosedPool.ContractId),
-			TokenInput:        tokenTransferInput,
-			SenderInputCids:   []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
-			Amount:            types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
-			TokenInstrumentId: feeTokenInstrumentId,
+			TokenPoolCid: types.CONTRACT_ID(disclosedPool.ContractId),
+			TokenInput:   tokenTransferInput,
 			PoolExtraContext: common.CCIPContext{
 				Values: types.TEXTMAP{
 					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
@@ -882,7 +894,6 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 		},
 		CcvSendInputs: []ccipsender.CCVSendInput{{
 			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-			VerifierArgs:    types.TEXT(""),
 			CcvExtraContext: common.CCIPContext{},
 		}},
 	}

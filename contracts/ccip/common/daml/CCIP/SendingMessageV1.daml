@@ -119,22 +119,22 @@ sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
 
 assertCCVInstanceId
     : Text
-    -> [CCIP.RawInstanceAddress.RawInstanceAddress]
-    -> Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
+    -> [BytesHex]
+    -> Optional [BytesHex]
     -> Text
     -> Party
     -> Update ()
 assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
-    let claimed = CCIP.RawInstanceAddress.make ccvInstanceId caller
+    let claimed = CCIP.RawInstanceAddress.toInstanceAddress(CCIP.RawInstanceAddress.make ccvInstanceId caller)
         allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
     in assertMsg msg (claimed `elem` allowedCCVs)
 
 buildMessageArtifacts
     : SendingMessageV1
-    -> ([CCIP.RawInstanceAddress.RawInstanceAddress], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
+    -> ([BytesHex], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
 buildMessageArtifacts sm =
     let
-        finalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+        ccvAddrs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
         executorAddressBytes = case sm.executionMode of
             Some ExecutionMode_Executor ->
                 CCIP.RawInstanceAddress.toInstanceAddress sm.executorAddress
@@ -142,7 +142,6 @@ buildMessageArtifacts sm =
                 noExecutionAddressBytes
             None ->
                 error "sendingMessage: execution mode not set"
-        ccvAddrs = map CCIP.RawInstanceAddress.toInstanceAddress finalCCVs
         finalHash =
             CCIP.MessageCodecV1.computeCCVAndExecutorHash ccvAddrs executorAddressBytes
         tokenTransferV1Opt = case sm.tokenSendData of
@@ -172,7 +171,7 @@ buildMessageArtifacts sm =
         encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
         msgId = keccak256 encoded
     in
-        (finalCCVs, finalHash, messageV1, encoded, msgId)
+        (ccvAddrs, finalHash, messageV1, encoded, msgId)
 
 template SendingMessageV1
     with
@@ -182,7 +181,7 @@ template SendingMessageV1
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
-        requiredCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+        requiredCCVs : [BytesHex]
         executorAddress : CCIP.RawInstanceAddress.RawInstanceAddress
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
@@ -206,7 +205,7 @@ template SendingMessageV1
         -- Expected token instrument for outbound TAR validation
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
-        outboundPoolCCVs : Optional [CCIP.RawInstanceAddress.RawInstanceAddress]
+        outboundPoolCCVs : Optional [BytesHex]
         -- Executor arguments, set by AddExecutorFee or SetNoExecutor
         executorArgs : BytesHex
         -- Executor flat fee, set by AddExecutorFee
@@ -307,9 +306,11 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
+                -- convert raw instance addresses to instance addresses
+                let instanceAddresses = map CCIP.RawInstanceAddress.toInstanceAddress poolCCVs
 
                 create this with
-                    outboundPoolCCVs = Some poolCCVs
+                    outboundPoolCCVs = Some instanceAddresses
                     state = SendingMessageState_Prepared
 
         -- Record the executor-selected flat fee. OnRamp computes execution

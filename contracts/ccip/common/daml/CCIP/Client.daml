@@ -1,0 +1,33 @@
+module CCIP.Client where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+
+data TokenAmount = TokenAmount
+    with
+        token : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data Any2CantonMessage = Any2CantonMessage
+    with
+        messageId : BytesHex
+        sourceChainSelector : Numeric 0
+        sender : BytesHex
+        payload : BytesHex
+        destTokenAmount : Optional TokenAmount
+    deriving (Eq, Show)
+
+data Canton2AnyMessage = Canton2AnyMessage
+    with
+        receiver : BytesHex
+        payload : BytesHex
+        tokenAmount : Optional TokenAmount
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+        extraArgs : BytesHex
+    deriving (Eq, Show)
+
+noExecutionTag : BytesHex
+noExecutionTag = "eba517d2"

@@ -25,6 +25,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
@@ -507,6 +509,7 @@ func TestCCIPSend(t *testing.T) {
 	})
 	require.NoError(t, err)
 	executorCid := extractCreatedContractId(res)
+	executorAddress := contracts.InstanceID("test-executor").RawInstanceAddress(types.PARTY(partyCCIP))
 	t.Logf("Deployed Executor: %s", executorCid)
 
 	// Get disclosures for CCIPSender.Send
@@ -669,27 +672,35 @@ func TestCCIPSend(t *testing.T) {
 		},
 	}
 
+	sendExtraArgs := &devenv.GenericExtraArgsV3{
+		GasLimit:           100_000,
+		BlockConfirmations: 0,
+		CCVs:               [][]byte{committeeVerifierRawAddr.InstanceAddress().Bytes()},
+		CCVArgs:            [][]byte{[]byte("")},
+		Executor:           executorAddress.InstanceAddress().Bytes(),
+		ExecutorArgs:       []byte(""),
+		TokenReceiver:      []byte(""),
+		TokenArgs:          []byte(""),
+	}
+	encodedExtraArgs, err := devenv.EncodeGenericExtraArgsV3(sendExtraArgs)
+	require.NoError(t, err)
 	sendArgs := ccipsender.Send{
-		Context:           sendContext,
-		RouterCid:         types.CONTRACT_ID(routerCid),
-		DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:          types.TEXT(receiverHex),
-		Payload:           types.TEXT(testPayloadHex),
-		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(100000),
-			SenderRequiredCCVs: []common.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
-			ExecutorArgs:       nil,
-			TokenReceiver:      nil,
-			TokenArgs:          types.TEXT(""),
+		Context:                  sendContext,
+		RouterCid:                types.CONTRACT_ID(routerCid),
+		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Message: common.Canton2AnyMessage{
+			Receiver:    types.TEXT(receiverHex),
+			Payload:     types.TEXT(testPayloadHex),
+			TokenAmount: nil,
+			FeeToken:    feeTokenInstrumentId,
+			ExtraArgs:   types.TEXT(hex.EncodeToString(encodedExtraArgs)),
 		},
-		FeeToken:            feeTokenInstrumentId,
+		ExecutorCid:         func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer:       nil,
 		CcvSendInputs: []ccipsender.CCVSendInput{{
 			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-			VerifierArgs:    types.TEXT(""),
 			CcvExtraContext: common.CCIPContext{},
 		}},
 	}
