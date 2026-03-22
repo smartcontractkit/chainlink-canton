@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "83052dfe245e38b53bf99570d4707391b1f6805ffeb245875785edbe8f4ff14e"
+	PackageID   = "2ba2cb41c61e280a66ee3518314dc388b5792e6dedb83f786cf66166fbb6551f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -141,8 +141,9 @@ func (t *LockOrBurnResult) UnmarshalHex(data string) error {
 
 // ReleaseOrMintResult is a Record type
 type ReleaseOrMintResult struct {
-	Output         ReleaseOrMintResultOutput `json:"output"`
-	PoolChangeCids []types.CONTRACT_ID       `json:"poolChangeCids"`
+	Output          ReleaseOrMintResultOutput `json:"output"`
+	PoolChangeCids  []types.CONTRACT_ID       `json:"poolChangeCids"`
+	ClaimedEventCid types.CONTRACT_ID         `json:"claimedEventCid"`
 }
 
 // ToMap converts ReleaseOrMintResult to a map for DAML arguments
@@ -163,6 +164,14 @@ func (t ReleaseOrMintResult) ToMap() map[string]any {
 			res = append(res, e)
 		}
 		return res
+	}()
+
+	m["claimedEventCid"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ClaimedEventCid).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ClaimedEventCid
 	}()
 
 	return m

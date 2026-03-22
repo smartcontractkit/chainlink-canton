@@ -13,6 +13,7 @@ import MCMS.RawInstanceAddress (RawInstanceAddress)
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
+import qualified CCIP.Events
 import qualified CCIP.TokenAdminRegistry
 
 -- | Direction of token transfer for CCV requirement lookup.
@@ -130,6 +131,7 @@ data ReleaseOrMintResult = ReleaseOrMintResult
     with
         output : ReleaseOrMintResult_Output
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        claimedEventCid : ContractId CCIP.Events.TokenReceiveTicketClaimed
     deriving (Eq, Show)
 
 data ReleaseOrMintResult_Output

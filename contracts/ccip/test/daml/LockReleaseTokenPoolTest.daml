@@ -13,6 +13,7 @@ import DA.Set qualified as Set
 import DA.TextMap qualified as TextMap
 import DA.Time (time)
 import qualified CCIP.Context
+import CCIP.Events qualified as Events
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FeeQuoter qualified as FeeQuoter
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
@@ -906,7 +907,7 @@ testReleaseFromTicket = script do
             instrumentId = testInstrumentId
             amount = 3000000.0
             sourcePoolData = ""
-            messageHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
             sourceChainSelector = sourceChainSelector
             finality = 0
 
@@ -950,6 +951,16 @@ testReleaseFromTicket = script do
             receiverH.amount === 3000000.0
             receiverH.owner === receiver
         _ -> abort "Expected completed result"
+
+    claimedEvent <- queryContractId receiver result.claimedEventCid
+    assertMsg "Claimed event should exist" (isSome claimedEvent)
+    let claimed = fromSome claimedEvent
+    claimed.tokenReceiveTicketCid === tokenReceiveTicket
+    claimed.event.messageId === "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    case claimed.event.output of
+        Events.TokenReceiveTicketClaimed_Completed receiverCids ->
+            length receiverCids === 1
+        _ -> abort "Expected completed claimed event output"
 
     -- Verify pool got change (7 tokens)
     assertMsg "Pool should have 1 change holding" (length result.poolChangeCids == 1)
@@ -1079,7 +1090,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             instrumentId = testInstrumentId
             amount = 3000000.0
             sourcePoolData = ""
-            messageHash = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
             finality = 0
 
@@ -1225,7 +1236,7 @@ testReleaseFromTicketDecimalConversion = script do
             instrumentId = testInstrumentId
             amount = 1234567890123456789.0
             sourcePoolData = sourcePoolData
-            messageHash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
             sourceChainSelector = sourceChainSelector
             finality = 0
 
@@ -1262,6 +1273,14 @@ testReleaseFromTicketDecimalConversion = script do
             let receiverH = fromSome receiverHolding
             receiverH.amount === 1234567.0
         _ -> abort "Expected completed result"
+
+    claimedEvent <- queryContractId receiver result.claimedEventCid
+    let claimed = fromSome claimedEvent
+    claimed.event.messageId === "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    case claimed.event.output of
+        Events.TokenReceiveTicketClaimed_Completed receiverCids ->
+            length receiverCids === 1
+        _ -> abort "Expected completed claimed event output"
 
     -- ConsumeCapacity archives the old rate limiter and creates a new one,
     -- so query by template type instead of the stale CID.
@@ -1384,7 +1403,7 @@ testReleaseFromTicketWithAdditionalCCVOwner = script do
             instrumentId = testInstrumentId
             amount = 3000000.0
             sourcePoolData = ""
-            messageHash = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             sourceChainSelector = sourceChainSelector
             finality = 0
 

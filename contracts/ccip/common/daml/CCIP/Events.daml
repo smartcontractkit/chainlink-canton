@@ -5,6 +5,9 @@ import DA.List (dedup)
 
 import qualified CCIP.Internal
 import qualified CCIP.Tickets
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.TransferInstructionV1
+import qualified MCMS.RawInstanceAddress
 
 template CCIPMessageSent
     with
@@ -46,3 +49,35 @@ data ExecutionStateChangedEvent = ExecutionStateChangedEvent
         returnData : BytesHex
     deriving (Eq, Show)
 
+template TokenReceiveTicketClaimed
+    with
+        ccipOwner : Party
+        ccvOwners : [Party]
+        poolOwner : Party
+        receiver : Party
+        tokenReceiver : Party
+        tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
+        event : TokenReceiveTicketClaimedEvent
+    where
+        signatory poolOwner
+        observer dedup (ccipOwner :: receiver :: tokenReceiver :: ccvOwners)
+
+data TokenReceiveTicketClaimedEvent = TokenReceiveTicketClaimedEvent
+    with
+        verifiedCCVs : [MCMS.RawInstanceAddress.RawInstanceAddress]
+        tokenAdminRegistryInstanceId : Text
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        sourcePoolData : BytesHex
+        messageId : BytesHex
+        sourceChainSelector : Numeric 0
+        finality : Int
+        output : TokenReceiveTicketClaimed_Output
+    deriving (Eq, Show)
+
+data TokenReceiveTicketClaimed_Output
+    = TokenReceiveTicketClaimed_Pending
+        with transferInstructionCid : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+    | TokenReceiveTicketClaimed_Completed
+        with receiverHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
