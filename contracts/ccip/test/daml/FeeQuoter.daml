@@ -10,7 +10,7 @@ import DA.Optional (fromSome)
 import DA.Time (time)
 
 import CCIP.FeeQuoter
-import CCIP.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 import Splice.Api.Token.HoldingV1
@@ -244,6 +244,88 @@ setup = script do
                         destChainSelector = -123.0
                         destChainConfig = destChainConfig1)
                 ]
+
+    -- test AddPriceUpdaters and RemovePriceUpdaters
+    updater1 <- allocateParty "updater1"
+    updater2 <- allocateParty "updater2"
+    updater3 <- allocateParty "updater3"
+
+    -- Add two price updaters
+    fq <- submit owner do
+        exerciseCmd fq AddPriceUpdaters with
+            parties = [updater1, updater2]
+
+    -- Verify updaters can call UpdatePrices
+    fq <- submit updater1 do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = [
+                        TokenPriceUpdate with
+                            instrumentId = instrumentIdLINK
+                            usdPerToken = 3000000000.0
+                    ]
+                gasPriceUpdates = []
+            caller = updater1
+
+    result <- submit owner do
+        exerciseCmd fq GetTokenPrice with
+            instrumentId = instrumentIdLINK
+            caller = owner
+    result.price === 3000000000.0
+
+    -- Non-updater should fail
+    submitMustFail updater3 do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = updater3
+
+    -- Add another, including a duplicate
+    fq <- submit owner do
+        exerciseCmd fq AddPriceUpdaters with
+            parties = [updater2, updater3]
+
+    -- updater3 should now work
+    fq <- submit updater3 do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = [
+                        TokenPriceUpdate with
+                            instrumentId = instrumentIdLINK
+                            usdPerToken = 4000000000.0
+                    ]
+                gasPriceUpdates = []
+            caller = updater3
+
+    -- Remove updater1
+    fq <- submit owner do
+        exerciseCmd fq RemovePriceUpdaters with
+            parties = [updater1]
+
+    -- updater1 should now fail
+    submitMustFail updater1 do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = updater1
+
+    -- updater2 should still work
+    fq <- submit updater2 do
+        exerciseCmd fq UpdatePrices with
+            priceUpdates = PriceUpdates with
+                tokenPriceUpdates = []
+                gasPriceUpdates = []
+            caller = updater2
+
+    -- Adding owner as price updater should be filtered out
+    fq <- submit owner do
+        exerciseCmd fq AddPriceUpdaters with
+            parties = [owner]
+
+    Some fqData <- queryContractId owner fq
+    assertMsg "owner should not be in priceUpdaters" (owner `notElem` fqData.priceUpdaters)
 
     -- try setting an invalid config (defaultTxGasLimit = 0), should fail
     let invalidDestChainConfig = destChainConfig1 with defaultTxGasLimit = 0

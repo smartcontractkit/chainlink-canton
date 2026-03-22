@@ -39,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -426,8 +427,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				strconv.FormatUint(remoteSelector, 10): lockreleasetokenpool.RemoteChainConfig{
 					RemotePools:           []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 					RemoteTokenAddress:    types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-					InboundCCVs:           []common.RawInstanceAddress{},
-					OutboundCCVs:          []common.RawInstanceAddress{},
+					InboundCCVs:           []mcms.RawInstanceAddress{},
+					OutboundCCVs:          []mcms.RawInstanceAddress{},
 					MinBlockConfirmations: types.INT64(0),
 					InboundRateLimiter:    outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
@@ -558,6 +559,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partySender),
+						InstanceId: "router-sender",
 					}),
 				}},
 			}},

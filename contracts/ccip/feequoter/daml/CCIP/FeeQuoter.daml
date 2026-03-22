@@ -8,14 +8,14 @@ import DA.Foldable qualified as Foldable
 import DA.List (unique, dedup, (\\))
 import DA.Map qualified as Map
 import DA.Optional
-import DA.Text qualified as T
-
 import Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Codec (decodePartyList)
 import CCIP.FeeQuoterCodec (
     decodeApplyPriceUpdatersUpdateParams,
     decodeUpdatePricesParams,
@@ -37,8 +37,8 @@ feeQuoterKey = "fee-quoter"
 lookupFeeQuoterCid : CCIP.Context.CCIPContext -> Update (ContractId FeeQuoter)
 lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
 
-rawInstanceAddress : FeeQuoter -> CCIP.RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress feeQuoter = CCIP.RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
+rawInstanceAddress : FeeQuoter -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress feeQuoter = RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
 
 gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
@@ -65,7 +65,7 @@ template FeeQuoter
     where
         signatory owner
         observer priceUpdaters
-        ensure not (T.isInfixOf "@" instanceId) && unique priceUpdaters
+        ensure assertValidInstanceId instanceId && unique priceUpdaters
 
         nonconsuming choice Get : FeeQuoter
             with
@@ -132,6 +132,24 @@ template FeeQuoter
                 let newUsdPerToken = foldl (\acc tpu -> Map.insert tpu.instrumentId (TimestampedPrice tpu.usdPerToken now) acc) usdPerToken priceUpdates.tokenPriceUpdates
                 let newUsdPerUnitGasByDestChainSelector = foldl (\acc gpu -> Map.insert gpu.destChainSelector (TimestampedPrice gpu.usdPerUnitGas now) acc) usdPerUnitGasByDestChainSelector priceUpdates.gasPriceUpdates
                 create this with usdPerToken = newUsdPerToken, usdPerUnitGasByDestChainSelector = newUsdPerUnitGasByDestChainSelector
+
+        choice AddPriceUpdaters : ContractId FeeQuoter
+            with
+                parties : [Party]
+            controller owner
+            do
+                create this with
+                    priceUpdaters =
+                        filter (/= owner)
+                            (dedup (priceUpdaters ++ parties))
+
+        choice RemovePriceUpdaters : ContractId FeeQuoter
+            with
+                parties : [Party]
+            controller owner
+            do
+                create this with
+                    priceUpdaters = filter (`notElem` parties) priceUpdaters
 
         -- ================================================================
         -- │                         Fee Quoting                          │
@@ -315,6 +333,20 @@ template FeeQuoter
                                 assertMsg "E_TRAILING_BYTES: ApplyDestChainConfigUpdates" (finalOffset == byteCount operationData)
                                 newCid <- exercise selfCid ApplyDestChainConfigUpdates with
                                     destChainConfigArgs
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "AddPriceUpdaters" -> do
+                        case decodePartyList operationData 0 of
+                            None -> abort "E_INVALID_PARAMS: AddPriceUpdaters"
+                            Some (parties, finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: AddPriceUpdaters" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid AddPriceUpdaters with parties
+                                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                    "RemovePriceUpdaters" -> do
+                        case decodePartyList operationData 0 of
+                            None -> abort "E_INVALID_PARAMS: RemovePriceUpdaters"
+                            Some (parties, finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: RemovePriceUpdaters" (finalOffset == byteCount operationData)
+                                newCid <- exercise selfCid RemovePriceUpdaters with parties
                                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 

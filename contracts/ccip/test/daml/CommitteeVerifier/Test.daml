@@ -12,7 +12,7 @@ import DA.Optional (fromSome)
 import qualified CCIP.Context
 import CCIP.CommitteeVerifier qualified as CommitteeVerifier
 import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
@@ -33,16 +33,16 @@ createExecMsg owner rmnOwner = submit owner do
         ccvVerifications = []
         ccvOwners = []
         requiredCCVs =
-          [ CCIP.RawInstanceAddress.make "test-ccv1" owner
-          , CCIP.RawInstanceAddress.make "test-ccv2" owner
-          , CCIP.RawInstanceAddress.make "test-ccv3" owner
-          , CCIP.RawInstanceAddress.make "test-ccv4" owner
-          , CCIP.RawInstanceAddress.make "test-ccv5" owner
-          , CCIP.RawInstanceAddress.make "test-ccv6" owner
-          , CCIP.RawInstanceAddress.make "test-ccv7" owner
-          , CCIP.RawInstanceAddress.make "test-ccv8" owner
-          , CCIP.RawInstanceAddress.make "test-ccv9" owner
-          , CCIP.RawInstanceAddress.make "test-ccv10" owner
+          [ RawInstanceAddress.make "test-ccv1" owner
+          , RawInstanceAddress.make "test-ccv2" owner
+          , RawInstanceAddress.make "test-ccv3" owner
+          , RawInstanceAddress.make "test-ccv4" owner
+          , RawInstanceAddress.make "test-ccv5" owner
+          , RawInstanceAddress.make "test-ccv6" owner
+          , RawInstanceAddress.make "test-ccv7" owner
+          , RawInstanceAddress.make "test-ccv8" owner
+          , RawInstanceAddress.make "test-ccv9" owner
+          , RawInstanceAddress.make "test-ccv10" owner
           ]
         optionalCCVs = []
         optionalCCVThreshold = 0
@@ -50,10 +50,10 @@ createExecMsg owner rmnOwner = submit owner do
         sourceDefaultCCVs = []
         inboundPoolCCVs = None
         deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
-            offRamp = CCIP.RawInstanceAddress.make "test-offramp" owner
-            globalConfig = CCIP.RawInstanceAddress.make "test-globalconfig" owner
-            rmnRemote = CCIP.RawInstanceAddress.make "test-rmn" rmnOwner
-            tokenAdminRegistry = CCIP.RawInstanceAddress.make "test-tar" owner
+            offRamp = RawInstanceAddress.make "test-offramp" owner
+            globalConfig = RawInstanceAddress.make "test-globalconfig" owner
+            rmnRemote = RawInstanceAddress.make "test-rmn" rmnOwner
+            tokenAdminRegistry = RawInstanceAddress.make "test-tar" owner
         state = CCIP.ExecutingMessageV1.ExecutingMessageState_Prepared
 
 testCommitteeVerifier : Script ()
@@ -70,7 +70,7 @@ testCommitteeVerifier = script do
     debug ("signedHash: " <> signedHash)
 
     let rmnInstanceId = "test-rmn"
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
 
     rmnRemote <- submit rmnOwner do
         createCmd RMNRemote.RMNRemote with
@@ -445,7 +445,7 @@ testCommitteeVerifier_StorageLocations = script do
     admin <- allocateParty "ccv-storage-locations-admin"
 
     let rmnInstanceId = "test-rmn"
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId owner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId owner
 
     ccv1 <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -499,7 +499,7 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
     allowedParty2 <- allocateParty "allowed-party-2"
 
     let rmnInstanceId = "test-rmn"
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId owner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId owner
 
     ccvCid <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -599,7 +599,7 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
     allowedParty3 <- allocateParty "allowed-party-3"
 
     let rmnInstanceId = "test-rmn"
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId owner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId owner
 
     ccvCid <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with
@@ -712,7 +712,7 @@ testCommitteeVerifier_SetDynamicConfig = script do
     admin <- allocateParty "ccv-dynamic-config-admin"
 
     let rmnInstanceId = "test-rmn"
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId owner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId owner
 
     ccvCid <- submit owner do
         createCmd CommitteeVerifier.CommitteeVerifier with

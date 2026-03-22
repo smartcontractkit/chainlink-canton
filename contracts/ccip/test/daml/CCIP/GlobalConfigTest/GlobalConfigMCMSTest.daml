@@ -7,10 +7,11 @@ import DA.Assert ((===))
 import DA.List
 import DA.Map qualified as Map
 
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.GlobalConfig
 import CCIP.GlobalConfigCodec
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -36,7 +37,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Create dest chain config update
@@ -92,7 +93,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
       destChainConfigs = Map.fromList [(456.0, existingConfig)]
       sourceChainConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Create multiple new configs, one to replace existing
@@ -165,7 +166,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Create source chain config
@@ -209,7 +210,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.fromList [(456.0, SourceChainConfig True ["abcd"] [] [])]
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Create multiple new configs, one to replace existing
@@ -273,7 +274,7 @@ testGlobalConfigMCMSEntrypoint_UnknownFunction = script do
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Call with unknown function name - should fail
@@ -300,7 +301,7 @@ testGlobalConfigMCMSEntrypoint_InvalidParams = script do
       destChainConfigs = Map.empty
       sourceChainConfigs = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid
 
   -- Call with invalid operationData - should fail

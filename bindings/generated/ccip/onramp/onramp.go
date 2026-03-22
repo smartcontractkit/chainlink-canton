@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "f066ec527be0bd7ccae20a9605b04cb01f356e9ba6585f892c10b367f01c2c41"
+	PackageID   = "07e53cd278b8389c1f655d0ef4c04ec332be2ba71856238041a3f8987109cea6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -569,11 +570,11 @@ var _ mcms.IMCMSReceiver = (*OnRamp)(nil)
 
 // OnRampDeps is a Record type
 type OnRampDeps struct {
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        common.RawInstanceAddress `json:"ccvRegistry"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	CcvRegistry        mcms.RawInstanceAddress `json:"ccvRegistry"`
 }
 
 // ToMap converts OnRampDeps to a map for DAML arguments
@@ -647,30 +648,27 @@ func (t *OnRampDeps) UnmarshalHex(data string) error {
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	DestChainSelector     types.NUMERIC            `json:"destChainSelector"`
-	Message               common.Canton2AnyMessage `json:"message"`
-	RouterPartyOwner      types.PARTY              `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT               `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID        `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID        `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID        `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID        `json:"rmnRemoteCid"`
-	CurrentSequenceNumber types.NUMERIC            `json:"currentSequenceNumber"`
+	RouterPartyOwner      types.PARTY                               `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT                                `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID                         `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID                         `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID                         `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID                         `json:"rmnRemoteCid"`
+	DestChainSelector     types.NUMERIC                             `json:"destChainSelector"`
+	Receiver              types.TEXT                                `json:"receiver"`
+	Payload               types.TEXT                                `json:"payload"`
+	CcipReceiveGasLimit   types.INT64                               `json:"ccipReceiveGasLimit"`
+	CurrentSequenceNumber types.NUMERIC                             `json:"currentSequenceNumber"`
+	SenderRequiredCCVs    []mcms.RawInstanceAddress                 `json:"senderRequiredCCVs"`
+	TokenInstrumentId     *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
+	TokenReceiver         *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
+	TokenArgs             types.TEXT                                `json:"tokenArgs"`
+	FeeToken              splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments
 func (t PrepareSendFromRouter) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Message
-	}()
 
 	m["routerPartyOwner"] = t.RouterPartyOwner.ToMap()
 
@@ -708,7 +706,60 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 		return t.RmnRemoteCid
 	}()
 
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
 	m["currentSequenceNumber"] = t.CurrentSequenceNumber
+
+	m["senderRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.SenderRequiredCCVs))
+		for _, e := range t.SenderRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	if t.TokenInstrumentId != nil {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenInstrumentId,
+		}
+	} else {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenReceiver != nil {
+		m["tokenReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": string(*t.TokenReceiver),
+		}
+	} else {
+		m["tokenReceiver"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["tokenArgs"] = string(t.TokenArgs)
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
+	}()
 
 	return m
 }
@@ -779,11 +830,11 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	CcvRegistry        *common.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
+	GlobalConfig       *mcms.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *mcms.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *mcms.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	CcvRegistry        *mcms.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments

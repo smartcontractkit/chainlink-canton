@@ -3,7 +3,7 @@ module GlobalConfigTypes where
 import Daml.Script
 
 import qualified CCIP.GlobalConfigTypes
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 template ValidationHarness
     with

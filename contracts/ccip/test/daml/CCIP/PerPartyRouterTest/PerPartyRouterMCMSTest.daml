@@ -7,9 +7,10 @@ import DA.Assert ((===))
 import DA.Map qualified as Map
 import DA.Set qualified as Set
 
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.PerPartyRouter
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- PERPARTYROUTER MCMS ENTRYPOINT TESTS - SET DEPS
@@ -39,8 +40,9 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 
   let newDeps = SetDepsParams with
@@ -96,8 +98,9 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 
   let partialDeps = SetDepsParams with
@@ -153,8 +156,9 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 
   submitMustFail ccipOwner do
@@ -188,8 +192,9 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 
   submitMustFail ccipOwner do
@@ -223,6 +228,7 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
+      customObservers = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver routerCid
 
@@ -267,7 +273,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps = script do
       deps = initialDeps
       registeredRouters = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
 
   let newDeps = SetDepsParams with
@@ -320,7 +326,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_FactorySetDeps_Partial = script do
       deps = initialDeps
       registeredRouters = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
 
   let partialDeps = SetDepsParams with
@@ -372,7 +378,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_UnknownFunction = script do
       deps
       registeredRouters = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
 
   submitMustFail ccipOwner do
@@ -403,7 +409,7 @@ testPerPartyRouterFactoryMCMSEntrypoint_InvalidParams = script do
       deps
       registeredRouters = Map.empty
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
 
   submitMustFail ccipOwner do

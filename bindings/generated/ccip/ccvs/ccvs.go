@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "edeb4d7b72579478513146f6d1cf63830772840825e4543b9b7045b626459cd4"
+	PackageID   = "13f883929257cef0cac0ec2c6df221bc670cff1f7fb7781d26cefddaef9450d3"
 	SDKVersion  = "3.4.10"
 )
 
@@ -871,7 +871,7 @@ var _ common.IICrossChainVerifier = (*CommitteeVerifier)(nil)
 
 // CommitteeVerifierDeps is a Record type
 type CommitteeVerifierDeps struct {
-	RmnRemote common.RawInstanceAddress `json:"rmnRemote"`
+	RmnRemote mcms.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts CommitteeVerifierDeps to a map for DAML arguments
@@ -1348,7 +1348,7 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	RmnRemote *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	RmnRemote *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments

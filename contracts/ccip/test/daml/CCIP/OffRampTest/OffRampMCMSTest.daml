@@ -6,9 +6,10 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
 
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..), makeInstanceAddress)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import CCIP.OffRamp
-import CCIP.RawInstanceAddress (RawInstanceAddress(..))
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - SET DEPS
@@ -31,7 +32,7 @@ testOffRampMCMSEntrypoint_SetDeps = script do
       ccipOwner
       deps = initialDeps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
   let newDeps = SetDepsParams with
@@ -74,7 +75,7 @@ testOffRampMCMSEntrypoint_SetDeps_Partial = script do
       ccipOwner
       deps = initialDeps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
   let partialDeps = SetDepsParams with
@@ -117,7 +118,7 @@ testOffRampMCMSEntrypoint_SetDeps_Replace = script do
       ccipOwner
       deps = initialDeps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
   let deps2 = SetDepsParams with
@@ -182,7 +183,7 @@ testOffRampMCMSEntrypoint_UnknownFunction = script do
       ccipOwner
       deps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
   submitMustFail ccipOwner do
@@ -210,7 +211,7 @@ testOffRampMCMSEntrypoint_InvalidParams = script do
       ccipOwner
       deps
 
-  let instAddr = makeInstanceAddress instanceId ccipOwner
+  let instAddr = RawInstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
   submitMustFail ccipOwner do

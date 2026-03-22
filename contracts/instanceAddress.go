@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"golang.org/x/crypto/sha3"
 
-	ccip_common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms_bindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 )
 
 type RawInstanceAddress string
@@ -44,8 +44,8 @@ func (r RawInstanceAddress) InstanceAddress() InstanceAddress {
 	return InstanceAddress(h.Sum(nil))
 }
 
-func (r RawInstanceAddress) Binding() ccip_common.RawInstanceAddress {
-	return ccip_common.RawInstanceAddress{
+func (r RawInstanceAddress) Binding() mcms_bindings.RawInstanceAddress {
+	return mcms_bindings.RawInstanceAddress{
 		Unpack: types.TEXT(r),
 	}
 }

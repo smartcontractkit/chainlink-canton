@@ -6,7 +6,7 @@ import DA.List (dedup)
 import DA.Optional (fromSomeNote, fromOptional)
 import qualified DA.Map as Map
 
-import CCIP.RawInstanceAddress (RawInstanceAddress, toInstanceAddress)
+import MCMS.RawInstanceAddress (RawInstanceAddress, toInstanceAddress, assertValidInstanceId)
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
 
@@ -43,7 +43,7 @@ template Executor
         remoteChainConfigs : Map.Map (Numeric 0) RemoteChainConfig
     where
         signatory owner
-        ensure maxCCVsPerMsg > 0 && dynamicConfig.minBlockConfirmations >= 0
+        ensure assertValidInstanceId instanceId && maxCCVsPerMsg > 0 && dynamicConfig.minBlockConfirmations >= 0
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with

@@ -23,7 +23,7 @@ import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import qualified CCIP.PerPartyRouter
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
@@ -128,10 +128,10 @@ testCCIPSend = script do
             id = "FeeToken"
 
     -- Compute instance addresses
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy GlobalConfig with network fee fields
     globalConfig <- submit ccipOwner do
@@ -203,7 +203,7 @@ testCCIPSend = script do
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
     -- Deploy production Executor
@@ -227,11 +227,11 @@ testCCIPSend = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp" ccipOwner
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
 
@@ -399,10 +399,10 @@ testCCIPExecute = script do
     let destChainSelector : Numeric 0 = 2222222222.0
 
     -- Compute instance addresses
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvInstanceAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccvOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
 
     -- Deploy GlobalConfig
     globalConfig <- submit ccipOwner do
@@ -449,11 +449,11 @@ testCCIPExecute = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make "unused-onramp" ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner
+                onRamp = RawInstanceAddress.make "unused-onramp" ccipOwner
+                offRamp = RawInstanceAddress.make offRampInstanceId ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "unused-feequoter" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
 
@@ -476,7 +476,7 @@ testCCIPExecute = script do
             finality = 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
-            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner)
+            offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
             sender = "0000000000000000000000000000000000000003"
             receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
@@ -557,12 +557,12 @@ testPrepareSendExtraArgs = script do
             admin = ccipOwner
             id = "TestToken"
 
-    let defaultCCV = CCIP.RawInstanceAddress.make "default-ccv" ccipOwner
+    let defaultCCV = RawInstanceAddress.make "default-ccv" ccipOwner
 
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
@@ -629,7 +629,7 @@ testPrepareSendExtraArgs = script do
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
@@ -637,11 +637,11 @@ testPrepareSendExtraArgs = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp" ccipOwner
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "test-feequoter" ccipOwner
+                feeQuoter = RawInstanceAddress.make "test-feequoter" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
     disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
@@ -813,10 +813,10 @@ testPrepareSendRejectsOversizedPayload = script do
             admin = ccipOwner
             id = "FeeToken"
 
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
@@ -883,7 +883,7 @@ testPrepareSendRejectsOversizedPayload = script do
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
@@ -891,11 +891,11 @@ testPrepareSendRejectsOversizedPayload = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp-payload" ccipOwner
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp-payload" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
 
@@ -944,12 +944,12 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
     let missingMessage = mkHexMessageId 100004
 
     let deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-            onRamp = CCIP.RawInstanceAddress.make "onramp-exec-state" ccipOwner
-            offRamp = CCIP.RawInstanceAddress.make "offramp-exec-state" ccipOwner
-            globalConfig = CCIP.RawInstanceAddress.make "gc-exec-state" ccipOwner
-            tokenAdminRegistry = CCIP.RawInstanceAddress.make "tar-exec-state" ccipOwner
-            feeQuoter = CCIP.RawInstanceAddress.make "fq-exec-state" ccipOwner
-            rmnRemote = CCIP.RawInstanceAddress.make "rmn-exec-state" ccipOwner
+            onRamp = RawInstanceAddress.make "onramp-exec-state" ccipOwner
+            offRamp = RawInstanceAddress.make "offramp-exec-state" ccipOwner
+            globalConfig = RawInstanceAddress.make "gc-exec-state" ccipOwner
+            tokenAdminRegistry = RawInstanceAddress.make "tar-exec-state" ccipOwner
+            feeQuoter = RawInstanceAddress.make "fq-exec-state" ccipOwner
+            rmnRemote = RawInstanceAddress.make "rmn-exec-state" ccipOwner
 
     olderArchive <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.ArchivedExecutedMessages with
@@ -976,6 +976,7 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.fromList [activeMessage]
             archivedExecutionContractIds = [olderArchive, newerArchive]
+            customObservers = []
 
     disclosedOlderArchive <- fromSome <$> queryDisclosure ccipOwner olderArchive
     disclosedNewerArchive <- fromSome <$> queryDisclosure ccipOwner newerArchive
@@ -1033,10 +1034,10 @@ testExecuteRollsOverExecutedMessages = script do
     let seededMessagesSet = Set.fromList seededMessages
     let sampleSeededMessage = mkHexMessageId 0
 
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvInstanceAddress = CCIP.RawInstanceAddress.make ccvInstanceId ccvOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvInstanceAddress = RawInstanceAddress.make ccvInstanceId ccvOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
@@ -1087,15 +1088,16 @@ testExecuteRollsOverExecutedMessages = script do
             ccipOwner
             partyOwner = receiver
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make "unused-onramp-rollover" ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner
+                onRamp = RawInstanceAddress.make "unused-onramp-rollover" ccipOwner
+                offRamp = RawInstanceAddress.make offRampInstanceId ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make "unused-feequoter-rollover" ccipOwner
+                feeQuoter = RawInstanceAddress.make "unused-feequoter-rollover" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             outboundSequenceNumbers = Map.empty
             executedMessages = seededMessagesSet
             archivedExecutionContractIds = [olderArchive]
+            customObservers = []
 
     let message = CCIP.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
@@ -1106,7 +1108,7 @@ testExecuteRollsOverExecutedMessages = script do
             finality = 2000
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000001"
-            offRampAddress = CCIP.RawInstanceAddress.toInstanceAddress (CCIP.RawInstanceAddress.make offRampInstanceId ccipOwner)
+            offRampAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make offRampInstanceId ccipOwner)
             sender = "0000000000000000000000000000000000000003"
             receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
@@ -1240,11 +1242,11 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             admin = ccipOwner
             id = "FeeToken"
 
-    let duplicateCCV = CCIP.RawInstanceAddress.make "sender-ccv" ccipOwner
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+    let duplicateCCV = RawInstanceAddress.make "sender-ccv" ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let ccvRegistryInstanceAddress = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
@@ -1300,7 +1302,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                 globalConfig = globalConfigInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
                 ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
@@ -1308,11 +1310,11 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             instanceId = factoryInstanceId
             ccipOwner = ccipOwner
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
-                onRamp = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp-dup-ccvs" ccipOwner
+                onRamp = RawInstanceAddress.make onRampInstanceId ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp-dup-ccvs" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
-                feeQuoter = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+                feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
             registeredRouters = Map.empty
 
@@ -1377,11 +1379,11 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             admin = ccipOwner
             id = "FeeToken"
 
-    let globalConfigInstanceAddress = CCIP.RawInstanceAddress.make globalConfigInstanceId ccipOwner
-    let rmnRemoteInstanceAddress = CCIP.RawInstanceAddress.make rmnInstanceId rmnOwner
-    let tokenAdminRegistryInstanceAddress = CCIP.RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let feeQuoterInstanceAddress = CCIP.RawInstanceAddress.make feeQuoterInstanceId ccipOwner
-    let onRampInstanceAddress = CCIP.RawInstanceAddress.make onRampInstanceId ccipOwner
+    let globalConfigInstanceAddress = RawInstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = RawInstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let feeQuoterInstanceAddress = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
+    let onRampInstanceAddress = RawInstanceAddress.make onRampInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.GlobalConfig.GlobalConfig with
@@ -1449,7 +1451,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = feeQuoterInstanceAddress
-                ccvRegistry = CCIP.RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
+                ccvRegistry = RawInstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     router <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouter with
@@ -1458,7 +1460,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             partyOwner = user
             deps = CCIP.PerPartyRouter.PerPartyRouterDeps with
                 onRamp = onRampInstanceAddress
-                offRamp = CCIP.RawInstanceAddress.make "unused-offramp-seq" ccipOwner
+                offRamp = RawInstanceAddress.make "unused-offramp-seq" ccipOwner
                 globalConfig = globalConfigInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = feeQuoterInstanceAddress
@@ -1466,6 +1468,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
             executedMessages = Set.empty
             archivedExecutionContractIds = []
+            customObservers = []
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
     disclosedGlobalConfig <- fromSome <$> queryDisclosure ccipOwner globalConfig

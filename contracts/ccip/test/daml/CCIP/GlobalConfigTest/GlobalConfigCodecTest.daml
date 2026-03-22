@@ -7,7 +7,7 @@ import DA.Optional (fromSome)
 
 import CCIP.GlobalConfigCodec qualified as GlobalConfigCodec
 import CCIP.GlobalConfigTypes qualified as GlobalConfigTypes
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -25,8 +25,8 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
                 addressBytesLength = 20
                 baseExecutionGasCost = 0
                 offRampAddress = "e95aad72f136c035ecc1cabf477fcdeedace3bce"
-                laneMandatedCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv1@party1", CCIP.RawInstanceAddress.RawInstanceAddress "ccv2@party2"]
-                defaultCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "default-ccv@party3"]
+                laneMandatedCCVs = [RawInstanceAddress.RawInstanceAddress "ccv1@party1", RawInstanceAddress.RawInstanceAddress "ccv2@party2"]
+                defaultCCVs = [RawInstanceAddress.RawInstanceAddress "default-ccv@party3"]
                 messageNetworkFeeUSDCents = 10.0
                 tokenNetworkFeeUSDCents = 5.0
             ,GlobalConfigTypes.DestChainConfigArgs with
@@ -35,7 +35,7 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
                 addressBytesLength = 32
                 baseExecutionGasCost = 0
                 offRampAddress = "78d10cee9ec94b0bc1da62fa3eaeca1bc85c78abee0eafeab7a20bd12c877cd1"
-                laneMandatedCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv2@party2"]
+                laneMandatedCCVs = [RawInstanceAddress.RawInstanceAddress "ccv2@party2"]
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = 1.0
                 tokenNetworkFeeUSDCents = 1000.0
@@ -45,7 +45,7 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
                 addressBytesLength = 20
                 baseExecutionGasCost = 0
                 offRampAddress = "41c8c7184de518bcaaf75f3aea14c3bccb256f97"
-                laneMandatedCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "ccv2@party2"]
+                laneMandatedCCVs = [RawInstanceAddress.RawInstanceAddress "ccv2@party2"]
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = 1.0
                 tokenNetworkFeeUSDCents = 1000.0
@@ -64,19 +64,19 @@ testApplySourceChainConfigUpdatesParamsRoundtrip = do
                 sourceChainSelector = 1.0
                 isEnabled = True
                 onRampAddresses = ["abcdef1234567890"]
-                laneMandatedCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "src-ccv1@partyA", CCIP.RawInstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
-                defaultCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "src-default@partyC"]
+                laneMandatedCCVs = [RawInstanceAddress.RawInstanceAddress "src-ccv1@partyA", RawInstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
+                defaultCCVs = [RawInstanceAddress.RawInstanceAddress "src-default@partyC"]
             ,GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 18446744073709551615.0 -- max uint64
                 isEnabled = False
                 onRampAddresses = ["feedface"]
-                laneMandatedCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
+                laneMandatedCCVs = [RawInstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
                 defaultCCVs = []
             ,GlobalConfigTypes.SourceChainConfigArgs with
                 sourceChainSelector = 0.0 -- edge case: zero selector
                 isEnabled = False
                 onRampAddresses = ["feedface"]
-                laneMandatedCCVs = [CCIP.RawInstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
+                laneMandatedCCVs = [RawInstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
                 defaultCCVs = []
             ])
     let encoded = GlobalConfigCodec.encodeApplySourceChainConfigUpdatesParams args

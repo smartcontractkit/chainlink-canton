@@ -39,7 +39,9 @@ import MCMS.Types
   )
 import MCMS.GroupVoting
 import MCMS.Crypto
-import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..), makeInstanceAddress, parseInstanceIdText, parsePartyIdText)
+import MCMS.MCMSReceiver (MCMSReceiver, MCMSReceiver_Entrypoint(..))
+import MCMS.RawInstanceAddress (assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.Codec
   ( decodeBlockedFunctionWithOffset
   , decodeSelfDispatchSetConfigWithOffset
@@ -114,6 +116,7 @@ template MCMS
     timelockTimestamps : Map.Map Text Time     -- opId -> readyTime (or doneTimestamp if done)
   where
     signatory owner
+    ensure assertValidInstanceId instanceId
 
     -- | Set signer configuration
     -- Validates the configuration and optionally clears the root
@@ -133,7 +136,7 @@ template MCMS
         let (newExpiringRoot, newRootMetadata) = if clearRoot
               then
                 let opCount = rs.expiringRoot.opCount
-                    instanceAddress = makeInstanceAddress instanceId owner
+                    instanceAddress = RawInstanceAddress.makeText instanceId owner
                     epoch = time (date 1970 Jan 1) 0 0 0
                 in ( ExpiringRoot "" epoch opCount
                    , RootMetadata chainId (makeMcmsId instanceAddress targetRole)
@@ -185,7 +188,7 @@ template MCMS
         -- 4. Validate metadata matches this role
         assertMsg ("mcms: chain ID mismatch, expected " <> show chainId) $
           metadata.chainId == chainId
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
         let expectedMultisigId = makeMcmsId instanceAddress targetRole
         assertMsg ("mcms: multisig ID mismatch, expected " <> expectedMultisigId) $
           metadata.multisigId == expectedMultisigId
@@ -266,7 +269,7 @@ template MCMS
         let rs = getRoleState targetRole this
 
         -- 1. Validate operation targets this MCMS
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
         assertMsg ("mcms: chain ID mismatch, expected " <> show chainId) $
           op.chainId == chainId
         assertMsg ("mcms: multisig ID mismatch, expected " <> makeMcmsId instanceAddress targetRole) $
@@ -377,7 +380,7 @@ template MCMS
                   assertMsg "mcms: predecessor operation not complete" $ predTime == doneTimestamp
 
             -- 6. Validate targetCids size to prevent DoS via inflated maps
-            let mcmsInstanceAddress = makeInstanceAddress instanceId owner
+            let mcmsInstanceAddress = RawInstanceAddress.makeText instanceId owner
             validateTargetCidsSize mcmsInstanceAddress calls targetCids
 
             -- 7. Process all calls (self-dispatch inline, external via MCMSReceiver)
@@ -401,7 +404,7 @@ template MCMS
       do
         now <- getTime
         let rs = getRoleState targetRole this
-        let instanceAddress = makeInstanceAddress instanceId owner
+        let instanceAddress = RawInstanceAddress.makeText instanceId owner
         pure $
           op.chainId == chainId &&
           op.multisigId == makeMcmsId instanceAddress targetRole &&
@@ -631,7 +634,7 @@ executeSelfDispatch mcms call =
           let (clearedRoot, clearedMetadata) = if params.clearRoot
                 then
                   let opCount = rs.expiringRoot.opCount
-                      instanceAddress = makeInstanceAddress mcms.instanceId mcms.owner
+                      instanceAddress = RawInstanceAddress.makeText mcms.instanceId mcms.owner
                       epoch = time (date 1970 Jan 1) 0 0 0
                   in ( ExpiringRoot "" epoch opCount
                      , RootMetadata mcms.chainId (makeMcmsId instanceAddress targetRole)
@@ -758,7 +761,7 @@ processCallsLoopInternal : Party -> Map.Map Text (ContractId ()) -> MCMS -> [Tim
 processCallsLoopInternal _ cidMap mcms [] = pure (cidMap, mcms)
 processCallsLoopInternal ownerParty cidMap mcms (call :: rest) = do
   -- Calculate MCMS's own instanceAddress for comparison
-  let mcmsInstanceAddress = makeInstanceAddress mcms.instanceId mcms.owner
+  let mcmsInstanceAddress = RawInstanceAddress.makeText mcms.instanceId mcms.owner
 
   if call.targetInstanceAddress == mcmsInstanceAddress then do
     -- Self-dispatch: execute internal function (no CID lookup needed)
@@ -772,12 +775,12 @@ processCallsLoopInternal ownerParty cidMap mcms (call :: rest) = do
       Some cid -> pure (coerceContractId cid)
 
     -- Parse instanceId from the call's targetInstanceAddress (from merkle leaf)
-    expectedInstanceId <- case parseInstanceIdText call.targetInstanceAddress of
+    expectedInstanceId <- case RawInstanceAddress.parseInstanceIdText call.targetInstanceAddress of
       None -> abort "mcms: invalid address format, expected instanceId@partyId"
       Some instId -> pure instId
 
     -- Parse partyId from the call's targetInstanceAddress (from merkle leaf)
-    expectedPartyText <- case parsePartyIdText call.targetInstanceAddress of
+    expectedPartyText <- case RawInstanceAddress.parsePartyIdText call.targetInstanceAddress of
       None -> abort "mcms: invalid address format, expected instanceId@partyId"
       Some partyId -> pure partyId
 

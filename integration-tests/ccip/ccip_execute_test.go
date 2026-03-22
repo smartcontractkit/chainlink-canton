@@ -493,6 +493,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partyReceiver),
+						InstanceId: "router-receiver",
 					}),
 				}},
 			}},

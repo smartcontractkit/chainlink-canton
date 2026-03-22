@@ -3,8 +3,6 @@ module CCIP.TokenAdminRegistry where
 import DA.Map qualified as Map
 import DA.Optional (isSome, fromSomeNote)
 import DA.Crypto.Text (BytesHex)
-import DA.Text qualified as T
-
 import qualified Splice.Api.Token.HoldingV1
 
 import qualified CCIP.Context
@@ -15,8 +13,8 @@ import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), TokenConfig(..))
 
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
-import CCIP.RawInstanceAddress (RawInstanceAddress)
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 
@@ -39,7 +37,7 @@ template TokenAdminRegistry
         tokenConfigs : Map.Map BytesHex TokenConfig
     where
         signatory owner
-        ensure not (T.isInfixOf "@" instanceId)
+        ensure assertValidInstanceId instanceId
 
         nonconsuming choice Get : TokenAdminRegistry
             with
@@ -223,7 +221,7 @@ template TokenAdminRegistry
                 -- re-check whether these mapping reads and snapshot checks are
                 -- still the right trust boundary.
                 assertMsg "TAR outbound: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
-                CCIP.RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
+                RawInstanceAddress.assertEqual "TAR outbound: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
 
                 instrumentId <- case sm.expectedTokenInstrumentId of
@@ -259,7 +257,7 @@ template TokenAdminRegistry
             do
                 sm <- fetch sendingMessageCid
                 assertMsg "TAR outbound fee: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
-                CCIP.RawInstanceAddress.assertEqual "TAR outbound fee: instance address mismatch"
+                RawInstanceAddress.assertEqual "TAR outbound fee: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
 
                 instrumentId <- case sm.expectedTokenInstrumentId of
@@ -300,7 +298,7 @@ template TokenAdminRegistry
             do
                 sm <- fetch sendingMessageCid
                 assertMsg "TAR outbound send: sendingMessage ccipOwner mismatch" (sm.ccipOwner == owner)
-                CCIP.RawInstanceAddress.assertEqual "TAR outbound send: instance address mismatch"
+                RawInstanceAddress.assertEqual "TAR outbound send: instance address mismatch"
                     instanceId owner sm.deps.tokenAdminRegistry
 
                 expectedInstrumentId <- case sm.expectedTokenInstrumentId of
@@ -345,7 +343,7 @@ template TokenAdminRegistry
                 -- `owner`/`ccipOwner` is honest about its mappings and preserves
                 -- the snapshot-checking invariants before updating the message.
                 assertMsg "TAR: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
-                CCIP.RawInstanceAddress.assertEqual "TAR: instance address mismatch"
+                RawInstanceAddress.assertEqual "TAR: instance address mismatch"
                     instanceId owner execMsg.deps.tokenAdminRegistry
 
                 let tt = fromSomeNote
@@ -375,7 +373,7 @@ template TokenAdminRegistry
             do
                 execMsg <- fetch executingMessageCid
                 assertMsg "TAR finalize: executingMessage ccipOwner mismatch" (execMsg.ccipOwner == owner)
-                CCIP.RawInstanceAddress.assertEqual "TAR finalize: instance address mismatch"
+                RawInstanceAddress.assertEqual "TAR finalize: instance address mismatch"
                     instanceId owner execMsg.deps.tokenAdminRegistry
 
                 resolvedTokenReceiver <- case execMsg.tokenReceiver of

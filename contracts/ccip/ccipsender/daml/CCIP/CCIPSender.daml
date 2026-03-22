@@ -43,6 +43,7 @@ template CCIPSender
         owner : Party
     where
         signatory owner
+        ensure assertValidInstanceId instanceId
 
         -- | Sends an outbound CCIP message end-to-end.
         nonconsuming choice Send : CCIP.PerPartyRouter.CCIPSendResult

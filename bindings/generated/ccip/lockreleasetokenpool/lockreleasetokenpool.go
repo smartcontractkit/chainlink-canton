@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "6507ab69d6db66e3aac58f69dac9988e2c0568abe506fa2085d4dbacc2e45c46"
+	PackageID   = "378dad4c730b6e6ba70ad9423b554748fbf74ad17d221bcd2cf490e120cd32a5"
 	SDKVersion  = "3.4.10"
 )
 
@@ -169,15 +169,15 @@ func (t *ApplyTokenTransferFeeConfigUpdates) UnmarshalHex(data string) error {
 
 // ChainUpdate is a Record type
 type ChainUpdate struct {
-	RemoteChainSelector                        types.NUMERIC               `json:"remoteChainSelector"`
-	RemotePools                                []types.TEXT                `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                  `json:"remoteTokenAddress"`
-	InboundCCVs                                []common.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs                               []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockConfirmations                      types.INT64                 `json:"minBlockConfirmations"`
-	InboundRateLimiter                         common.RawInstanceAddress   `json:"inboundRateLimiter"`
-	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
-	OutboundRateLimiter                        common.RawInstanceAddress   `json:"outboundRateLimiter"`
+	RemoteChainSelector                        types.NUMERIC             `json:"remoteChainSelector"`
+	RemotePools                                []types.TEXT              `json:"remotePools"`
+	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
+	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
+	MinBlockConfirmations                      types.INT64               `json:"minBlockConfirmations"`
+	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
 }
 
 // ToMap converts ChainUpdate to a map for DAML arguments
@@ -878,9 +878,9 @@ var _ interfaces.IITokenPool = (*LockReleaseTokenPool)(nil)
 
 // LockReleaseTokenPoolDeps is a Record type
 type LockReleaseTokenPoolDeps struct {
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
 }
 
 // ToMap converts LockReleaseTokenPoolDeps to a map for DAML arguments
@@ -1500,10 +1500,10 @@ func (t *LockReleaseTokenPoolVerifyOutboundCCVsMCMSParams) UnmarshalHex(data str
 
 // RateLimitConfigArgs is a Record type
 type RateLimitConfigArgs struct {
-	RemoteChainSelector                        types.NUMERIC             `json:"remoteChainSelector"`
-	InboundRateLimiter                         common.RawInstanceAddress `json:"inboundRateLimiter"`
-	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress `json:"inboundCustomBlockConfirmationsRateLimiter"`
-	OutboundRateLimiter                        common.RawInstanceAddress `json:"outboundRateLimiter"`
+	RemoteChainSelector                        types.NUMERIC           `json:"remoteChainSelector"`
+	InboundRateLimiter                         mcms.RawInstanceAddress `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        mcms.RawInstanceAddress `json:"outboundRateLimiter"`
 }
 
 // ToMap converts RateLimitConfigArgs to a map for DAML arguments
@@ -1563,14 +1563,14 @@ func (t *RateLimitConfigArgs) UnmarshalHex(data string) error {
 
 // RemoteChainConfig is a Record type
 type RemoteChainConfig struct {
-	RemotePools                                []types.TEXT                `json:"remotePools"`
-	RemoteTokenAddress                         types.TEXT                  `json:"remoteTokenAddress"`
-	InboundCCVs                                []common.RawInstanceAddress `json:"inboundCCVs"`
-	OutboundCCVs                               []common.RawInstanceAddress `json:"outboundCCVs"`
-	MinBlockConfirmations                      types.INT64                 `json:"minBlockConfirmations"`
-	InboundRateLimiter                         common.RawInstanceAddress   `json:"inboundRateLimiter"`
-	InboundCustomBlockConfirmationsRateLimiter common.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
-	OutboundRateLimiter                        common.RawInstanceAddress   `json:"outboundRateLimiter"`
+	RemotePools                                []types.TEXT              `json:"remotePools"`
+	RemoteTokenAddress                         types.TEXT                `json:"remoteTokenAddress"`
+	InboundCCVs                                []mcms.RawInstanceAddress `json:"inboundCCVs"`
+	OutboundCCVs                               []mcms.RawInstanceAddress `json:"outboundCCVs"`
+	MinBlockConfirmations                      types.INT64               `json:"minBlockConfirmations"`
+	InboundRateLimiter                         mcms.RawInstanceAddress   `json:"inboundRateLimiter"`
+	InboundCustomBlockConfirmationsRateLimiter mcms.RawInstanceAddress   `json:"inboundCustomBlockConfirmationsRateLimiter"`
+	OutboundRateLimiter                        mcms.RawInstanceAddress   `json:"outboundRateLimiter"`
 }
 
 // ToMap converts RemoteChainConfig to a map for DAML arguments

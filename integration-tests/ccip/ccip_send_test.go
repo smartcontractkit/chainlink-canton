@@ -430,6 +430,7 @@ func TestCCIPSend(t *testing.T) {
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(perpartyrouter.CreateRouter{
 						PartyOwner: types.PARTY(partySender),
+						InstanceId: "router-sender",
 					}),
 				}},
 			}},
@@ -701,6 +702,7 @@ func TestCCIPSend(t *testing.T) {
 		TokenTransfer:       nil,
 		CcvSendInputs: []ccipsender.CCVSendInput{{
 			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+			VerifierArgs:    types.TEXT(""),
 			CcvExtraContext: common.CCIPContext{},
 		}},
 	}

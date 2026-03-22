@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-offramp"
-	PackageID   = "c7da21a88eff315d5a2c553932432a2e04c160d351622418d714b32f03469b74"
+	PackageID   = "08ebc15e2d1f64aa7ecb54d3598292a7521630c487baede2eab3124c355a354d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -199,9 +199,9 @@ func (t *ExecuteFromRouterResult) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
-	GlobalConfigCid      types.CONTRACT_ID           `json:"globalConfigCid"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC               `json:"sourceChainSelector"`
+	GlobalConfigCid      types.CONTRACT_ID         `json:"globalConfigCid"`
+	ReceiverRequiredCCVs []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC             `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
@@ -479,9 +479,9 @@ var _ mcms.IMCMSReceiver = (*OffRamp)(nil)
 
 // OffRampDeps is a Record type
 type OffRampDeps struct {
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
 }
 
 // ToMap converts OffRampDeps to a map for DAML arguments
@@ -539,17 +539,17 @@ func (t *OffRampDeps) UnmarshalHex(data string) error {
 
 // PrepareExecute is a Record type
 type PrepareExecute struct {
-	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
-	GlobalConfigCid               types.CONTRACT_ID           `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
-	RmnRemoteCid                  types.CONTRACT_ID           `json:"rmnRemoteCid"`
-	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
-	Caller                        types.PARTY                 `json:"caller"`
+	EncodedMessage                types.TEXT                `json:"encodedMessage"`
+	GlobalConfigCid               types.CONTRACT_ID         `json:"globalConfigCid"`
+	TokenAdminRegistryCid         types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
+	RmnRemoteCid                  types.CONTRACT_ID         `json:"rmnRemoteCid"`
+	ReceiverParty                 types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	Caller                        types.PARTY               `json:"caller"`
 }
 
 // ToMap converts PrepareExecute to a map for DAML arguments
@@ -655,16 +655,16 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 // PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecuteMCMSParams struct {
-	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
-	GlobalConfigCid               types.CONTRACT_ID           `json:"globalConfigCid"`
-	TokenAdminRegistryCid         types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
-	RmnRemoteCid                  types.CONTRACT_ID           `json:"rmnRemoteCid"`
-	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
+	EncodedMessage                types.TEXT                `json:"encodedMessage"`
+	GlobalConfigCid               types.CONTRACT_ID         `json:"globalConfigCid"`
+	TokenAdminRegistryCid         types.CONTRACT_ID         `json:"tokenAdminRegistryCid"`
+	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
+	RmnRemoteCid                  types.CONTRACT_ID         `json:"rmnRemoteCid"`
+	ReceiverParty                 types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
 }
 
 // MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.
@@ -723,9 +723,9 @@ func (t *SetDeps) UnmarshalHex(data string) error {
 
 // SetDepsParams is a Record type
 type SetDepsParams struct {
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	GlobalConfig       *mcms.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	RmnRemote          *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	TokenAdminRegistry *mcms.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments

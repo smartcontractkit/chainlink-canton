@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -24,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "7971138ae438be42ff86a60c084d97f32411165a55f413fca4ce90b58238e3cc"
+	PackageID   = "6f69b16b915b3d6740e470260a44c3f8fe1735f959f0ab4936f6411b37e90a7e"
 	SDKVersion  = "3.4.10"
 )
 
@@ -105,12 +106,12 @@ func (t *DynamicConfig) UnmarshalHex(data string) error {
 
 // Executor is a Template type
 type Executor struct {
-	InstanceId         types.TEXT                  `json:"instanceId"`
-	Owner              types.PARTY                 `json:"owner"`
-	MaxCCVsPerMsg      types.INT64                 `json:"maxCCVsPerMsg"`
-	DynamicConfig      DynamicConfig               `json:"dynamicConfig"`
-	AllowedCCVs        []common.RawInstanceAddress `json:"allowedCCVs"`
-	RemoteChainConfigs types.GENMAP                `json:"remoteChainConfigs"`
+	InstanceId         types.TEXT                `json:"instanceId"`
+	Owner              types.PARTY               `json:"owner"`
+	MaxCCVsPerMsg      types.INT64               `json:"maxCCVsPerMsg"`
+	DynamicConfig      DynamicConfig             `json:"dynamicConfig"`
+	AllowedCCVs        []mcms.RawInstanceAddress `json:"allowedCCVs"`
+	RemoteChainConfigs types.GENMAP              `json:"remoteChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -463,9 +464,9 @@ var _ common.IIExecutor = (*Executor)(nil)
 
 // ExecutorApplyAllowedCCVUpdates is a Record type
 type ExecutorApplyAllowedCCVUpdates struct {
-	CcvsToRemove        []common.RawInstanceAddress `json:"ccvsToRemove"`
-	CcvsToAdd           []common.RawInstanceAddress `json:"ccvsToAdd"`
-	CcvAllowlistEnabled types.BOOL                  `json:"ccvAllowlistEnabled"`
+	CcvsToRemove        []mcms.RawInstanceAddress `json:"ccvsToRemove"`
+	CcvsToAdd           []mcms.RawInstanceAddress `json:"ccvsToAdd"`
+	CcvAllowlistEnabled types.BOOL                `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts ExecutorApplyAllowedCCVUpdates to a map for DAML arguments

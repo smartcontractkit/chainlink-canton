@@ -8,6 +8,7 @@ import (
 
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
+	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "2999f49d7d7a16ce543b0777570eeaeaabe900055455a724215cec3826062f75"
+	PackageID   = "fc680de7a4ec159840a1e33f5ae6080fa2cba66d415548c57792bedf05d8d71f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -209,12 +210,12 @@ func (t CCIPMessageReceived) ArchiveWithPackageID(contractID string, packageID s
 
 // CCIPReceiver is a Template type
 type CCIPReceiver struct {
-	InstanceId            types.TEXT                  `json:"instanceId"`
-	Owner                 types.PARTY                 `json:"owner"`
-	RequiredCCVs          []common.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs          []common.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold     types.INT64                 `json:"optionalThreshold"`
-	MinBlockConfirmations types.INT64                 `json:"minBlockConfirmations"`
+	InstanceId            types.TEXT                `json:"instanceId"`
+	Owner                 types.PARTY               `json:"owner"`
+	RequiredCCVs          []mcms.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs          []mcms.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold     types.INT64               `json:"optionalThreshold"`
+	MinBlockConfirmations types.INT64               `json:"minBlockConfirmations"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -687,7 +688,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 
 // UpdateRequiredCCVs is a Record type
 type UpdateRequiredCCVs struct {
-	NewRequiredCCVs []common.RawInstanceAddress `json:"newRequiredCCVs"`
+	NewRequiredCCVs []mcms.RawInstanceAddress `json:"newRequiredCCVs"`
 }
 
 // ToMap converts UpdateRequiredCCVs to a map for DAML arguments

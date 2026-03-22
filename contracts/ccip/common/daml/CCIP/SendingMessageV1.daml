@@ -13,7 +13,7 @@ import DA.Optional (isNone, isSome, fromSome, fromOptional, isSome)
 import qualified CCIP.Events
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.RawInstanceAddress
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.Tickets
 
 import qualified Splice.Api.Token.HoldingV1
@@ -72,12 +72,12 @@ data ExecutionMode
 
 data SendingMessageDeps = SendingMessageDeps
     with
-        router : CCIP.RawInstanceAddress.RawInstanceAddress
-        onRamp : CCIP.RawInstanceAddress.RawInstanceAddress
-        globalConfig : CCIP.RawInstanceAddress.RawInstanceAddress
-        rmnRemote : CCIP.RawInstanceAddress.RawInstanceAddress
-        tokenAdminRegistry : CCIP.RawInstanceAddress.RawInstanceAddress
-        feeQuoter : CCIP.RawInstanceAddress.RawInstanceAddress
+        router : RawInstanceAddress.RawInstanceAddress
+        onRamp : RawInstanceAddress.RawInstanceAddress
+        globalConfig : RawInstanceAddress.RawInstanceAddress
+        rmnRemote : RawInstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
+        feeQuoter : RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
 data SendingMessageState
@@ -125,7 +125,7 @@ assertCCVInstanceId
     -> Party
     -> Update ()
 assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
-    let claimed = CCIP.RawInstanceAddress.toInstanceAddress(CCIP.RawInstanceAddress.make ccvInstanceId caller)
+    let claimed = RawInstanceAddress.toInstanceAddress(CCIP.RawInstanceAddress.make ccvInstanceId caller)
         allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
     in assertMsg msg (claimed `elem` allowedCCVs)
 
@@ -137,7 +137,7 @@ buildMessageArtifacts sm =
         ccvAddrs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
         executorAddressBytes = case sm.executionMode of
             Some ExecutionMode_Executor ->
-                CCIP.RawInstanceAddress.toInstanceAddress sm.executorAddress
+                RawInstanceAddress.toInstanceAddress sm.executorAddress
             Some ExecutionMode_NoExecutor ->
                 noExecutionAddressBytes
             None ->
@@ -182,7 +182,7 @@ template SendingMessageV1
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [BytesHex]
-        executorAddress : CCIP.RawInstanceAddress.RawInstanceAddress
+        executorAddress : RawInstanceAddress.RawInstanceAddress
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
         senderAddress : BytesHex
@@ -300,14 +300,14 @@ template SendingMessageV1
         -- TAR-authorized outbound pool CCV requirements.
         choice SetOutboundPoolCCVs : ContractId SendingMessageV1
             with
-                poolCCVs : [CCIP.RawInstanceAddress.RawInstanceAddress]
+                poolCCVs : [RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
                 -- convert raw instance addresses to instance addresses
-                let instanceAddresses = map CCIP.RawInstanceAddress.toInstanceAddress poolCCVs
+                let instanceAddresses = map RawInstanceAddress.toInstanceAddress poolCCVs
 
                 create this with
                     outboundPoolCCVs = Some instanceAddresses
@@ -327,7 +327,7 @@ template SendingMessageV1
                 assertMsg "addExecutorFee: already set" (isNone executorFee && isNone executionMode)
                 assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
 
-                let derivedExecutor = CCIP.RawInstanceAddress.make executorInstanceId caller
+                let derivedExecutor = RawInstanceAddress.make executorInstanceId caller
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId

@@ -9,6 +9,7 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "d54c197050c48954f001beb71f031bfae79f0ed522bf950b074676d82d63f3cc"
+	PackageID   = "971118a9357abf26e257a4b03503cbf180c34ef2ab2f0e510d917a5ea8e64ab0"
 	SDKVersion  = "3.4.10"
 )
 
@@ -52,6 +53,48 @@ func argsToMap(args any) map[string]any {
 	}
 
 	return map[string]any{"args": args}
+}
+
+// AddCustomObservers is a Record type
+type AddCustomObservers struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts AddCustomObservers to a map for DAML arguments
+func (t AddCustomObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t AddCustomObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *AddCustomObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes AddCustomObservers to hex string (Canton MCMS format)
+func (t AddCustomObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes AddCustomObservers from hex string (Canton MCMS format)
+func (t *AddCustomObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
 }
 
 // ArchivedExecutedMessages is a Template type
@@ -710,9 +753,9 @@ func (t *GetExecutionStateMCMSParams) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute2 is a Record type
 type GetRequiredCCVsForExecute2 struct {
-	Context              common.CCIPContext          `json:"context"`
-	ReceiverRequiredCCVs []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	SourceChainSelector  types.NUMERIC               `json:"sourceChainSelector"`
+	Context              common.CCIPContext        `json:"context"`
+	ReceiverRequiredCCVs []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	SourceChainSelector  types.NUMERIC             `json:"sourceChainSelector"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute2 to a map for DAML arguments
@@ -950,6 +993,7 @@ type PerPartyRouter struct {
 	OutboundSequenceNumbers      types.GENMAP        `json:"outboundSequenceNumbers"`
 	ExecutedMessages             types.SET           `json:"executedMessages"`
 	ArchivedExecutionContractIds []types.CONTRACT_ID `json:"archivedExecutionContractIds"`
+	CustomObservers              []types.PARTY       `json:"customObservers"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1010,6 +1054,15 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["customObservers"] = func() []any {
+		res := make([]any, 0, len(t.CustomObservers))
+		for _, e := range t.CustomObservers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -1060,6 +1113,15 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 		res := make([]any, 0, len(t.ArchivedExecutionContractIds))
 		for _, e := range t.ArchivedExecutionContractIds {
 			res = append(res, e)
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["customObservers"] = func() []any {
+		res := make([]any, 0, len(t.CustomObservers))
+		for _, e := range t.CustomObservers {
+			res = append(res, e.ToMap())
 		}
 		return res
 	}()
@@ -1325,6 +1387,48 @@ func (t PerPartyRouter) GetSequenceNumberWithPackageID(contractID string, packag
 	}
 }
 
+// AddCustomObservers exercises the AddCustomObservers choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) AddCustomObservers(contractID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AddCustomObserversWithPackageID exercises the AddCustomObservers choice using the provided package ID instead of package name
+func (t PerPartyRouter) AddCustomObserversWithPackageID(contractID string, packageID string, args AddCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "AddCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObservers exercises the RemoveCustomObservers choice on this PerPartyRouter contract
+// This method uses the package name in the template ID
+func (t PerPartyRouter) RemoveCustomObservers(contractID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// RemoveCustomObserversWithPackageID exercises the RemoveCustomObservers choice using the provided package ID instead of package name
+func (t PerPartyRouter) RemoveCustomObserversWithPackageID(contractID string, packageID string, args RemoveCustomObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.PerPartyRouter", "PerPartyRouter"),
+		ContractID: contractID,
+		Choice:     "RemoveCustomObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this PerPartyRouter contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t PerPartyRouter) MCMSReceiverEntrypoint(contractID string, args mcms.MCMSReceiverEntrypoint) *model.ExerciseCommand {
@@ -1352,12 +1456,12 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouter)(nil)
 
 // PerPartyRouterDeps is a Record type
 type PerPartyRouterDeps struct {
-	OnRamp             common.RawInstanceAddress `json:"onRamp"`
-	OffRamp            common.RawInstanceAddress `json:"offRamp"`
-	GlobalConfig       common.RawInstanceAddress `json:"globalConfig"`
-	TokenAdminRegistry common.RawInstanceAddress `json:"tokenAdminRegistry"`
-	FeeQuoter          common.RawInstanceAddress `json:"feeQuoter"`
-	RmnRemote          common.RawInstanceAddress `json:"rmnRemote"`
+	OnRamp             mcms.RawInstanceAddress `json:"onRamp"`
+	OffRamp            mcms.RawInstanceAddress `json:"offRamp"`
+	GlobalConfig       mcms.RawInstanceAddress `json:"globalConfig"`
+	TokenAdminRegistry mcms.RawInstanceAddress `json:"tokenAdminRegistry"`
+	FeeQuoter          mcms.RawInstanceAddress `json:"feeQuoter"`
+	RmnRemote          mcms.RawInstanceAddress `json:"rmnRemote"`
 }
 
 // ToMap converts PerPartyRouterDeps to a map for DAML arguments
@@ -1656,15 +1760,15 @@ var _ mcms.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute2 is a Record type
 type PrepareExecute2 struct {
-	Context                       common.CCIPContext          `json:"context"`
-	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
-	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
-	Caller                        types.PARTY                 `json:"caller"`
+	Context                       common.CCIPContext        `json:"context"`
+	EncodedMessage                types.TEXT                `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
+	Caller                        types.PARTY               `json:"caller"`
 }
 
 // ToMap converts PrepareExecute2 to a map for DAML arguments
@@ -1754,14 +1858,14 @@ func (t *PrepareExecute2) UnmarshalHex(data string) error {
 // PrepareExecute2MCMSParams is PrepareExecute2 without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type PrepareExecute2MCMSParams struct {
-	Context                       common.CCIPContext          `json:"context"`
-	EncodedMessage                types.TEXT                  `json:"encodedMessage"`
-	ReceiverParty                 types.PARTY                 `json:"receiverParty"`
-	TokenReceiverParty            *types.PARTY                `json:"tokenReceiverParty" hex:"optional"`
-	ReceiverRequiredCCVs          []common.RawInstanceAddress `json:"receiverRequiredCCVs"`
-	ReceiverOptionalCCVs          []common.RawInstanceAddress `json:"receiverOptionalCCVs"`
-	ReceiverOptionalThreshold     types.INT64                 `json:"receiverOptionalThreshold"`
-	ReceiverMinBlockConfirmations types.INT64                 `json:"receiverMinBlockConfirmations"`
+	Context                       common.CCIPContext        `json:"context"`
+	EncodedMessage                types.TEXT                `json:"encodedMessage"`
+	ReceiverParty                 types.PARTY               `json:"receiverParty"`
+	TokenReceiverParty            *types.PARTY              `json:"tokenReceiverParty" hex:"optional"`
+	ReceiverRequiredCCVs          []mcms.RawInstanceAddress `json:"receiverRequiredCCVs"`
+	ReceiverOptionalCCVs          []mcms.RawInstanceAddress `json:"receiverOptionalCCVs"`
+	ReceiverOptionalThreshold     types.INT64               `json:"receiverOptionalThreshold"`
+	ReceiverMinBlockConfirmations types.INT64               `json:"receiverMinBlockConfirmations"`
 }
 
 // MarshalHex encodes PrepareExecute2MCMSParams to hex string for MCMS operationData.
@@ -1778,24 +1882,21 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 
 // PrepareSend is a Record type
 type PrepareSend struct {
-	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
-	Message                  common.Canton2AnyMessage `json:"message"`
-	Context                  common.CCIPContext       `json:"context"`
+	Context             common.CCIPContext                        `json:"context"`
+	DestChainSelector   types.NUMERIC                             `json:"destChainSelector"`
+	Receiver            types.TEXT                                `json:"receiver"`
+	Payload             types.TEXT                                `json:"payload"`
+	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
+	SenderRequiredCCVs  []mcms.RawInstanceAddress                 `json:"senderRequiredCCVs"`
+	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
+	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
+	TokenArgs           types.TEXT                                `json:"tokenArgs"`
+	FeeToken            splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
 }
 
 // ToMap converts PrepareSend to a map for DAML arguments
 func (t PrepareSend) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["destinationChainSelector"] = t.DestinationChainSelector
-
-	m["message"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.Message).(mapper); ok {
-			return m.toMap()
-		}
-		return t.Message
-	}()
 
 	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1803,6 +1904,59 @@ func (t PrepareSend) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.Context
+	}()
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["receiver"] = string(t.Receiver)
+
+	m["payload"] = string(t.Payload)
+
+	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
+
+	m["senderRequiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.SenderRequiredCCVs))
+		for _, e := range t.SenderRequiredCCVs {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(e).(mapper); ok {
+				res = append(res, m.toMap())
+			} else {
+				res = append(res, e)
+			}
+		}
+		return res
+	}()
+
+	if t.TokenInstrumentId != nil {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": *t.TokenInstrumentId,
+		}
+	} else {
+		m["tokenInstrumentId"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.TokenReceiver != nil {
+		m["tokenReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": string(*t.TokenReceiver),
+		}
+	} else {
+		m["tokenReceiver"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	m["tokenArgs"] = string(t.TokenArgs)
+
+	m["feeToken"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.FeeToken).(mapper); ok {
+			return m.toMap()
+		}
+		return t.FeeToken
 	}()
 
 	return m
@@ -1826,6 +1980,48 @@ func (t PrepareSend) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes PrepareSend from hex string (Canton MCMS format)
 func (t *PrepareSend) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// RemoveCustomObservers is a Record type
+type RemoveCustomObservers struct {
+	Parties []types.PARTY `json:"parties"`
+}
+
+// ToMap converts RemoveCustomObservers to a map for DAML arguments
+func (t RemoveCustomObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["parties"] = func() []any {
+		res := make([]any, 0, len(t.Parties))
+		for _, e := range t.Parties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t RemoveCustomObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *RemoveCustomObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes RemoveCustomObservers to hex string (Canton MCMS format)
+func (t RemoveCustomObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes RemoveCustomObservers from hex string (Canton MCMS format)
+func (t *RemoveCustomObservers) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1874,12 +2070,12 @@ func (t *SetDeps3) UnmarshalHex(data string) error {
 
 // SetDepsParams3 is a Record type
 type SetDepsParams3 struct {
-	OnRamp             *common.RawInstanceAddress `json:"onRamp" hex:"optional"`
-	OffRamp            *common.RawInstanceAddress `json:"offRamp" hex:"optional"`
-	GlobalConfig       *common.RawInstanceAddress `json:"globalConfig" hex:"optional"`
-	TokenAdminRegistry *common.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
-	FeeQuoter          *common.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	RmnRemote          *common.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
+	OnRamp             *mcms.RawInstanceAddress `json:"onRamp" hex:"optional"`
+	OffRamp            *mcms.RawInstanceAddress `json:"offRamp" hex:"optional"`
+	GlobalConfig       *mcms.RawInstanceAddress `json:"globalConfig" hex:"optional"`
+	TokenAdminRegistry *mcms.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
+	FeeQuoter          *mcms.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
+	RmnRemote          *mcms.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams3 to a map for DAML arguments
@@ -1980,6 +2176,7 @@ func (t *SetDepsParams3) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
+	AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error)
 	CCIPSend(args CCIPSend) (*bind.EncodedChoice, error)
 	CreateRouter(args CreateRouter) (*bind.EncodedChoice, error)
 	Execute(args Execute) (*bind.EncodedChoice, error)
@@ -1996,6 +2193,7 @@ type MCMSEncoder interface {
 	PrepareExecute2(args PrepareExecute2) (*bind.EncodedChoice, error)
 	PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bind.EncodedChoice, error)
 	PrepareSend(args PrepareSend) (*bind.EncodedChoice, error)
+	RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error)
 	SetDeps3(args SetDeps3) (*bind.EncodedChoice, error)
 }
 
@@ -2024,6 +2222,11 @@ func NewContract(packageID, moduleName, templateName string) *Contract {
 // Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
 func (c *Contract) Encoder() MCMSEncoder {
 	return c.enc
+}
+
+// AddCustomObservers encodes parameters for the AddCustomObservers choice.
+func (e *encoder) AddCustomObservers(args AddCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("AddCustomObservers", args)
 }
 
 // CCIPSend encodes parameters for the CCIPSend choice.
@@ -2104,6 +2307,11 @@ func (e *encoder) PrepareExecute2MCMSParams(args PrepareExecute2MCMSParams) (*bi
 // PrepareSend encodes parameters for the PrepareSend choice.
 func (e *encoder) PrepareSend(args PrepareSend) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("PrepareSend", args)
+}
+
+// RemoveCustomObservers encodes parameters for the RemoveCustomObservers choice.
+func (e *encoder) RemoveCustomObservers(args RemoveCustomObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("RemoveCustomObservers", args)
 }
 
 // SetDeps3 encodes parameters for the SetDeps3 choice.
