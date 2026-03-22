@@ -9,6 +9,7 @@ import DA.Optional (fromOptional, fromSomeNote, isSome)
 import qualified CCIP.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.GlobalConfig
+import qualified CCIP.Internal
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
 import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
@@ -62,10 +63,13 @@ resolveReceiverExecutionCCVs sourceConfig isTokenOnlyTransfer receiverRequiredCC
         assertMsg "offramp: receiver optional CCVs cannot contain duplicates" (unique receiverOptionalCCVs)
         assertMsg "offramp: receiver optional threshold must be non-negative" (receiverOptionalThreshold >= 0)
         assertMsg "offramp: receiver optional threshold cannot be higher than number of optional CCVs" (receiverOptionalThreshold <= length receiverOptionalCCVs)
-        assertMsg "offramp: receiver optional CCVs cannot contain useDefaultCCVs sentinel" (CCIP.GlobalConfig.useDefaultCCVs `notElem` receiverOptionalCCVs)
+        assertMsg "offramp: receiver optional CCVs cannot contain useDefaultCCVs sentinel" (CCIP.Internal.useDefaultCCVs `notElem` receiverOptionalCCVs)
         let resolvedRequired = case receiverRequiredCCVs of
                 [] -> sourceConfig.defaultCCVs
-                _ -> CCIP.ExecutingMessageV1.resolveDefaultCCVs sourceConfig.defaultCCVs receiverRequiredCCVs
+                _ -> CCIP.Internal.resolveDefaultCCVs
+                    sourceConfig.defaultCCVs
+                    CCIP.Internal.useDefaultCCVs
+                    receiverRequiredCCVs
         pure (resolvedRequired, receiverOptionalCCVs, receiverOptionalThreshold)
 
 -- | OffRamp contract for PerPartyRouter architecture.
@@ -219,7 +223,7 @@ template OffRamp
                         resolvedReceiverRequiredCCVs
                         ++ sourceConfig.laneMandatedCCVs
                 let (baseOptionalCCVs, baseOptionalCCVThreshold) =
-                        CCIP.ExecutingMessageV1.resolveOptionalCCVs
+                        CCIP.Internal.resolveOptionalCCVs
                             baseRequiredCCVs
                             resolvedReceiverOptionalCCVs
                             resolvedReceiverOptionalThreshold
