@@ -898,6 +898,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
 			CcvExtraContext: common.CCIPContext{},
 		}},
+		ExecutorCid: func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)

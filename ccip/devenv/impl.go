@@ -1250,6 +1250,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		FeeTokenHoldingCids: nil,
 		TokenTransfer:       nil,
 		CcvSendInputs:       ccvSendInputs,
+		ExecutorCid:         &executorCID,
 	}
 	sendArgsMap := sendArgs.ToMap()
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {
