@@ -137,7 +137,7 @@ buildMessageArtifacts sm =
         ccvAddrs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
         executorAddressBytes = case sm.executionMode of
             Some ExecutionMode_Executor ->
-                RawInstanceAddress.toInstanceAddress sm.executorAddress
+                sm.executorAddress
             Some ExecutionMode_NoExecutor ->
                 noExecutionAddressBytes
             None ->
@@ -182,7 +182,7 @@ template SendingMessageV1
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         requiredCCVs : [BytesHex]
-        executorAddress : RawInstanceAddress.RawInstanceAddress
+        executorAddress : BytesHex
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
         senderAddress : BytesHex
@@ -327,7 +327,7 @@ template SendingMessageV1
                 assertMsg "addExecutorFee: already set" (isNone executorFee && isNone executionMode)
                 assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
 
-                let derivedExecutor = RawInstanceAddress.make executorInstanceId caller
+                let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId

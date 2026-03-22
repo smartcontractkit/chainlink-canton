@@ -5,8 +5,7 @@ import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
-import DA.Optional (fromOptional, fromSomeNote, isSome)
-import DA.Text qualified as T
+import DA.Optional (fromOptional, fromSomeNote)
 
 import qualified CCIP.Client
 import qualified CCIP.Events
@@ -29,8 +28,6 @@ import CCIP.Codec
   )
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex, isValidHex)
-
-import qualified Splice.Api.Token.HoldingV1
 
 messageStaticSize : Int
 messageStaticSize = 67
@@ -190,7 +187,7 @@ template OnRamp
                 -- TODO: parse with defaults
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
-                        _ -> abort "onramp: unsupported extraArgs version"
+                        _ -> abort "onramp: unsupported extraArgs version" -- exhaustive default match to ensure this fails if new versions of extraArgs are added without updating the onramp
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
                 assertMsg "onramp: block confirmations not allowed from Canton" (extraArgs.blockConfirmations == 0)
                 assertValidHex "executor" extraArgs.executor
@@ -249,6 +246,9 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
+                let resolvedExecutorAddress = if extraArgs.executor /= ""
+                        then extraArgs.executor
+                        else RawInstanceAddress.toInstanceAddress destConfig.defaultExecutor
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -281,7 +281,7 @@ template OnRamp
                     networkFeeUSDCents = networkFeeUSD
                     expectedTokenInstrumentId = tokenInstrumentId
                     outboundPoolCCVs = None
-                    executorAddress = RawInstanceAddress.make "" ccipOwner -- TODO: fill from extraArgs
+                    executorAddress = resolvedExecutorAddress
                     executionMode = None
                     executorArgs = ""
                     executorFee = None

@@ -116,6 +116,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
 				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
 			}
+			defaultExecutor := mcms.RawInstanceAddress{Unpack: types.TEXT(remoteConfig.DefaultExecutor)}
 
 			// Outbound / OnRamp
 			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.DestChainConfigArgs{
@@ -123,6 +124,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
 				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
 				OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
+				DefaultExecutor:           defaultExecutor,
 				LaneMandatedCCVs:          laneMandatedOutboundCCVs,
 				DefaultCCVs:               defaultOutboundCCVs,
 				MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatInt(int64(remoteConfig.FeeQuoterDestChainConfig.NetworkFeeUSDCents), 10)),

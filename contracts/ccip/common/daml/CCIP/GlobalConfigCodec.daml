@@ -27,6 +27,8 @@ import MCMS.Codec (
     decodeList,
     )
 import CCIP.Codec (
+    encodeRawInstanceAddress,
+    decodeRawInstanceAddressAt,
     encodeRawInstanceAddressList,
     decodeRawInstanceAddressList
     )
@@ -47,6 +49,7 @@ encodeDestChainConfigArgs dcc =
     fromSome (encodeInt64 dcc.addressBytesLength) <>
     fromSome (encodeInt64 dcc.baseExecutionGasCost) <>
     encodeBytesHex dcc.offRampAddress <>
+    encodeRawInstanceAddress dcc.defaultExecutor <>
     encodeRawInstanceAddressList dcc.laneMandatedCCVs <>
     encodeRawInstanceAddressList dcc.defaultCCVs <>
     encodeNumeric0 dcc.messageNetworkFeeUSDCents <>
@@ -64,16 +67,18 @@ decodeDestChainConfigArgsAt encoded offset = do
     (addressBytesLength, offset3) <- decodeInt64At encoded offset2
     (baseExecutionGasCost, offset4) <- decodeInt64At encoded offset3
     (offRampAddress, offset5) <- decodeBytesHexAt encoded offset4
-    (laneMandatedCCVs, offset6) <- decodeRawInstanceAddressList encoded offset5
-    (defaultCCVs, offset7) <- decodeRawInstanceAddressList encoded offset6
-    (messageNetworkFeeUSDCents, offset8) <- decodeNumeric0At encoded offset7
-    (tokenNetworkFeeUSDCents, finalOffset) <- decodeNumeric0At encoded offset8
+    (defaultExecutor, offset6) <- decodeRawInstanceAddressAt encoded offset5
+    (laneMandatedCCVs, offset7) <- decodeRawInstanceAddressList encoded offset6
+    (defaultCCVs, offset8) <- decodeRawInstanceAddressList encoded offset7
+    (messageNetworkFeeUSDCents, offset9) <- decodeNumeric0At encoded offset8
+    (tokenNetworkFeeUSDCents, finalOffset) <- decodeNumeric0At encoded offset9
     Some ( DestChainConfigArgs with
             destChainSelector = destChainSelector
             isEnabled = isEnabled
             addressBytesLength = addressBytesLength
             baseExecutionGasCost = baseExecutionGasCost
             offRampAddress = offRampAddress
+            defaultExecutor = defaultExecutor
             laneMandatedCCVs = laneMandatedCCVs
             defaultCCVs = defaultCCVs
             messageNetworkFeeUSDCents = messageNetworkFeeUSDCents

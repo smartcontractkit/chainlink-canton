@@ -28,7 +28,6 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
 
@@ -144,6 +143,7 @@ testCCIPSend = script do
                 addressBytesLength = 20
                 baseExecutionGasCost = 12345
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -575,6 +575,7 @@ testPrepareSendExtraArgs = script do
                 addressBytesLength = 20
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = [defaultCCV]
                 messageNetworkFeeUSDCents = cents 0.0
@@ -884,6 +885,7 @@ testPrepareSendRejectsOversizedPayload = script do
                 addressBytesLength = 20
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -1315,6 +1317,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                 addressBytesLength = 20
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -1452,6 +1455,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 addressBytesLength = 20
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0

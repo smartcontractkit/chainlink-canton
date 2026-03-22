@@ -48,6 +48,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates = script do
           addressBytesLength = 20
           baseExecutionGasCost = 0
           offRampAddress = "d589cf1d9ddc38d0aff8f324ed5d16d220f0fdbe"
+          defaultExecutor = RawInstanceAddress "default-executor@party"
           laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
           defaultCCVs = []
           messageNetworkFeeUSDCents = 10.0
@@ -82,7 +83,16 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "globalconfig-replace-test"
-      existingConfig = DestChainConfig True 20 0 "abcd" [] [] (cents 1.0) (cents 1.0)
+      existingConfig = DestChainConfig with
+        isEnabled = True
+        addressBytesLength = 20
+        baseExecutionGasCost = 0
+        offRampAddress = "abcd"
+        defaultExecutor = RawInstanceAddress "executor@party"
+        laneMandatedCCVs = []
+        defaultCCVs = []
+        messageNetworkFeeUSDCents = cents 1.0
+        tokenNetworkFeeUSDCents = cents 1.0
 
   -- Create GlobalConfig with existing dest chain config
   gcCid <- submit ccipOwner do
@@ -104,6 +114,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
           addressBytesLength = 20
           baseExecutionGasCost = 0
           offRampAddress = "b70fd68ac42892c71b3f9df7dde8efcafcfa82fe"
+          defaultExecutor = RawInstanceAddress "default-executor@party"
           laneMandatedCCVs = []
           defaultCCVs = [RawInstanceAddress "default@party"]
           messageNetworkFeeUSDCents = 20.0
@@ -114,6 +125,7 @@ testGlobalConfigMCMSEntrypoint_ApplyDestChainConfigUpdates_Replace = script do
           addressBytesLength = 32
           baseExecutionGasCost = 0
           offRampAddress = "fdd0a23462dbe0f8cd1dfb5afdb61ffa9dccdfab1dcfcb0ee87aec14269fe8b5"
+          defaultExecutor = RawInstanceAddress "default-executor@party"
           laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
           defaultCCVs = [RawInstanceAddress "default@party"]
           messageNetworkFeeUSDCents = 300.0
@@ -338,6 +350,7 @@ testGlobalConfigMCMSEntrypoint_MissingSelfCid = script do
           addressBytesLength = 20
           baseExecutionGasCost = 0
           offRampAddress = "abcdef1234567890"
+          defaultExecutor = RawInstanceAddress "default-executor@party"
           laneMandatedCCVs = [RawInstanceAddress "ccv@owner"]
           defaultCCVs = []
           messageNetworkFeeUSDCents = 10.0

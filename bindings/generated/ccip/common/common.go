@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "6ff5944b1ec0d5c01ce360cb84ae0670de951108bf45a1edc702b3db7023a8f9"
+	PackageID   = "1e2b0913e2afe812431a6a62f78692f92262e6a8e7a108387f49ecc01e028436"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1583,6 +1583,7 @@ type DestChainConfig struct {
 	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
+	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1600,6 +1601,14 @@ func (t DestChainConfig) ToMap() map[string]any {
 	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
+
+	m["defaultExecutor"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DefaultExecutor).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DefaultExecutor
+	}()
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -1663,6 +1672,7 @@ type DestChainConfigArgs struct {
 	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
+	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
 	LaneMandatedCCVs          []mcms.RawInstanceAddress `json:"laneMandatedCCVs"`
 	DefaultCCVs               []mcms.RawInstanceAddress `json:"defaultCCVs"`
 	MessageNetworkFeeUSDCents types.NUMERIC             `json:"messageNetworkFeeUSDCents"`
@@ -1682,6 +1692,14 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
 
 	m["offRampAddress"] = string(t.OffRampAddress)
+
+	m["defaultExecutor"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.DefaultExecutor).(mapper); ok {
+			return m.toMap()
+		}
+		return t.DefaultExecutor
+	}()
 
 	m["laneMandatedCCVs"] = func() []any {
 		res := make([]any, 0, len(t.LaneMandatedCCVs))
@@ -4232,7 +4250,7 @@ type SendingMessageV1 struct {
 	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
 	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
 	RequiredCCVs              []types.TEXT                              `json:"requiredCCVs"`
-	ExecutorAddress           mcms.RawInstanceAddress                   `json:"executorAddress"`
+	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
 	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
 	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
 	SenderAddress             types.TEXT                                `json:"senderAddress"`
@@ -4316,13 +4334,7 @@ func (t SendingMessageV1) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["executorAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutorAddress
-	}()
+	args["executorAddress"] = string(t.ExecutorAddress)
 
 	if t.ExecutionMode != nil {
 		args["executionMode"] = map[string]any{
@@ -4583,13 +4595,7 @@ func (t SendingMessageV1) CreateCommandWithPackageID(packageID string) *model.Cr
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["executorAddress"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.ExecutorAddress).(mapper); ok {
-			return m.toMap()
-		}
-		return t.ExecutorAddress
-	}()
+	args["executorAddress"] = string(t.ExecutorAddress)
 
 	if t.ExecutionMode != nil {
 		args["executionMode"] = map[string]any{

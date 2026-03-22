@@ -4,8 +4,6 @@
 module CCIP.CCIPSender where
 
 import DA.Action (foldlA)
-import DA.Crypto.Text (BytesHex)
-import DA.List (zip)
 import DA.Optional (fromSome, fromSomeNote, isSome)
 
 import qualified CCIP.Client
