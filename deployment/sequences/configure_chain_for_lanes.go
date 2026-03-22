@@ -123,6 +123,8 @@ var ConfigureChainForLanes = operations.NewSequence(
 				DestChainSelector:         types.NUMERIC(remoteSelectorStr),
 				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
 				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
+				TokenReceiverAllowed:      types.BOOL(true), // TODO this is missing from the input
+				BaseExecutionGasCost:      types.INT64(remoteConfig.BaseExecutionGasCost),
 				OffRampAddress:            types.TEXT(hex.EncodeToString(remoteConfig.OffRamp)), // Remote chain off-ramp for outbound execution
 				DefaultExecutor:           defaultExecutor,
 				LaneMandatedCCVs:          laneMandatedOutboundCCVs,

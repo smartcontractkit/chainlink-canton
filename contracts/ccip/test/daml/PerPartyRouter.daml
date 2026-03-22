@@ -141,6 +141,7 @@ testCCIPSend = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 12345
                 offRampAddress = "0000000000000000000000000000000000000003"
                 defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
@@ -550,6 +551,7 @@ testPrepareSendExtraArgs = script do
     let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
+    let destChainSelector2 : Numeric 0 = 3333333333.0
 
     let feeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -570,16 +572,29 @@ testPrepareSendExtraArgs = script do
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = sourceChainSelector
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
-                isEnabled = True
-                addressBytesLength = 20
-                baseExecutionGasCost = 0
-                offRampAddress = "0000000000000000000000000000000000000003"
-                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
-                laneMandatedCCVs = []
-                defaultCCVs = [defaultCCV]
-                messageNetworkFeeUSDCents = cents 0.0
-                tokenNetworkFeeUSDCents = cents 0.0)]
+            destChainConfigs = Map.fromList [
+                (destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = True
+                    baseExecutionGasCost = 0
+                    offRampAddress = "0000000000000000000000000000000000000003"
+                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    laneMandatedCCVs = []
+                    defaultCCVs = [defaultCCV]
+                    messageNetworkFeeUSDCents = cents 0.0
+                    tokenNetworkFeeUSDCents = cents 0.0),
+                (destChainSelector2, CCIP.GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = False -- token receiver not allowed for this destination chain
+                    baseExecutionGasCost = 0
+                    offRampAddress = "0000000000000000000000000000000000000003"
+                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    laneMandatedCCVs = []
+                    defaultCCVs = [defaultCCV]
+                    messageNetworkFeeUSDCents = cents 0.0
+                    tokenNetworkFeeUSDCents = cents 0.0)]
             sourceChainConfigs = Map.empty
 
     rmnRemote <- submit rmnOwner do
@@ -771,6 +786,35 @@ testPrepareSendExtraArgs = script do
 
     -- Token-only send with separate receiver and tokenReceiver
     let tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89" -- 20 bytes
+
+    -- This destionation chain does not allow token receivers, should fail if tokenReceiver is set
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destinationChainSelector = destChainSelector2
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                        gasLimit = 0
+                        blockConfirmations = 0
+                        ccvs = []
+                        ccvArgs = []
+                        executor = ""
+                        executorArgs = ""
+                        tokenReceiver = tokenReceiver
+                        tokenArgs = "aabbccdd"
+    -- This chain has tokenReceiverAllowed = true, should succeed and set tokenReceiver on the message
     smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
@@ -883,6 +927,7 @@ testPrepareSendRejectsOversizedPayload = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
                 defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
@@ -1315,6 +1360,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
                 defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
@@ -1453,6 +1499,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
                 defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"

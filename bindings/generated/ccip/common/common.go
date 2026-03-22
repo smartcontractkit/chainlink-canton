@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "1e2b0913e2afe812431a6a62f78692f92262e6a8e7a108387f49ecc01e028436"
+	PackageID   = "72bde1143beb4b99c3bc8d50d587c2a37f8715b0d9dd89177b46f4d1d542bde9"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1581,6 +1581,7 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 type DestChainConfig struct {
 	IsEnabled                 types.BOOL                `json:"isEnabled"`
 	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
+	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
 	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
@@ -1597,6 +1598,8 @@ func (t DestChainConfig) ToMap() map[string]any {
 	m["isEnabled"] = bool(t.IsEnabled)
 
 	m["addressBytesLength"] = int64(t.AddressBytesLength)
+
+	m["tokenReceiverAllowed"] = bool(t.TokenReceiverAllowed)
 
 	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
 
@@ -1670,6 +1673,7 @@ type DestChainConfigArgs struct {
 	DestChainSelector         types.NUMERIC             `json:"destChainSelector"`
 	IsEnabled                 types.BOOL                `json:"isEnabled"`
 	AddressBytesLength        types.INT64               `json:"addressBytesLength"`
+	TokenReceiverAllowed      types.BOOL                `json:"tokenReceiverAllowed"`
 	BaseExecutionGasCost      types.INT64               `json:"baseExecutionGasCost"`
 	OffRampAddress            types.TEXT                `json:"offRampAddress"`
 	DefaultExecutor           mcms.RawInstanceAddress   `json:"defaultExecutor"`
@@ -1688,6 +1692,8 @@ func (t DestChainConfigArgs) ToMap() map[string]any {
 	m["isEnabled"] = bool(t.IsEnabled)
 
 	m["addressBytesLength"] = int64(t.AddressBytesLength)
+
+	m["tokenReceiverAllowed"] = bool(t.TokenReceiverAllowed)
 
 	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
 

@@ -69,8 +69,19 @@ template GlobalConfig
 
                 -- Update
                 let newConfigs = foldl
-                        (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, defaultExecutor, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
-                            Map.insert destChainSelector DestChainConfig{isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, defaultExecutor, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
+                        (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, baseExecutionGasCost, tokenReceiverAllowed, offRampAddress, defaultExecutor, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
+                            Map.insert destChainSelector DestChainConfig with
+                                isEnabled,
+                                 addressBytesLength,
+                                 baseExecutionGasCost,
+                                 tokenReceiverAllowed,
+                                 offRampAddress,
+                                 defaultExecutor,
+                                 laneMandatedCCVs,
+                                 defaultCCVs,
+                                 messageNetworkFeeUSDCents,
+                                 tokenNetworkFeeUSDCents
+                            configs)
                         destChainConfigs
                         destChainConfigUpdates
                 create this with destChainConfigs = newConfigs

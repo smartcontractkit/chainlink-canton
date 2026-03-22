@@ -184,7 +184,6 @@ template OnRamp
                 assertValidHex "payload" message.payload
 
                 -- Parse extraArgs and validate fields
-                -- TODO: parse with defaults
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
                         _ -> abort "onramp: unsupported extraArgs version" -- exhaustive default match to ensure this fails if new versions of extraArgs are added without updating the onramp
@@ -193,6 +192,7 @@ template OnRamp
                 assertValidHex "executor" extraArgs.executor
                 assertValidHex "executorArgs" extraArgs.executorArgs
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
+                assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
                 assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
                 assertMsg "onramp: CCVs and CCV args length mismatch" (length extraArgs.ccvs == length extraArgs.ccvArgs)

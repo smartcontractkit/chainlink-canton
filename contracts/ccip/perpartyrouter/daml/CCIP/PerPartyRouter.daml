@@ -9,7 +9,7 @@ import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional)
-import DA.Time (time, addRelTime, hours)
+import DA.Time (time)
 
 import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
