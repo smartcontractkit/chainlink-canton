@@ -28,7 +28,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -426,16 +426,16 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
 				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
 				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+				CommitteeVerifiers: []lanes.CommitteeVerifierConfig[contracts.InstanceAddress]{
 					{
 						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteSelector: {
 								AllowlistEnabled:   false,
 								FeeUSDCents:        50,
 								GasForVerification: 50_000,
 								PayloadSizeBytes:   6*64 + 2*32,
-								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+								SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
 									Signers:   ccvSignerPubKeys,
 									Threshold: 2,
 								},
@@ -443,30 +443,31 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
+				RemoteChains: map[uint64]lanes.ChainDefinition{
 					remoteSelector: {
-						AllowTrafficFrom:         true,
-						OnRamps:                  [][]byte{hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd")},
-						OffRamp:                  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
-						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-						LaneMandatedInboundCCVs:  nil,
-						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+						OnRamp:                  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+						OffRamp:                 hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+						DefaultInboundCCVs:      []datastore.AddressRef{{Address: string(committeeVerifierRawAddr)}},
+						LaneMandatedInboundCCVs: nil,
+						DefaultOutboundCCVs:     []datastore.AddressRef{{Address: string(committeeVerifierRawAddr)}},
 						LaneMandatedOutboundCCVs: nil,
-						DefaultExecutor:          "",
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DefaultExecutor:         datastore.AddressRef{},
+						FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
 							IsEnabled:                   true,
 							MaxDataBytes:                50000,
 							MaxPerMsgGasLimit:           4000000,
 							DestGasOverhead:             300000,
 							DestGasPerPayloadByteBase:   16,
-							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+							ChainFamilySelector:         binary.BigEndian.Uint32([]byte{0x28, 0x12, 0xd5, 0x2c}),
 							DefaultTxGasLimit:           200000,
-							LinkFeeMultiplierPercent:    90,
 							DefaultTokenFeeUSDCents:     0,
 							DefaultTokenDestGasOverhead: 34000,
 							NetworkFeeUSDCents:          0,
+							V2Params: &lanes.FeeQuoterV2Params{
+								LinkFeeMultiplierPercent: 90,
+							},
 						},
-						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+						ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{},
 						AddressBytesLength:      20,
 						BaseExecutionGasCost:    0,
 					},

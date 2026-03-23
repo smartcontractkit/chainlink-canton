@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -17,7 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -221,16 +222,16 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 				FeeQuoter:     contracts.HexToInstanceAddress(feeQuoter.Address),
 				OnRamp:        contracts.HexToInstanceAddress(onRamp.Address),
 				OffRamp:       contracts.HexToInstanceAddress(offRamp.Address),
-				CommitteeVerifiers: []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+				CommitteeVerifiers: []lanes.CommitteeVerifierConfig[contracts.InstanceAddress]{
 					{
 						CommitteeVerifier: []contracts.InstanceAddress{contracts.HexToInstanceAddress(committeeVerifier.Address)},
-						RemoteChains: map[uint64]adapters.CommitteeVerifierRemoteChainConfig{
+						RemoteChains: map[uint64]lanes.CommitteeVerifierRemoteChainConfig{
 							remoteSelector: {
 								AllowlistEnabled:   false,
 								FeeUSDCents:        7,
 								GasForVerification: 50_000,
 								PayloadSizeBytes:   6*64 + 2*32,
-								SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+								SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
 									Signers:   ccvSignerPubKeys,
 									Threshold: 2,
 								},
@@ -238,30 +239,31 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 						},
 					},
 				},
-				RemoteChains: map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
+				RemoteChains: map[uint64]lanes.ChainDefinition{
 					remoteSelector: {
-						AllowTrafficFrom:         true,
-						OnRamps:                  [][]byte{[]byte("0x2e8bbc8db4217b3ab527fd5ea2cfa5cd1bd6cea0")},
-						OffRamp:                  hexutil.MustDecode("0xade37fcfcb5fff70eeea7dc9cc3eab19659cfc7c"),
-						DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
-						LaneMandatedInboundCCVs:  nil,
-						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+						OnRamp:                  hexutil.MustDecode("0x2e8bbc8db4217b3ab527fd5ea2cfa5cd1bd6cea0"),
+						OffRamp:                 hexutil.MustDecode("0xade37fcfcb5fff70eeea7dc9cc3eab19659cfc7c"),
+						DefaultInboundCCVs:      []datastore.AddressRef{{Address: string(committeeVerifierRawAddr)}},
+						LaneMandatedInboundCCVs: nil,
+						DefaultOutboundCCVs:     []datastore.AddressRef{{Address: string(committeeVerifierRawAddr)}},
 						LaneMandatedOutboundCCVs: nil,
-						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // TODO: replace with actual executor, currently deployed down below and not used yet
-						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+						DefaultExecutor: datastore.AddressRef{Address: committeeVerifierRawAddr.String()}, // TODO: replace with actual executor
+						FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
 							IsEnabled:                   true,
 							MaxDataBytes:                50000,
 							MaxPerMsgGasLimit:           4000000,
 							DestGasOverhead:             300000,
 							DestGasPerPayloadByteBase:   16,
-							ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+							ChainFamilySelector:         binary.BigEndian.Uint32([]byte{0x28, 0x12, 0xd5, 0x2c}),
 							DefaultTxGasLimit:           200000,
-							LinkFeeMultiplierPercent:    90,
 							DefaultTokenFeeUSDCents:     10,
 							DefaultTokenDestGasOverhead: 34000,
 							NetworkFeeUSDCents:          25,
+							V2Params: &lanes.FeeQuoterV2Params{
+								LinkFeeMultiplierPercent: 90,
+							},
 						},
-						ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+						ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{},
 						AddressBytesLength:      20,
 						BaseExecutionGasCost:    0,
 					},
