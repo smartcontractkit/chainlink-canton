@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -1881,9 +1882,9 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 
 // PrepareSend is a Record type
 type PrepareSend struct {
-	DestinationChainSelector types.NUMERIC      `json:"destinationChainSelector"`
-	Message                  Canton2AnyMessage  `json:"message"`
-	Context                  common.CCIPContext `json:"context"`
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage `json:"message"`
+	Context                  common.CCIPContext       `json:"context"`
 }
 
 // ToMap converts PrepareSend to a map for DAML arguments

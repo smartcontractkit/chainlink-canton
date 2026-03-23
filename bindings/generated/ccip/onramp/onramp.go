@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -647,15 +648,15 @@ func (t *OnRampDeps) UnmarshalHex(data string) error {
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	DestChainSelector     types.NUMERIC     `json:"destChainSelector"`
-	Message               Canton2AnyMessage `json:"message"`
-	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT        `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
-	CurrentSequenceNumber types.NUMERIC     `json:"currentSequenceNumber"`
+	DestChainSelector     types.NUMERIC            `json:"destChainSelector"`
+	Message               client.Canton2AnyMessage `json:"message"`
+	RouterPartyOwner      types.PARTY              `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT               `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID        `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID        `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID        `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID        `json:"rmnRemoteCid"`
+	CurrentSequenceNumber types.NUMERIC            `json:"currentSequenceNumber"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments

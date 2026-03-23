@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -168,11 +169,11 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 
 // Send is a Record type
 type Send struct {
-	DestinationChainSelector types.NUMERIC      `json:"destinationChainSelector"`
-	Message                  Canton2AnyMessage  `json:"message"`
-	Ccvs                     []CCVSendInput     `json:"ccvs"`
-	Context                  common.CCIPContext `json:"context"`
-	RouterCid                types.CONTRACT_ID  `json:"routerCid"`
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  client.Canton2AnyMessage `json:"message"`
+	Ccvs                     []client.CCVSendInput    `json:"ccvs"`
+	Context                  common.CCIPContext       `json:"context"`
+	RouterCid                types.CONTRACT_ID        `json:"routerCid"`
 }
 
 // ToMap converts Send to a map for DAML arguments
