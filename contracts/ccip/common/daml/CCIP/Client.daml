@@ -11,15 +11,6 @@ data TokenAmount = TokenAmount
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
-data Any2CantonMessage = Any2CantonMessage
-    with
-        messageId : BytesHex
-        sourceChainSelector : Numeric 0
-        sender : BytesHex
-        payload : BytesHex
-        destTokenAmount : Optional TokenAmount
-    deriving (Eq, Show)
-
 data Canton2AnyMessage = Canton2AnyMessage
     with
         receiver : BytesHex
@@ -38,7 +29,7 @@ data ExtraArgs
 
 data GenericExtraArgsV3 = GenericExtraArgsV3
     with
-        -- | Gas limit for the callback on the destination chain. 
+        -- | Gas limit for the callback on the destination chain.
         -- | If the gas limit is zero and the message data length is also zero, no callback
         -- | will be performed, even if a receiver is specified. A gas limit of zero is useful
         -- | when only token transfers are desired, or when the receiver is an EOA account
@@ -78,7 +69,7 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         -- | is specific to each chain family and is not interpreted by CCIP itself, only by the
         -- | executor. Things that may be included here are Solana accounts or Sui object IDs,
         -- | which must be secured through the message ID as passing in incorrect values can lead
-        -- | to loss of funds. 
+        -- | to loss of funds.
         -- | May be empty depending on the destination chain.
         executorArgs : BytesHex
         -- | Address of the token receiver on the destination chain, in bytes format. If an empty
