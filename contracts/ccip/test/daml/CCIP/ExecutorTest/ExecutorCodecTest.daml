@@ -1,0 +1,84 @@
+-- | Round-trip tests for Executor codec functions
+module ExecutorTest.ExecutorCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Optional (fromSome)
+
+import CCIP.Executor qualified as Executor
+import MCMS.RawInstanceAddress (RawInstanceAddress(..))
+
+-- ===============================================
+-- |            ApplyDestChainUpdates            |
+-- ===============================================
+
+testApplyDestChainUpdatesParamsRoundtrip : Script ()
+testApplyDestChainUpdatesParamsRoundtrip = do
+    -- empty args
+    let args = ([], [])
+        encoded = Executor.encodeApplyDestChainUpdatesParams args
+    fst (fromSome (Executor.decodeApplyDestChainConfigUpdatesParams encoded)) === args
+    -- non-empty args
+    let args = (
+            [2.0, 3.0],
+            [
+                Executor.RemoteChainConfigArgs with
+                    destChainSelector = 1.0
+                    config = Executor.RemoteChainConfig with
+                        feeUSDCents = 100.0
+                        enabled = True
+                ,Executor.RemoteChainConfigArgs with
+                    destChainSelector = 18446744073709551615.0 -- max uint64
+                    config = Executor.RemoteChainConfig with
+                        feeUSDCents = 0.0
+                        enabled = False
+                ,Executor.RemoteChainConfigArgs with
+                    destChainSelector = 0.0
+                    config = Executor.RemoteChainConfig with
+                        feeUSDCents = 999.0
+                        enabled = True
+            ]
+            )
+        encoded = Executor.encodeApplyDestChainUpdatesParams args
+    fst (fromSome (Executor.decodeApplyDestChainConfigUpdatesParams encoded)) === args
+
+-- ===============================================
+-- |              SetDynamicConfig               |
+-- ===============================================
+
+testSetDynamicConfigParamsRoundtrip : Script ()
+testSetDynamicConfigParamsRoundtrip = do
+    -- with feeAggregator = None
+    let args = Executor.DynamicConfig with
+            feeAggregator = None
+            minBlockConfirmations = 0
+            ccvAllowlistEnabled = False
+        encoded = Executor.encodeSetDynamicConfigParams args
+    fst (fromSome (Executor.decodeSetDynamicConfigParams encoded)) === args
+    -- with feeAggregator = Some
+    feeAgg <- allocateParty "fee_aggregator"
+    let args = Executor.DynamicConfig with
+            feeAggregator = Some feeAgg
+            minBlockConfirmations = 7
+            ccvAllowlistEnabled = True
+        encoded = Executor.encodeSetDynamicConfigParams args
+    fst (fromSome (Executor.decodeSetDynamicConfigParams encoded)) === args
+
+-- ===============================================
+-- |           ApplyAllowedCCVUpdates            |
+-- ===============================================
+
+testApplyAllowedCCVUpdatesParamsRoundtrip : Script ()
+testApplyAllowedCCVUpdatesParamsRoundtrip = do
+    -- empty args
+    let args = ([], [], False)
+        encoded = Executor.encodeApplyAllowedCCVUpdatesParams args
+    fst (fromSome (Executor.decodeApplyAllowedCCVUpdatesParams encoded)) === args
+    -- non-empty args
+    let args = (
+            [RawInstanceAddress "ccv-remove-1@party1", RawInstanceAddress "ccv-remove-2@party2"],
+            [RawInstanceAddress "ccv-add-1@party3", RawInstanceAddress "ccv-add-2@party4"],
+            True
+            )
+        encoded = Executor.encodeApplyAllowedCCVUpdatesParams args
+    fst (fromSome (Executor.decodeApplyAllowedCCVUpdatesParams encoded)) === args
