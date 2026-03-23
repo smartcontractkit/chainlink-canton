@@ -2,6 +2,7 @@ package devenv
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -22,10 +23,12 @@ import (
 	"github.com/rs/zerolog/log"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	evm_ds_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
+	evmproxy "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/proxy"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -63,10 +66,8 @@ import (
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
-	"github.com/smartcontractkit/chainlink-ccv/deployments"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
 )
 
 var (
@@ -153,7 +154,7 @@ func (c *Chain) ConfigureNodes(ctx context.Context, blockchain *blockchain.Input
 }
 
 // DeployContractsForSelector implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *deployments.EnvironmentTopology) (datastore.DataStore, error) {
+func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *offchain.EnvironmentTopology) (datastore.DataStore, error) {
 	// Only using a single participant for now
 	participant := env.BlockChains.CantonChains()[selector].Participants[0]
 
@@ -387,8 +388,8 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	err = runningDS.AddressRefStore.Add(datastore.AddressRef{
 		Address:       executorProxyRawAddr.InstanceAddress().String(),
 		Labels:        datastore.NewLabelSet(executorProxyRawAddr.String()),
-		Type:          datastore.ContractType(executor.ProxyType),
-		Version:       executor.Version,
+		Type:          datastore.ContractType(evmproxy.ContractType),
+		Version:       evmproxy.Version,
 		Qualifier:     devenvcommon.DefaultExecutorQualifier,
 		ChainSelector: selector,
 	})
@@ -402,7 +403,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 }
 
 // ConnectContractsWithSelectors implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployment.Environment, selector uint64, remoteSelectors []uint64, committees *deployments.EnvironmentTopology) error {
+func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployment.Environment, selector uint64, remoteSelectors []uint64, committees *offchain.EnvironmentTopology) error {
 	l := c.logger
 	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Connecting contracts with selectors")
 	bundle := operations.NewBundle(
@@ -453,7 +454,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				OnRamp:             onRamp,
 				OffRamp:            offRamp,
 				CommitteeVerifiers: nil,
-				RemoteChains:       make(map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress], len(remoteSelectors)),
+				RemoteChains:       make(map[uint64]lanes.ChainDefinition, len(remoteSelectors)),
 			},
 		},
 	}
@@ -472,20 +473,21 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 	}
 
 	for _, remoteSelector := range remoteSelectors {
-		// TODO: should be moved to the ChainFamily interface.
 		var addressBytesLength uint8
 		family, err := chainsel.GetSelectorFamily(remoteSelector)
 		if err != nil {
 			return fmt.Errorf("failed to get selector family for chain %d: %w", remoteSelector, err)
 		}
-		var chainFamily adapters.ChainFamily
+		var refToBytes dsutils.FormatFn[[]byte]
 		switch family {
 		case chainsel.FamilyEVM:
 			addressBytesLength = 20
-			chainFamily = &evmadapters.ChainFamilyAdapter{}
+			refToBytes = evm_ds_utils.ToEVMAddressBytes
 		case chainsel.FamilyCanton:
 			addressBytesLength = 32
-			chainFamily = cantonadapters.NewChainFamilyAdapter(&evmadapters.ChainFamilyAdapter{})
+			refToBytes = func(ref datastore.AddressRef) ([]byte, error) {
+				return contracts.HexToInstanceAddress(ref.Address).Bytes(), nil
+			}
 		default:
 			return fmt.Errorf("unsupported family %s for chain %d", family, remoteSelector)
 		}
@@ -493,22 +495,22 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		remoteOnRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(onramp.ContractType),
 			Version: onramp.Version,
-		}, remoteSelector, chainFamily.AddressRefToBytes)
+		}, remoteSelector, refToBytes)
 		if err != nil {
 			return fmt.Errorf("failed to get on ramp address for remote chain %d: %w", remoteSelector, err)
 		}
 		remoteOffRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			Type:    datastore.ContractType(offramp.ContractType),
 			Version: offramp.Version,
-		}, remoteSelector, chainFamily.AddressRefToBytes)
+		}, remoteSelector, refToBytes)
 		if err != nil {
 			return fmt.Errorf("failed to get off ramp address for remote chain %d: %w", remoteSelector, err)
 		}
 		localExecutorRef, err := env.DataStore.Addresses().Get(
 			datastore.NewAddressRefKey(
 				selector,
-				datastore.ContractType(executor.ProxyType),
-				executor.Version,
+				datastore.ContractType(evmproxy.ContractType),
+				evmproxy.Version,
 				devenvcommon.DefaultExecutorQualifier,
 			),
 		)
@@ -517,29 +519,32 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		}
 		// Normalize executor to 32 bytes (left-padded) for Canton config encoding.
 		normalizedSourceExecutor := contracts.HexToInstanceAddress(localExecutorRef.Address).Hex()
-		remoteChainConfig := adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
-			AllowTrafficFrom:         true,
-			OnRamps:                  [][]byte{remoteOnRamp},
+		ccvAddrRef := datastore.AddressRef{Address: string(committeeVerifierRawAddr)}
+		chainFamilySel := [4]byte{0x28, 0x12, 0xd5, 0x2c}
+		remoteChainConfig := lanes.ChainDefinition{
+			OnRamp:                   remoteOnRamp,
 			OffRamp:                  remoteOffRamp,
-			DefaultInboundCCVs:       []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+			DefaultInboundCCVs:       []datastore.AddressRef{ccvAddrRef},
 			LaneMandatedInboundCCVs:  nil,
-			DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
+			DefaultOutboundCCVs:      []datastore.AddressRef{ccvAddrRef},
 			LaneMandatedOutboundCCVs: nil,
-			DefaultExecutor:          contracts.RawInstanceAddress(normalizedSourceExecutor),
-			FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
+			DefaultExecutor:          datastore.AddressRef{Address: normalizedSourceExecutor},
+			FeeQuoterDestChainConfig: lanes.FeeQuoterDestChainConfig{
 				IsEnabled:                   true,
 				MaxDataBytes:                50000,
 				MaxPerMsgGasLimit:           4000000,
 				DestGasOverhead:             300000,
 				DestGasPerPayloadByteBase:   16,
-				ChainFamilySelector:         [4]byte{0x28, 0x12, 0xd5, 0x2c},
+				ChainFamilySelector:         binary.BigEndian.Uint32(chainFamilySel[:]),
 				DefaultTxGasLimit:           200000,
-				LinkFeeMultiplierPercent:    90,
 				DefaultTokenFeeUSDCents:     0,
 				DefaultTokenDestGasOverhead: 34000,
 				NetworkFeeUSDCents:          0,
+				V2Params: &lanes.FeeQuoterV2Params{
+					LinkFeeMultiplierPercent: 90,
+				},
 			},
-			ExecutorDestChainConfig: adapters.ExecutorDestChainConfig{},
+			ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{},
 			AddressBytesLength:      addressBytesLength,
 			BaseExecutionGasCost:    0,
 		}
@@ -556,9 +561,9 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 			return fmt.Errorf("failed to get committee verifier address with qualifier %s for chain %d: %w", qualifier, selector, err)
 		}
 
-		committeeVerifierConfig := adapters.CommitteeVerifierConfig[contracts.InstanceAddress]{
+		committeeVerifierConfig := lanes.CommitteeVerifierConfig[contracts.InstanceAddress]{
 			CommitteeVerifier: []contracts.InstanceAddress{committeeVerifier},
-			RemoteChains:      make(map[uint64]adapters.CommitteeVerifierRemoteChainConfig),
+			RemoteChains:      make(map[uint64]lanes.CommitteeVerifierRemoteChainConfig),
 		}
 
 		// Configure all remote chains with the respective signers
@@ -582,14 +587,14 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 				}
 				signers = append(signers, signer)
 			}
-			committeeVerifierConfig.RemoteChains[remoteSelector] = adapters.CommitteeVerifierRemoteChainConfig{
+			committeeVerifierConfig.RemoteChains[remoteSelector] = lanes.CommitteeVerifierRemoteChainConfig{
 				AllowlistEnabled:          false,
 				AddedAllowlistedSenders:   nil,
 				RemovedAllowlistedSenders: nil,
 				FeeUSDCents:               0,
 				GasForVerification:        50_000,
 				PayloadSizeBytes:          0,
-				SignatureConfig: adapters.CommitteeVerifierSignatureQuorumConfig{
+				SignatureConfig: lanes.CommitteeVerifierSignatureQuorumConfig{
 					Signers:   signers,
 					Threshold: chainCfg.Threshold,
 				},
@@ -966,8 +971,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	executorProxyRef, err := c.e.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(
 			c.chainDetails.ChainSelector,
-			datastore.ContractType(executor.ProxyType),
-			executor.Version,
+			datastore.ContractType(evmproxy.ContractType),
+			evmproxy.Version,
 			devenvcommon.DefaultExecutorQualifier,
 		),
 	)

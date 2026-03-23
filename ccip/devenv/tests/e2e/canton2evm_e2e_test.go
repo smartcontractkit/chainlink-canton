@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	evmproxy "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/proxy"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -81,8 +81,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		executorAddr, err := tcapi.GetContractAddress(
 			in,
 			cantonChain.ChainSelector(),
-			datastore.ContractType(executor.ProxyType),
-			executor.DeployProxy.Version(),
+			datastore.ContractType(evmproxy.ContractType),
+			evmproxy.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
 			"source executor",
 		)

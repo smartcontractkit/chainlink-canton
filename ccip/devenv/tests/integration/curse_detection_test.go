@@ -27,7 +27,9 @@ import (
 func getCantonConfig(t *testing.T, in *ccv.Cfg, cantonSelector string) *ccip.Config {
 	for _, v := range in.Verifier {
 		if v.ChainFamily == blockchain.FamilyCanton {
-			cantonConfig, err := util.OpaqueToConcreteStrict[ccip.Config](v.CantonConfigs)
+			opaque, ok := v.OpaqueConfigs[chainsel.FamilyCanton]
+			require.True(t, ok, "verifier opaque_configs missing %q", chainsel.FamilyCanton)
+			cantonConfig, err := util.OpaqueToConcreteStrict[ccip.Config](opaque)
 			require.NoError(t, err)
 
 			return cantonConfig

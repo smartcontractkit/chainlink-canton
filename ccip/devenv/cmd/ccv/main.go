@@ -5,10 +5,10 @@ import (
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cli"
-	"github.com/smartcontractkit/chainlink-ccv/build/devenv/registry"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 
@@ -28,8 +28,8 @@ func init() {
 	committeeverifier.RegisterModifier(chain_selectors.FamilyCanton, cantondevenv.CommitteeVerifierModifier)
 	// Register the canton chain config loader for the canton family.
 	chainconfig.RegisterChainConfigLoader(chain_selectors.FamilyCanton, cantondevenv.CommitteeVerifierConfigLoader)
-	// Register the canton chain family adapter for the canton family.
-	registry.RegisterChainFamilyAdapter(chain_selectors.FamilyCanton, cantonadapters.NewChainFamilyAdapter(&evmadapters.ChainFamilyAdapter{}))
+	// Register the canton lane adapter (CCV 2.0.0), aligned with EVM registration in chainlink-ccip.
+	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyCanton, semver.MustParse("2.0.0"), cantonadapters.NewCantonLaneAdapter())
 	// Register the canton impl factory for the canton family.
 	ccv.RegisterImplFactory(chain_selectors.FamilyCanton, cantondevenv.NewImplFactory())
 	// Register the canton token adapter for the canton family.

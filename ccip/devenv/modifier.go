@@ -90,7 +90,11 @@ func CommitteeVerifierModifier(req testcontainers.ContainerRequest, verifierInpu
 
 // hydrateAndMarshalCantonConfig hydrates the canton config with the full party ID for the CCIPOwnerParty.
 func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*blockchain.Output) ([]byte, error) {
-	cantonConfigs, err := util.OpaqueToConcreteStrict[ccip.Config](in.CantonConfigs)
+	cantonOpaque, ok := in.OpaqueConfigs[chainsel.FamilyCanton]
+	if !ok {
+		return nil, fmt.Errorf("no opaque_configs entry for chain family %q", chainsel.FamilyCanton)
+	}
+	cantonConfigs, err := util.OpaqueToConcreteStrict[ccip.Config](cantonOpaque)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get canton config from opaque: %w", err)
 	}
@@ -184,7 +188,10 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 	newOpaque := make(util.OpaqueConfig)
 	newOpaque["reader_configs"] = cantonConfigs.ReaderConfigs
 	newOpaque["blockchain_infos"] = cantonConfigs.BlockchainInfos
-	in.CantonConfigs = newOpaque
+	if in.OpaqueConfigs == nil {
+		in.OpaqueConfigs = make(map[string]util.OpaqueConfig)
+	}
+	in.OpaqueConfigs[chainsel.FamilyCanton] = newOpaque
 
 	return cantonConfigBytes, nil
 }

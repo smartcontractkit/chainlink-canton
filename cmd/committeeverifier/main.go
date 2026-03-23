@@ -11,9 +11,9 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/bootstrap"
-	cmd "github.com/smartcontractkit/chainlink-ccv/cmd/verifier"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
-	"github.com/smartcontractkit/chainlink-ccv/verifier/commit"
+	ccvverifier "github.com/smartcontractkit/chainlink-ccv/verifier/cmd"
+	"github.com/smartcontractkit/chainlink-ccv/verifier/pkg/commit"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
@@ -36,7 +36,7 @@ func loadConfig(path string) (*ccip.Config, error) {
 func main() {
 	if err := bootstrap.Run(
 		"CantonCommitteeVerifier",
-		cmd.NewServiceFactory(
+		ccvverifier.NewServiceFactory(
 			chainsel.FamilyCanton,
 			func(
 				ctx context.Context,
