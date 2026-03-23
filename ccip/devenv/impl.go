@@ -37,8 +37,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	onrampbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
@@ -1130,9 +1132,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	senderRequiredCCVs := make([]types.TEXT, 0, len(opts.CCVs))
-	ccvArgs := make([]types.TEXT, 0, len(opts.CCVs))
-	ccvSendInputs := make(types.GENMAP, len(opts.CCVs))
+	senderRequiredCCVs := make([]mcmsbindings.RawInstanceAddress, 0, len(opts.CCVs))
+	ccvSendInputs := make([]ccipclient.CCVSendInput, 0, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1176,12 +1177,14 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		senderRequiredCCVs = append(senderRequiredCCVs, types.TEXT(hex.EncodeToString(rawAddr.InstanceAddress().Bytes())))
-		ccvArgs = append(ccvArgs, types.TEXT(hex.EncodeToString(ccvItem.Args)))
-		ccvSendInputs[hex.EncodeToString(verifierAddress.Bytes())] = ccipsender.CCVSendInput{
+		senderRequiredCCVs = append(senderRequiredCCVs, mcmsbindings.RawInstanceAddress{
+			Unpack: types.TEXT(rawAddr.String()),
+		})
+		ccvSendInputs = append(ccvSendInputs, ccipclient.CCVSendInput{
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
+			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
 			CcvExtraContext: common.CCIPContext{},
-		}
+		})
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
 		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
 		if len(fallbackVerifierDestAddress) == 0 {
@@ -1213,42 +1216,42 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Context:                  sendContext,
 		RouterCid:                routerCID,
 		DestinationChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
-		Message: common.Canton2AnyMessage{
-			Receiver:    types.TEXT(hex.EncodeToString(fields.Receiver)),
-			Payload:     types.TEXT(hex.EncodeToString(fields.Data)),
-			TokenAmount: nil,
-			FeeToken:    feeTokenInstrument,
-			ExtraArgs: common.ExtraArgs{
-				V3: &common.GenericExtraArgsV3{
+		Message: ccipclient.Canton2AnyMessage{
+			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
+			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
+			FeeToken: ccipclient.FeeTokenInput{
+				Token: feeTokenInstrument,
+				TokenInput: interfaces.TokenInput{
+					// TODO: replace with a real Splice TransferFactory CID from the
+					// transfer-instruction API. Using routerCID is invalid because
+					// CCIPSend is a consuming choice on the router, so exercising
+					// TransferFactory_Transfer on the same CID fails with
+					// CONTRACT_NOT_ACTIVE. This only works today because total fees
+					// are 0 (gas price set to 0 below) so the transfer is skipped.
+					TransferFactory: routerCID,
+					ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+						Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
+						Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
+					},
+					TokenPoolHoldings: nil,
+				},
+				SenderInputCids: nil,
+			},
+			ExtraArgs: ccipclient.ExtraArgs{
+				V3: &ccipclient.GenericExtraArgsV3{
 					GasLimit:           types.INT64(opts.ExecutionGasLimit),
 					BlockConfirmations: 0,
 					Ccvs:               senderRequiredCCVs,
-					CcvArgs:            ccvArgs,
-					Executor:           types.TEXT(hex.EncodeToString(executorInstanceAddress.Bytes())),
-					ExecutorArgs:       types.TEXT(""),
-					TokenReceiver:      types.TEXT(""),
-					TokenArgs:          types.TEXT(""),
+					Executor: &ccipclient.ExecutorInput{
+						ExecutorCid:  executorCID,
+						ExecutorArgs: types.TEXT(""),
+					},
+					TokenReceiver: types.TEXT(""),
+					TokenArgs:     types.TEXT(""),
 				},
 			},
 		},
-		FeeTokenInput: interfaces.TokenInput{
-			// TODO: replace with a real Splice TransferFactory CID from the
-			// transfer-instruction API. Using routerCID is invalid because
-			// CCIPSend is a consuming choice on the router, so exercising
-			// TransferFactory_Transfer on the same CID fails with
-			// CONTRACT_NOT_ACTIVE. This only works today because total fees
-			// are 0 (gas price set to 0 below) so the transfer is skipped.
-			TransferFactory: routerCID,
-			ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-				Context: splice_api_token_metadata_v1.ChoiceContext{Values: types.TEXTMAP{}},
-				Meta:    splice_api_token_metadata_v1.Metadata{Values: types.TEXTMAP{}},
-			},
-			TokenPoolHoldings: nil,
-		},
-		FeeTokenHoldingCids: nil,
-		TokenTransfer:       nil,
-		CcvSendInputs:       ccvSendInputs,
-		ExecutorCid:         &executorCID,
+		Ccvs: ccvSendInputs,
 	}
 	sendArgsMap := sendArgs.ToMap()
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {
