@@ -105,6 +105,7 @@ template CommitteeVerifier
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CommitteeVerifier_CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
+                        extraContext = arg.extraContext
                         caller = arg.caller
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
@@ -338,6 +339,7 @@ template CommitteeVerifier
                 : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                extraContext : CCIP.Context.CCIPContext
                 caller : Party
             controller caller
             do

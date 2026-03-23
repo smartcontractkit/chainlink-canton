@@ -99,6 +99,7 @@ interface ITokenPool where
             : ContractId CCIP.SendingMessageV1.SendingMessageV1
         with
             tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
+            extraContext : CCIP.Context.CCIPContext
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId

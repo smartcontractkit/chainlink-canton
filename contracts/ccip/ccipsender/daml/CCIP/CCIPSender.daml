@@ -61,6 +61,7 @@ template CCIPSender
                     exercise input.ccvCid
                         ICCV.CrossChainVerifier_CalculateFee with
                             sendingMessageCid = cid
+                            extraContext = input.ccvExtraContext
                             caller = owner
                     ) smCid ccvs
 
@@ -70,6 +71,7 @@ template CCIPSender
                         exercise tt.tokenPoolCid
                             CCIP.Interfaces.TokenPool.TokenPool_CalculateFee with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
+                                extraContext = tt.poolExtraContext
                                 sendingMessageCid = smCid
                                 feeQuoterCid = feeQuoterCid
                                 tokenInstrumentId = tt.token
@@ -82,6 +84,7 @@ template CCIPSender
                             CCIP.Interfaces.Executor.Executor_CalculateFee with
                                 sendingMessageCid = smCid
                                 executorArgs = executorInput.executorArgs
+                                extraContext = executorInput.executorExtraContext
                                 caller = owner
 
                 smCid <- exercise routerCid CCIP.PerPartyRouter.FinalizeFee with

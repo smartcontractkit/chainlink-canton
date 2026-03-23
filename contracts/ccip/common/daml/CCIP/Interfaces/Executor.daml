@@ -1,6 +1,7 @@
 module CCIP.Interfaces.Executor where
 
 import DA.Crypto.Text (BytesHex)
+import qualified CCIP.Context
 import qualified CCIP.SendingMessageV1
 
 interface IExecutor where
@@ -15,6 +16,7 @@ interface IExecutor where
         with
             sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             executorArgs : BytesHex
+            extraContext : CCIP.Context.CCIPContext
             caller : Party
         controller caller
         do executor_calculateFeeImpl this self arg
