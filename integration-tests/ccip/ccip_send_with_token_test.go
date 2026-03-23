@@ -29,8 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccipsender"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
