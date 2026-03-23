@@ -9,8 +9,8 @@ import (
 	"github.com/Masterminds/semver/v3"
 	gethcommon "github.com/ethereum/go-ethereum/common"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -61,9 +61,9 @@ type ConfigureChainForLanesInput struct {
 
 	// The CommitteeVerifiers on the chain being configured.
 	// There can be multiple committee verifiers on a chain, each controlled by a different entity.
-	CommitteeVerifiers []adapters.CommitteeVerifierConfig[contracts.InstanceAddress]
+	CommitteeVerifiers []lanes.CommitteeVerifierConfig[contracts.InstanceAddress]
 	// The configuration for each remote chain that we want to connect to.
-	RemoteChains map[uint64]adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]
+	RemoteChains map[uint64]lanes.ChainDefinition
 }
 
 var ConfigureChainForLanes = operations.NewSequence(
@@ -84,25 +84,23 @@ var ConfigureChainForLanes = operations.NewSequence(
 			// Inbound / OffRamp
 			defaultInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultInboundCCVs))
 			for _, ccv := range remoteConfig.DefaultInboundCCVs {
-				defaultInboundCCVs = append(defaultInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				defaultInboundCCVs = append(defaultInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv.Address)})
 			}
 			laneMandatedInboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedInboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedInboundCCVs {
-				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				laneMandatedInboundCCVs = append(laneMandatedInboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv.Address)})
 			}
-			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamps))
-			for _, onRamp := range remoteConfig.OnRamps {
-				// EVM messages encode source addresses as 32-byte left-padded values, so we must
-				// normalize configured remote onramps to that same shape or OffRamp validation will reject them.
-				normalizedOnRamp, err := normalizeConfiguredOnRamp(onRamp)
-				if err != nil {
-					return sequences.OnChainOutput{}, fmt.Errorf("failed to normalize onramp for remote chain %d: %w", remoteSelector, err)
-				}
-				onRamps = append(onRamps, types.TEXT(normalizedOnRamp))
+			onRamps := make([]types.TEXT, 0, len(remoteConfig.OnRamp))
+			// EVM messages encode source addresses as 32-byte left-padded values, so we must
+			// normalize configured remote onramps to that same shape or OffRamp validation will reject them.
+			normalizedOnRamp, err := normalizeConfiguredOnRamp(remoteConfig.OnRamp)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to normalize onramp for remote chain %d: %w", remoteSelector, err)
 			}
+			onRamps = append(onRamps, types.TEXT(normalizedOnRamp))
 			globalConfigSourceChainConfigArgs = append(globalConfigSourceChainConfigArgs, common.SourceChainConfigArgs{
 				SourceChainSelector: types.NUMERIC(remoteSelectorStr),
-				IsEnabled:           types.BOOL(remoteConfig.AllowTrafficFrom),
+				IsEnabled:           types.BOOL(remoteConfig.FeeQuoterDestChainConfig.IsEnabled),
 				OnRampAddresses:     onRamps,
 				LaneMandatedCCVs:    laneMandatedInboundCCVs,
 				DefaultCCVs:         defaultInboundCCVs,
@@ -110,18 +108,18 @@ var ConfigureChainForLanes = operations.NewSequence(
 
 			defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.DefaultOutboundCCVs))
 			for _, ccv := range remoteConfig.DefaultOutboundCCVs {
-				defaultOutboundCCVs = append(defaultOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				defaultOutboundCCVs = append(defaultOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv.Address)})
 			}
 			laneMandatedOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(remoteConfig.LaneMandatedOutboundCCVs))
 			for _, ccv := range remoteConfig.LaneMandatedOutboundCCVs {
-				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv)})
+				laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, mcms.RawInstanceAddress{Unpack: types.TEXT(ccv.Address)})
 			}
-			defaultExecutor := mcms.RawInstanceAddress{Unpack: types.TEXT(remoteConfig.DefaultExecutor)}
+			defaultExecutor := mcms.RawInstanceAddress{Unpack: types.TEXT(remoteConfig.DefaultExecutor.Address)}
 
 			// Outbound / OnRamp
 			globalConfigDestChainConfigArgs = append(globalConfigDestChainConfigArgs, common.DestChainConfigArgs{
 				DestChainSelector:         types.NUMERIC(remoteSelectorStr),
-				IsEnabled:                 types.BOOL(remoteConfig.AllowTrafficFrom),
+				IsEnabled:                 types.BOOL(remoteConfig.FeeQuoterDestChainConfig.IsEnabled),
 				AddressBytesLength:        types.INT64(remoteConfig.AddressBytesLength),
 				TokenReceiverAllowed:      types.BOOL(true), // TODO this is missing from the input
 				BaseExecutionGasCost:      types.INT64(remoteConfig.BaseExecutionGasCost),
@@ -143,7 +141,7 @@ var ConfigureChainForLanes = operations.NewSequence(
 					DestGasOverhead:             types.INT64(fqConfig.DestGasOverhead),
 					DestGasPerPayloadByteBase:   types.INT64(fqConfig.DestGasPerPayloadByteBase),
 					DefaultTxGasLimit:           types.INT64(fqConfig.DefaultTxGasLimit),
-					LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(fqConfig.LinkFeeMultiplierPercent), 10)),
+					LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(fqConfig.V2Params.LinkFeeMultiplierPercent), 10)),
 					DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(fqConfig.DefaultTokenFeeUSDCents), 10)),
 					DefaultTokenDestGasOverhead: types.INT64(fqConfig.DefaultTokenDestGasOverhead),
 				},

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -30,7 +30,7 @@ func convertPartySlice(in []string) []types.PARTY {
 
 type ConfigureCommitteeVerifierForLanesInput struct {
 	ChainSelector uint64
-	adapters.CommitteeVerifierConfig[contracts.InstanceAddress]
+	lanes.CommitteeVerifierConfig[contracts.InstanceAddress]
 }
 
 var ConfigureCommitteeVerifierForLanes = operations.NewSequence(
