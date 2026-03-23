@@ -69,6 +69,21 @@ template ParseSourcePoolDecimalsHarness
       controller owner
       do pure (LockReleaseTokenPool.parseSourcePoolDecimals localDecimals sourcePoolData)
 
+template CalculateLocalAmountHarness
+  with
+    owner : Party
+  where
+    signatory owner
+
+    nonconsuming choice CalculateLocalAmount : Numeric 0
+      with
+        amount : Numeric 0
+        remoteDecimals : Int
+        localDecimals : Int
+      controller owner
+      do
+        pure (LockReleaseTokenPool.calculateLocalAmount amount remoteDecimals localDecimals)
+
 
 mkPoolDeps : Text -> Text -> Text -> Party -> Party -> LockReleaseTokenPool.LockReleaseTokenPoolDeps
 mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner =
@@ -1290,6 +1305,167 @@ testReleaseFromTicketDecimalConversion = script do
 
     debug "testReleaseFromTicketDecimalConversion: PASSED"
 
+testReleaseFromTicketDecimalConversionOverflowFails : Script ()
+testReleaseFromTicketDecimalConversionOverflowFails = script do
+    ccipOwner <- allocateParty "ccip-owner-decimals-overflow"
+    rmnOwner <- allocateParty "rmn-owner-decimals-overflow"
+    poolOwner <- allocateParty "pool-owner-decimals-overflow"
+    receiver <- allocateParty "receiver-decimals-overflow"
+
+    let rmnInstanceId = "test-rmn-decimals-overflow"
+    let tokenAdminRegistryInstanceId = "test-tar-decimals-overflow"
+    let tokenPoolInstanceId = "test-lock-release-pool-decimals-overflow"
+    let sourceChainSelector : Numeric 0 = 123.0
+    let originalPoolAmount : Decimal = 9999999999999999999999999999.0
+
+    let testInstrumentId = HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    rmnRemote <- submit rmnOwner do
+        createCmd RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd TokenAdminRegistry.TokenAdminRegistry with
+            owner = ccipOwner
+            instanceId = tokenAdminRegistryInstanceId
+            tokenConfigs = Map.empty
+
+    tokenAdminRegistry <- submit ccipOwner do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+            instrumentId = testInstrumentId
+            newAdmin = poolOwner
+            caller = ccipOwner
+
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+            instrumentId = testInstrumentId
+            caller = poolOwner
+
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    tokenAdminRegistry <- submit (actAs poolOwner <> disclose disclosedTar) do
+        exerciseCmd tokenAdminRegistry TokenAdminRegistry.TokenAdminRegistry_SetPool with
+            instrumentId = testInstrumentId
+            tokenPool = Some TokenAdminRegistryTypes.PoolRegistration with
+                poolOwner = poolOwner
+                poolInstanceId = tokenPoolInstanceId
+            caller = poolOwner
+
+    poolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            admin = ccipOwner
+            owner = poolOwner
+            amount = originalPoolAmount
+            instrumentId = testInstrumentId
+
+    receiverPreapproval <- submit (actAs receiver <> actAs ccipOwner) do
+        createCmd TestToken.TestTransferPreapproval with
+            admin = ccipOwner
+            receiver = receiver
+
+    transferFactory <- submit ccipOwner do
+        createCmd TestToken.TestTransferFactory with
+            admin = ccipOwner
+            preapprovalCid = Some receiverPreapproval
+
+    (inboundRateLimiter, inboundRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        tokenPoolInstanceId
+        sourceChainSelector
+        RateLimiter.RateLimitDirection_Inbound
+        9999999999999999999999999999.0
+        9999999999999999999999999999.0
+
+    let remoteChainCfg = LockReleaseTokenPool.RemoteChainConfig with
+            remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            minBlockConfirmations = 0
+            inboundRateLimiter = inboundRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = inboundRateLimiterAddr
+            outboundRateLimiter = RawInstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        createCmd LockReleaseTokenPool.LockReleaseTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = tokenPoolInstanceId
+            instrumentId = testInstrumentId
+            decimals = 18
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, remoteChainCfg)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = CCIP.Context.emptyCCIPContext
+            transferTimeout = LockReleaseTokenPool.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId "test-feequoter-decimals-overflow" ccipOwner rmnOwner
+
+    let sourcePoolData = fromSome (MessageCodecV1.encodeUint256 6.0)
+    let overflowingAmount : Numeric 0 = 100000000000000000000000000.0
+    tokenReceiveTicket <- submit ccipOwner do
+        createCmd Tickets.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            ccvOwners = []
+            verifiedCCVs = []
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = overflowingAmount
+            sourcePoolData = sourcePoolData
+            messageId = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            sourceChainSelector = sourceChainSelector
+            finality = 0
+
+    let tokenInput = ITokenPool.TokenInput with
+            transferFactory = toInterfaceContractId transferFactory
+            extraArgs = MetadataV1.ExtraArgs with
+                context = MetadataV1.emptyChoiceContext
+                meta = MetadataV1.emptyMetadata
+            tokenPoolHoldings = [toInterfaceContractId poolHolding]
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiter
+
+    submitMustFail (actAs receiver
+                    <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedFactory
+                    <> disclose disclosedPreapproval <> disclose disclosedRmn
+                    <> disclose disclosedRateLimiter) do
+        exerciseCmd tokenPool LockReleaseTokenPool.LockReleaseTokenPool_ReleaseFromTicket with
+            tokenReceiveTicketCid = tokenReceiveTicket
+            tokenAdminRegistryCid = tokenAdminRegistry
+            rmnRemoteCid = rmnRemote
+            extraContext = mkInboundRateLimiterContext inboundRateLimiter inboundRateLimiter
+            tokenInput = tokenInput
+            caller = receiver
+
+    receiverHoldings <- query @TestToken.TestHolding receiver
+    length receiverHoldings === 0
+
+    poolHoldingAfter <- queryContractId poolOwner poolHolding
+    let poolHoldingData = fromSome poolHoldingAfter
+    poolHoldingData.amount === originalPoolAmount
+
+    ticketAfter <- queryContractId ccipOwner tokenReceiveTicket
+    assertMsg "ticket should remain when conversion fails" (isSome ticketAfter)
+
+    rateLimiterAfter <- queryContractId poolOwner inboundRateLimiter
+    let rateLimiterData = fromSome rateLimiterAfter
+    rateLimiterData.tokens === 9999999999999999999999999999.0
+
+    debug "testReleaseFromTicketDecimalConversionOverflowFails: PASSED"
+
 testReleaseFromTicketWithAdditionalCCVOwner : Script ()
 testReleaseFromTicketWithAdditionalCCVOwner = script do
     ccipOwner <- allocateParty "ccip-owner-ccv-auth"
@@ -1561,6 +1737,35 @@ testDecimalConversion_ScaleUp = script do
     let result2 = LockReleaseTokenPool.calculateLocalAmount 1.0 6 18
     result2 === 1000000000000.0
     debug "testDecimalConversion_ScaleUp: PASSED"
+
+testDecimalConversion_ScaleUpBoundary_Succeeds : Script ()
+testDecimalConversion_ScaleUpBoundary_Succeeds = script do
+    let largestPassing : Numeric 0 = 99999999999999999999999999.0
+    LockReleaseTokenPool.calculateLocalAmount largestPassing 6 18
+        === 99999999999999999999999999000000000000.0
+    LockReleaseTokenPool.calculateLocalAmount 9.0 0 37
+        === 90000000000000000000000000000000000000.0
+    debug "testDecimalConversion_ScaleUpBoundary_Succeeds: PASSED"
+
+testDecimalConversion_ScaleUpBoundary_Fails : Script ()
+testDecimalConversion_ScaleUpBoundary_Fails = script do
+    owner <- allocateParty "calculate-local-amount-owner"
+    harnessCid <- submit owner do
+        createCmd CalculateLocalAmountHarness with owner
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CalculateLocalAmount with
+            amount = 100000000000000000000000000.0
+            remoteDecimals = 6
+            localDecimals = 18
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CalculateLocalAmount with
+            amount = 10.0
+            remoteDecimals = 0
+            localDecimals = 37
+
+    debug "testDecimalConversion_ScaleUpBoundary_Fails: PASSED"
 
 -- C-1: Equal decimals (no conversion).
 testDecimalConversion_EqualDecimals : Script ()

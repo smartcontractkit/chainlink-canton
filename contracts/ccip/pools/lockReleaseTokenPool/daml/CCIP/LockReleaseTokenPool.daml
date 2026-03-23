@@ -78,28 +78,13 @@ parseSourcePoolDecimals localDecimals sourcePoolData =
             then error "ReleaseFromTicket: invalid source pool decimals"
             else truncate decoded
 
-pow10Numeric0 : Int -> Numeric 0
-pow10Numeric0 exponent
-    | exponent < 0 = error "pow10Numeric0: negative exponent"
-    | exponent > 37 = error "pow10Numeric0: exponent exceeds Numeric 0 range"
-    | otherwise = pow10Numeric0Go exponent 1.0
-
-pow10Numeric0Go : Int -> Numeric 0 -> Numeric 0
-pow10Numeric0Go remaining acc =
-    if remaining == 0 then acc
-    else pow10Numeric0Go (remaining - 1) (acc * 10.0)
-
 calculateLocalAmount : Numeric 0 -> Int -> Int -> Numeric 0
 calculateLocalAmount remoteAmount remoteDecimals localDecimals =
-    if remoteDecimals == localDecimals
-    then remoteAmount
-    else
-        let decimalsDiff = abs (remoteDecimals - localDecimals)
-            scaleFactor = pow10Numeric0 decimalsDiff
-        in
-            if remoteDecimals > localDecimals
-            then CCIP.Math.mulDivDown remoteAmount 1.0 scaleFactor
-            else CCIP.Math.mulDivDown remoteAmount scaleFactor 1.0
+    CCIP.Math.calculateLocalAmountChecked
+        "LockReleaseTokenPool.calculateLocalAmount"
+        remoteAmount
+        remoteDecimals
+        localDecimals
 
 -- | Convert CCIP AnyValue to Splice AnyValue at TransferFactory boundary.
 toSpliceAnyValue : CCIP.Context.AnyValue -> Splice.Api.Token.MetadataV1.AnyValue
