@@ -2636,6 +2636,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
                 tokenAdminRegistryCid = tokenAdminRegistry
+                extraContext = CCIP.Context.emptyCCIPContext
                 sendingMessageCid = sendingMessageCid
                 feeQuoterCid = feeQuoter
                 tokenInstrumentId = testInstrumentId
@@ -2804,6 +2805,7 @@ testCalculateFeePrefersPoolOverride = script do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
                 tokenAdminRegistryCid = tokenAdminRegistry
+                extraContext = CCIP.Context.emptyCCIPContext
                 sendingMessageCid = sendingMessageCid
                 feeQuoterCid = feeQuoter
                 tokenInstrumentId = testInstrumentId
@@ -2971,6 +2973,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
         exerciseCmd (toInterfaceContractId @ITokenPool.ITokenPool tokenPool)
             ITokenPool.TokenPool_CalculateFee with
                 tokenAdminRegistryCid = tokenAdminRegistry
+                extraContext = CCIP.Context.emptyCCIPContext
                 sendingMessageCid = sendingMessageCid
                 feeQuoterCid = feeQuoter
                 tokenInstrumentId = testInstrumentId

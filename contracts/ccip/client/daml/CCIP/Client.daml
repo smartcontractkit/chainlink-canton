@@ -46,6 +46,7 @@ data ExecutorInput = ExecutorInput
     with
         executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
         executorArgs : BytesHex
+        executorExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
 data ExtraArgs

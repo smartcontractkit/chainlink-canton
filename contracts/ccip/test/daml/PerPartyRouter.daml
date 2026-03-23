@@ -99,7 +99,8 @@ extraArgsWithExecutor gasLimit executorCid executorArgs =
         ccvs = []
         executor = Some (CCIP.Client.ExecutorInput with
             executorCid = executorCid
-            executorArgs = executorArgs)
+            executorArgs = executorArgs
+            executorExtraContext = CCIP.Context.emptyCCIPContext)
         tokenReceiver = ""
         tokenArgs = ""
 
@@ -328,6 +329,7 @@ testCCIPSend = script do
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 sendingMessageCid = sendingMessageCid
                 executorArgs = ""
+                extraContext = CCIP.Context.emptyCCIPContext
                 caller = ccipOwner
 
     sendingMessageCid <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
@@ -389,6 +391,7 @@ testCCIPSend = script do
             CCIP.Interfaces.Executor.Executor_CalculateFee with
                 sendingMessageCid = sendingMessageCid2
                 executorArgs = ""
+                extraContext = CCIP.Context.emptyCCIPContext
                 caller = ccipOwner
 
     sendingMessageCid2 <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do

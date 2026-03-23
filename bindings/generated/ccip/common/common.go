@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "d8fff29a1dc63ecc7c871934768a281f8ac7e62801d143adaddbe311bc4ca8d3"
+	PackageID   = "78e28ea5b335dd33af47a8e3298dfa4fa4dcfa91ba332351a05f9e69e1c3aa5f"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1283,6 +1283,7 @@ func (t *CrossChainVerifierView) UnmarshalHex(data string) error {
 // CrossChainVerifierCalculateFee is a Record type
 type CrossChainVerifierCalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	ExtraContext      CCIPContext       `json:"extraContext"`
 	Caller            types.PARTY       `json:"caller"`
 }
 
@@ -1296,6 +1297,14 @@ func (t CrossChainVerifierCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -2533,6 +2542,7 @@ func (t *ExecutorView) UnmarshalHex(data string) error {
 type ExecutorCalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT        `json:"executorArgs"`
+	ExtraContext      CCIPContext       `json:"extraContext"`
 	Caller            types.PARTY       `json:"caller"`
 }
 
@@ -2549,6 +2559,14 @@ func (t ExecutorCalculateFee) ToMap() map[string]any {
 	}()
 
 	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 

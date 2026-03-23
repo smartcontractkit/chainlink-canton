@@ -7,7 +7,7 @@ import DA.Optional (fromSome, fromSomeNote, fromOptional)
 import qualified DA.Map as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import MCMS.RawInstanceAddress (RawInstanceAddress, toInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import MCMS.Codec (
     encodeNumeric0,
     decodeNumeric0At,
@@ -23,6 +23,7 @@ import MCMS.Codec (
     decodePartyAt,
     )
 
+import qualified CCIP.Context
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
 import CCIP.Codec( 
@@ -74,6 +75,7 @@ template Executor
                 exercise (fromInterfaceContractId @Executor self) CalculateFee with
                     sendingMessageCid = arg.sendingMessageCid
                     executorArgs = arg.executorArgs
+                    extraContext = arg.extraContext
                     caller = arg.caller
 
         choice ApplyDestChainUpdates : ContractId Executor
@@ -153,6 +155,7 @@ template Executor
             with
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
                 executorArgs : BytesHex
+                extraContext : CCIP.Context.CCIPContext
                 caller : Party
             controller caller
             do
