@@ -9,7 +9,6 @@ import (
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -27,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "106c8f081814b8e1e457af3f5634fb3367634b43d6f792fd331cd7bcdd52b96c"
+	PackageID   = "069978fb69675ea843ed1300af24bc828d5d2e4da3844094e061a1cbd416796d"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1882,21 +1881,24 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 
 // PrepareSend is a Record type
 type PrepareSend struct {
-	Context             common.CCIPContext                        `json:"context"`
-	DestChainSelector   types.NUMERIC                             `json:"destChainSelector"`
-	Receiver            types.TEXT                                `json:"receiver"`
-	Payload             types.TEXT                                `json:"payload"`
-	CcipReceiveGasLimit types.INT64                               `json:"ccipReceiveGasLimit"`
-	SenderRequiredCCVs  []mcms.RawInstanceAddress                 `json:"senderRequiredCCVs"`
-	TokenInstrumentId   *splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId" hex:"optional"`
-	TokenReceiver       *types.TEXT                               `json:"tokenReceiver" hex:"optional"`
-	TokenArgs           types.TEXT                                `json:"tokenArgs"`
-	FeeToken            splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
+	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
+	Message                  common.Canton2AnyMessage `json:"message"`
+	Context                  common.CCIPContext       `json:"context"`
 }
 
 // ToMap converts PrepareSend to a map for DAML arguments
 func (t PrepareSend) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["destinationChainSelector"] = t.DestinationChainSelector
+
+	m["message"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Message).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Message
+	}()
 
 	m["context"] = func() any {
 		type mapper interface{ toMap() map[string]any }
@@ -1904,59 +1906,6 @@ func (t PrepareSend) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.Context
-	}()
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["receiver"] = string(t.Receiver)
-
-	m["payload"] = string(t.Payload)
-
-	m["ccipReceiveGasLimit"] = int64(t.CcipReceiveGasLimit)
-
-	m["senderRequiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.SenderRequiredCCVs))
-		for _, e := range t.SenderRequiredCCVs {
-			type mapper interface{ toMap() map[string]any }
-			if m, ok := any(e).(mapper); ok {
-				res = append(res, m.toMap())
-			} else {
-				res = append(res, e)
-			}
-		}
-		return res
-	}()
-
-	if t.TokenInstrumentId != nil {
-		m["tokenInstrumentId"] = map[string]any{
-			"_type": "optional",
-			"value": *t.TokenInstrumentId,
-		}
-	} else {
-		m["tokenInstrumentId"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	if t.TokenReceiver != nil {
-		m["tokenReceiver"] = map[string]any{
-			"_type": "optional",
-			"value": string(*t.TokenReceiver),
-		}
-	} else {
-		m["tokenReceiver"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	m["tokenArgs"] = string(t.TokenArgs)
-
-	m["feeToken"] = func() any {
-		type mapper interface{ toMap() map[string]any }
-		if m, ok := any(t.FeeToken).(mapper); ok {
-			return m.toMap()
-		}
-		return t.FeeToken
 	}()
 
 	return m

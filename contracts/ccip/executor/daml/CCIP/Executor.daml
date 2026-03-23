@@ -6,7 +6,7 @@ import DA.List (dedup)
 import DA.Optional (fromSomeNote, fromOptional)
 import qualified DA.Map as Map
 
-import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress (RawInstanceAddress, toInstanceAddress, assertValidInstanceId)
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.SendingMessageV1
 
@@ -142,10 +142,13 @@ template Executor
                 assertMsg "executor: destination chain disabled" remoteCfg.enabled
 
                 let canonicalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+                let allowedCCVInstanceAddresses = if dynamicConfig.ccvAllowlistEnabled
+                    then map toInstanceAddress allowedCCVs
+                    else []
 
                 if dynamicConfig.ccvAllowlistEnabled
                     then Foldable.forA_ canonicalCCVs (\ccv ->
-                        assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVs)
+                        assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVInstanceAddresses)
                         )
                     else pure ()
 

@@ -1,0 +1,127 @@
+module CCIP.Client where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+
+data TokenAmount = TokenAmount
+    with
+        token : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+    deriving (Eq, Show)
+
+data Canton2AnyMessage = Canton2AnyMessage
+    with
+        receiver : BytesHex
+        payload : BytesHex
+        tokenAmount : Optional TokenAmount
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+        extraArgs : ExtraArgs
+    deriving (Eq, Show)
+
+noExecutionTag : BytesHex
+noExecutionTag = "eba517d2"
+
+data ExtraArgs
+     = V3 GenericExtraArgsV3
+     deriving (Eq, Show)
+
+data GenericExtraArgsV3 = GenericExtraArgsV3
+    with
+        -- | Gas limit for the callback on the destination chain.
+        -- | If the gas limit is zero and the message data length is also zero, no callback
+        -- | will be performed, even if a receiver is specified. A gas limit of zero is useful
+        -- | when only token transfers are desired, or when the receiver is an EOA account
+        -- | instead of a contract. Besides this gasLimit check, there are other checks on the
+        -- | destination chain that may prevent the callback from being executed, depending on
+        -- | the destination chain family.
+        -- | The sender is billed for the gas specified, not the gas actually used. Any unspent
+        -- | gas is not refunded. There are various ways to estimate the gas required for a
+        -- | callback on the destination chain, depending on the chain family. Please refer to
+        -- | the documentation for each chain for more details.
+        gasLimit : Int
+        -- | The number of block confirmations to wait for.
+        -- | 0 means the default finality that the CCV considers final. Any non-zero value means
+        -- | a block depth. CCVs, Pools and the executor may all reject this value by reverting
+        -- | the transaction on the source chain if they do not want to take on the risk of the
+        -- | block confirmations specified.
+        -- | May be zero to indicate waiting for finality is desired.
+        blockConfirmations : Int
+        -- | An array of CCV addresses representing the cross-chain verifiers to be used for
+        -- | the message.
+        -- | May be empty or contain "" as a placeholder to indicate that the default CCVs should
+        -- | be used.
+        ccvs : [BytesHex]
+        -- | Optional arguments that are passed into the CCV without modification or inspection.
+        -- | CCIP itself does not interpret these arguments: they are encoded in whatever format
+        -- | the CCV has decided.
+        -- | Must be the same length as the `ccvs` array. May have empty bytes as arguments.
+        ccvArgs : [BytesHex]
+        -- | Address of the executor contract on the source chain.
+        -- | The executor is responsible for executing the message on the destination chains once
+        -- | a quorum of CCVs have verified the message.
+        -- | May be empty to indicate the default executor should be used.
+        executor : BytesHex
+        -- | Destination chain family specific arguments for the executor.
+        -- | This field is passed to the destination chain as part of the message itself and these
+        -- | args are therefore fully protected through the message ID. The format of this field
+        -- | is specific to each chain family and is not interpreted by CCIP itself, only by the
+        -- | executor. Things that may be included here are Solana accounts or Sui object IDs,
+        -- | which must be secured through the message ID as passing in incorrect values can lead
+        -- | to loss of funds.
+        -- | May be empty depending on the destination chain.
+        executorArgs : BytesHex
+        -- | Address of the token receiver on the destination chain, in bytes format. If an empty
+        -- | bytes array is provided, the receiver address from the message itself is used for
+        -- | token transfers. This field allows for scenarios where the token receiver is
+        -- | different from the message receiver.
+        -- | May be empty, the behavior differs depending on if there is a token transfer or not:
+        -- | - If there is a token transfer, the receiver from the message is used.
+        -- | - If there is no token transfer, this field should be empty.
+        tokenReceiver : BytesHex
+        -- | Additional arguments for token transfers.
+        -- | This field is passed into the token pool on the source chain and is not inspected by
+        -- | CCIP itself. The format of this field is therefore specific to the token pool being
+        -- | used and may vary between different pools.
+        -- | May be empty depending on the token pool.
+        tokenArgs : BytesHex
+    deriving (Eq, Show)
+
+-- Creates a basic ExtraArgs with only the gasLimit set.
+--
+-- Params:
+-- gasLimit: The gas limit for the callback on the destination chain.
+getBasicExtraArgs : Int -> ExtraArgs
+getBasicExtraArgs gasLimit =
+    V3 GenericExtraArgsV3 with
+        gasLimit = gasLimit
+        blockConfirmations = 0
+        ccvs = []
+        ccvArgs = []
+        executor = ""
+        executorArgs = ""
+        tokenReceiver = ""
+        tokenArgs = ""
+
+-- Creates a basic ExtraArgs with only the gasLimit and ccvs set.
+--
+-- Params:
+-- gasLimit: The gas limit for the callback on the destination chain.
+-- ccvs: The list of CCV addresses.
+-- ccvArgs: The list of CCV arguments. Must be the same length as ccvs. Can be empty bytes for each CCV if no arguments are needed.
+getBasicExtraArgsWithCCVs : Int -> [BytesHex] -> [BytesHex] -> ExtraArgs
+getBasicExtraArgsWithCCVs gasLimit ccvs ccvArgs =
+    -- Validate that the length of ccvs and ccvArgs match
+    if length ccvs /= length ccvArgs then
+        error "Length of ccvs and ccvArgs must match"
+    else
+        V3 GenericExtraArgsV3 with
+            gasLimit = gasLimit
+            blockConfirmations = 0
+            ccvs = ccvs
+            ccvArgs = ccvArgs
+            executor = ""
+            executorArgs = ""
+            tokenReceiver = ""
+            tokenArgs = ""

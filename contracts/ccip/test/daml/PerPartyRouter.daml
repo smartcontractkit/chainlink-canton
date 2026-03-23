@@ -12,6 +12,7 @@ import DA.Set qualified as Set
 import qualified DA.Text as Text
 import qualified DA.TextMap as TextMap
 
+import qualified CCIP.Client
 import qualified CCIP.Context
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
@@ -27,7 +28,6 @@ import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 
 import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.CrossChainVerifier
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Executor
 
@@ -141,8 +141,10 @@ testCCIPSend = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 12345
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.make "test-executor" ccipOwner -- this default executor will be used if no executor is specified as part of the extraArgs
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -263,15 +265,13 @@ testCCIPSend = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "48656c6c6f20576f726c64"
-            ccipReceiveGasLimit = 100000
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "48656c6c6f20576f726c64"
+                tokenAmount = None
+                feeToken = testFeeTokenId
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     -- Executor fee and message finalization
     disclosedExecutor <- fromSome <$> queryDisclosure ccipOwner executor
@@ -339,15 +339,13 @@ testCCIPSend = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "48656c6c6f20576f726c6432"
-            ccipReceiveGasLimit = 100000
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "48656c6c6f20576f726c6432"
+                tokenAmount = None
+                feeToken = testFeeTokenId
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     -- Executor fee and message finalization for second message
     sendingMessageCid2 <- submit (actAs user <> actAs ccipOwner <> disclose disclosedExecutor) do
@@ -386,6 +384,7 @@ testCCIPSend = script do
     pure ()
 
 -- | Test CCIP execute via PerPartyRouter.
+testCCIPExecute : Script ()
 testCCIPExecute = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -538,6 +537,7 @@ testCCIPExecute = script do
 
 -- | Test PrepareSend keeps token-only default CCV behavior without per-message block confirmations.
 -- Executor finalization is tested separately; after PrepareSend message is always None.
+testPrepareSendExtraArgs : Script ()
 testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
@@ -551,6 +551,7 @@ testPrepareSendExtraArgs = script do
     let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
+    let destChainSelector2 : Numeric 0 = 3333333333.0
 
     let feeTokenId = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -571,15 +572,29 @@ testPrepareSendExtraArgs = script do
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = sourceChainSelector
-            destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
-                isEnabled = True
-                addressBytesLength = 20
-                baseExecutionGasCost = 0
-                offRampAddress = "0000000000000000000000000000000000000003"
-                laneMandatedCCVs = []
-                defaultCCVs = [defaultCCV]
-                messageNetworkFeeUSDCents = cents 0.0
-                tokenNetworkFeeUSDCents = cents 0.0)]
+            destChainConfigs = Map.fromList [
+                (destChainSelector, CCIP.GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = True
+                    baseExecutionGasCost = 0
+                    offRampAddress = "0000000000000000000000000000000000000003"
+                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    laneMandatedCCVs = []
+                    defaultCCVs = [defaultCCV]
+                    messageNetworkFeeUSDCents = cents 0.0
+                    tokenNetworkFeeUSDCents = cents 0.0),
+                (destChainSelector2, CCIP.GlobalConfig.DestChainConfig with
+                    isEnabled = True
+                    addressBytesLength = 20
+                    tokenReceiverAllowed = False -- token receiver not allowed for this destination chain
+                    baseExecutionGasCost = 0
+                    offRampAddress = "0000000000000000000000000000000000000003"
+                    defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
+                    laneMandatedCCVs = []
+                    defaultCCVs = [defaultCCV]
+                    messageNetworkFeeUSDCents = cents 0.0
+                    tokenNetworkFeeUSDCents = cents 0.0)]
             sourceChainConfigs = Map.empty
 
     rmnRemote <- submit rmnOwner do
@@ -671,15 +686,13 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "01"
-            ccipReceiveGasLimit = 123
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "01"
+                tokenAmount = None
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.getBasicExtraArgs 123
 
     Some sm <- user `queryContractId` smCid
     sm.message === None
@@ -694,18 +707,16 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = "02"
-            ccipReceiveGasLimit = 123
-            senderRequiredCCVs = [CCIP.Interfaces.CrossChainVerifier.useDefaultCCVs, customCCV]
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = "02"
+                feeToken = feeTokenId
+                tokenAmount = None
+                extraArgs = CCIP.Client.getBasicExtraArgsWithCCVs 123 ["", RawInstanceAddress.toInstanceAddress customCCV] ["", ""]
 
     Some smWithDefaultSentinel <- user `queryContractId` smWithDefaultSentinelCid
-    smWithDefaultSentinel.requiredCCVs === [defaultCCV, customCCV]
+    smWithDefaultSentinel.requiredCCVs === [RawInstanceAddress.toInstanceAddress defaultCCV, RawInstanceAddress.toInstanceAddress customCCV]
 
     -- Token-only send (payload empty, gas 0): skip default CCVs.
     smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
@@ -716,15 +727,24 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = None
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs = []
+                    ccvArgs = []
+                    executor = ""
+                    executorArgs = ""
+                    tokenReceiver = ""
+                    tokenArgs = "aabbccdd"
 
     Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
     smTokenOnly.requiredCCVs === []
@@ -740,23 +760,61 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            senderRequiredCCVs = [CCIP.Interfaces.CrossChainVerifier.useDefaultCCVs, customCCV]
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = None
-            tokenArgs = "ddccbbaa"
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs = ["", RawInstanceAddress.toInstanceAddress customCCV]
+                    ccvArgs = ["", ""]
+                    executor = ""
+                    executorArgs = ""
+                    tokenReceiver = ""
+                    tokenArgs = "ddccbbaa"
 
     Some smTokenOnlyWithDefaultSentinel <- user `queryContractId` smTokenOnlyWithDefaultSentinelCid
-    smTokenOnlyWithDefaultSentinel.requiredCCVs === [defaultCCV, customCCV]
+    smTokenOnlyWithDefaultSentinel.requiredCCVs === [RawInstanceAddress.toInstanceAddress defaultCCV, RawInstanceAddress.toInstanceAddress customCCV]
     smTokenOnlyWithDefaultSentinel.tokenArgs === "ddccbbaa"
     smTokenOnlyWithDefaultSentinel.tokenReceiver === receiver
 
     -- Token-only send with separate receiver and tokenReceiver
     let tokenReceiver = "72bfa34fa86ff609ee85ae7fbffee1a49c231b89" -- 20 bytes
+
+    -- This destionation chain does not allow token receivers, should fail if tokenReceiver is set
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
+        exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
+            context = CCIP.Context.CCIPContext with
+                values = TextMap.fromList [(CCIP.Context.rmnRemoteKey, CCIP.Context.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, CCIP.Context.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
+                 (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
+                 (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
+            destinationChainSelector = destChainSelector2
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                        gasLimit = 0
+                        blockConfirmations = 0
+                        ccvs = []
+                        ccvArgs = []
+                        executor = ""
+                        executorArgs = ""
+                        tokenReceiver = tokenReceiver
+                        tokenArgs = "aabbccdd"
+    -- This chain has tokenReceiverAllowed = true, should succeed and set tokenReceiver on the message
     smTokenOnlyCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
@@ -765,15 +823,24 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = Some tokenReceiver
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                        gasLimit = 0
+                        blockConfirmations = 0
+                        ccvs = []
+                        ccvArgs = []
+                        executor = ""
+                        executorArgs = ""
+                        tokenReceiver = tokenReceiver
+                        tokenArgs = "aabbccdd"
 
     Some smTokenOnly <- user `queryContractId` smTokenOnlyCid
     smTokenOnly.requiredCCVs === []
@@ -790,15 +857,13 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = "12345678" -- invalid receiver (not 20 bytes)
-            payload = ""
-            ccipReceiveGasLimit = 0
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = Some tokenReceiver
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "12345678" -- invalid receiver (not 20 bytes)
+                payload = ""
+                tokenAmount = None
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.getBasicExtraArgs 0
 
     submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -808,18 +873,28 @@ testPrepareSendExtraArgs = script do
                  (CCIP.FeeQuoter.feeQuoterKey, CCIP.Context.AV_ContractId $ coerceContractId feeQuoter),
                  (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig),
                  (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)]
-            destChainSelector = destChainSelector
-            receiver = receiver
-            payload = ""
-            ccipReceiveGasLimit = 0
-            senderRequiredCCVs = []
-            tokenInstrumentId = Some tokenInstrumentId
-            tokenReceiver = Some("12345678") -- invalid token receiver (not 20 bytes)
-            tokenArgs = "aabbccdd"
-            feeToken = feeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = receiver
+                payload = ""
+                tokenAmount = Some CCIP.Client.TokenAmount with
+                    token = tokenInstrumentId
+                    amount = 1000.0
+                    senderInputCids = []
+                feeToken = feeTokenId
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                        gasLimit = 0
+                        blockConfirmations = 0
+                        ccvs = []
+                        ccvArgs = []
+                        executor = ""
+                        executorArgs = ""
+                        tokenReceiver = "12345678" -- invalid token receiver (not 20 bytes)
+                        tokenArgs = "aabbccdd"
 
     pure ()
 
+testPrepareSendRejectsOversizedPayload : Script ()
 testPrepareSendRejectsOversizedPayload = script do
     ccipOwner <- allocateParty "ccip-owner-payload"
     rmnOwner <- allocateParty "rmn-owner-payload"
@@ -852,8 +927,10 @@ testPrepareSendRejectsOversizedPayload = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -949,15 +1026,13 @@ testPrepareSendRejectsOversizedPayload = script do
                     , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
                     , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
                     ]
-            destChainSelector = destChainSelector
-            receiver = "0000000000000000000000000000000000000001"
-            payload = "0011223344"
-            ccipReceiveGasLimit = 100000
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0000000000000000000000000000000000000001"
+                payload = "0011223344"
+                tokenAmount = None
+                feeToken = testFeeTokenId
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     pure ()
 
@@ -1251,6 +1326,7 @@ testExecuteRollsOverExecutedMessages = script do
 
     debug "testExecuteRollsOverExecutedMessages: PASSED"
 
+testPrepareSendRejectsDuplicateSenderRequiredCCVs : Script ()
 testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     ccipOwner <- allocateParty "ccip-owner-dup-ccvs"
     rmnOwner <- allocateParty "rmn-owner-dup-ccvs"
@@ -1284,8 +1360,10 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -1369,18 +1447,25 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                     , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
                     , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
                     ]
-            destChainSelector = destChainSelector
-            receiver = "0000000000000000000000000000000000000001"
-            payload = "abcd"
-            ccipReceiveGasLimit = 100000
-            senderRequiredCCVs = [duplicateCCV, duplicateCCV] -- Duplicate CCVs should be rejected
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0000000000000000000000000000000000000001"
+                payload = "abcd"
+                feeToken = testFeeTokenId
+                tokenAmount = None
+                extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+                    gasLimit = 0
+                    blockConfirmations = 0
+                    ccvs = [RawInstanceAddress.toInstanceAddress duplicateCCV, RawInstanceAddress.toInstanceAddress duplicateCCV] -- Duplicate CCVs should be rejected
+                    ccvArgs = ["", ""]
+                    executor = ""
+                    executorArgs = ""
+                    tokenReceiver = ""
+                    tokenArgs = ""
 
     pure ()
 
+testPrepareSendRejectsSequenceNumberOverflow : Script ()
 testPrepareSendRejectsSequenceNumberOverflow = script do
     ccipOwner <- allocateParty "ccip-owner-seq"
     rmnOwner <- allocateParty "rmn-owner-seq"
@@ -1414,8 +1499,10 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.GlobalConfig.DestChainConfig with
                 isEnabled = True
                 addressBytesLength = 20
+                tokenReceiverAllowed = False
                 baseExecutionGasCost = 0
                 offRampAddress = "0000000000000000000000000000000000000003"
+                defaultExecutor = RawInstanceAddress.RawInstanceAddress "default-executor@party"
                 laneMandatedCCVs = []
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = cents 0.0
@@ -1508,14 +1595,12 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                     , (CCIP.GlobalConfig.globalConfigKey, CCIP.Context.AV_ContractId $ coerceContractId globalConfig)
                     , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
                     ]
-            destChainSelector = destChainSelector
-            receiver = "0000000000000000000000000000000000000001"
-            payload = "abcd"
-            ccipReceiveGasLimit = 100000
-            senderRequiredCCVs = []
-            tokenInstrumentId = None
-            tokenReceiver = None
-            tokenArgs = ""
-            feeToken = testFeeTokenId
+            destinationChainSelector = destChainSelector
+            message = CCIP.Client.Canton2AnyMessage with
+                receiver = "0000000000000000000000000000000000000001"
+                payload = "abcd"
+                tokenAmount = None
+                feeToken = testFeeTokenId
+                extraArgs = CCIP.Client.getBasicExtraArgs 100000
 
     pure ()

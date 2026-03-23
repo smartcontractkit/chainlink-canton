@@ -14,9 +14,10 @@ import CCIP.GlobalConfigTypes (
     SourceChainConfig(..),
     SourceChainConfigArgs(..),
     validateDefaultAndMandatedCCVs,
+    noExecutionExecutorRawInstanceAddress,
     )
 import CCIP.GlobalConfigCodec (decodeApplyDestChainConfigUpdatesParams, decodeApplySourceChainConfigUpdatesParams)
-import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress (assertValidInstanceId)
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex)
@@ -69,8 +70,19 @@ template GlobalConfig
 
                 -- Update
                 let newConfigs = foldl
-                        (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
-                            Map.insert destChainSelector DestChainConfig{isEnabled, addressBytesLength, baseExecutionGasCost, offRampAddress, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} configs)
+                        (\configs DestChainConfigArgs{destChainSelector, isEnabled, addressBytesLength, baseExecutionGasCost, tokenReceiverAllowed, offRampAddress, defaultExecutor, laneMandatedCCVs, defaultCCVs, messageNetworkFeeUSDCents, tokenNetworkFeeUSDCents} ->
+                            Map.insert destChainSelector DestChainConfig with
+                                isEnabled,
+                                 addressBytesLength,
+                                 baseExecutionGasCost,
+                                 tokenReceiverAllowed,
+                                 offRampAddress,
+                                 defaultExecutor,
+                                 laneMandatedCCVs,
+                                 defaultCCVs,
+                                 messageNetworkFeeUSDCents,
+                                 tokenNetworkFeeUSDCents
+                            configs)
                         destChainConfigs
                         destChainConfigUpdates
                 create this with destChainConfigs = newConfigs

@@ -6,13 +6,19 @@ import DA.List qualified as List
 
 import MCMS.RawInstanceAddress (RawInstanceAddress(..))
 
+-- set the DestChainConfig to this value to disable the default executor.
+noExecutionExecutorRawInstanceAddress : RawInstanceAddress
+noExecutionExecutorRawInstanceAddress = RawInstanceAddress "no-execution-executor"
+
 data DestChainConfigArgs = DestChainConfigArgs
     with
         destChainSelector : Numeric 0           -- Destination chain selector of the config to update.
         isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
         addressBytesLength : Int                -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+        tokenReceiverAllowed : Bool             -- Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
         baseExecutionGasCost : Int              -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
+        defaultExecutor : RawInstanceAddress    -- Default executor to use for messages to this destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
         messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.
@@ -24,8 +30,10 @@ data DestChainConfig = DestChainConfig
     with
         isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
         addressBytesLength : Int                -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+        tokenReceiverAllowed : Bool             -- Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
         baseExecutionGasCost : Int              -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
         offRampAddress : BytesHex               -- OffRamp address on the destination chain.
+        defaultExecutor : RawInstanceAddress    -- Default executor to use for messages to this destination chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
         messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.

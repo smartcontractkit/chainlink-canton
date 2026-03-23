@@ -244,7 +244,7 @@ testLockOrBurn = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor" ccipOwner
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = sourceChainSelector
             senderAddress = senderAddr
@@ -500,7 +500,7 @@ testLockOrBurnIgnoresExistingPoolHoldingsInValidation = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor" ccipOwner
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = sourceChainSelector
             senderAddress = senderAddr
@@ -712,7 +712,7 @@ testLockOrBurnDeductsFeeBps = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor-bps" ccipOwner
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-bps" ccipOwner)
             executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = sourceChainSelector
             senderAddress = senderAddr
@@ -1463,10 +1463,11 @@ testExecutionGasLimitAggregation = script do
             destChainSelector = 456.0
             sequenceNumber = 1.0
             requiredCCVs =
-                [ RawInstanceAddress.make "ccv-1" ccvOwner1
-                , RawInstanceAddress.make "ccv-2" ccvOwner2
+                [ (RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "ccv-1" ccvOwner1))
+                , (RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "ccv-2" ccvOwner2))
                 ]
-            executorAddress = RawInstanceAddress.make "default-executor-gas" ccipOwner
+            -- executorAddress is specified, only the specified executor can add executor fee
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas" executorOwner)
             executionMode = None
             sourceChainSelector = 123.0
             senderAddress = senderAddr
@@ -1519,11 +1520,20 @@ testExecutionGasLimitAggregation = script do
             destGasLimit = 23456
             destBytesOverhead = 0
             caller = ccvOwner2
-
+    
     disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    -- test that executor fee cannot be added by a different executor than what's specified in the message
+    submitMustFail (actAs executorOwner <> disclose disclosedSM) do
+        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+            executorInstanceId = "different-executor"
+            executorArgs = ""
+            feeUSDCents = cents 3.0
+            caller = executorOwner
+
+    -- add executor fee with the correct executor
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
-            executorInstanceId = "executor-gas"
+            executorInstanceId = "default-executor-gas"
             executorArgs = ""
             feeUSDCents = cents 3.0
             caller = executorOwner
@@ -1687,8 +1697,8 @@ testExecutionGasLimitWithTokenSendFee = script do
                 feeQuoter = RawInstanceAddress.make "test-feequoter-gas-pool" ccipOwner
             destChainSelector = 456.0
             sequenceNumber = 1.0
-            requiredCCVs = [RawInstanceAddress.make "ccv-pool" ccvOwner]
-            executorAddress = RawInstanceAddress.make "default-executor-gas-pool" ccipOwner
+            requiredCCVs = [(RawInstanceAddress.toInstanceAddress(RawInstanceAddress.make "ccv-pool" ccvOwner))]
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas-pool" executorOwner)
             executionMode = None
             sourceChainSelector = 123.0
             senderAddress = senderAddr
@@ -1752,7 +1762,7 @@ testExecutionGasLimitWithTokenSendFee = script do
     disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
-            executorInstanceId = "executor-gas-pool"
+            executorInstanceId = "default-executor-gas-pool"
             executorArgs = ""
             feeUSDCents = cents 3.0
             caller = executorOwner
@@ -1809,8 +1819,8 @@ testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
             destChainSelector = 456.0
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor-extra-bound" ccipOwner
-            executionMode = None
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-extra-bound" ccipOwner)
+            executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = 123.0
             senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"
@@ -1844,12 +1854,6 @@ testAddTokenSendRejectsExtraDataBeyondQuotedOverhead = script do
             tokenSendData = None
             observingParties = [poolOwner]
             state = SendingMessageV1.SendingMessageState_Prepared
-
-    disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    sendingMessageCid <- submit (actAs poolOwner <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.SetNoExecutor with
-            executorArgs = ""
-            caller = poolOwner
 
     sendingMessageCid <- submit ccipOwner do
         exerciseCmd sendingMessageCid SendingMessageV1.AddTokenSendFee with
@@ -2392,7 +2396,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor-fallback" ccipOwner
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-fallback" ccipOwner)
             executionMode = None
             sourceChainSelector = sourceChainSelector
             senderAddress = senderAddr
@@ -2560,7 +2564,7 @@ testCalculateFeePrefersPoolOverride = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor-override" ccipOwner
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-override" ccipOwner)
             executionMode = None
             sourceChainSelector = 123.0
             senderAddress = senderAddr
@@ -2727,7 +2731,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             requiredCCVs = []
-            executorAddress = RawInstanceAddress.make "default-executor-disabled" ccipOwner
+            executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-disabled" ccipOwner)
             executionMode = None
             sourceChainSelector = 123.0
             senderAddress = senderAddr

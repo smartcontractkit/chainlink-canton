@@ -5,7 +5,7 @@ import Daml.Script
 import DA.Assert ((===))
 
 import CCIP.OnRamp
-import MCMS.RawInstanceAddress (RawInstanceAddress(..), make)
+import MCMS.RawInstanceAddress (RawInstanceAddress(..), make, toInstanceAddress)
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 -- ===========================================================================
@@ -131,8 +131,8 @@ testOrderedVerifierDataByCCVs : Script ()
 testOrderedVerifierDataByCCVs = do
   ccvOwner <- allocateParty "ccv-owner"
 
-  let ccv1 = make "ccv-1" ccvOwner
-      ccv2 = make "ccv-2" ccvOwner
+  let ccv1 = toInstanceAddress (make "ccv-1" ccvOwner)
+      ccv2 = toInstanceAddress (make "ccv-2" ccvOwner)
       vd1 = SendingMessageV1.VerifierData with
         ccvInstanceId = "ccv-1"
         ccvOwner = ccvOwner

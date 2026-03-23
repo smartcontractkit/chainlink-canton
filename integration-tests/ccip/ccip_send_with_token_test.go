@@ -247,7 +247,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 						LaneMandatedInboundCCVs:  nil,
 						DefaultOutboundCCVs:      []contracts.RawInstanceAddress{committeeVerifierRawAddr},
 						LaneMandatedOutboundCCVs: nil,
-						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // random executor
+						DefaultExecutor:          contracts.RawInstanceAddress(committeeVerifierRawAddr.String()), // TODO: replace with actual executor, currently deployed down below and not used yet
 						FeeQuoterDestChainConfig: adapters.FeeQuoterDestChainConfig{
 							IsEnabled:                   true,
 							MaxDataBytes:                50000,
@@ -635,6 +635,7 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	})
 	require.NoError(t, err)
 	executorCid := extractCreatedContractId(res)
+	executorAddress := contracts.InstanceID("test-executor").RawInstanceAddress(types.PARTY(partyCCIP))
 	t.Logf("Deployed Executor: %s", executorCid)
 
 	// Get disclosures for CCIPSender.Send
@@ -852,39 +853,49 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	// TokenTransferFeeConfigs[remoteSelector].feeBps = 500 (5%),
 	// so 10,000 sent -> 9,500 bridged, with 500 collected by pool.
 	sendArgs := ccipsender.Send{
-		Context:           sendContext,
-		RouterCid:         types.CONTRACT_ID(routerCid),
-		DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Receiver:          types.TEXT(receiverHex),
-		Payload:           types.TEXT(testPayloadHex),
-		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(100000), // executorDestGasLimit
-			SenderRequiredCCVs: []mcms.RawInstanceAddress{committeeVerifierRawAddr.Binding()},
-			ExecutorCid:        func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
-			ExecutorArgs:       nil,
-			TokenReceiver:      nil,
-			TokenArgs:          types.TEXT(""),
+		Context:                  sendContext,
+		RouterCid:                types.CONTRACT_ID(routerCid),
+		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
+		Message: common.Canton2AnyMessage{
+			Receiver: types.TEXT(receiverHex),
+			Payload:  types.TEXT(testPayloadHex),
+			TokenAmount: &common.TokenAmount{
+				Token:           feeTokenInstrumentId,
+				Amount:          types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
+				SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			},
+			FeeToken: feeTokenInstrumentId,
+			ExtraArgs: common.ExtraArgs{
+				V3: &common.GenericExtraArgsV3{
+					GasLimit:           100_000,
+					BlockConfirmations: 0,
+					Ccvs:               []types.TEXT{types.TEXT(hex.EncodeToString(committeeVerifierRawAddr.InstanceAddress().Bytes()))},
+					CcvArgs:            []types.TEXT{types.TEXT("")},
+					Executor:           types.TEXT(hex.EncodeToString(executorAddress.InstanceAddress().Bytes())),
+					ExecutorArgs:       types.TEXT(""),
+					TokenReceiver:      types.TEXT(""),
+					TokenArgs:          types.TEXT(""),
+				},
+			},
 		},
-		FeeToken:            feeTokenInstrumentId,
 		FeeTokenInput:       feeTokenInput,
 		FeeTokenHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 		TokenTransfer: &ccipsender.TokenTransferInput{
-			TokenPoolCid:      types.CONTRACT_ID(disclosedPool.ContractId),
-			TokenInput:        tokenTransferInput,
-			SenderInputCids:   []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
-			Amount:            types.NUMERIC(strconv.FormatInt(tokenTransferAmount, 10)),
-			TokenInstrumentId: feeTokenInstrumentId,
+			TokenPoolCid: types.CONTRACT_ID(disclosedPool.ContractId),
+			TokenInput:   tokenTransferInput,
 			PoolExtraContext: common.CCIPContext{
 				Values: types.TEXTMAP{
 					"rate-limiter": common.AnyValue{AVContractId: &outboundRateLimiterContractID},
 				},
 			},
 		},
-		CcvSendInputs: []ccipsender.CCVSendInput{{
-			CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
-			VerifierArgs:    types.TEXT(""),
-			CcvExtraContext: common.CCIPContext{},
-		}},
+		CcvSendInputs: types.GENMAP(map[string]any{
+			hex.EncodeToString(committeeVerifierRawAddr.InstanceAddress().Bytes()): ccipsender.CCVSendInput{
+				CcvCid:          types.CONTRACT_ID(disclosedCCV.ContractId),
+				CcvExtraContext: common.CCIPContext{},
+			},
+		}),
+		ExecutorCid: func() *types.CONTRACT_ID { c := types.CONTRACT_ID(executorCid); return &c }(),
 	}
 
 	ccipSendArgs := ledger.MapToValue(sendArgs)

@@ -45,7 +45,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/tokenadminregistry"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -1131,8 +1130,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		),
 	)
 
-	senderRequiredCCVs := make([]mcms.RawInstanceAddress, 0, len(opts.CCVs))
-	ccvSendInputs := make([]ccipsender.CCVSendInput, 0, len(opts.CCVs))
+	senderRequiredCCVs := make([]types.TEXT, 0, len(opts.CCVs))
+	ccvArgs := make([]types.TEXT, 0, len(opts.CCVs))
+	ccvSendInputs := make(types.GENMAP, len(opts.CCVs))
 	disclosedVerifierContracts := make([]*ledgerv2.DisclosedContract, 0, len(opts.CCVs))
 	receiptIssuers := make([]protocol.UnknownAddress, 0, len(opts.CCVs)+2)
 	var fallbackVerifierDestAddress protocol.UnknownAddress
@@ -1176,12 +1176,12 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 				return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("construct verifier raw address: %w", err)
 			}
 		}
-		senderRequiredCCVs = append(senderRequiredCCVs, rawAddr.Binding())
-		ccvSendInputs = append(ccvSendInputs, ccipsender.CCVSendInput{
+		senderRequiredCCVs = append(senderRequiredCCVs, types.TEXT(hex.EncodeToString(rawAddr.InstanceAddress().Bytes())))
+		ccvArgs = append(ccvArgs, types.TEXT(hex.EncodeToString(ccvItem.Args)))
+		ccvSendInputs[hex.EncodeToString(verifierAddress.Bytes())] = ccipsender.CCVSendInput{
 			CcvCid:          types.CONTRACT_ID(activeVerifier.GetCreatedEvent().GetContractId()),
-			VerifierArgs:    types.TEXT(hex.EncodeToString(ccvItem.Args)),
 			CcvExtraContext: common.CCIPContext{},
-		})
+		}
 		disclosedVerifierContracts = append(disclosedVerifierContracts, convertToDisclosedContract(activeVerifier))
 		receiptIssuers = append(receiptIssuers, protocol.UnknownAddress(verifierAddress.Bytes()))
 		if len(fallbackVerifierDestAddress) == 0 {
@@ -1210,20 +1210,27 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	}
 
 	sendArgs := ccipsender.Send{
-		Context:           sendContext,
-		RouterCid:         routerCID,
-		DestChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
-		Receiver:          types.TEXT(hex.EncodeToString(fields.Receiver)),
-		Payload:           types.TEXT(hex.EncodeToString(fields.Data)),
-		ExtraArgs: ccipsender.CantonExtraArgsV1{
-			GasLimit:           types.INT64(opts.ExecutionGasLimit),
-			SenderRequiredCCVs: senderRequiredCCVs,
-			ExecutorCid:        &executorCID,
-			ExecutorArgs:       nil,
-			TokenReceiver:      nil,
-			TokenArgs:          types.TEXT(""),
+		Context:                  sendContext,
+		RouterCid:                routerCID,
+		DestinationChainSelector: types.NUMERIC(fmt.Sprintf("%d", dest)),
+		Message: common.Canton2AnyMessage{
+			Receiver:    types.TEXT(hex.EncodeToString(fields.Receiver)),
+			Payload:     types.TEXT(hex.EncodeToString(fields.Data)),
+			TokenAmount: nil,
+			FeeToken:    feeTokenInstrument,
+			ExtraArgs: common.ExtraArgs{
+				V3: &common.GenericExtraArgsV3{
+					GasLimit:           types.INT64(opts.ExecutionGasLimit),
+					BlockConfirmations: 0,
+					Ccvs:               senderRequiredCCVs,
+					CcvArgs:            ccvArgs,
+					Executor:           types.TEXT(hex.EncodeToString(executorInstanceAddress.Bytes())),
+					ExecutorArgs:       types.TEXT(""),
+					TokenReceiver:      types.TEXT(""),
+					TokenArgs:          types.TEXT(""),
+				},
+			},
 		},
-		FeeToken: feeTokenInstrument,
 		FeeTokenInput: interfaces.TokenInput{
 			// TODO: replace with a real Splice TransferFactory CID from the
 			// transfer-instruction API. Using routerCID is invalid because
@@ -1241,6 +1248,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		FeeTokenHoldingCids: nil,
 		TokenTransfer:       nil,
 		CcvSendInputs:       ccvSendInputs,
+		ExecutorCid:         &executorCID,
 	}
 	sendArgsMap := sendArgs.ToMap()
 	if onRampCID == "" || globalConfigCID == "" || tokenAdminRegistryCID == "" || feeQuoterCID == "" || rmnRemoteCID == "" || routerCID == "" || ccipSenderCID == "" || executorCID == "" {

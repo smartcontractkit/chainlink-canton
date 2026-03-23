@@ -9,8 +9,9 @@ import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional)
-import DA.Time (time, addRelTime, hours)
+import DA.Time (time)
 
+import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
@@ -291,16 +292,9 @@ template PerPartyRouter
         -- | Create SendingMessageV1 via OnRamp. Validates fee token, sets network fee.
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
+                destinationChainSelector : Numeric 0
+                message : CCIP.Client.Canton2AnyMessage
                 context : CCIP.Context.CCIPContext
-                destChainSelector : Numeric 0
-                receiver : BytesHex
-                payload : BytesHex
-                ccipReceiveGasLimit : Int
-                senderRequiredCCVs : [RawInstanceAddress]
-                tokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
-                tokenReceiver : Optional BytesHex
-                tokenArgs : BytesHex
-                feeToken : Splice.Api.Token.HoldingV1.InstrumentId
             controller partyOwner
             do
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
@@ -330,25 +324,19 @@ template PerPartyRouter
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 let currentSeqNum = fromOptional 0.0
-                        (Map.lookup destChainSelector outboundSequenceNumbers)
+                        (Map.lookup destinationChainSelector outboundSequenceNumbers)
 
                 exercise onRampCid CCIP.OnRamp.PrepareSendFromRouter with
+                    destChainSelector = destinationChainSelector
+                    message = message
+
                     routerPartyOwner = partyOwner
                     routerInstanceId = instanceId
                     globalConfigCid
                     tokenAdminRegistryCid
                     feeQuoterCid
                     rmnRemoteCid
-                    destChainSelector
-                    receiver
-                    payload
-                    ccipReceiveGasLimit
                     currentSequenceNumber = currentSeqNum
-                    senderRequiredCCVs
-                    tokenInstrumentId
-                    tokenReceiver
-                    tokenArgs
-                    feeToken
 
         nonconsuming choice FinalizeFee : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
