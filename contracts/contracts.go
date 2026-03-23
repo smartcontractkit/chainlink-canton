@@ -21,6 +21,7 @@ const (
 	MCMSTest     = Package("mcms-test")
 	GlobalConfig = Package("globalconfig")
 
+	CCIPClient               = Package("ccip-client")
 	CCIPCommon               = Package("ccip-common")
 	CCIPSender               = Package("ccip-sender")
 	CCIPReceiver             = Package("ccip-receiver")
@@ -52,6 +53,7 @@ var Versions map[Package][]string = map[Package][]string{
 	MCMSTest:     []string{"0.0.1", CurrentVersion},
 	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
 
+	CCIPClient:               []string{"0.0.1", CurrentVersion},
 	CCIPCommon:               []string{"0.0.1", CurrentVersion},
 	CCIPSender:               []string{"0.0.1", CurrentVersion},
 	CCIPReceiver:             []string{"0.0.1", CurrentVersion},
@@ -103,6 +105,7 @@ var OutputDirs = map[Package][]string{
 	MCMS:     []string{"mcms"},
 	MCMSTest: []string{"mcms", "mcmstest"},
 
+	CCIPClient:               []string{"ccip", "client"},
 	CCIPReceiver:             []string{"ccip", "ccipreceiver"},
 	CCIPSender:               []string{"ccip", "ccipsender"},
 	CCIPCommitteeVerifier:    []string{"ccip", "ccvs"},
