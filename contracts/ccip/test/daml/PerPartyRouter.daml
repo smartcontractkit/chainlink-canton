@@ -64,6 +64,20 @@ basicFeeToken token tokenInput = CCIP.Client.FeeTokenInput with
     tokenInput = tokenInput
     senderInputCids = []
 
+-- Script-level helper to create a TokenInput for fee collection tests.
+mkTokenInput : Party -> Script (ContractId TestToken.TestTransferFactory, CCIP.Interfaces.TokenPool.TokenInput)
+mkTokenInput admin = do
+    transferFactory <- submit admin do
+        createCmd TestToken.TestTransferFactory with
+            admin = admin
+            preapprovalCid = None
+    pure (transferFactory, CCIP.Interfaces.TokenPool.TokenInput with
+        transferFactory = toInterfaceContractId transferFactory
+        extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            meta = Splice.Api.Token.MetadataV1.emptyMetadata
+        tokenPoolHoldings = [])
+
 basicExtraArgs : Int -> CCIP.Client.ExtraArgs
 basicExtraArgs gasLimit = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
     gasLimit = gasLimit
@@ -288,6 +302,8 @@ testCCIPSend = script do
 
     let receiver = "9df48df28ecc2863af9e90cde2e82fa62a9ee2c5" -- 20 bytes
 
+    (transferFactory, feeTokenInput) <- mkTokenInput ccipOwner
+
     -- PrepareSend: create SendingMessageV1 (message deferred to executor)
     sendingMessageCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -302,7 +318,7 @@ testCCIPSend = script do
                 receiver = receiver
                 payload = "48656c6c6f20576f726c64"
                 tokenTransfer = None
-                feeToken = basicFeeToken testFeeTokenId
+                feeToken = basicFeeToken testFeeTokenId feeTokenInput
                 extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
     -- Executor fee calculation (must happen before FinalizeFee)
@@ -323,19 +339,6 @@ testCCIPSend = script do
                     , (CCIP.OnRamp.onRampKey, CCIP.Context.AV_ContractId $ coerceContractId onRamp)
                     ]
             sendingMessageCid = sendingMessageCid
-
-    -- Deploy a fee token transfer factory for CCIPSend
-    transferFactory <- submit ccipOwner do
-        createCmd TestToken.TestTransferFactory with
-            admin = ccipOwner
-            preapprovalCid = None
-
-    let feeTokenInput = CCIP.Interfaces.TokenPool.TokenInput with
-            transferFactory = toInterfaceContractId transferFactory
-            extraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
-                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                meta = Splice.Api.Token.MetadataV1.emptyMetadata
-            tokenPoolHoldings = []
 
     disclosedTransferFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
 
@@ -376,7 +379,7 @@ testCCIPSend = script do
                 receiver = receiver
                 payload = "48656c6c6f20576f726c6432"
                 tokenTransfer = None
-                feeToken = basicFeeToken testFeeTokenId
+                feeToken = basicFeeToken testFeeTokenId feeTokenInput
                 extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
     -- Executor fee for second message (must happen before FinalizeFee)
@@ -423,6 +426,7 @@ testCCIPExecute = script do
     rmnOwner <- allocateParty "rmn-owner"
     ccvOwner <- allocateParty "ccv-owner"
     receiver <- allocateParty "receiver"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig"
     let offRampInstanceId = "test-offramp"
@@ -575,6 +579,8 @@ testPrepareSendExtraArgs = script do
     ccipOwner <- allocateParty "ccip-owner"
     rmnOwner <- allocateParty "rmn-owner"
     user <- allocateParty "user"
+
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig"
     let onRampInstanceId = "test-onramp"
@@ -733,13 +739,13 @@ testPrepareSendExtraArgs = script do
                 receiver = receiver
                 payload = "01"
                 tokenTransfer = None
-                feeToken = basicFeeToken feeTokenId
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
                 extraArgs = basicExtraArgs 123
 
     Some sm <- user `queryContractId` smCid
     sm.message === None
     sm.ccipReceiveGasLimit === 123
-    sm.requiredCCVs === [RawInstanceAddress.toInstanceAddress defaultCCV]
+    sm.requiredCCVs === [defaultCCV]
 
     smWithCustomCCVCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -749,7 +755,7 @@ testPrepareSendExtraArgs = script do
                 receiver = receiver
                 payload = "02"
                 tokenTransfer = None
-                feeToken = basicFeeToken feeTokenId
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 123
                     blockConfirmations = 0
@@ -759,7 +765,7 @@ testPrepareSendExtraArgs = script do
                     tokenArgs = ""
 
     Some smWithCustomCCV <- user `queryContractId` smWithCustomCCVCid
-    smWithCustomCCV.requiredCCVs === [CCIP.MessageCodecV1.encodeInstanceAddress "custom-ccv" user]
+    smWithCustomCCV.requiredCCVs === [RawInstanceAddress.make "custom-ccv" user]
 
     submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
@@ -769,7 +775,7 @@ testPrepareSendExtraArgs = script do
                 receiver = receiver
                 payload = "03"
                 tokenTransfer = None
-                feeToken = basicFeeToken feeTokenId
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 0
                     blockConfirmations = 0
@@ -786,7 +792,7 @@ testPrepareSendExtraArgs = script do
                 receiver = "12345678"
                 payload = ""
                 tokenTransfer = None
-                feeToken = basicFeeToken feeTokenId
+                feeToken = basicFeeToken feeTokenId dummyTokenInput
                 extraArgs = basicExtraArgs 0
 
     pure ()
@@ -796,6 +802,7 @@ testPrepareSendRejectsOversizedPayload = script do
     ccipOwner <- allocateParty "ccip-owner-payload"
     rmnOwner <- allocateParty "rmn-owner-payload"
     user <- allocateParty "user-payload"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig-payload"
     let onRampInstanceId = "test-onramp-payload"
@@ -928,7 +935,7 @@ testPrepareSendRejectsOversizedPayload = script do
                 receiver = "0000000000000000000000000000000000000001"
                 payload = "0011223344"
                 tokenTransfer = None
-                feeToken = basicFeeToken testFeeTokenId
+                feeToken = basicFeeToken testFeeTokenId dummyTokenInput
                 extraArgs = basicExtraArgs 100000
 
     pure ()
@@ -1228,6 +1235,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     ccipOwner <- allocateParty "ccip-owner-dup-ccvs"
     rmnOwner <- allocateParty "rmn-owner-dup-ccvs"
     user <- allocateParty "user-dup-ccvs"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig-dup-ccvs"
     let onRampInstanceId = "test-onramp-dup-ccvs"
@@ -1357,7 +1365,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             message = CCIP.Client.Canton2AnyMessage with
                 receiver = "0000000000000000000000000000000000000001"
                 payload = "abcd"
-                feeToken = basicFeeToken testFeeTokenId
+                feeToken = basicFeeToken testFeeTokenId dummyTokenInput
                 tokenTransfer = None
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 0
@@ -1377,6 +1385,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
     ccipOwner <- allocateParty "ccip-owner-seq"
     rmnOwner <- allocateParty "rmn-owner-seq"
     user <- allocateParty "user-seq"
+    (_, dummyTokenInput) <- mkTokenInput ccipOwner
 
     let globalConfigInstanceId = "test-globalconfig-seq"
     let onRampInstanceId = "test-onramp-seq"
@@ -1507,7 +1516,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 receiver = "0000000000000000000000000000000000000001"
                 payload = "abcd"
                 tokenTransfer = None
-                feeToken = basicFeeToken testFeeTokenId
+                feeToken = basicFeeToken testFeeTokenId dummyTokenInput
                 extraArgs = basicExtraArgs 100000
 
     pure ()
