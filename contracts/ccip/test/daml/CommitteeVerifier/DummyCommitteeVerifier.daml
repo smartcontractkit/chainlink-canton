@@ -26,6 +26,8 @@ template DummyCommitteeVerifier
 
         interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
             view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+                instanceId = instanceId
+                owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = ["ipfs://dummy"]
 

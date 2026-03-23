@@ -47,6 +47,7 @@ template Executor
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
+                instanceId = instanceId
                 owner = owner
 
             executor_calculateFeeImpl self arg = do

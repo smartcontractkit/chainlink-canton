@@ -2,30 +2,54 @@ module CCIP.Client where
 
 import DA.Crypto.Text (BytesHex)
 
+import qualified CCIP.Context
+import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
+import qualified CCIP.Interfaces.Executor
+import qualified CCIP.Interfaces.TokenPool
 import qualified Splice.Api.Token.HoldingV1
 
-data TokenAmount = TokenAmount
+data Canton2AnyMessage = Canton2AnyMessage
+    with
+        receiver : BytesHex
+        payload : BytesHex
+        tokenTransfer : Optional TokenTransferInput
+        feeToken : FeeTokenInput
+        extraArgs : ExtraArgs
+    deriving (Eq, Show)
+
+data CCVSendInput = CCVSendInput
+    with
+        ccvCid : ContractId ICCV.ICrossChainVerifier
+        verifierArgs : BytesHex
+        ccvExtraContext : CCIP.Context.CCIPContext
+    deriving (Eq, Show)
+
+data FeeTokenInput = FeeTokenInput
     with
         token : Splice.Api.Token.HoldingV1.InstrumentId
         amount : Numeric 0
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
-data Canton2AnyMessage = Canton2AnyMessage
+data TokenTransferInput = TokenTransferInput
     with
-        receiver : BytesHex
-        payload : BytesHex
-        tokenAmount : Optional TokenAmount
-        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-        extraArgs : ExtraArgs
+        token : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Numeric 0
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
+        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
+        poolExtraContext : CCIP.Context.CCIPContext
     deriving (Eq, Show)
 
-noExecutionTag : BytesHex
-noExecutionTag = "eba517d2"
+data ExecutorInput = ExecutorInput
+    with
+        executorCid : ContractId CCIP.Interfaces.Executor.IExecutor
+        executorArgs : BytesHex
+    deriving (Eq, Show)
 
 data ExtraArgs
-     = V3 GenericExtraArgsV3
-     deriving (Eq, Show)
+    = V3 GenericExtraArgsV3
+    deriving (Eq, Show)
 
 data GenericExtraArgsV3 = GenericExtraArgsV3
     with
@@ -43,35 +67,20 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         gasLimit : Int
         -- | The number of block confirmations to wait for.
         -- | 0 means the default finality that the CCV considers final. Any non-zero value means
-        -- | a block depth. CCVs, Pools and the executor may all reject this value by reverting
-        -- | the transaction on the source chain if they do not want to take on the risk of the
-        -- | block confirmations specified.
+        -- | a block depth. CCVs, pools, and the executor may all reject this value if they do
+        -- | not want to take on the risk of the block confirmations specified.
         -- | May be zero to indicate waiting for finality is desired.
         blockConfirmations : Int
-        -- | An array of CCV addresses representing the cross-chain verifiers to be used for
-        -- | the message.
-        -- | May be empty or contain "" as a placeholder to indicate that the default CCVs should
-        -- | be used.
-        ccvs : [BytesHex]
-        -- | Optional arguments that are passed into the CCV without modification or inspection.
-        -- | CCIP itself does not interpret these arguments: they are encoded in whatever format
-        -- | the CCV has decided.
-        -- | Must be the same length as the `ccvs` array. May have empty bytes as arguments.
-        ccvArgs : [BytesHex]
-        -- | Address of the executor contract on the source chain.
-        -- | The executor is responsible for executing the message on the destination chains once
-        -- | a quorum of CCVs have verified the message.
-        -- | May be empty to indicate the default executor should be used.
-        executor : BytesHex
-        -- | Destination chain family specific arguments for the executor.
-        -- | This field is passed to the destination chain as part of the message itself and these
-        -- | args are therefore fully protected through the message ID. The format of this field
-        -- | is specific to each chain family and is not interpreted by CCIP itself, only by the
-        -- | executor. Things that may be included here are Solana accounts or Sui object IDs,
-        -- | which must be secured through the message ID as passing in incorrect values can lead
-        -- | to loss of funds.
-        -- | May be empty depending on the destination chain.
-        executorArgs : BytesHex
+        -- | Ordered CCV send inputs for the message.
+        -- | Each entry identifies the verifier contract to use, the per-CCV verifier args, and
+        -- | any extra source-chain context needed during forwarding.
+        -- | May be empty to indicate that the destination chain defaults should be used.
+        ccvs : [CCVSendInput]
+        -- | Optional executor selection for the message.
+        -- | If present, the executor is responsible for execution on the destination chain once
+        -- | a quorum of CCVs has verified the message. If absent, the message is prepared in
+        -- | no-executor mode.
+        executor : Optional ExecutorInput
         -- | Address of the token receiver on the destination chain, in bytes format. If an empty
         -- | bytes array is provided, the receiver address from the message itself is used for
         -- | token transfers. This field allows for scenarios where the token receiver is
@@ -87,41 +96,3 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         -- | May be empty depending on the token pool.
         tokenArgs : BytesHex
     deriving (Eq, Show)
-
--- Creates a basic ExtraArgs with only the gasLimit set.
---
--- Params:
--- gasLimit: The gas limit for the callback on the destination chain.
-getBasicExtraArgs : Int -> ExtraArgs
-getBasicExtraArgs gasLimit =
-    V3 GenericExtraArgsV3 with
-        gasLimit = gasLimit
-        blockConfirmations = 0
-        ccvs = []
-        ccvArgs = []
-        executor = ""
-        executorArgs = ""
-        tokenReceiver = ""
-        tokenArgs = ""
-
--- Creates a basic ExtraArgs with only the gasLimit and ccvs set.
---
--- Params:
--- gasLimit: The gas limit for the callback on the destination chain.
--- ccvs: The list of CCV addresses.
--- ccvArgs: The list of CCV arguments. Must be the same length as ccvs. Can be empty bytes for each CCV if no arguments are needed.
-getBasicExtraArgsWithCCVs : Int -> [BytesHex] -> [BytesHex] -> ExtraArgs
-getBasicExtraArgsWithCCVs gasLimit ccvs ccvArgs =
-    -- Validate that the length of ccvs and ccvArgs match
-    if length ccvs /= length ccvArgs then
-        error "Length of ccvs and ccvArgs must match"
-    else
-        V3 GenericExtraArgsV3 with
-            gasLimit = gasLimit
-            blockConfirmations = 0
-            ccvs = ccvs
-            ccvArgs = ccvArgs
-            executor = ""
-            executorArgs = ""
-            tokenReceiver = ""
-            tokenArgs = ""
