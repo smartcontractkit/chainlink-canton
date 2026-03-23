@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -25,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "353b2eff0e4f0ad62c7d2385c0d04662e3ae962aba321bb3b1622764fdb8c8d2"
+	PackageID   = "66ee9a03d3ff4d5dc6922fe77c41073a469f07add0b52daf0cc4778fe975845a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -648,7 +649,7 @@ func (t *OnRampDeps) UnmarshalHex(data string) error {
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
 	DestChainSelector     types.NUMERIC            `json:"destChainSelector"`
-	Message               common.Canton2AnyMessage `json:"message"`
+	Message               client.Canton2AnyMessage `json:"message"`
 	RouterPartyOwner      types.PARTY              `json:"routerPartyOwner"`
 	RouterInstanceId      types.TEXT               `json:"routerInstanceId"`
 	GlobalConfigCid       types.CONTRACT_ID        `json:"globalConfigCid"`

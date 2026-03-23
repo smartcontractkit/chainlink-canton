@@ -11,7 +11,7 @@ import qualified Splice.Api.Token.HoldingV1
 
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
-import CCIP.SendingMessageV1 qualified as SendingMessageV1
+import CCIP.OnRamp qualified as OnRamp
 
 setup = script do
 
@@ -95,9 +95,13 @@ setup = script do
         (hashForward /= hashReverse)
     debug("ccvAndExecutorHash ordering test passed")
 
-    SendingMessageV1.noExecutionAddressBytes
+    assertMsg "no-execution sentinel should produce different hash"
+        (MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] OnRamp.noExecutionAddressBytes /= hashForward)
+    debug("no-execution sentinel hashing test passed")
+
+    OnRamp.noExecutionAddressBytes
         === "eba517d200000000000000000000000000000000000000000000000000000000"
-    byteCount SendingMessageV1.noExecutionAddressBytes === 32
+    byteCount OnRamp.noExecutionAddressBytes === 32
     debug("no-execution sentinel encoding test passed")
 
     -- Test InstrumentId round-trip with new id@party format

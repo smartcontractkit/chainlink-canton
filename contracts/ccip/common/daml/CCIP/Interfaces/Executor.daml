@@ -21,5 +21,6 @@ interface IExecutor where
 
 data ExecutorView = ExecutorView
     with
+        instanceId : Text
         owner : Party
     deriving (Eq, Show)

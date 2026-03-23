@@ -8,7 +8,7 @@ module CCIP.SendingMessageV1 where
 import DA.Crypto.Text (BytesHex, byteCount, keccak256)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup)
-import DA.Optional (isNone, isSome, fromSome, fromOptional, isSome)
+import DA.Optional (isNone, isSome, fromSome, fromOptional)
 
 import qualified CCIP.Events
 import qualified CCIP.Math
@@ -96,13 +96,6 @@ premiumIdentity = 100000000.0
 usd8PerUsdCent : Numeric 0
 usd8PerUsdCent = 1000000.0
 
-noExecutionAddressBytes : BytesHex
-noExecutionAddressBytes =
-    -- EVM uses keccak256("NO_EXECUTION_TAG")[:4] embedded at the front of the
-    -- address, with the remaining bytes zero-padded. Canton keeps the same
-    -- 4-byte tag semantics but adapts them to the 32-byte instance-address domain.
-    "eba517d200000000000000000000000000000000000000000000000000000000"
-
 gasCostUsdCents : Numeric 0 -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
     CCIP.Math.mulDivUp (intToNumeric gasUnits) usdPerUnitGas usd8PerUsdCent
@@ -119,27 +112,26 @@ sumExecutionGasLimit ccvFees tokenSendFee executorDestGasLimit =
 
 assertCCVInstanceId
     : Text
-    -> [BytesHex]
-    -> Optional [BytesHex]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Optional [RawInstanceAddress.RawInstanceAddress]
     -> Text
     -> Party
     -> Update ()
 assertCCVInstanceId msg requiredCCVs outboundPoolCCVs ccvInstanceId caller =
-    let claimed = RawInstanceAddress.toInstanceAddress(RawInstanceAddress.make ccvInstanceId caller)
+    let claimed = RawInstanceAddress.make ccvInstanceId caller
         allowedCCVs = dedup (requiredCCVs ++ fromOptional [] outboundPoolCCVs)
     in assertMsg msg (claimed `elem` allowedCCVs)
 
 buildMessageArtifacts
     : SendingMessageV1
-    -> ([BytesHex], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
+    -> ([RawInstanceAddress.RawInstanceAddress], BytesHex, CCIP.MessageCodecV1.MessageV1, BytesHex, BytesHex)
 buildMessageArtifacts sm =
     let
-        ccvAddrs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+        allCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
+        ccvAddrs = map RawInstanceAddress.toInstanceAddress allCCVs
         executorAddressBytes = case sm.executionMode of
-            Some ExecutionMode_Executor ->
+            Some _ ->
                 sm.executorAddress
-            Some ExecutionMode_NoExecutor ->
-                noExecutionAddressBytes
             None ->
                 error "sendingMessage: execution mode not set"
         finalHash =
@@ -171,7 +163,7 @@ buildMessageArtifacts sm =
         encoded = CCIP.MessageCodecV1.encodeMessageV1 messageV1
         msgId = keccak256 encoded
     in
-        (ccvAddrs, finalHash, messageV1, encoded, msgId)
+        (allCCVs, finalHash, messageV1, encoded, msgId)
 
 template SendingMessageV1
     with
@@ -181,7 +173,7 @@ template SendingMessageV1
         sender : Party
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
-        requiredCCVs : [BytesHex]
+        requiredCCVs : [RawInstanceAddress.RawInstanceAddress]
         executorAddress : BytesHex
         executionMode : Optional ExecutionMode
         sourceChainSelector : Numeric 0
@@ -205,8 +197,8 @@ template SendingMessageV1
         -- Expected token instrument for outbound TAR validation
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
         -- Pool-required outbound CCVs, set via TAR authorization
-        outboundPoolCCVs : Optional [BytesHex]
-        -- Executor arguments, set by AddExecutorFee or SetNoExecutor
+        outboundPoolCCVs : Optional [RawInstanceAddress.RawInstanceAddress]
+        -- Executor arguments, set during PrepareSend and validated by AddExecutorFee.
         executorArgs : BytesHex
         -- Executor flat fee, set by AddExecutorFee
         executorFee : Optional ExecutorFee
@@ -306,11 +298,9 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
-                -- convert raw instance addresses to instance addresses
-                let instanceAddresses = map RawInstanceAddress.toInstanceAddress poolCCVs
 
                 create this with
-                    outboundPoolCCVs = Some instanceAddresses
+                    outboundPoolCCVs = Some poolCCVs
                     state = SendingMessageState_Prepared
 
         -- Record the executor-selected flat fee. OnRamp computes execution
@@ -324,11 +314,12 @@ template SendingMessageV1
             controller caller
             do
                 assertMsg "sendingMessage: invalid state for AddExecutorFee" (state == SendingMessageState_Prepared)
-                assertMsg "addExecutorFee: already set" (isNone executorFee && isNone executionMode)
+                assertMsg "addExecutorFee: already set" (isNone executorFee)
                 assertMsg "sendingMessage: token sends require outbound pool CCVs to be resolved" (isNone expectedTokenInstrumentId || isSome outboundPoolCCVs)
+                assertMsg "sendingMessage: executor mode already fixed to no executor"
+                    (executionMode == Some ExecutionMode_Executor)
 
                 let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
-                assertMsg "sendingMessage: caller is not the executor" (derivedExecutor == executorAddress)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId
@@ -336,7 +327,6 @@ template SendingMessageV1
                         feeUSDCents = feeUSDCents
                 create this with
                     executorAddress = derivedExecutor
-                    executionMode = Some ExecutionMode_Executor
                     executorArgs = executorArgs
                     executorFee = Some ef
 
@@ -354,6 +344,11 @@ template SendingMessageV1
             do
                 assertMsg "sendingMessage: FinalizeFee only allowed after executor selection" (state == SendingMessageState_Prepared)
                 assertMsg "sendingMessage: execution mode not set" (isSome executionMode)
+                case executionMode of
+                    Some ExecutionMode_Executor -> do
+                        assertMsg "sendingMessage: executor fee not set" (isSome executorFee)
+                        assertMsg "sendingMessage: executor address not set" (executorAddress /= "")
+                    _ -> pure ()
                 assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
                 assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
 

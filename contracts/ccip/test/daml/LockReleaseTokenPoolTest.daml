@@ -1463,12 +1463,12 @@ testExecutionGasLimitAggregation = script do
             destChainSelector = 456.0
             sequenceNumber = 1.0
             requiredCCVs =
-                [ (RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "ccv-1" ccvOwner1))
-                , (RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "ccv-2" ccvOwner2))
+                [ RawInstanceAddress.make "ccv-1" ccvOwner1
+                , RawInstanceAddress.make "ccv-2" ccvOwner2
                 ]
             -- executorAddress is specified, only the specified executor can add executor fee
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas" executorOwner)
-            executionMode = None
+            executionMode = Some SendingMessageV1.ExecutionMode_Executor
             sourceChainSelector = 123.0
             senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"
@@ -1522,15 +1522,6 @@ testExecutionGasLimitAggregation = script do
             caller = ccvOwner2
     
     disclosedSM <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
-    -- test that executor fee cannot be added by a different executor than what's specified in the message
-    submitMustFail (actAs executorOwner <> disclose disclosedSM) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
-            executorInstanceId = "different-executor"
-            executorArgs = ""
-            feeUSDCents = cents 3.0
-            caller = executorOwner
-
-    -- add executor fee with the correct executor
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSM) do
         exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
             executorInstanceId = "default-executor-gas"
@@ -1697,9 +1688,9 @@ testExecutionGasLimitWithTokenSendFee = script do
                 feeQuoter = RawInstanceAddress.make "test-feequoter-gas-pool" ccipOwner
             destChainSelector = 456.0
             sequenceNumber = 1.0
-            requiredCCVs = [(RawInstanceAddress.toInstanceAddress(RawInstanceAddress.make "ccv-pool" ccvOwner))]
+            requiredCCVs = [RawInstanceAddress.make "ccv-pool" ccvOwner]
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-gas-pool" executorOwner)
-            executionMode = None
+            executionMode = Some SendingMessageV1.ExecutionMode_Executor
             sourceChainSelector = 123.0
             senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"
@@ -2397,7 +2388,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             sequenceNumber = 1.0
             requiredCCVs = []
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-fallback" ccipOwner)
-            executionMode = None
+            executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = sourceChainSelector
             senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"
@@ -2565,7 +2556,7 @@ testCalculateFeePrefersPoolOverride = script do
             sequenceNumber = 1.0
             requiredCCVs = []
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-override" ccipOwner)
-            executionMode = None
+            executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = 123.0
             senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"
@@ -2732,7 +2723,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             sequenceNumber = 1.0
             requiredCCVs = []
             executorAddress = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make "default-executor-disabled" ccipOwner)
-            executionMode = None
+            executionMode = Some SendingMessageV1.ExecutionMode_NoExecutor
             sourceChainSelector = 123.0
             senderAddress = senderAddr
             receiver = "0000000000000000000000000000000000000001"

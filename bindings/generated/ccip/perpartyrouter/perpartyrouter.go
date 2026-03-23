@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	common "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	interfaces "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	mcms "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-perpartyrouter"
-	PackageID   = "069978fb69675ea843ed1300af24bc828d5d2e4da3844094e061a1cbd416796d"
+	PackageID   = "d5b7068849ae9f0eb43c8a448427b42a69de61cd14911cd7bca58e256e81d718"
 	SDKVersion  = "3.4.10"
 )
 
@@ -1882,7 +1883,7 @@ func (t *PrepareExecute2MCMSParams) UnmarshalHex(data string) error {
 // PrepareSend is a Record type
 type PrepareSend struct {
 	DestinationChainSelector types.NUMERIC            `json:"destinationChainSelector"`
-	Message                  common.Canton2AnyMessage `json:"message"`
+	Message                  client.Canton2AnyMessage `json:"message"`
 	Context                  common.CCIPContext       `json:"context"`
 }
 

@@ -10,6 +10,7 @@ packages:
   - ccip/tokenAdminRegistry
   - ccip/onramp
   - ccip/offramp
+  - ccip/client
   - ccip/pools/interfaces
   - ccip/pools/lockReleaseTokenPool
   - ccip/perpartyrouter

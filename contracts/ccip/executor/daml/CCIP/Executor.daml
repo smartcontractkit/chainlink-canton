@@ -47,6 +47,7 @@ template Executor
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where
             view = CCIP.Interfaces.Executor.ExecutorView with
+                instanceId = instanceId
                 owner = owner
 
             executor_calculateFeeImpl self arg = do
@@ -142,13 +143,10 @@ template Executor
                 assertMsg "executor: destination chain disabled" remoteCfg.enabled
 
                 let canonicalCCVs = dedup (sm.requiredCCVs ++ fromOptional [] sm.outboundPoolCCVs)
-                let allowedCCVInstanceAddresses = if dynamicConfig.ccvAllowlistEnabled
-                    then map toInstanceAddress allowedCCVs
-                    else []
 
                 if dynamicConfig.ccvAllowlistEnabled
                     then Foldable.forA_ canonicalCCVs (\ccv ->
-                        assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVInstanceAddresses)
+                        assertMsg "executor: CCV not allowed" (ccv `elem` allowedCCVs)
                         )
                     else pure ()
 
