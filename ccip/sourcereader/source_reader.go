@@ -335,7 +335,7 @@ func identifiersClose(a, b *ledgerv2.Identifier) bool {
 
 // GetBlocksHeaders implements chainaccess.SourceReader.
 // The blockNumbers passed in are offset numbers, since that's all we ever return from LatestAndFinalizedBlock.
-func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big.Int) (map[*big.Int]protocol.BlockHeader, error) {
+func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big.Int) (map[uint64]protocol.BlockHeader, error) {
 	latest, _, err := c.LatestAndFinalizedBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
@@ -344,14 +344,18 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 		return nil, fmt.Errorf("latest block is nil")
 	}
 
-	headers := make(map[*big.Int]protocol.BlockHeader)
+	headers := make(map[uint64]protocol.BlockHeader)
 	for _, blockNum := range blockNumbers {
+		if !blockNum.IsUint64() {
+			return nil, errors.New("block number does not fit in uint64")
+		}
+
 		if blockNum.Uint64() > latest.Number {
 			return nil, fmt.Errorf("block number is greater than latest offset: %d > %d", blockNum.Uint64(), latest.Number)
 		}
 
 		h := intToBytes32(blockNum.Uint64())
-		headers[blockNum] = protocol.BlockHeader{
+		headers[blockNum.Uint64()] = protocol.BlockHeader{
 			Number:     blockNum.Uint64(),
 			Hash:       h,
 			ParentHash: parentHash(blockNum.Uint64()),
