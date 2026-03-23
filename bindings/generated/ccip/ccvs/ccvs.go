@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-committeeverifier"
-	PackageID   = "62b1cfa1cff7bc2d45886e94e344db5d0ae5796cf69a27e1fd9404d4f6a6efae"
+	PackageID   = "1825d38544adc9fc2369abe6bb0e8fa65cac34cbb1266e0e1418ac04f841f0a1"
 	SDKVersion  = "3.4.10"
 )
 
@@ -913,8 +913,9 @@ func (t *CommitteeVerifierDeps) UnmarshalHex(data string) error {
 
 // CommitteeVerifierCalculateFee is a Record type
 type CommitteeVerifierCalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	Caller            types.PARTY       `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	Caller            types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CommitteeVerifierCalculateFee to a map for DAML arguments
@@ -927,6 +928,14 @@ func (t CommitteeVerifierCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.SendingMessageCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["caller"] = t.Caller.ToMap()
@@ -959,7 +968,8 @@ func (t *CommitteeVerifierCalculateFee) UnmarshalHex(data string) error {
 // CommitteeVerifierCalculateFeeMCMSParams is CommitteeVerifierCalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CommitteeVerifierCalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CommitteeVerifierCalculateFeeMCMSParams to hex string for MCMS operationData.

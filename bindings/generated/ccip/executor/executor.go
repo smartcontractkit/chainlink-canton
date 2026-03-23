@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "43fc2ac5941c9945f69bf993d82915b0be7481b541e67f0e99f0cb5bc4a90ada"
+	PackageID   = "cd627aec090b40ec15064c73cc6d012040e948fe89e61ac0ca56fb29ce1bd0cc"
 	SDKVersion  = "3.4.10"
 )
 
@@ -175,9 +175,10 @@ func (t *ApplyDestChainUpdates) UnmarshalHex(data string) error {
 
 // CalculateFee is a Record type
 type CalculateFee struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT        `json:"executorArgs"`
-	Caller            types.PARTY       `json:"caller"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT         `json:"executorArgs"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
+	Caller            types.PARTY        `json:"caller"`
 }
 
 // ToMap converts CalculateFee to a map for DAML arguments
@@ -193,6 +194,14 @@ func (t CalculateFee) ToMap() map[string]any {
 	}()
 
 	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
+	}()
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -224,8 +233,9 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // Use this when encoding choice arguments for MCMS timelock operations.
 type CalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT        `json:"executorArgs"`
+	SendingMessageCid types.CONTRACT_ID  `json:"sendingMessageCid"`
+	ExecutorArgs      types.TEXT         `json:"executorArgs"`
+	ExtraContext      common.CCIPContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.

@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-lockreleasetokenpool"
-	PackageID   = "806cd876615609e958c4a964b1e5f1773948a46a8df955692076e31ef3775e36"
+	PackageID   = "3f51842052a97f1b0bf4dae1252d3d7bc7e21f6a3e2c25dea8c22600fe5ca6c8"
 	SDKVersion  = "3.4.10"
 )
 
@@ -939,6 +939,7 @@ func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
 // LockReleaseTokenPoolCalculateFee is a Record type
 type LockReleaseTokenPoolCalculateFee struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext                       `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
 	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
@@ -955,6 +956,14 @@ func (t LockReleaseTokenPoolCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
@@ -1012,6 +1021,7 @@ func (t *LockReleaseTokenPoolCalculateFee) UnmarshalHex(data string) error {
 // Use this when encoding choice arguments for MCMS timelock operations.
 type LockReleaseTokenPoolCalculateFeeMCMSParams struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext                       `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
 	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`

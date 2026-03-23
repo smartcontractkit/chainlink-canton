@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-client"
-	PackageID   = "0680d50b1c8aecb857e4cb6a694c32613e8ebec59a38181908f1a78d2e016b86"
+	PackageID   = "99ae711729b556ec098a2830c916b2b0032dff2afa518895bde116e0a6b70279"
 	SDKVersion  = "3.4.10"
 )
 
@@ -180,8 +180,9 @@ func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
 
 // ExecutorInput is a Record type
 type ExecutorInput struct {
-	ExecutorCid  types.CONTRACT_ID `json:"executorCid"`
-	ExecutorArgs types.TEXT        `json:"executorArgs"`
+	ExecutorCid          types.CONTRACT_ID  `json:"executorCid"`
+	ExecutorArgs         types.TEXT         `json:"executorArgs"`
+	ExecutorExtraContext common.CCIPContext `json:"executorExtraContext"`
 }
 
 // ToMap converts ExecutorInput to a map for DAML arguments
@@ -197,6 +198,14 @@ func (t ExecutorInput) ToMap() map[string]any {
 	}()
 
 	m["executorArgs"] = string(t.ExecutorArgs)
+
+	m["executorExtraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExecutorExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExecutorExtraContext
+	}()
 
 	return m
 }

@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-tokenpool-interfaces"
-	PackageID   = "45b6a2b9ee6f2fcff8b30aac3581edfd80cdd757574f9dd222a309da58beab29"
+	PackageID   = "ee2ffc607999519d2e6d2e236cf4f4dc38f3b8b6aec4d9829fbc13e4c19f9c79"
 	SDKVersion  = "3.4.10"
 )
 
@@ -454,6 +454,7 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 // TokenPoolCalculateFee is a Record type
 type TokenPoolCalculateFee struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                        `json:"tokenAdminRegistryCid"`
+	ExtraContext          common.CCIPContext                       `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                        `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                        `json:"feeQuoterCid"`
 	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
@@ -470,6 +471,14 @@ func (t TokenPoolCalculateFee) ToMap() map[string]any {
 			return m.toMap()
 		}
 		return t.TokenAdminRegistryCid
+	}()
+
+	m["extraContext"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.ExtraContext).(mapper); ok {
+			return m.toMap()
+		}
+		return t.ExtraContext
 	}()
 
 	m["sendingMessageCid"] = func() any {
