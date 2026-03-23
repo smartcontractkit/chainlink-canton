@@ -72,7 +72,7 @@ template CCIPFactory
             instanceId
 
           mcmsEntrypoint functionName operationData contractIds = do
-            let selfAddress = instanceId <> "@" <> partyToText owner
+            let selfAddress = RawInstanceAddress.makeText instanceId owner
             selfCid <- case Map.lookup selfAddress contractIds of
               None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> selfAddress
               Some cid -> pure (coerceContractId cid : ContractId CCIPFactory)
@@ -87,7 +87,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployGlobalConfig" (decodeDeployGlobalConfigParams operationData)
                 deployResult <- exercise selfCid DeployGlobalConfig with
                   contract = mkGlobalConfigContract owner params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -95,7 +95,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployFeeQuoter" (decodeDeployFeeQuoterParams operationData)
                 deployResult <- exercise selfCid DeployFeeQuoter with
                   contract = mkFeeQuoterContract owner params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -103,7 +103,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployTokenAdminRegistry" (decodeDeployTokenAdminRegistryParams operationData)
                 deployResult <- exercise selfCid DeployTokenAdminRegistry with
                   contract = mkTokenAdminRegistryContract owner params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -111,7 +111,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployOnRamp" (decodeDeployOnRampParams operationData)
                 deployResult <- exercise selfCid DeployOnRamp with
                   contract = mkOnRampContract owner params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -119,7 +119,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployOffRamp" (decodeDeployOffRampParams operationData)
                 deployResult <- exercise selfCid DeployOffRamp with
                   contract = mkOffRampContract owner params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -127,7 +127,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployPerPartyRouterFactory" (decodeDeployPerPartyRouterFactoryParams operationData)
                 deployResult <- exercise selfCid DeployPerPartyRouterFactory with
                   contract = mkPerPartyRouterFactoryContract owner params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -135,7 +135,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployRMNRemote" (decodeDeployRMNRemoteParams operationData)
                 deployResult <- exercise selfCid DeployRMNRemote with
                   contract = mkRMNRemoteContract params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -143,7 +143,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployCommitteeVerifier" (decodeDeployCommitteeVerifierParams operationData)
                 deployResult <- exercise selfCid DeployCommitteeVerifier with
                   contract = mkCommitteeVerifierContract params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -151,7 +151,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployLockReleaseTokenPool" (decodeDeployLockReleaseTokenPoolParams operationData)
                 deployResult <- exercise selfCid DeployLockReleaseTokenPool with
                   contract = mkLockReleaseTokenPoolContract params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -160,7 +160,7 @@ template CCIPFactory
                 rateLimiterContract <- mkRateLimiterContract params
                 deployResult <- exercise selfCid DeployRateLimiter with
                   contract = rateLimiterContract
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -168,7 +168,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployCCIPSender" (decodeDeployCCIPSenderParams operationData)
                 deployResult <- exercise selfCid DeployCCIPSender with
                   contract = mkCCIPSenderContract params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
@@ -176,7 +176,7 @@ template CCIPFactory
                 params <- requireDecoded "DeployCCIPReceiver" (decodeDeployCCIPReceiverParams operationData)
                 deployResult <- exercise selfCid DeployCCIPReceiver with
                   contract = mkCCIPReceiverContract params
-                let deployedAddress = params.instanceId <> "@" <> partyToText owner
+                let deployedAddress = RawInstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
 
