@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-onramp"
-	PackageID   = "353b2eff0e4f0ad62c7d2385c0d04662e3ae962aba321bb3b1622764fdb8c8d2"
+	PackageID   = "66ee9a03d3ff4d5dc6922fe77c41073a469f07add0b52daf0cc4778fe975845a"
 	SDKVersion  = "3.4.10"
 )
 
@@ -647,15 +647,15 @@ func (t *OnRampDeps) UnmarshalHex(data string) error {
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	DestChainSelector     types.NUMERIC            `json:"destChainSelector"`
-	Message               common.Canton2AnyMessage `json:"message"`
-	RouterPartyOwner      types.PARTY              `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT               `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID        `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID        `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID        `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID        `json:"rmnRemoteCid"`
-	CurrentSequenceNumber types.NUMERIC            `json:"currentSequenceNumber"`
+	DestChainSelector     types.NUMERIC     `json:"destChainSelector"`
+	Message               Canton2AnyMessage `json:"message"`
+	RouterPartyOwner      types.PARTY       `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT        `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID `json:"rmnRemoteCid"`
+	CurrentSequenceNumber types.NUMERIC     `json:"currentSequenceNumber"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments

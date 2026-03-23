@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "fa5036f4a4b50262cc414135a56d3b3e8aa4144173efd00b333b7793070e4869"
+	PackageID   = "6a5b7e8486de8697c14e55ecbb8159e89746beb5e04df2acc53bee25acd943b6"
 	SDKVersion  = "3.4.10"
 )
 
@@ -492,11 +492,11 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute2 is a Record type
 type Execute2 struct {
-	Context        common.CCIPContext  `json:"context"`
-	RouterCid      types.CONTRACT_ID   `json:"routerCid"`
-	EncodedMessage types.TEXT          `json:"encodedMessage"`
-	TokenTransfer  *TokenTransferInput `json:"tokenTransfer" hex:"optional"`
-	CcvInputs      []CCVInput          `json:"ccvInputs"`
+	Context        common.CCIPContext   `json:"context"`
+	RouterCid      types.CONTRACT_ID    `json:"routerCid"`
+	EncodedMessage types.TEXT           `json:"encodedMessage"`
+	TokenTransfer  *TokenTransferInput2 `json:"tokenTransfer" hex:"optional"`
+	CcvInputs      []CCVInput           `json:"ccvInputs"`
 }
 
 // ToMap converts Execute2 to a map for DAML arguments
@@ -623,16 +623,16 @@ func (t *GetRequiredCCVsMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenTransferInput is a Record type
-type TokenTransferInput struct {
+// TokenTransferInput2 is a Record type
+type TokenTransferInput2 struct {
 	TokenPoolCid       types.CONTRACT_ID     `json:"tokenPoolCid"`
 	TokenReceiverParty types.PARTY           `json:"tokenReceiverParty"`
 	TokenInput         interfaces.TokenInput `json:"tokenInput"`
 	PoolExtraContext   common.CCIPContext    `json:"poolExtraContext"`
 }
 
-// ToMap converts TokenTransferInput to a map for DAML arguments
-func (t TokenTransferInput) ToMap() map[string]any {
+// ToMap converts TokenTransferInput2 to a map for DAML arguments
+func (t TokenTransferInput2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenPoolCid"] = func() any {
@@ -664,24 +664,24 @@ func (t TokenTransferInput) ToMap() map[string]any {
 	return m
 }
 
-func (t TokenTransferInput) MarshalJSON() ([]byte, error) {
+func (t TokenTransferInput2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *TokenTransferInput) UnmarshalJSON(data []byte) error {
+func (t *TokenTransferInput2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes TokenTransferInput to hex string (Canton MCMS format)
-func (t TokenTransferInput) MarshalHex() (string, error) {
+// MarshalHex encodes TokenTransferInput2 to hex string (Canton MCMS format)
+func (t TokenTransferInput2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes TokenTransferInput from hex string (Canton MCMS format)
-func (t *TokenTransferInput) UnmarshalHex(data string) error {
+// UnmarshalHex decodes TokenTransferInput2 from hex string (Canton MCMS format)
+func (t *TokenTransferInput2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
