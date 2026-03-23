@@ -13,6 +13,7 @@ module MCMS.Codec
   , encodeUint32
   , decodeUint8
   , decodeUint16
+  , decodeUint16At
   , decodeUint32
   , extractBytes
   , encodeText
@@ -238,6 +239,13 @@ decodeUint16 : BytesHex -> Optional Int
 decodeUint16 hex =
   if byteCount hex /= 2 then None
   else fromHex hex
+
+-- | Decode uint16 with offset, returns (value, newOffset)
+decodeUint16At : BytesHex -> Int -> Optional (Int, Int)
+decodeUint16At encoded offset = do
+  hex <- extractBytes encoded offset 2
+  value <- decodeUint16 hex
+  return (value, offset + 2)
 
 -- | Encode int64 (8 bytes) - rejects negative values to prevent silent sign loss
 encodeInt64 : Int -> Optional BytesHex
