@@ -509,7 +509,6 @@ func TestCCIPSend(t *testing.T) {
 	})
 	require.NoError(t, err)
 	executorCid := extractCreatedContractId(res)
-	executorAddress := contracts.InstanceID("test-executor").RawInstanceAddress(types.PARTY(partyCCIP))
 	t.Logf("Deployed Executor: %s", executorCid)
 
 	// Get disclosures for CCIPSender.Send
