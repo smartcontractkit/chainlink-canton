@@ -14,7 +14,7 @@ import (
 
 var ContractType = deployment.ContractType("TokenAdminRegistry")
 
-var Version = semver.MustParse("0.1.0")
+var Version = semver.MustParse("1.5.0")
 
 var Deploy = contract.NewDeploy(contract.DeployParams[tokenadminregistry.TokenAdminRegistry]{
 	Name:           "canton/ccip/token_admin_registry/deploy",
