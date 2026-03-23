@@ -6,6 +6,30 @@ import DA.Assert
 
 import qualified CCIP.Math as Math
 
+template MathHarness
+  with
+    owner : Party
+  where
+    signatory owner
+
+    nonconsuming choice CheckedPow10Numeric0 : Numeric 0
+      with
+        label : Text
+        exponent : Int
+      controller owner
+      do
+        pure (Math.checkedPow10Numeric0 label exponent)
+
+    nonconsuming choice CalculateLocalAmountChecked : Numeric 0
+      with
+        label : Text
+        remoteAmount : Numeric 0
+        remoteDecimals : Int
+        localDecimals : Int
+      controller owner
+      do
+        pure (Math.calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals)
+
 usd8 : Decimal -> Numeric 0
 usd8 d = intToNumeric (truncate (d * 100000000.0))
 
@@ -68,3 +92,80 @@ testNumeric0ToDecimalChecked = script do
     Math.numeric0ToDecimalChecked "test" 0.0 === 0.0
     Math.numeric0ToDecimalChecked "test" 100000000.0 === 100000000.0
     Math.numeric0ToDecimalChecked "test" 9999999999999999999999999999.0 === 9999999999999999999999999999.0
+
+testCheckedPow10Numeric0 = script do
+    Math.checkedPow10Numeric0 "test" 0 === 1.0
+    Math.checkedPow10Numeric0 "test" 12 === 1000000000000.0
+    Math.checkedPow10Numeric0 "test" 37 === 10000000000000000000000000000000000000.0
+
+testCheckedPow10Numeric0_FailsBeyondNumeric0 = script do
+    owner <- allocateParty "pow10-owner"
+    harnessCid <- submit owner do
+        createCmd MathHarness with owner
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CheckedPow10Numeric0 with
+            label = "test"
+            exponent = 38
+
+testCanScaleAmountByPowerOfTen = script do
+    assert (Math.canScaleAmountByPowerOfTen 0.0 12)
+    assert (Math.canScaleAmountByPowerOfTen 99999999999999999999999999.0 12)
+    assert (not (Math.canScaleAmountByPowerOfTen 100000000000000000000000000.0 12))
+    assert (Math.canScaleAmountByPowerOfTen 9.0 37)
+    assert (not (Math.canScaleAmountByPowerOfTen 10.0 37))
+    assert (not (Math.canScaleAmountByPowerOfTen (-1.0) 12))
+
+testCalculateLocalAmountChecked_EqualDecimals = script do
+    Math.calculateLocalAmountChecked "test" 123456789.0 18 18 === 123456789.0
+    Math.calculateLocalAmountChecked "test" 0.0 6 6 === 0.0
+
+testCalculateLocalAmountChecked_ScaleDown = script do
+    Math.calculateLocalAmountChecked "test" 1000000000000000000.0 18 6 === 1000000.0
+    Math.calculateLocalAmountChecked "test" 1234567890123456789.0 18 6 === 1234567.0
+    Math.calculateLocalAmountChecked "test" 999999999999.0 18 6 === 0.0
+
+testCalculateLocalAmountChecked_ScaleUp = script do
+    Math.calculateLocalAmountChecked "test" 1.0 6 18 === 1000000000000.0
+    Math.calculateLocalAmountChecked "test" 1000000.0 6 18 === 1000000000000000000.0
+    Math.calculateLocalAmountChecked "test" 1.0 0 18 === 1000000000000000000.0
+
+testCalculateLocalAmountChecked_ScaleUpBoundary_6To18 = script do
+    let largestPassing : Numeric 0 = 99999999999999999999999999.0
+    Math.calculateLocalAmountChecked "test" largestPassing 6 18
+        === 99999999999999999999999999000000000000.0
+
+testCalculateLocalAmountChecked_ScaleUpBoundary_0To37 = script do
+    Math.calculateLocalAmountChecked "test" 9.0 0 37
+        === 90000000000000000000000000000000000000.0
+
+testCalculateLocalAmountChecked_ScaleUpBoundary_Fails = script do
+    owner <- allocateParty "scale-up-boundary-owner"
+    harnessCid <- submit owner do
+        createCmd MathHarness with owner
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CalculateLocalAmountChecked with
+            label = "test"
+            remoteAmount = 100000000000000000000000000.0
+            remoteDecimals = 6
+            localDecimals = 18
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CalculateLocalAmountChecked with
+            label = "test"
+            remoteAmount = 10.0
+            remoteDecimals = 0
+            localDecimals = 37
+
+testCalculateLocalAmountChecked_RejectsNegative = script do
+    owner <- allocateParty "negative-owner"
+    harnessCid <- submit owner do
+        createCmd MathHarness with owner
+
+    submitMustFail owner do
+        exerciseCmd harnessCid CalculateLocalAmountChecked with
+            label = "test"
+            remoteAmount = -1.0
+            remoteDecimals = 6
+            localDecimals = 18
