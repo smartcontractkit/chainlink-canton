@@ -14,6 +14,7 @@ import qualified CCIP.GlobalConfig
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
+import qualified CCIP.Internal
 import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import MCMS.RawInstanceAddress (assertValidInstanceId)
 import qualified CCIP.RMNRemote
@@ -88,6 +89,22 @@ data SetDepsParams = SetDepsParams
         feeQuoter : Optional RawInstanceAddress.RawInstanceAddress
         ccvRegistry : Optional RawInstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
+
+resolveSenderRequiredCCVs
+    : [RawInstanceAddress.RawInstanceAddress]
+    -> [RawInstanceAddress.RawInstanceAddress]
+    -> Bool
+    -> [RawInstanceAddress.RawInstanceAddress]
+resolveSenderRequiredCCVs defaultCCVs senderRequiredCCVs isTokenOnlyTransfer =
+    case senderRequiredCCVs of
+        [] ->
+            if isTokenOnlyTransfer
+            then []
+            else defaultCCVs
+        _ -> CCIP.Internal.resolveDefaultCCVs
+            defaultCCVs
+            CCIP.Internal.useDefaultCCVs
+            senderRequiredCCVs
 
 template OnRamp
     with
@@ -196,8 +213,7 @@ template OnRamp
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
-                let senderCCVAddrs = map RawInstanceAddress.toInstanceAddress extraArgs.ccvs
-                assertMsg "onramp: CCVs cannot contain duplicates" (unique senderCCVAddrs)
+                assertMsg "onramp: CCVs cannot contain duplicates" (unique extraArgs.ccvs)
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
                     Some feeDestConfig ->
@@ -221,15 +237,11 @@ template OnRamp
                         && extraArgs.gasLimit == 0
                 
                 let resolvedCCVs = dedup (
-                        (if null extraArgs.ccvs
-                            then if isTokenOnlyTransfer
-                                -- If the user has not specified any CCVs and this is a token-only transfer, CCVs are skipped as only the Token Pool CCVs apply.
-                                then []
-                                -- If the user has not specified any CCVs and this is not a token-only transfer, use the default CCVs from the config. This allows users to not have to specify CCVs for every message if they just want to use the defaults.
-                                else map RawInstanceAddress.toInstanceAddress destConfig.defaultCCVs
-                            else senderCCVAddrs)
-                        -- Always add the lane mandated CCVs, these cannot be skipped.
-                        ++ map RawInstanceAddress.toInstanceAddress destConfig.laneMandatedCCVs)
+                        resolveSenderRequiredCCVs
+                            destConfig.defaultCCVs
+                            extraArgs.ccvs
+                            isTokenOnlyTransfer
+                        ++ destConfig.laneMandatedCCVs)
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"
@@ -501,21 +513,19 @@ template OnRamp
                         pure c
 
                 -- Validate required CCVs covered by verifierData
-                let verifierAddresses = map
-                        (\vd -> CCIP.MessageCodecV1.encodeInstanceAddress
-                            vd.ccvInstanceId vd.ccvOwner)
+                let verifierRawAddrs = map
+                        (\vd -> RawInstanceAddress.make vd.ccvInstanceId vd.ccvOwner)
                         sendingMsg.verifierData
                 Foldable.forA_ sendingMsg.requiredCCVs $ \requiredCCV ->
                     assertMsg ("missing required CCV " <> show requiredCCV)
-                        (requiredCCV `elem` verifierAddresses)
+                        (requiredCCV `elem` verifierRawAddrs)
 
-                let ccvFeeAddresses = map
-                        (\fee -> CCIP.MessageCodecV1.encodeInstanceAddress
-                            fee.ccvInstanceId fee.ccvOwner)
+                let ccvFeeRawAddrs = map
+                        (\fee -> RawInstanceAddress.make fee.ccvInstanceId fee.ccvOwner)
                         sendingMsg.ccvFees
                 Foldable.forA_ sendingMsg.requiredCCVs $ \requiredCCV ->
                     assertMsg ("missing CCV fee for " <> show requiredCCV)
-                        (requiredCCV `elem` ccvFeeAddresses)
+                        (requiredCCV `elem` ccvFeeRawAddrs)
 
                 case (sendingMsg.tokenSendData, sendingMsg.tokenSendFee) of
                     (Some _, None) -> abort "missing token pool fee"
@@ -614,7 +624,8 @@ orderedVerifierDataByCCVs finalCCVs verifierData =
 orderedVerifierData : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.SendingMessageV1.VerifierData]
 orderedVerifierData sendingMsg =
     let
-        finalCCVs = dedup (sendingMsg.requiredCCVs ++ fromOptional [] sendingMsg.outboundPoolCCVs)
+        finalCCVs = map RawInstanceAddress.toInstanceAddress
+            (dedup (sendingMsg.requiredCCVs ++ fromOptional [] sendingMsg.outboundPoolCCVs))
     in
         orderedVerifierDataByCCVs finalCCVs sendingMsg.verifierData
 

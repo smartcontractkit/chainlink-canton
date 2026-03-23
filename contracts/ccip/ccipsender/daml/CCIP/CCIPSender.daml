@@ -10,6 +10,7 @@ import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
+import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.TokenAdminRegistry
 

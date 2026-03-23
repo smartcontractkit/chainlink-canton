@@ -58,10 +58,10 @@ mult m = intToNumeric (truncate (m * 100000000.0))
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
 
-basicFeeToken : Splice.Api.Token.HoldingV1.InstrumentId -> CCIP.Client.FeeTokenInput
-basicFeeToken token = CCIP.Client.FeeTokenInput with
+basicFeeToken : Splice.Api.Token.HoldingV1.InstrumentId -> CCIP.Interfaces.TokenPool.TokenInput -> CCIP.Client.FeeTokenInput
+basicFeeToken token tokenInput = CCIP.Client.FeeTokenInput with
     token = token
-    amount = 0.0
+    tokenInput = tokenInput
     senderInputCids = []
 
 basicExtraArgs : Int -> CCIP.Client.ExtraArgs
