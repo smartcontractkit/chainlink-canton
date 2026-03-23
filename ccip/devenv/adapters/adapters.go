@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
+
 	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
@@ -20,6 +22,17 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+)
+
+// No-op sequence so devenv ConfigureTokensForTransfers succeeds on Canton without sending EVM-style
+// token pool transactions to the ledger (Canton uses DAML contracts; message-only lanes do not need this).
+var cantonConfigureTokenForTransfersNoOp = operations.NewSequence(
+	"canton/devenv/configure_token_for_transfers_noop",
+	semver.MustParse("0.0.1"),
+	"Canton devenv: skip EVM token pool configure sequence; pools are not driven by the shared EVM path",
+	func(_ operations.Bundle, _ chain.BlockChains, _ tokenadapters.ConfigureTokenForTransfersInput) (sequences.OnChainOutput, error) {
+		return sequences.OnChainOutput{}, nil
+	},
 )
 
 var (
@@ -44,12 +57,12 @@ func NewTokenAdapter(base tokenadapters.TokenAdapter) *CantonTokenAdapter {
 
 // AddressRefToBytes implements tokens.TokenAdapter.
 func (t *CantonTokenAdapter) AddressRefToBytes(ref datastore.AddressRef) ([]byte, error) {
-	return t.base.AddressRefToBytes(ref)
+	return contracts.HexToInstanceAddress(ref.Address).Bytes(), nil
 }
 
 // ConfigureTokenForTransfersSequence implements tokens.TokenAdapter.
 func (t *CantonTokenAdapter) ConfigureTokenForTransfersSequence() *operations.Sequence[tokenadapters.ConfigureTokenForTransfersInput, sequences.OnChainOutput, chain.BlockChains] {
-	return t.base.ConfigureTokenForTransfersSequence()
+	return cantonConfigureTokenForTransfersNoOp
 }
 
 // DeployToken implements tokens.TokenAdapter.

@@ -24,6 +24,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evm_ds_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	vvr "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	evmproxy "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/proxy"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -367,6 +368,24 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to add dst token pool address ref: %w", err)
+		}
+	}
+
+	// Stub CommitteeVerifierResolver refs on Canton so ConfigureTokensForTransfers can resolve CCV refs
+	// built from devenv token combinations (Canton does not deploy the EVM resolver contract).
+	if topology.NOPTopology != nil {
+		for qualifier := range topology.NOPTopology.Committees {
+			err = runningDS.AddressRefStore.Add(datastore.AddressRef{
+				Address: contracts.MustNewInstanceID("canton-committee-verifier-resolver-" + qualifier).
+					RawInstanceAddress(types.PARTY(participant.PartyID)).InstanceAddress().Hex(),
+				Type:          datastore.ContractType(vvr.CommitteeVerifierResolverType),
+				Version:       vvr.Version,
+				Qualifier:     qualifier,
+				ChainSelector: selector,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to add committee verifier resolver ref for qualifier %q: %w", qualifier, err)
+			}
 		}
 	}
 
