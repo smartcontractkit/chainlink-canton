@@ -95,9 +95,9 @@ setup = script do
         (hashForward /= hashReverse)
     debug("ccvAndExecutorHash ordering test passed")
 
-    MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] ""
-        /= hashForward
-    debug("empty executor address hashing test passed")
+    assertMsg "no-execution sentinel should produce different hash"
+        (MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] OnRamp.noExecutionAddressBytes /= hashForward)
+    debug("no-execution sentinel hashing test passed")
 
     OnRamp.noExecutionAddressBytes
         === "eba517d200000000000000000000000000000000000000000000000000000000"

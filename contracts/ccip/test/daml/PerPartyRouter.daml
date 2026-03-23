@@ -305,6 +305,15 @@ testCCIPSend = script do
                 feeToken = basicFeeToken testFeeTokenId
                 extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
 
+    -- Executor fee calculation (must happen before FinalizeFee)
+    disclosedSm <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid
+    sendingMessageCid <- submit (actAs ccipOwner <> disclose disclosedSm) do
+        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                sendingMessageCid = sendingMessageCid
+                executorArgs = ""
+                caller = ccipOwner
+
     sendingMessageCid <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
         exerciseCmd router CCIP.PerPartyRouter.FinalizeFee with
             context = CCIP.Context.CCIPContext with
@@ -369,6 +378,15 @@ testCCIPSend = script do
                 tokenTransfer = None
                 feeToken = basicFeeToken testFeeTokenId
                 extraArgs = extraArgsWithExecutor 100000 (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor) ""
+
+    -- Executor fee for second message (must happen before FinalizeFee)
+    disclosedSm2 <- fromSome <$> queryDisclosure ccipOwner sendingMessageCid2
+    sendingMessageCid2 <- submit (actAs ccipOwner <> disclose disclosedSm2) do
+        exerciseCmd (toInterfaceContractId @CCIP.Interfaces.Executor.IExecutor executor)
+            CCIP.Interfaces.Executor.Executor_CalculateFee with
+                sendingMessageCid = sendingMessageCid2
+                executorArgs = ""
+                caller = ccipOwner
 
     sendingMessageCid2 <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
         exerciseCmd newRouter CCIP.PerPartyRouter.FinalizeFee with
@@ -723,7 +741,7 @@ testPrepareSendExtraArgs = script do
     sm.ccipReceiveGasLimit === 123
     sm.requiredCCVs === [RawInstanceAddress.toInstanceAddress defaultCCV]
 
-    smWithCustomCCVCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote <> disclose disclosedCustomVerifier) do
+    smWithCustomCCVCid <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context
             destinationChainSelector = destChainSelector
@@ -735,11 +753,7 @@ testPrepareSendExtraArgs = script do
                 extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
                     gasLimit = 123
                     blockConfirmations = 0
-                    ccvs =
-                        [CCIP.Client.CCVSendInput with
-                            ccvCid = toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier customVerifier
-                            verifierArgs = ""
-                            ccvExtraContext = CCIP.Context.CCIPContext with values = TextMap.empty]
+                    ccvs = [RawInstanceAddress.make "custom-ccv" user]
                     executor = None
                     tokenReceiver = ""
                     tokenArgs = ""
@@ -1329,7 +1343,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
             destBytesOverhead = 0
     disclosedDuplicateVerifier <- fromSome <$> queryDisclosure ccipOwner duplicateVerifier
 
-    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote <> disclose disclosedDuplicateVerifier) do
+    submitMustFail (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
         exerciseCmd router CCIP.PerPartyRouter.PrepareSend with
             context = CCIP.Context.CCIPContext with
                 values = TextMap.fromList
@@ -1349,14 +1363,8 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                     gasLimit = 0
                     blockConfirmations = 0
                     ccvs =
-                        [ CCIP.Client.CCVSendInput with
-                            ccvCid = toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier duplicateVerifier
-                            verifierArgs = ""
-                            ccvExtraContext = CCIP.Context.CCIPContext with values = TextMap.empty
-                        , CCIP.Client.CCVSendInput with
-                            ccvCid = toInterfaceContractId @CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier duplicateVerifier
-                            verifierArgs = ""
-                            ccvExtraContext = CCIP.Context.CCIPContext with values = TextMap.empty
+                        [ RawInstanceAddress.make "sender-ccv" ccipOwner
+                        , RawInstanceAddress.make "sender-ccv" ccipOwner
                         ]
                     executor = None
                     tokenReceiver = ""

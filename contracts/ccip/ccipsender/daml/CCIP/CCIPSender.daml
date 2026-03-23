@@ -10,7 +10,6 @@ import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
 import qualified CCIP.TokenAdminRegistry
 
@@ -28,6 +27,7 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.Client.Canton2AnyMessage
+                ccvs : [CCIP.Client.CCVSendInput]
                 context : CCIP.Context.CCIPContext
                 routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
             controller owner
@@ -61,7 +61,7 @@ template CCIPSender
                         ICCV.CrossChainVerifier_CalculateFee with
                             sendingMessageCid = cid
                             caller = owner
-                    ) smCid extraArgs.ccvs
+                    ) smCid ccvs
 
                 smCid <- case message.tokenTransfer of
                     None -> pure smCid
@@ -110,10 +110,10 @@ template CCIPSender
                             sendingMessageCid = cid
                             verifierArgs = input.verifierArgs
                             caller = owner
-                    ) smCid extraArgs.ccvs
+                    ) smCid ccvs
 
                 exercise routerCid CCIP.PerPartyRouter.CCIPSend with
                     context
                     sendingMessageCid = smCid
-                    feeTokenInput = message.feeToken
+                    feeTokenInput = message.feeToken.tokenInput
                     feeTokenHoldingCids = message.feeToken.senderInputCids

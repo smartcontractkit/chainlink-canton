@@ -5,7 +5,7 @@ import DA.Crypto.Text (BytesHex, byteCount)
 import DA.Foldable qualified as Foldable
 import DA.List (dedup, unique)
 import DA.Map qualified as Map
-import DA.Optional (fromOptional, fromSomeNote, isSome)
+import DA.Optional (fromOptional, fromSomeNote)
 
 import qualified CCIP.Client
 import qualified CCIP.Events
@@ -28,7 +28,6 @@ import CCIP.Codec
   )
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Crypto (assertValidHex, isValidHex)
-import MCMS.RawInstanceAddress (make, toInstanceAddress)
 
 messageStaticSize : Int
 messageStaticSize = 67
@@ -197,16 +196,8 @@ template OnRamp
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
                 assertValidHex "tokenArgs" extraArgs.tokenArgs
-                let requestedCCVs = map
-                        (\input ->
-                            let v = view input.ccvCid
-                            in toInstanceAddress (make v.instanceId v.owner))
-                        extraArgs.ccvs
-                assertMsg "onramp: CCVs cannot contain duplicates" (unique requestedCCVs)
-                Foldable.forA_ extraArgs.ccvs (\input -> assertValidHex "verifierArgs" input.verifierArgs)
-                case extraArgs.executor of
-                    None -> pure ()
-                    Some executorInput -> assertValidHex "executorArgs" executorInput.executorArgs
+                let senderCCVAddrs = map RawInstanceAddress.toInstanceAddress extraArgs.ccvs
+                assertMsg "onramp: CCVs cannot contain duplicates" (unique senderCCVAddrs)
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
                     Some feeDestConfig ->
@@ -236,7 +227,7 @@ template OnRamp
                                 then []
                                 -- If the user has not specified any CCVs and this is not a token-only transfer, use the default CCVs from the config. This allows users to not have to specify CCVs for every message if they just want to use the defaults.
                                 else map RawInstanceAddress.toInstanceAddress destConfig.defaultCCVs
-                            else requestedCCVs)
+                            else senderCCVAddrs)
                         -- Always add the lane mandated CCVs, these cannot be skipped.
                         ++ map RawInstanceAddress.toInstanceAddress destConfig.laneMandatedCCVs)
 
@@ -254,17 +245,11 @@ template OnRamp
                 let initialState = if hasTokenTransfer
                         then CCIP.SendingMessageV1.SendingMessageState_RequirePoolCCVs
                         else CCIP.SendingMessageV1.SendingMessageState_Prepared
-                let resolvedExecutorAddress = case extraArgs.executor of
-                        Some executorInput ->
-                            let v = view executorInput.executorCid
-                            in toInstanceAddress (make v.instanceId v.owner)
-                        None -> noExecutionAddressBytes
-                let executionMode = Some (if isSome extraArgs.executor
-                    then CCIP.SendingMessageV1.ExecutionMode_Executor
-                    else CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
-                let resolvedExecutorArgs = case extraArgs.executor of
-                        Some executorInput -> executorInput.executorArgs
-                        None -> ""
+                let (resolvedExecutorAddress, executionMode) = case extraArgs.executor of
+                        Some _ ->
+                            ("", Some CCIP.SendingMessageV1.ExecutionMode_Executor)
+                        None ->
+                            (noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
 
                 create CCIP.SendingMessageV1.SendingMessageV1 with
                     ccipOwner = ccipOwner
@@ -299,7 +284,7 @@ template OnRamp
                     outboundPoolCCVs = None
                     executorAddress = resolvedExecutorAddress
                     executionMode = executionMode
-                    executorArgs = resolvedExecutorArgs
+                    executorArgs = ""
                     executorFee = None
                     executorDestGasLimit = 0
                     executorDestBytesOverhead = 0

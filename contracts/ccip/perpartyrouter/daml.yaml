@@ -10,6 +10,7 @@ data-dependencies:
   - ../../dependencies/splice-api-token-holding-v1-1.0.0.dar
   - ../../dependencies/splice-api-token-transfer-instruction-v1-1.0.0.dar
   - ../common/.daml/dist/ccip-common-0.0.1.dar
+  - ../client/.daml/dist/ccip-client-0.0.1.dar
   - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
   - ../feequoter/.daml/dist/ccip-feequoter-0.0.1.dar
   - ../tokenAdminRegistry/.daml/dist/ccip-tokenadminregistry-0.0.1.dar

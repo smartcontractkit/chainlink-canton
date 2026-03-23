@@ -6,6 +6,7 @@ import qualified CCIP.Context
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
+import MCMS.RawInstanceAddress qualified as RawInstanceAddress
 import qualified Splice.Api.Token.HoldingV1
 
 data Canton2AnyMessage = Canton2AnyMessage
@@ -27,7 +28,7 @@ data CCVSendInput = CCVSendInput
 data FeeTokenInput = FeeTokenInput
     with
         token : Splice.Api.Token.HoldingV1.InstrumentId
-        amount : Numeric 0
+        tokenInput : CCIP.Interfaces.TokenPool.TokenInput
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
     deriving (Eq, Show)
 
@@ -71,11 +72,9 @@ data GenericExtraArgsV3 = GenericExtraArgsV3
         -- | not want to take on the risk of the block confirmations specified.
         -- | May be zero to indicate waiting for finality is desired.
         blockConfirmations : Int
-        -- | Ordered CCV send inputs for the message.
-        -- | Each entry identifies the verifier contract to use, the per-CCV verifier args, and
-        -- | any extra source-chain context needed during forwarding.
+        -- | Sender-specified CCV addresses for the message.
         -- | May be empty to indicate that the destination chain defaults should be used.
-        ccvs : [CCVSendInput]
+        ccvs : [RawInstanceAddress.RawInstanceAddress]
         -- | Optional executor selection for the message.
         -- | If present, the executor is responsible for execution on the destination chain once
         -- | a quorum of CCVs has verified the message. If absent, the message is prepared in

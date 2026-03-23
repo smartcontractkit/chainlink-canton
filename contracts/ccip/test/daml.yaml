@@ -15,6 +15,7 @@ dependencies:
   - daml-stdlib
   - daml-script
   - ../common/.daml/dist/ccip-common-0.0.1.dar
+  - ../client/.daml/dist/ccip-client-0.0.1.dar
   - ../rmn/.daml/dist/ccip-rmn-0.0.1.dar
   - ../ccvs/.daml/dist/ccip-committeeverifier-0.0.1.dar
   - ../feequoter/.daml/dist/ccip-feequoter-0.0.1.dar

@@ -321,7 +321,6 @@ template SendingMessageV1
                     (executionMode == Some ExecutionMode_Executor)
 
                 let derivedExecutor = RawInstanceAddress.toInstanceAddress (RawInstanceAddress.make executorInstanceId caller)
-                assertMsg "sendingMessage: caller is not the executor" (derivedExecutor == executorAddress)
 
                 let ef = ExecutorFee with
                         executorInstanceId = executorInstanceId
@@ -346,6 +345,11 @@ template SendingMessageV1
             do
                 assertMsg "sendingMessage: FinalizeFee only allowed after executor selection" (state == SendingMessageState_Prepared)
                 assertMsg "sendingMessage: execution mode not set" (isSome executionMode)
+                case executionMode of
+                    Some ExecutionMode_Executor -> do
+                        assertMsg "sendingMessage: executor fee not set" (isSome executorFee)
+                        assertMsg "sendingMessage: executor address not set" (executorAddress /= "")
+                    _ -> pure ()
                 assertMsg "fee token price must be positive" (feeTokenPrice > 0.0)
                 assertMsg "premium multiplier must be positive" (premiumMultiplier > 0.0)
 
