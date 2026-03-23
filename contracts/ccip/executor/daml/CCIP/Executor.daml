@@ -7,7 +7,7 @@ import DA.Optional (fromSome, fromSomeNote, fromOptional)
 import qualified DA.Map as Map
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import MCMS.RawInstanceAddress (RawInstanceAddress, toInstanceAddress, assertValidInstanceId)
+import MCMS.RawInstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import MCMS.Codec (
     encodeNumeric0,
     decodeNumeric0At,
