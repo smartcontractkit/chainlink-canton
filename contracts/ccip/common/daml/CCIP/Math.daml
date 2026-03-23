@@ -35,6 +35,9 @@ module CCIP.Math
   , maxDecimalIntegerValue
   , canFitInDecimal
   , numeric0ToDecimalChecked
+  , checkedPow10Numeric0
+  , canScaleAmountByPowerOfTen
+  , calculateLocalAmountChecked
   ) where
 
 import DA.Text qualified as Text
@@ -65,6 +68,63 @@ numeric0ToDecimalChecked label n =
         (\acc limb -> acc * 100000000.0 + intToDecimal limb)
         0.0
         (reverse (toLimbs label n))
+
+checkedPow10Numeric0 : Text -> Int -> Numeric 0
+checkedPow10Numeric0 label exponent
+    | exponent < 0 = error (label <> ": negative exponent")
+    | exponent > 37 = error (label <> ": scale factor exceeds Numeric 0 range")
+    | otherwise = checkedPow10Numeric0Go exponent 1.0
+
+checkedPow10Numeric0Go : Int -> Numeric 0 -> Numeric 0
+checkedPow10Numeric0Go remaining acc =
+    if remaining == 0 then acc
+    else checkedPow10Numeric0Go (remaining - 1) (acc * 10.0)
+
+maxNumeric0IntegerText : Text
+maxNumeric0IntegerText = "99999999999999999999999999999999999999"
+
+appendZeros : Text -> Int -> Text
+appendZeros text count =
+    if count <= 0 then text
+    else appendZeros (text <> "0") (count - 1)
+
+stripLeadingZeros : Text -> Text
+stripLeadingZeros str =
+    if Text.length str == 0 then ""
+    else if Text.take 1 str == "0" then stripLeadingZeros (Text.drop 1 str)
+    else str
+
+decimalTextWithinNumeric0 : Text -> Bool
+decimalTextWithinNumeric0 str =
+    let stripped = stripLeadingZeros str
+        normalized = if Text.length stripped == 0 then "0" else stripped
+        normalizedLength = Text.length normalized
+        maxLength = Text.length maxNumeric0IntegerText
+    in normalizedLength < maxLength
+        || (normalizedLength == maxLength && normalized <= maxNumeric0IntegerText)
+
+canScaleAmountByPowerOfTen : Numeric 0 -> Int -> Bool
+canScaleAmountByPowerOfTen amount exponent =
+    if amount < 0.0 || exponent < 0 then False
+    else
+        let amountDigits = numeric0IntegerText "canScaleAmountByPowerOfTen.amount" amount
+        in decimalTextWithinNumeric0 (appendZeros amountDigits exponent)
+
+calculateLocalAmountChecked : Text -> Numeric 0 -> Int -> Int -> Numeric 0
+calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals =
+    if remoteAmount < 0.0 then error (label <> ": negative remote amount")
+    else if remoteDecimals == localDecimals then remoteAmount
+    else if remoteDecimals > localDecimals then
+        let diff = remoteDecimals - localDecimals
+            scale = checkedPow10Numeric0 (label <> ": scale-down factor") diff
+        in mulDivDown remoteAmount 1.0 scale
+    else
+        let diff = localDecimals - remoteDecimals
+        in if not (canScaleAmountByPowerOfTen remoteAmount diff)
+           then error (label <> ": local amount exceeds Numeric 0 range")
+           else
+               let scale = checkedPow10Numeric0 (label <> ": scale-up factor") diff
+               in mulDivDown remoteAmount scale 1.0
 
 -- | Check whether a LINK-denominated fee amount in local LINK smallest units
 -- is within the juels-denominated cap.
