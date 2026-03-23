@@ -25,7 +25,7 @@ var (
 
 const (
 	PackageName = "ccip-common"
-	PackageID   = "1f57163d10f6a58caa575b04557d405d0e3e8d0b11ae0ac6b0231b0b2a50799b"
+	PackageID   = "85dd3a12962c65cffea565b72bb704a54ba96da8cd78af363d6f2ac1bce18c50"
 	SDKVersion  = "3.4.10"
 )
 
@@ -450,63 +450,6 @@ func (t AddVerifierDataMCMSParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddVerifierDataMCMSParams from hex string.
 func (t *AddVerifierDataMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Any2CantonMessage is a Record type
-type Any2CantonMessage struct {
-	MessageId           types.TEXT    `json:"messageId"`
-	SourceChainSelector types.NUMERIC `json:"sourceChainSelector"`
-	Sender              types.TEXT    `json:"sender"`
-	Payload             types.TEXT    `json:"payload"`
-	DestTokenAmount     *TokenAmount  `json:"destTokenAmount" hex:"optional"`
-}
-
-// ToMap converts Any2CantonMessage to a map for DAML arguments
-func (t Any2CantonMessage) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["messageId"] = string(t.MessageId)
-
-	m["sourceChainSelector"] = t.SourceChainSelector
-
-	m["sender"] = string(t.Sender)
-
-	m["payload"] = string(t.Payload)
-
-	if t.DestTokenAmount != nil {
-		m["destTokenAmount"] = map[string]any{
-			"_type": "optional",
-			"value": *t.DestTokenAmount,
-		}
-	} else {
-		m["destTokenAmount"] = map[string]any{
-			"_type": "optional",
-		}
-	}
-
-	return m
-}
-
-func (t Any2CantonMessage) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *Any2CantonMessage) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes Any2CantonMessage to hex string (Canton MCMS format)
-func (t Any2CantonMessage) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes Any2CantonMessage from hex string (Canton MCMS format)
-func (t *Any2CantonMessage) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
