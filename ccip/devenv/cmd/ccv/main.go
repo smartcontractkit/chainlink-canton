@@ -5,7 +5,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
-	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cli"
@@ -14,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
 )
 
 // TODO: should this be defined elsewhere?

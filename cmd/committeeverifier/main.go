@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/bootstrap"
 	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	cmd "github.com/smartcontractkit/chainlink-ccv/verifier/cmd"
-	"
 	"github.com/smartcontractkit/chainlink-ccv/verifier/pkg/commit"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
