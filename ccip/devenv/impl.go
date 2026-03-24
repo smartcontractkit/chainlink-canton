@@ -24,6 +24,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	evm_ds_utils "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/utils/datastore"
+	ccipseq "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	vvr "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/versioned_verifier_resolver"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/executor"
 	evmproxy "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/proxy"
@@ -404,10 +405,12 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 		return nil, fmt.Errorf("failed to add executor address ref: %w", err)
 	}
 	executorProxyRawAddr := contracts.MustNewInstanceID("executor-proxy-1").RawInstanceAddress(types.PARTY(participant.PartyID))
+	// CLDF lane changesets (e.g. populateAddressesV2) resolve DefaultExecutor using ccipseq.ExecutorProxyType
+	// ("ExecutorProxy"), not the on-chain proxy operation type ("Proxy" from v2_0_0 operations/proxy).
 	err = runningDS.AddressRefStore.Add(datastore.AddressRef{
 		Address:       executorProxyRawAddr.InstanceAddress().String(),
 		Labels:        datastore.NewLabelSet(executorProxyRawAddr.String()),
-		Type:          datastore.ContractType(evmproxy.ContractType),
+		Type:          datastore.ContractType(ccipseq.ExecutorProxyType),
 		Version:       evmproxy.Version,
 		Qualifier:     devenvcommon.DefaultExecutorQualifier,
 		ChainSelector: selector,
@@ -528,7 +531,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		localExecutorRef, err := env.DataStore.Addresses().Get(
 			datastore.NewAddressRefKey(
 				selector,
-				datastore.ContractType(evmproxy.ContractType),
+				datastore.ContractType(ccipseq.ExecutorProxyType),
 				evmproxy.Version,
 				devenvcommon.DefaultExecutorQualifier,
 			),
@@ -990,7 +993,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	executorProxyRef, err := c.e.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(
 			c.chainDetails.ChainSelector,
-			datastore.ContractType(evmproxy.ContractType),
+			datastore.ContractType(ccipseq.ExecutorProxyType),
 			evmproxy.Version,
 			devenvcommon.DefaultExecutorQualifier,
 		),
