@@ -33,9 +33,9 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
-	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260319175550-83cf59fe6839
-	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260319175550-83cf59fe6839
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260319175550-83cf59fe6839
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260324014651-146c8a75758e
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260324014651-146c8a75758e
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260324014651-146c8a75758e
 	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260323101703-9dc3109b9a57
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260323101703-9dc3109b9a57
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260319222221-2bac99c7a470
@@ -376,7 +376,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260306142855-8d629e752265 // indirect
-	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260319175550-83cf59fe6839 // indirect
+	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260324014651-146c8a75758e // indirect
 	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260319175550-83cf59fe6839 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
