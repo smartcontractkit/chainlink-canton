@@ -28,6 +28,7 @@ import (
 	ccvsequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
+	ccipOffchain "github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/offchain"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
@@ -153,7 +154,7 @@ func (c *Chain) ConfigureNodes(ctx context.Context, blockchain *blockchain.Input
 }
 
 // DeployContractsForSelector implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *deployments.EnvironmentTopology) (datastore.DataStore, error) {
+func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.Environment, selector uint64, topology *ccipOffchain.EnvironmentTopology) (datastore.DataStore, error) {
 	// Only using a single participant for now
 	participant := env.BlockChains.CantonChains()[selector].Participants[0]
 
@@ -402,7 +403,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 }
 
 // ConnectContractsWithSelectors implements cciptestinterfaces.CCIP17Configuration.
-func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployment.Environment, selector uint64, remoteSelectors []uint64, committees *deployments.EnvironmentTopology) error {
+func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployment.Environment, selector uint64, remoteSelectors []uint64, committees *ccipOffchain.EnvironmentTopology) error {
 	l := c.logger
 	l.Info().Uint64("FromSelector", selector).Any("ToSelectors", remoteSelectors).Msg("Connecting contracts with selectors")
 	bundle := operations.NewBundle(
@@ -653,22 +654,15 @@ func (c *Chain) Curse(ctx context.Context, subjects [][16]byte) error {
 		return fmt.Errorf("get rmn remote address: %w", err)
 	}
 
-	deps := dependencies.CantonDeps{
-		Chain:       c.chain,
-		Participant: 0,
-	}
 	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
-	party := c.chain.Participants[0].PartyID
 
 	c.logger.Info().
 		Uint64("chainSelector", c.chainDetails.ChainSelector).
 		Int("numSubjects", len(subjects)).
 		Msg("Cursing subjects on chain")
 	for _, subject := range subjects {
-		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Curse, deps, contract.ChoiceInput[rmn.Curse]{
-			ChainSelector:   c.chainDetails.ChainSelector,
+		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Curse, c.chain, contract.ChoiceInput[rmn.Curse]{
 			InstanceAddress: instanceAddr,
-			ActAs:           []string{party},
 			Args: rmn.Curse{
 				Subject: types.TEXT(hex.EncodeToString(subject[:])),
 			},
