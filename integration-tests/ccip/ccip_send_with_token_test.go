@@ -314,10 +314,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 
 	// Configure FeeToken: Add FeeToken to FeeQuoter
 
-	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.ApplyFeeTokenUpdates, ccipDeps, contractops.ChoiceInput[feequoter.ApplyFeeTokenUpdates]{
-		ChainSelector:   env.Chain.ChainSelector(),
+	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.ApplyFeeTokenUpdates, env.Chain, contractops.ChoiceInput[feequoter.ApplyFeeTokenUpdates]{
 		InstanceAddress: feeQuoterInstanceAddress,
-		ActAs:           []string{partyCCIP},
 		Args: feequoter.ApplyFeeTokenUpdates{
 			FeeTokensToRemove: []splice_api_token_holding_v1.InstrumentId{},
 			FeeTokensToAdd: []feequoter.FeeTokenArgs{
@@ -344,10 +342,8 @@ func TestCCIPSendWithTokenTransferFeeBps(t *testing.T) {
 	//                        = (152,000,000 * 2500) / 10,000,000,000
 	//                        = 38
 	destUsdPerUnitGas := "38"
-	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.UpdatePrices, ccipDeps, contractops.ChoiceInput[feequoter.UpdatePrices]{
-		ChainSelector:   env.Chain.ChainSelector(),
+	_, err = cld_ops.ExecuteOperation(bundle, fee_quoter.UpdatePrices, env.Chain, contractops.ChoiceInput[feequoter.UpdatePrices]{
 		InstanceAddress: feeQuoterInstanceAddress,
-		ActAs:           []string{partyCCIP},
 		Args: feequoter.UpdatePrices{
 			PriceUpdates: feequoter.PriceUpdates{
 				TokenPriceUpdates: []feequoter.TokenPriceUpdate{

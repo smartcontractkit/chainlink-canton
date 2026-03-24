@@ -20,10 +20,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	dsutils2 "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	evmadapters "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/operations/executor"
+	ccvsequences "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/sequences"
+	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/op
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/v1_7_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -51,7 +53,6 @@ import (
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -68,7 +69,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/deployments"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 
-	cantonadapters "github.com/smartcontractkit/chainlink-canton/ccip/devenv/adapters"
+	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
 var (
@@ -389,7 +390,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	err = runningDS.AddressRefStore.Add(datastore.AddressRef{
 		Address:       executorProxyRawAddr.InstanceAddress().String(),
 		Labels:        datastore.NewLabelSet(executorProxyRawAddr.String()),
-		Type:          datastore.ContractType(executor.ProxyType),
+		Type:          datastore.ContractType(ccvsequences.ExecutorProxyType),
 		Version:       executor.Version,
 		Qualifier:     devenvcommon.DefaultExecutorQualifier,
 		ChainSelector: selector,
@@ -414,32 +415,37 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 	)
 	env.OperationsBundle = bundle
 
-	formatFunc := func(ref datastore.AddressRef) (contracts.InstanceAddress, error) {
-		return contracts.HexToInstanceAddress(ref.Address), nil
-	}
-
 	// Get InstanceAddresses of Canton contracts
+	globalConfigRef, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		selector,
+		datastore.ContractType(global_config.ContractType),
+		global_config.Version,
+		"",
+	))
+	if err != nil {
+		return fmt.Errorf("failed to get global config address ref for chain %d: %w", selector, err)
+	}
 	globalConfig, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		Type: datastore.ContractType(global_config.ContractType),
-	}, selector, formatFunc)
+	}, selector, dsutils2.ToInstanceAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get global config address for chain %d: %w", selector, err)
 	}
 	feeQuoter, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		Type: datastore.ContractType(fee_quoter.ContractType),
-	}, selector, formatFunc)
+	}, selector, dsutils2.ToInstanceAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get fee quoter address for chain %d: %w", selector, err)
 	}
 	onRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		Type: datastore.ContractType(onramp.ContractType),
-	}, selector, formatFunc)
+	}, selector, dsutils2.ToInstanceAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get on ramp address for chain %d: %w", selector, err)
 	}
 	offRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 		Type: datastore.ContractType(offramp.ContractType),
-	}, selector, formatFunc)
+	}, selector, dsutils2.ToInstanceAddress)
 	if err != nil {
 		return fmt.Errorf("failed to get off ramp address for chain %d: %w", selector, err)
 	}
@@ -473,6 +479,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		committeeVerifierRawAddr = contracts.RawInstanceAddress(ccvRef.Labels.List()[0])
 	}
 
+	remoteChains := make(map[uint64]lanes.ChainDefinition)
 	for _, remoteSelector := range remoteSelectors {
 		// TODO: should be moved to the ChainFamily interface.
 		var addressBytesLength uint8
@@ -480,36 +487,19 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		if err != nil {
 			return fmt.Errorf("failed to get selector family for chain %d: %w", remoteSelector, err)
 		}
-		var chainFamily adapters.ChainFamily
 		switch family {
 		case chainsel.FamilyEVM:
 			addressBytesLength = 20
-			chainFamily = &evmadapters.ChainFamilyAdapter{}
 		case chainsel.FamilyCanton:
 			addressBytesLength = 32
-			chainFamily = cantonadapters.NewChainFamilyAdapter(&evmadapters.ChainFamilyAdapter{})
 		default:
 			return fmt.Errorf("unsupported family %s for chain %d", family, remoteSelector)
 		}
 
-		remoteOnRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:    datastore.ContractType(onramp.ContractType),
-			Version: onramp.Version,
-		}, remoteSelector, chainFamily.AddressRefToBytes)
-		if err != nil {
-			return fmt.Errorf("failed to get on ramp address for remote chain %d: %w", remoteSelector, err)
-		}
-		remoteOffRamp, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
-			Type:    datastore.ContractType(offramp.ContractType),
-			Version: offramp.Version,
-		}, remoteSelector, chainFamily.AddressRefToBytes)
-		if err != nil {
-			return fmt.Errorf("failed to get off ramp address for remote chain %d: %w", remoteSelector, err)
-		}
 		localExecutorRef, err := env.DataStore.Addresses().Get(
 			datastore.NewAddressRefKey(
 				selector,
-				datastore.ContractType(executor.ProxyType),
+				datastore.ContractType(ccvsequences.ExecutorProxyType),
 				executor.Version,
 				devenvcommon.DefaultExecutorQualifier,
 			),
@@ -519,6 +509,33 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		}
 		// Normalize executor to 32 bytes (left-padded) for Canton config encoding.
 		normalizedSourceExecutor := contracts.HexToInstanceAddress(localExecutorRef.Address).Hex()
+
+		remoteChains[remoteSelector] = lanes.ChainDefinition{
+			Selector:                          remoteSelector,
+			GasPrice:                          nil,
+			TokenPrices:                       nil,
+			FeeQuoterDestChainConfigOverrides: nil,
+			RMNVerificationEnabled:            false,
+			AllowListEnabled:                  false,
+			AllowList:                         nil,
+			CommitteeVerifiers:                nil,
+			DefaultInboundCCVs:                nil,
+			LaneMandatedInboundCCVs:           nil,
+			DefaultOutboundCCVs:               nil,
+			LaneMandatedOutboundCCVs:          nil,
+			DefaultExecutor:                   localExecutorRef,
+			ExecutorDestChainConfig:           lanes.ExecutorDestChainConfig{},
+			AddressBytesLength:                0,
+			BaseExecutionGasCost:              0,
+			TokenReceiverAllowed:              nil,
+			MessageNetworkFeeUSDCents:         0,
+			TokenNetworkFeeUSDCents:           0,
+			CantonLaneConfig: &lanes.CantonLaneConfig{
+				GlobalConfig: globalConfigRef,
+			},
+			FeeQuoterVersion: nil,
+		}
+
 		remoteChainConfig := adapters.RemoteChainConfig[[]byte, contracts.RawInstanceAddress]{
 			AllowTrafficFrom:         true,
 			OnRamps:                  [][]byte{remoteOnRamp},
@@ -553,7 +570,7 @@ func (c *Chain) ConnectContractsWithSelectors(ctx context.Context, env *deployme
 		committeeVerifier, err := dsutils.FindAndFormatRef(env.DataStore, datastore.AddressRef{
 			Type:      datastore.ContractType(committee_verifier.ContractType),
 			Qualifier: qualifier,
-		}, selector, formatFunc)
+		}, selector, dsutils2.ToInstanceAddress)
 		if err != nil {
 			return fmt.Errorf("failed to get committee verifier address with qualifier %s for chain %d: %w", qualifier, selector, err)
 		}
@@ -677,22 +694,15 @@ func (c *Chain) Uncurse(ctx context.Context, subjects [][16]byte) error {
 		return fmt.Errorf("get rmn remote address: %w", err)
 	}
 
-	deps := dependencies.CantonDeps{
-		Chain:       c.chain,
-		Participant: 0,
-	}
 	instanceAddr := contracts.HexToInstanceAddress(rmnRemoteRef.Address)
-	party := c.chain.Participants[0].PartyID
 
 	c.logger.Info().
 		Uint64("chainSelector", c.chainDetails.ChainSelector).
 		Int("numSubjects", len(subjects)).
 		Msg("Uncursing subjects on chain")
 	for _, subject := range subjects {
-		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Uncurse, deps, contract.ChoiceInput[rmn.Uncurse]{
-			ChainSelector:   c.chainDetails.ChainSelector,
+		_, err := operations.ExecuteOperation(c.e.OperationsBundle, rmn_remote.Uncurse, c.chain, contract.ChoiceInput[rmn.Uncurse]{
 			InstanceAddress: instanceAddr,
-			ActAs:           []string{party},
 			Args: rmn.Uncurse{
 				Subject: types.TEXT(hex.EncodeToString(subject[:])),
 			},
@@ -968,7 +978,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	executorProxyRef, err := c.e.DataStore.Addresses().Get(
 		datastore.NewAddressRefKey(
 			c.chainDetails.ChainSelector,
-			datastore.ContractType(executor.ProxyType),
+			datastore.ContractType(ccvsequences.ExecutorProxyType),
 			executor.Version,
 			devenvcommon.DefaultExecutorQualifier,
 		),

@@ -36,11 +36,7 @@ func (c ConfigureChainForLanes) Apply(e cldf.Environment, config CantonCSDeps[Co
 
 	chain := e.BlockChains.CantonChains()[config.ChainSelector]
 
-	deps := dependencies.CantonDeps{
-		Chain: chain,
-	}
-
-	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.ConfigureChainForLanes, deps, config.Config.Input)
+	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.ConfigureChainForLanes, chain, config.Config.Input)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("failed to execute DeployChainContracts sequence: %w", err)
 	}

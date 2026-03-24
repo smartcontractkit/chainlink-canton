@@ -133,9 +133,7 @@ func TestDeployChainContracts(t *testing.T) {
 		},
 	}
 
-	deployChainContracts := DeployChainContracts{}
-
-	out, err := deployChainContracts.Apply(*env, config)
+	out, err := DeployChainContracts(nil).Apply(*env, config)
 	require.NoError(t, err)
 
 	addresses := out.DataStore.Addresses().Filter()

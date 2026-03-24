@@ -5,6 +5,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/dependencies"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -38,16 +38,14 @@ var RegisterTokenPool = operations.NewSequence(
 	registerTokenPool,
 )
 
-func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input RegisterTokenPoolInput) (sequences.OnChainOutput, error) {
+func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTokenPoolInput) (sequences.OnChainOutput, error) {
 	instrumentId := input.InstrumentId
 	ccipParty := input.CcipParty
 	poolOwnerParty := input.PoolOwnerParty
 
 	// Step 1: ProposeAdministrator (CCIP acts)
 	_, err := operations.ExecuteOperation(b, token_admin_registry.ProposeAdministrator, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistryProposeAdministrator]{
-		ChainSelector:   deps.Chain.Selector,
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		ActAs:           []string{ccipParty},
 		Args: tokenadminregistry.TokenAdminRegistryProposeAdministrator{
 			InstrumentId: instrumentId,
 			NewAdmin:     types.PARTY(poolOwnerParty),
@@ -60,9 +58,7 @@ func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input 
 
 	// Step 2: AcceptAdminRole (pool owner acts). Exercise resolves current TAR contract by InstanceAddress.
 	_, err = operations.ExecuteOperation(b, token_admin_registry.AcceptAdminRole, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistryAcceptAdminRole]{
-		ChainSelector:   deps.Chain.Selector,
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		ActAs:           []string{poolOwnerParty},
 		Args: tokenadminregistry.TokenAdminRegistryAcceptAdminRole{
 			InstrumentId: instrumentId,
 			Caller:       types.PARTY(poolOwnerParty),
@@ -75,9 +71,7 @@ func registerTokenPool(b operations.Bundle, deps dependencies.CantonDeps, input 
 	// Step 3: SetPool (pool owner acts)
 	poolOwnerPartyTyped := types.PARTY(poolOwnerParty)
 	_, err = operations.ExecuteOperation(b, token_admin_registry.SetPool, deps, contract.ChoiceInput[tokenadminregistry.TokenAdminRegistrySetPool]{
-		ChainSelector:   deps.Chain.Selector,
 		InstanceAddress: input.TokenAdminRegistryInstanceAddress,
-		ActAs:           []string{poolOwnerParty},
 		Args: tokenadminregistry.TokenAdminRegistrySetPool{
 			InstrumentId: instrumentId,
 			TokenPool: &tokenadminregistry.PoolRegistration{
