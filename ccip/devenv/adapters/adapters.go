@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/fee_quoter"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/offramp"
 	"github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v2_0_0/operations/onramp"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	datastore_utils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
@@ -22,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	ppfactory "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 )
 
 // No-op sequence so devenv ConfigureTokensForTransfers succeeds on Canton without sending EVM-style
@@ -166,10 +166,17 @@ func (c *CantonLaneAdapter) GetFQAddress(ds datastore.DataStore, chainSelector u
 }
 
 // GetRouterAddress implements lanes.LaneAdapter.
+// Shared lane changesets (e.g. chainlink-ccip lanes.ConnectChains) always populate a "router" field from
+// the datastore. Canton does not deploy the EVM Router (1.2.0); routing uses PerPartyRouterFactory instead.
 func (c *CantonLaneAdapter) GetRouterAddress(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
 	return datastore_utils.FindAndFormatRef(ds, datastore.AddressRef{
 		ChainSelector: chainSelector,
-		Type:          datastore.ContractType(router.ContractType),
-		Version:       router.Version,
+		Type:          datastore.ContractType(ppfactory.ContractType),
+		Version:       ppfactory.Version,
 	}, chainSelector, cantonInstanceAddressBytes)
+}
+
+// GetTestRouter satisfies lanes.TestRouterProvider on the embedded EVM adapter; Canton has no EVM test router ref.
+func (c *CantonLaneAdapter) GetTestRouter(ds datastore.DataStore, chainSelector uint64) ([]byte, error) {
+	return c.GetRouterAddress(ds, chainSelector)
 }
