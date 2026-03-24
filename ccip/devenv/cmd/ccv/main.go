@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-canton/deployment/adapters"
-	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
@@ -29,8 +28,9 @@ func init() {
 	chainconfig.RegisterChainConfigLoader(chain_selectors.FamilyCanton, cantondevenv.CommitteeVerifierConfigLoader)
 	// Register the canton impl factory for the canton family.
 	ccv.RegisterImplFactory(chain_selectors.FamilyCanton, cantondevenv.NewImplFactory())
-	// Register the canton chain family adapter for the canton family.
-	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chain_selectors.FamilyCanton, semver.MustParse("2.0.0"), adapters.ChainFamilyAdapter{})
+
+	// The other Canton adapters are registered via the init function in the adapters package
+
 	// Register the canton token adapter for the canton family.
 	for _, version := range tokenPoolVersions {
 		tokenscore.GetTokenAdapterRegistry().RegisterTokenAdapter(chain_selectors.FamilyCanton, semver.MustParse(version), adapters.CantonTokenAdapter{})
