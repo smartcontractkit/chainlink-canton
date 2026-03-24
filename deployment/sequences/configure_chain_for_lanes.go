@@ -68,7 +68,7 @@ type ConfigureChainForLanesInput struct {
 
 var ConfigureChainForLanes = operations.NewSequence(
 	"canton/ccip/configure_chain_for_lanes",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a Canton chain as a source & destination for multiple remote chains",
 	// TODO change deps to cldf_chain.BlockChains once clients are added
 	func(b operations.Bundle, deps dependencies.CantonDeps, input ConfigureChainForLanesInput) (sequences.OnChainOutput, error) {

@@ -35,7 +35,7 @@ type ConfigureCommitteeVerifierForLanesInput struct {
 
 var ConfigureCommitteeVerifierForLanes = operations.NewSequence(
 	"canton/ccip/configure_committee_verifier_for_lanes",
-	semver.MustParse("1.7.0"),
+	semver.MustParse("2.0.0"),
 	"Configures a Canton CommitteeVerifier contract for multiple remote chains",
 	func(b operations.Bundle, deps dependencies.CantonDeps, input ConfigureCommitteeVerifierForLanesInput) (output sequences.OnChainOutput, err error) {
 		remoteChainConfigArgs := make([]ccvs.RemoteChainConfigArgs, 0, len(input.RemoteChains))

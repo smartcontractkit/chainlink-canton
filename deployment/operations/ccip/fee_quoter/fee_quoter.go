@@ -15,7 +15,8 @@ import (
 
 var ContractType = deployment.ContractType("FeeQuoter")
 
-var Version = semver.MustParse("0.1.0")
+// 2.0.0 matches chainlink-ccip v2_0_0 operations and CantonLaneAdapter datastore lookups (was 0.1.0).
+var Version = semver.MustParse("2.0.0")
 
 var Deploy = contract.NewDeploy(contract.DeployParams[feequoter.FeeQuoter]{
 	Name:           "canton/ccip/fee_quoter/deploy",
