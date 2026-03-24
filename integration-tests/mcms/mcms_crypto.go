@@ -635,15 +635,10 @@ func TextToHex(s string) string {
 }
 
 // EncodeMinDelay encodes a delay value (in seconds) for UpdateMinDelay operationData.
-// Daml's parseInt expects a decimal string, but BytesHex requires valid hex (even length).
-// This pads the number with a leading zero if needed: 1 → "01", 120 → "0120"
+// Uses 8-byte big-endian encoding (16 hex chars)
+// Example: 120 → "0000000000000078"
 func EncodeMinDelay(seconds int) string {
-	s := fmt.Sprintf("%d", seconds)
-	if len(s)%2 != 0 {
-		s = "0" + s
-	}
-
-	return s
+	return fmt.Sprintf("%016x", seconds)
 }
 
 // ===========================================================================

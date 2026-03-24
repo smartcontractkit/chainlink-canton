@@ -79,6 +79,7 @@ template CCIPFactory
 
             case functionName of
               "SetOwnerToMCMS" -> do
+                assertMsg "E_TRAILING_BYTES: SetOwnerToMCMS" (0 == byteCount operationData)
                 newCid <- exercise selfCid SetOwnerToMCMS
                 let newAddress = instanceId <> "@" <> partyToText mcmsParty
                 pure (Map.insert newAddress (coerceContractId newCid) (Map.delete selfAddress contractIds))
