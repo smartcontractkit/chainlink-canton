@@ -1,7 +1,7 @@
 name: Build and publish Docker images
 on:
   push:
-    branches: [ main ]
+    branches: [ main , mk/bump-ccv-version ]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
