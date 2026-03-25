@@ -57,8 +57,8 @@ var ConfigureLaneLegAsSource = operations.NewSequence(
 			}
 			laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, outboundCCV.Binding())
 		}
-		defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
-		for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
+		defaultOutboundCCVs := make([]mcms.RawInstanceAddress, 0, len(sourceChain.DefaultOutboundCCVs))
+		for _, ccv := range sourceChain.DefaultOutboundCCVs {
 			outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
 			if err != nil {
 				return sequences.OnChainOutput{}, fmt.Errorf("getting lane mandated outbound CCV: %w", err)

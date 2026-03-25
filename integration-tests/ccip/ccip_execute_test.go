@@ -447,7 +447,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				},
 			},
 			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifier},
-			DefaultOutboundCCVs:     nil,
+			DefaultInboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfig,
 			},

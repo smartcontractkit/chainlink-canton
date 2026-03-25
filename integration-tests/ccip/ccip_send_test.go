@@ -201,7 +201,7 @@ func TestCCIPSend(t *testing.T) {
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
 	require.Truef(t, ok, "failed to get Canton Lane adapter")
-	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsDest(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
+	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, cantonAdapter.ConfigureLaneLegAsSource(), cldfEnv.BlockChains, lanes.UpdateLanesInput{
 		Source: &lanes.ChainDefinition{
 			Selector: env.Chain.ChainSelector(),
 			CommitteeVerifiers: []lanes.CommitteeVerifierConfig[datastore.AddressRef]{
@@ -223,8 +223,8 @@ func TestCCIPSend(t *testing.T) {
 					},
 				},
 			},
-			LaneMandatedInboundCCVs: []datastore.AddressRef{committeeVerifier},
-			DefaultOutboundCCVs:     []datastore.AddressRef{committeeVerifier},
+			LaneMandatedOutboundCCVs: []datastore.AddressRef{committeeVerifier},
+			DefaultOutboundCCVs:      nil,
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfig,
 			},
@@ -234,9 +234,10 @@ func TestCCIPSend(t *testing.T) {
 			OffRamp:         contracts.HexToInstanceAddress(offRamp.Address).Bytes(),
 		},
 		Dest: &lanes.ChainDefinition{
-			Selector: remoteSelector,
-			OnRamp:   hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp:  hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+			Selector:           remoteSelector,
+			AddressBytesLength: 20,
+			OnRamp:             hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+			OffRamp:            hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
 		},
 		IsDisabled:   false,
 		TestRouter:   false,
