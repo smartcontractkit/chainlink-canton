@@ -63,7 +63,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
@@ -315,14 +314,17 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 
 	// Setup Amulet token as fee token
 	// Get registry admin for Amulet tokens
-	registryAdmin, err := testhelpers.GetRegistryAdmin(ctx, tokenMetadataClient)
+	registryInfoResponse, err := tokenMetadataClient.GetRegistryInfoWithResponse(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get registry admin: %w", err)
+		return nil, fmt.Errorf("error getting registry info: %w", err)
+	}
+	if registryInfoResponse.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code from tokenMetadataClient: %d: %v", registryInfoResponse.StatusCode(), registryInfoResponse.Body)
 	}
 
 	// Native is Amulet
 	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
-		Admin: types.PARTY(registryAdmin),
+		Admin: types.PARTY(registryInfoResponse.JSON200.AdminId),
 		Id:    types.TEXT("Amulet"),
 	}
 
