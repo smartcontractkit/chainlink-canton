@@ -436,6 +436,11 @@ func (c *sourceReader) LatestAndFinalizedBlock(ctx context.Context) (latest, fin
 		}, nil
 }
 
+func (c *sourceReader) LatestSafeBlock(ctx context.Context) (safe *protocol.BlockHeader, err error) {
+	//nolint:nilnil // Returns nil without an error when the chain does not support the safe tag.
+	return nil, nil
+}
+
 func intToBytes32(i uint64) protocol.Bytes32 {
 	var b protocol.Bytes32
 	binary.BigEndian.PutUint64(b[:], i)
