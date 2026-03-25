@@ -449,6 +449,7 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	// }
 
 	env.DataStore = runningDS.Seal()
+	c.e = env
 
 	return runningDS.Seal(), nil
 }
