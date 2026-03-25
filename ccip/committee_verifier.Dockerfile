@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.25.5-alpine AS builder
+FROM golang:1.25-alpine AS builder
 WORKDIR /build
 
 # Copy module files first to maximize cache reuse (deps layer invalidated only when go.mod/go.sum change)
