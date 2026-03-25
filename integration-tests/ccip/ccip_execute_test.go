@@ -12,11 +12,13 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/http"
 	"os"
 	"strconv"
 	"testing"
@@ -28,6 +30,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -45,6 +48,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
@@ -61,6 +65,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
 	"github.com/smartcontractkit/chainlink-canton/integration-tests/testhelpers"
 	edsv1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 
 	// Import to register adapters
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
@@ -264,7 +269,33 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
 	versionTag := "49ff34ed"
-	ccvQualifier := "default"
+	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
+
+	// Create Scan and Registry API clients
+	// Using the scanProxy endpoint of the 0-th participant, all participants are able to forward requests using the BFT Scan Proxy, it doesn't matter which one we use
+	tokenSource := ccipParticipant.TokenSource
+	interceptor := func(ctx context.Context, req *http.Request) error {
+		token, err := tokenSource.Token()
+		if err != nil {
+			return fmt.Errorf("failed to retrieve token: %w", err)
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+		return nil
+	}
+	tokenMetadataClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL), tokenMetadataV1.WithRequestEditorFn(interceptor))
+	require.NoError(t, err, "Failed to create token metadata client")
+
+	// Setup Amulet token as fee token
+	// Get registry admin for Amulet tokens
+	registryAdmin, err := testhelpers.GetRegistryAdmin(t.Context(), tokenMetadataClient)
+	require.NoError(t, err, "failed to get registry admin")
+
+	// Native is Amulet
+	nativeInstrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(registryAdmin),
+		Id:    types.TEXT("Amulet"),
+	}
 
 	reporter := cld_ops.NewMemoryReporter()
 	bundle := cld_ops.NewBundle(
@@ -315,6 +346,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						CursedSubjects: nil,
 					},
 				},
+				NativeInstrumentId: nativeInstrumentId,
 			},
 		},
 	})

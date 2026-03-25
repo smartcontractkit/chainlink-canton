@@ -449,14 +449,13 @@ func (c *Chain) DeployContractsForSelector(ctx context.Context, env *deployment.
 	// }
 
 	env.DataStore = runningDS.Seal()
-	c.e = env
 
 	return runningDS.Seal(), nil
 }
 
-func (c *Chain) GetConnectionProfile(selector uint64) (lanes.ChainDefinition, changesets.CommitteeVerifierRemoteChainConfig, error) {
+func (c *Chain) GetConnectionProfile(env *deployment.Environment, selector uint64) (lanes.ChainDefinition, changesets.CommitteeVerifierRemoteChainConfig, error) {
 	// TODO this is currently not populated by populateAddressesV2
-	globalConfig, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
+	globalConfig, err := env.DataStore.Addresses().Get(datastore.NewAddressRefKey(selector, datastore.ContractType(global_config.ContractType), global_config.Version, ""))
 	if err != nil {
 		return lanes.ChainDefinition{}, changesets.CommitteeVerifierRemoteChainConfig{}, fmt.Errorf("failed to get GlobalConfig address for chain %d: %w", selector, err)
 	}
@@ -489,6 +488,7 @@ func (c *Chain) GetConnectionProfile(selector uint64) (lanes.ChainDefinition, ch
 				Qualifier:     devenvcommon.DefaultCommitteeVerifierQualifier,
 			},
 		},
+		BaseExecutionGasCost: 1,
 		CantonLaneConfig: &lanes.CantonLaneConfig{
 			GlobalConfig: globalConfig,
 		},
