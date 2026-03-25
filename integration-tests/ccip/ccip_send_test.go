@@ -15,6 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
+
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -31,13 +34,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	ccipclient "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/interfaces"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/perpartyrouter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/rmn"
 	mcmsbindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -52,6 +56,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 
 	// Import to register adapters
+	_ "github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment/v1_7_0/adapters"
+
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
@@ -112,7 +118,7 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
 	versionTag := "49ff34ed"
-	ccvQualifier := "default"
+	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -148,6 +154,21 @@ func TestCCIPSend(t *testing.T) {
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
 							PendingStorageLocationsAdmin: types.PARTY(partyCCIP),
 							Deps:                         ccvs.CommitteeVerifierDeps{}, // Set by sequence
+						},
+					},
+				},
+				Executors: []sequences.ExecutorParams{
+					{
+						Qualifier: devenvcommon.DefaultExecutorQualifier,
+						Template: executorBinding.Executor{
+							Owner:         types.PARTY(partyCCIP),
+							MaxCCVsPerMsg: 10,
+							DynamicConfig: executorBinding.DynamicConfig{
+								FeeAggregator:         nil,
+								MinBlockConfirmations: 0,
+								CcvAllowlistEnabled:   false,
+							},
+							AllowedCCVs: nil,
 						},
 					},
 				},
@@ -197,6 +218,8 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to get CommitteeVerifier address")
 	committeeVerifierRawAddr, err := contracts.RawInstanceAddressFromString(committeeVerifier.Labels.List()[0])
 	require.NoError(t, err, "failed to parse CommitteeVerifier raw address")
+	executorAddress, err := cldfEnv.DataStore.Addresses().Get(datastore.NewAddressRefKey(env.Chain.ChainSelector(), datastore.ContractType(executor.ContractType), executor.Version, devenvcommon.DefaultExecutorQualifier))
+	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
 	cantonAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"))
@@ -228,16 +251,22 @@ func TestCCIPSend(t *testing.T) {
 			CantonLaneConfig: &lanes.CantonLaneConfig{
 				GlobalConfig: globalConfig,
 			},
-			DefaultExecutor: feeQuoter, // TODO - deploy Executor beforehand
+			DefaultExecutor: executorAddress,
 			FeeQuoter:       contracts.HexToInstanceAddress(feeQuoter.Address).Bytes(),
 			OnRamp:          contracts.HexToInstanceAddress(onRamp.Address).Bytes(),
 			OffRamp:         contracts.HexToInstanceAddress(offRamp.Address).Bytes(),
 		},
 		Dest: &lanes.ChainDefinition{
-			Selector:           remoteSelector,
-			AddressBytesLength: 20,
-			OnRamp:             hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
-			OffRamp:            hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+			Selector:                 remoteSelector,
+			AddressBytesLength:       20,
+			FeeQuoterDestChainConfig: lanes.DefaultFeeQuoterDestChainConfig(true, remoteSelector),
+			ExecutorDestChainConfig: lanes.ExecutorDestChainConfig{
+				USDCentsFee: 50,
+				Enabled:     true,
+			},
+			OnRamp:  hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"),
+			OffRamp: hexutil.MustDecode("0xd8c9ec8cad3fb34aeca3ddbebfabe9f28a9bfaed"),
+			Router:  hexutil.MustDecode("0xe3ddcb2fde5d27a33c450fddc54a3f9bb2ecaa9f"),
 		},
 		IsDisabled:   false,
 		TestRouter:   false,
@@ -368,46 +397,6 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to update prices")
 	t.Logf("Updated FeeToken price to $%s per token", usdPerToken)
 
-	// Apply FeeQuoter dest chain config (needed by OnRamp.FinalizeFeeFromRouter)
-	disclosedFeeQuoterForConfig, err = testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter",
-	})
-	require.NoError(t, err)
-	_, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-feequoter", ModuleName: "CCIP.FeeQuoter", EntityName: "FeeQuoter"},
-					ContractId: disclosedFeeQuoterForConfig.ContractId,
-					Choice:     "ApplyDestChainConfigUpdates",
-					ChoiceArgument: ledger.MapToValue(feequoter.ApplyDestChainConfigUpdates2{
-						DestChainConfigArgs: []feequoter.DestChainConfigArgs2{
-							{
-								DestChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-								DestChainConfig: feequoter.DestChainConfig2{
-									IsEnabled:                   true,
-									MaxDataBytes:                50000,
-									MaxPerMsgGasLimit:           4000000,
-									DestGasOverhead:             300000,
-									DestGasPerPayloadByteBase:   16,
-									DefaultTxGasLimit:           200000,
-									LinkFeeMultiplierPercent:    types.NUMERIC("90"),
-									DefaultTokenFeeUSD:          types.NUMERIC("10"),
-									DefaultTokenDestGasOverhead: 34000,
-								},
-							},
-						},
-					}),
-				}},
-			}},
-			ActAs:              []string{partyCCIP},
-			DisclosedContracts: []*apiv2.DisclosedContract{disclosedFeeQuoterForConfig},
-		},
-	})
-	require.NoError(t, err, "failed to apply FeeQuoter dest chain config")
-	t.Log("Applied FeeQuoter dest chain config")
-
 	// Create PerPartyRouter for sender
 	disclosedFactory, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), ccipParticipant, &apiv2.Identifier{
 		PackageId: "#ccip-perpartyrouter", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
@@ -469,42 +458,6 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 	ccipSenderCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPSender: %s", ccipSenderCid)
-
-	// Deploy Executor with dest chain fee config
-	res, err = ccipParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.Must(uuid.NewUUID()).String(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-executor", ModuleName: "CCIP.Executor", EntityName: "Executor"},
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-executor"}}},
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyCCIP}}},
-						{Label: "maxCCVsPerMsg", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 10}}},
-						{Label: "dynamicConfig", Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-							{Label: "feeAggregator", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}},
-							{Label: "minBlockConfirmations", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-							{Label: "ccvAllowlistEnabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: false}}},
-						}}}}},
-						{Label: "allowedCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-						{Label: "remoteChainConfigs", Value: &apiv2.Value{Sum: &apiv2.Value_GenMap{GenMap: &apiv2.GenMap{Entries: []*apiv2.GenMap_Entry{
-							{
-								Key: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: strconv.FormatUint(remoteSelector, 10)}},
-								Value: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-									{Label: "feeUSDCents", Value: &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: "0"}}},
-									{Label: "enabled", Value: &apiv2.Value{Sum: &apiv2.Value_Bool{Bool: true}}},
-								}}}},
-							},
-						}}}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyCCIP},
-		},
-	})
-	require.NoError(t, err)
-	executorCid := extractCreatedContractId(res)
-	t.Logf("Deployed Executor: %s", executorCid)
 
 	// Get disclosures for CCIPSender.Send
 	disclosedCCIPSender, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
@@ -656,6 +609,7 @@ func TestCCIPSend(t *testing.T) {
 	tarCid := types.CONTRACT_ID(disclosedTar.ContractId)
 	feeQuoterCid := types.CONTRACT_ID(disclosedFeeQuoter.ContractId)
 	rmnRemoteCid := types.CONTRACT_ID(disclosedRmnRemote.ContractId)
+	executorCid := types.CONTRACT_ID(disclosedExecutor.ContractId)
 	sendContext := common.CCIPContext{
 		Values: types.TEXTMAP{
 			"on-ramp":              common.AnyValue{AVContractId: &onRampCid},
@@ -686,7 +640,7 @@ func TestCCIPSend(t *testing.T) {
 						{Unpack: types.TEXT(committeeVerifierRawAddr.String())},
 					},
 					Executor: &ccipclient.ExecutorInput{
-						ExecutorCid:  types.CONTRACT_ID(executorCid),
+						ExecutorCid:  executorCid,
 						ExecutorArgs: types.TEXT(""),
 					},
 					TokenReceiver: types.TEXT(""),

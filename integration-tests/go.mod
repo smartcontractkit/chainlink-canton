@@ -16,7 +16,9 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smartcontractkit/chain-selectors v1.0.97
 	github.com/smartcontractkit/chainlink-canton v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm/deployment v0.0.0-20260323224438-d819cb3228e1
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260323224438-d819cb3228e1
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.0-20260325170514-2fd7d2cb9758
 	github.com/smartcontractkit/chainlink-common v0.10.1-0.20260319222221-2bac99c7a470
 	github.com/smartcontractkit/chainlink-deployments-framework v0.89.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
@@ -167,8 +169,6 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/oapi-codegen/runtime v1.3.0 // indirect
 	github.com/oklog/run v1.2.0 // indirect
-	github.com/onsi/ginkgo/v2 v2.23.3 // indirect
-	github.com/onsi/gomega v1.37.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
@@ -190,11 +190,16 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sigurn/crc16 v0.0.0-20211026045750-20ab5afb07e3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
+	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260306142855-8d629e752265 // indirect
 	github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260323224438-d819cb3228e1 // indirect
+	github.com/smartcontractkit/chainlink-ccip/ccv/chains/evm v0.0.0-20260323224438-d819cb3228e1 // indirect
+	github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment v0.0.0-20260323224438-d819cb3228e1 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
+	github.com/smartcontractkit/chainlink-ccv v0.0.0-20260325170514-2fd7d2cb9758 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
+	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260126170652-c5f27bb1804e // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260119171452-39c98c3b33cd // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260226130359-963f935e0396 // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.18.0 // indirect

@@ -10,8 +10,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/ccvs"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/common"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/feequoter"
 	offrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/offramp"
 	onrampBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/ccip/onramp"
@@ -40,6 +43,11 @@ type CommitteeVerifierParams struct {
 	Template  ccvs.CommitteeVerifier
 }
 
+type ExecutorParams struct {
+	Qualifier string
+	Template  executorBinding.Executor
+}
+
 type RMNRemoteParams struct {
 	Template rmn.RMNRemote
 }
@@ -55,6 +63,7 @@ type FeeQuoterParams struct {
 type DeployChainContractsParams struct {
 	CCIPOwnerParty     string
 	CommitteeVerifiers []CommitteeVerifierParams
+	Executors          []ExecutorParams
 	GlobalConfig       GlobalConfigParams
 	RMNRemote          RMNRemoteParams
 	FeeQuoterConfig    FeeQuoterParams
@@ -237,6 +246,19 @@ var DeployChainContracts = operations.NewSequence(
 				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy CommitteeVerifier #%v: %w", i, err)
 			}
 			addresses = append(addresses, deployCommitteeVerifierReport.Output)
+		}
+
+		// Deploy Executors
+		for i, params := range input.Executors {
+			deployExecutorReport, err := operations.ExecuteOperation(b, executor.Deploy, deps, contract.DeployInput[executorBinding.Executor]{
+				Template:   params.Template,
+				OwnerParty: params.Template.Owner,
+				Qualifier:  &params.Qualifier,
+			})
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy Executor #%v: %w", i, err)
+			}
+			addresses = append(addresses, deployExecutorReport.Output)
 		}
 
 		return sequences.OnChainOutput{

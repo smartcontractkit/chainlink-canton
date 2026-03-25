@@ -59,6 +59,9 @@ func NewDeploy[TT common.Template](params DeployParams[TT]) *operations.Operatio
 					return datastore.AddressRef{}, fmt.Errorf("validate input: %w", err)
 				}
 			}
+			if input.OwnerParty == "" {
+				return datastore.AddressRef{}, fmt.Errorf("owner party must not be empty")
+			}
 
 			participant := deps.Participants[0]
 
